@@ -134,7 +134,7 @@ class AsyncGzipBinaryFile:
 
         self._file = None
         self._engine = None  # type: ignore
-        self._buffer: bytes = b""
+        self._buffer = bytearray()  # Use bytearray for efficient buffer growth
         self._is_closed: bool = False
         self._eof: bool = False
 
@@ -211,21 +211,24 @@ class AsyncGzipBinaryFile:
 
         # If size is -1, read all data in chunks to avoid memory issues
         if size == -1:
-            chunks = []
+            # Return buffered data + read remaining (no recursion)
+            chunks = [bytes(self._buffer)] if self._buffer else []
+            self._buffer = bytearray()
+
             while not self._eof:
-                # Read in reasonable chunks to control memory usage
-                chunk = await self.read(64 * 1024)  # 64KB chunks
-                if not chunk:
-                    break
-                chunks.append(chunk)
+                await self._fill_buffer()
+                if self._buffer:
+                    chunks.append(bytes(self._buffer))
+                    self._buffer = bytearray()
+
             return b"".join(chunks)
         else:
             # Otherwise, read until the buffer has enough data to satisfy the request.
             while len(self._buffer) < size and not self._eof:
                 await self._fill_buffer()
 
-            data_to_return = self._buffer[:size]
-            self._buffer = self._buffer[size:]
+            data_to_return = bytes(self._buffer[:size])
+            del self._buffer[:size]  # More efficient than slicing for bytearray
 
         return data_to_return
 
@@ -240,14 +243,14 @@ class AsyncGzipBinaryFile:
                 self._eof = True  # pyrefly: ignore
                 # Decompressor might have leftover data
                 try:
-                    self._buffer += self._engine.flush()  # type: ignore
+                    self._buffer.extend(self._engine.flush())  # type: ignore
                 except zlib.error as e:
                     raise OSError(f"Error finalizing gzip decompression: {e}") from e
                 return
 
             try:
                 decompressed = self._engine.decompress(compressed_chunk)  # type: ignore
-                self._buffer += decompressed
+                self._buffer.extend(decompressed)  # More efficient than +=
             except zlib.error as e:
                 raise OSError(f"Error decompressing gzip data: {e}") from e
         except OSError:
@@ -357,6 +360,28 @@ class AsyncGzipTextFile:
         self._text_data: str = (
             ""  # Buffer for decoded text data that hasn't been returned yet
         )
+        self._line_buffer: str = ""  # Initialize line buffer here for efficiency
+        self._max_incomplete_bytes = self._determine_max_incomplete_bytes()
+
+    def _determine_max_incomplete_bytes(self) -> int:
+        """
+        Determine the maximum number of bytes an incomplete character sequence
+        can have for the current encoding. This is calculated once at init time
+        for efficiency.
+
+        Returns:
+            Maximum bytes to check for incomplete sequences at buffer boundaries
+        """
+        encoding_lower = self._encoding.lower().replace("-", "").replace("_", "")
+        if encoding_lower in ("utf8", "utf8"):
+            return 4  # UTF-8: max 4 bytes per character
+        elif encoding_lower.startswith("utf16") or encoding_lower.startswith("utf32"):
+            return 4  # UTF-16/32: max 4 bytes
+        elif encoding_lower in ("ascii", "latin1", "iso88591"):
+            return 1  # Single-byte encodings
+        else:
+            # For unknown encodings, use a safe fallback
+            return 8
 
     async def __aenter__(self):
         """Enter the async context manager and initialize resources."""
@@ -421,18 +446,16 @@ class AsyncGzipTextFile:
             raise ValueError("File not opened. Use async context manager.")
 
         if size == -1:
-            # Read all remaining data
-            if self._text_data:
-                # Return any buffered text data first
-                result = self._text_data
-                self._text_data = ""  # pyrefly: ignore
-                return result
-
+            # Read all remaining data (including any buffered text)
             raw_data: bytes = await self._binary_file.read(-1)
             # Combine with any pending bytes
             all_data = self._pending_bytes + raw_data
             self._pending_bytes = b""  # pyrefly: ignore
-            return self._safe_decode(all_data)
+            decoded = self._safe_decode(all_data)
+            # Combine buffered text with newly decoded data
+            result = self._text_data + decoded
+            self._text_data = ""  # pyrefly: ignore
+            return result
         else:
             # Check if we have enough data in our text buffer
             if len(self._text_data) >= size:
@@ -442,8 +465,10 @@ class AsyncGzipTextFile:
 
             # Read more data if needed
             while len(self._text_data) < size and not self._binary_file._eof:
-                # Read a chunk of bytes
-                chunk_size = max(1024, size - len(self._text_data))
+                # Read a chunk of bytes (estimate bytes needed, UTF-8 can be up to 4 bytes per char)
+                chars_needed = size - len(self._text_data)
+                bytes_estimate = chars_needed * 4
+                chunk_size = max(4096, min(bytes_estimate, 64 * 1024))
                 raw_chunk: bytes = await self._binary_file.read(chunk_size)
 
                 if not raw_chunk:
@@ -483,7 +508,7 @@ class AsyncGzipTextFile:
 
     def _safe_decode_with_remainder(self, data: bytes) -> tuple[str, bytes]:
         """
-        Safely decode bytes to string, handling multi-byte UTF-8 characters
+        Safely decode bytes to string, handling multi-byte characters
         that might be split across buffer boundaries. Returns both the decoded
         string and any remaining bytes that couldn't be decoded.
         """
@@ -494,22 +519,23 @@ class AsyncGzipTextFile:
             return data.decode(self._encoding), b""
         except UnicodeDecodeError:
             # Handle incomplete multi-byte sequences at the end
-            # Try to decode as much as possible by working backwards
-            for i in range(len(data), 0, -1):
+            # Use the pre-calculated max incomplete bytes for this encoding
+            # This optimization changes O(n²) worst case to O(1) for common encodings
+            max_check = min(self._max_incomplete_bytes, len(data))
+
+            for i in range(1, max_check + 1):
                 try:
-                    decoded = data[:i].decode(self._encoding)
-                    remaining = data[i:]
+                    decoded = data[:-i].decode(self._encoding)
+                    remaining = data[-i:]
                     return decoded, remaining
                 except UnicodeDecodeError:
                     continue
 
-            # If all else fails, use error replacement
+            # If we still can't decode, use error replacement
             return data.decode(self._encoding, errors="replace"), b""
 
     def __aiter__(self):
         """Make AsyncGzipTextFile iterable for line-by-line reading."""
-        # Initialize line buffer for iteration
-        self._line_buffer = ""
         return self
 
     async def __anext__(self):

@@ -66,7 +66,7 @@ async def main():
         print(content)
 
     # Iterate over lines in a text file
-    async with AsyncGgipFile("file.txt.gz", "rt") as f:
+    async with AsyncGzipFile("file.txt.gz", "rt") as f:
         async for line in f:
             print(line.strip())
 
@@ -81,11 +81,22 @@ asyncio.run(main())
 
 According to the benchmarks, `aiogzip` is:
 
-- **4.2x faster** for general text file operations.
+- **4.3x faster** for general text file operations.
 - **1.6x faster** when processing structured text like JSONL files.
-- **1.3x slower** for binary file operations using 1KB chunk sizes.
+- **1.1x slower** for binary file operations using 1KB chunk sizes.
 
 The key is to match the tool to the task. Use `aiogzip` where its async and text-handling capabilities provide the most significant advantage.
+
+### Async and Concurrent Processing Benefits
+
+`aiogzip` excels in scenarios where you need to process multiple files concurrently or integrate with other async libraries:
+
+- **Concurrent file processing**: Process multiple `.gz` files simultaneously without blocking
+- **Async pipeline integration**: Seamlessly works with `aiocsv`, `aiohttp`, and other async libraries
+- **Non-blocking I/O**: Allows your application to handle other tasks while file operations are in progress
+- **Better resource utilization**: More efficient use of system resources in I/O-bound applications
+
+**Note**: The benefits of async are most visible when there's actual I/O latency (network storage, remote APIs, etc.) or when mixing file operations with other async tasks. For purely local file processing on SSDs, the async overhead may exceed the benefits due to minimal I/O wait times.
 
 ### When to Use `aiogzip`
 
@@ -93,14 +104,14 @@ The key is to match the tool to the task. Use `aiogzip` where its async and text
 
 - Async applications processing text, CSV, or JSONL files.
 - Streaming text-based data pipelines.
-- Applications where async integration is more critical than raw binary I/O speed.
+- Applications where async integration and concurrent file processing are more important than raw binary I/O speed.
 
 ### When to Use Standard `gzip`
 
 ❌ **Consider standard `gzip` for:**
 
 - Purely synchronous applications.
-- Applications that are highly memory-constrained, as `aiogzip` can use more memory during decompression of highly compressible data.
+- Applications that are highly memory-constrained, as `aiogzip` may use more memory during decompression of highly compressible data due to internal buffering.
 - Workloads dominated by binary file I/O where maximum performance is essential.
 
 ---
@@ -117,22 +128,27 @@ The key is to match the tool to the task. Use `aiogzip` where its async and text
 
 This project uses `setuptools` for packaging.
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/geoff-davis/aiogzip.git
-    cd aiogzip
-    ```
-2.  **Create a virtual environment and install dependencies**:
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate
-    pip install -e .[csv]  # Install in editable mode with extras
-    pip install pytest pytest-asyncio psutil # Install dev dependencies
-    ```
-3.  **Run tests**:
-    ```bash
-    pytest
-    ```
+1. **Clone the repository**:
+
+   ```bash
+   git clone https://github.com/geoff-davis/aiogzip.git
+   cd aiogzip
+   ```
+
+2. **Create a virtual environment and install dependencies**:
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -e .[csv]  # Install in editable mode with extras
+   pip install pytest pytest-asyncio psutil # Install dev dependencies
+   ```
+
+3. **Run tests**:
+
+   ```bash
+   pytest
+   ```
 
 ## License
 

@@ -171,15 +171,15 @@ class ConsolidatedBenchmarkSuite:
             "gzip_read_time": gzip_read_time,
             "aiogzip_total_time": aiogzip_write_time + aiogzip_read_time,
             "gzip_total_time": gzip_write_time + gzip_read_time,
-            "aiogzip_vs_gzip_ratio": (aiogzip_write_time + aiogzip_read_time)
-            / (gzip_write_time + gzip_read_time),
+            "aiogzip_vs_gzip_ratio": (gzip_write_time + gzip_read_time)
+            / (aiogzip_write_time + aiogzip_read_time),
         }
 
         print(
             f"aiogzip write: {aiogzip_write_time:.3f}s, read: {aiogzip_read_time:.3f}s"
         )
         print(f"gzip write: {gzip_write_time:.3f}s, read: {gzip_read_time:.3f}s")
-        print(f"aiogzip vs gzip ratio: {results['aiogzip_vs_gzip_ratio']:.2f}x")
+        print(f"aiogzip speedup: {results['aiogzip_vs_gzip_ratio']:.2f}x")
 
         return results
 
@@ -250,8 +250,8 @@ class ConsolidatedBenchmarkSuite:
             "gzip_read_time": gzip_read_time,
             "aiogzip_total_time": aiogzip_write_time + aiogzip_read_time,
             "gzip_total_time": gzip_write_time + gzip_read_time,
-            "aiogzip_vs_gzip_ratio": (aiogzip_write_time + aiogzip_read_time)
-            / (gzip_write_time + gzip_read_time),
+            "aiogzip_vs_gzip_ratio": (gzip_write_time + gzip_read_time)
+            / (aiogzip_write_time + aiogzip_read_time),
             "chunk_size": chunk_size,
         }
 
@@ -259,7 +259,7 @@ class ConsolidatedBenchmarkSuite:
             f"aiogzip write: {aiogzip_write_time:.3f}s, read: {aiogzip_read_time:.3f}s"
         )
         print(f"gzip write: {gzip_write_time:.3f}s, read: {gzip_read_time:.3f}s")
-        print(f"aiogzip vs gzip ratio: {results['aiogzip_vs_gzip_ratio']:.2f}x")
+        print(f"aiogzip speedup: {results['aiogzip_vs_gzip_ratio']:.2f}x")
         print(f"Chunk size: {chunk_size} bytes")
 
         return results
@@ -315,15 +315,15 @@ class ConsolidatedBenchmarkSuite:
             "gzip_read_time": gzip_read_time,
             "aiogzip_total_time": aiogzip_write_time + aiogzip_read_time,
             "gzip_total_time": gzip_write_time + gzip_read_time,
-            "aiogzip_vs_gzip_ratio": (aiogzip_write_time + aiogzip_read_time)
-            / (gzip_write_time + gzip_read_time),
+            "aiogzip_vs_gzip_ratio": (gzip_write_time + gzip_read_time)
+            / (aiogzip_write_time + aiogzip_read_time),
         }
 
         print(
             f"aiogzip write: {aiogzip_write_time:.3f}s, read: {aiogzip_read_time:.3f}s"
         )
         print(f"gzip write: {gzip_write_time:.3f}s, read: {gzip_read_time:.3f}s")
-        print(f"aiogzip vs gzip ratio: {results['aiogzip_vs_gzip_ratio']:.2f}x")
+        print(f"aiogzip speedup: {results['aiogzip_vs_gzip_ratio']:.2f}x")
 
         return results
 
@@ -405,13 +405,17 @@ class ConsolidatedBenchmarkSuite:
         Measures: Performance advantages of async I/O in concurrent scenarios
 
         What it tests:
-        - Parallel file processing capabilities
+        - Parallel file processing capabilities with many files
         - Async I/O benefits over synchronous operations
         - Scalability with multiple concurrent operations
+
+        Note: Async benefits are most visible with many files (50+) or when
+        there's real I/O latency (network storage, etc.). With local SSDs and
+        few files, the async overhead may dominate.
         """
         print("\n=== Concurrent Processing Benchmark ===")
 
-        num_files = 5
+        num_files = 50  # Increased from 5 to better show async benefits
         file_size = self.data_size_bytes // num_files
 
         # Create test files
@@ -470,9 +474,11 @@ class ConsolidatedBenchmarkSuite:
             "files_processed": num_files,
         }
 
-        print(f"Async processing: {async_time:.3f}s")
-        print(f"Sync processing: {sync_time:.3f}s")
+        print(f"Async processing: {async_time:.3f}s ({num_files} files)")
+        print(f"Sync processing: {sync_time:.3f}s ({num_files} files)")
         print(f"Speedup: {results['speedup']:.2f}x")
+        print(f"Note: Local SSD benchmarks may not show async benefits.")
+        print(f"      Async excels with network I/O or mixed workloads.")
 
         return results
 
@@ -524,7 +530,7 @@ class ConsolidatedBenchmarkSuite:
         results = {
             "aiogzip_time": aiogzip_time,
             "gzip_time": gzip_time,
-            "aiogzip_vs_gzip_ratio": aiogzip_time / gzip_time,
+            "aiogzip_vs_gzip_ratio": gzip_time / aiogzip_time,
             "records_processed": records_processed,
             "records_per_second_aiogzip": (
                 records_processed / aiogzip_time if aiogzip_time > 0 else 0
@@ -536,7 +542,7 @@ class ConsolidatedBenchmarkSuite:
 
         print(f"aiogzip: {aiogzip_time:.3f}s, {records_processed} records")
         print(f"gzip: {gzip_time:.3f}s, {records_processed_gzip} records")
-        print(f"aiogzip vs gzip ratio: {results['aiogzip_vs_gzip_ratio']:.2f}x")
+        print(f"aiogzip speedup: {results['aiogzip_vs_gzip_ratio']:.2f}x")
 
         return results
 
@@ -718,25 +724,33 @@ class ConsolidatedBenchmarkSuite:
         if "basic_binary" in self.results:
             binary_ratio = self.results["basic_binary"]["aiogzip_vs_gzip_ratio"]
             print(
-                f"Binary Operations (10-byte chunks): aiogzip is {binary_ratio:.2f}x {'slower' if binary_ratio > 1 else 'faster'} than gzip"
+                f"Binary Operations (10-byte chunks): aiogzip is {binary_ratio:.2f}x {'faster' if binary_ratio > 1 else 'slower'} than gzip"
             )
 
         if "realistic_binary" in self.results:
             realistic_ratio = self.results["realistic_binary"]["aiogzip_vs_gzip_ratio"]
             print(
-                f"Binary Operations (1KB chunks): aiogzip is {realistic_ratio:.2f}x {'slower' if realistic_ratio > 1 else 'faster'} than gzip"
+                f"Binary Operations (1KB chunks): aiogzip is {realistic_ratio:.2f}x {'faster' if realistic_ratio > 1 else 'slower'} than gzip"
             )
 
         if "basic_text" in self.results:
             text_ratio = self.results["basic_text"]["aiogzip_vs_gzip_ratio"]
             print(
-                f"Text Operations: aiogzip is {text_ratio:.2f}x {'slower' if text_ratio > 1 else 'faster'} than gzip"
+                f"Text Operations: aiogzip is {text_ratio:.2f}x {'faster' if text_ratio > 1 else 'slower'} than gzip"
             )
 
         # Concurrent processing summary
         if "concurrent_processing" in self.results:
             speedup = self.results["concurrent_processing"]["speedup"]
-            print(f"Concurrent Processing: {speedup:.2f}x speedup with async I/O")
+            num_files = self.results["concurrent_processing"]["files_processed"]
+            print(
+                f"Concurrent Processing ({num_files} files): {speedup:.2f}x {'speedup' if speedup > 1 else 'overhead'}"
+            )
+            if speedup < 1:
+                print(
+                    "  Note: Local SSDs show minimal async benefit due to low I/O latency"
+                )
+                print("        Async shines with network storage or mixed workloads")
 
         # Memory efficiency summary
         if "memory_efficiency" in self.results and not self.results[
@@ -749,7 +763,7 @@ class ConsolidatedBenchmarkSuite:
         if "jsonl_processing" in self.results:
             jsonl_ratio = self.results["jsonl_processing"]["aiogzip_vs_gzip_ratio"]
             print(
-                f"JSONL Processing: aiogzip is {jsonl_ratio:.2f}x {'slower' if jsonl_ratio > 1 else 'faster'} than gzip"
+                f"JSONL Processing: aiogzip is {jsonl_ratio:.2f}x {'faster' if jsonl_ratio > 1 else 'slower'} than gzip"
             )
 
         print("=" * 60)

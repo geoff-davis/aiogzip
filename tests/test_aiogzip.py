@@ -9,7 +9,7 @@ import pytest
 
 from aiogzip import (
     AsyncGzipBinaryFile,
-    AsyncGzipFile,  # Backward compatibility alias
+    AsyncGzipFile,
     AsyncGzipTextFile,
     WithAsyncRead,
     WithAsyncReadWrite,
@@ -435,6 +435,34 @@ class TestAsyncGzipTextFile:
             # Read remaining data
             remaining_data = await f.read()
             assert remaining_data == sample_text[10:]
+
+    @pytest.mark.asyncio
+    async def test_text_read_all_after_partial_with_buffering(self, temp_file):
+        """Test read(-1) returns all remaining data including buffered text.
+
+        This test catches a bug where read(-1) would only return buffered
+        text data without reading the rest of the file.
+        """
+        # Create test data that's large enough to ensure internal buffering
+        test_text = "x" * 10000 + "END"
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(test_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Read a small amount first - this creates internal buffering
+            # because the binary read will fetch more data than needed
+            first_chars = await f.read(5)
+            assert first_chars == "xxxxx"
+
+            # Now read all remaining data with read(-1)
+            # This should return ALL remaining data, not just buffered data
+            remaining = await f.read(-1)
+
+            # Verify we got everything
+            assert first_chars + remaining == test_text
+            assert len(remaining) == len(test_text) - 5
+            assert remaining.endswith("END")
 
     @pytest.mark.asyncio
     async def test_text_large_data(self, temp_file, large_text):
