@@ -25,6 +25,11 @@ dependencies = [
 csv = [
     "aiocsv>=1.2.0",
 ]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio",
+    "psutil",
+]
 [project.urls]
 Homepage = "https://github.com/geoff-davis/aiogzip"
 Issues = "https://github.com/geoff-davis/aiogzip/issues"
