@@ -140,8 +140,8 @@ This project uses `setuptools` for packaging.
    ```bash
    python -m venv .venv
    source .venv/bin/activate
-   pip install -e .[csv]  # Install in editable mode with extras
-   pip install pytest pytest-asyncio psutil # Install dev dependencies
+   pip install -e ".[csv]"  # Install in editable mode with extras
+   pip install -e ".[dev]" # Install dev dependencies
    ```
 
 3. **Run tests**:
