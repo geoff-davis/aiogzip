@@ -24,7 +24,6 @@ import shutil
 import string
 import tempfile
 import time
-from typing import Dict
 
 from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 
@@ -44,7 +43,7 @@ class ConsolidatedBenchmarkSuite:
         self.data_size_mb = data_size_mb
         self.data_size_bytes = int(data_size_mb * 1024 * 1024)
         self.temp_dir: str | None = None
-        self.results: Dict[str, Dict] = {}
+        self.results: dict[str, dict] = {}
 
     def setup(self):
         """Create temporary directory and test data files."""
@@ -104,7 +103,7 @@ class ConsolidatedBenchmarkSuite:
     # 1. BASIC OPERATIONS BENCHMARKS
     # ============================================================================
 
-    async def benchmark_basic_binary_operations(self) -> Dict[str, float]:
+    async def benchmark_basic_binary_operations(self) -> dict[str, float]:
         """
         Measures: Binary file read/write performance with small chunks
 
@@ -183,7 +182,7 @@ class ConsolidatedBenchmarkSuite:
 
         return results
 
-    async def benchmark_realistic_binary_operations(self) -> Dict[str, float]:
+    async def benchmark_realistic_binary_operations(self) -> dict[str, float]:
         """
         Measures: Realistic binary file operations with reasonable chunk sizes
 
@@ -264,7 +263,7 @@ class ConsolidatedBenchmarkSuite:
 
         return results
 
-    async def benchmark_basic_text_operations(self) -> Dict[str, float]:
+    async def benchmark_basic_text_operations(self) -> dict[str, float]:
         """
         Measures: Basic text file read/write performance
 
@@ -331,7 +330,7 @@ class ConsolidatedBenchmarkSuite:
     # 2. MEMORY EFFICIENCY BENCHMARKS
     # ============================================================================
 
-    async def benchmark_memory_efficiency(self) -> Dict[str, float]:
+    async def benchmark_memory_efficiency(self) -> dict[str, float]:
         """
         Measures: Memory usage patterns during file operations
 
@@ -400,7 +399,7 @@ class ConsolidatedBenchmarkSuite:
     # 3. CONCURRENT PROCESSING BENCHMARKS
     # ============================================================================
 
-    async def benchmark_concurrent_processing(self) -> Dict[str, float]:
+    async def benchmark_concurrent_processing(self) -> dict[str, float]:
         """
         Measures: Performance advantages of async I/O in concurrent scenarios
 
@@ -477,8 +476,8 @@ class ConsolidatedBenchmarkSuite:
         print(f"Async processing: {async_time:.3f}s ({num_files} files)")
         print(f"Sync processing: {sync_time:.3f}s ({num_files} files)")
         print(f"Speedup: {results['speedup']:.2f}x")
-        print(f"Note: Local SSD benchmarks may not show async benefits.")
-        print(f"      Async excels with network I/O or mixed workloads.")
+        print("Note: Local SSD benchmarks may not show async benefits.")
+        print("      Async excels with network I/O or mixed workloads.")
 
         return results
 
@@ -486,7 +485,7 @@ class ConsolidatedBenchmarkSuite:
     # 4. REAL-WORLD SCENARIOS BENCHMARKS
     # ============================================================================
 
-    async def benchmark_jsonl_processing(self) -> Dict[str, float]:
+    async def benchmark_jsonl_processing(self) -> dict[str, float]:
         """
         Measures: JSONL file processing performance (common in data pipelines)
 
@@ -550,7 +549,7 @@ class ConsolidatedBenchmarkSuite:
     # 5. COMPRESSION ANALYSIS BENCHMARKS
     # ============================================================================
 
-    async def benchmark_compression_analysis(self) -> Dict[str, float]:
+    async def benchmark_compression_analysis(self) -> dict[str, float]:
         """
         Measures: Compression efficiency and ratios
 
@@ -628,7 +627,7 @@ class ConsolidatedBenchmarkSuite:
     # 6. ERROR HANDLING BENCHMARKS
     # ============================================================================
 
-    async def benchmark_error_handling(self) -> Dict[str, float]:
+    async def benchmark_error_handling(self) -> dict[str, float]:
         """
         Measures: Error handling robustness and performance impact
 
@@ -679,7 +678,7 @@ class ConsolidatedBenchmarkSuite:
     # MAIN BENCHMARK RUNNER
     # ============================================================================
 
-    async def run_all_benchmarks(self) -> Dict[str, Dict]:
+    async def run_all_benchmarks(self) -> dict[str, dict]:
         """Run all benchmarks and return consolidated results."""
         print("=" * 60)
         print("CONSOLIDATED AIOGZIP BENCHMARK SUITE")
