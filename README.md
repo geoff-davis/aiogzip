@@ -6,7 +6,7 @@
 
 It is designed for high-performance I/O operations, especially for text-based data pipelines, and integrates seamlessly with other `async` libraries like `aiocsv`.
 
-## \#\# Features
+## Features
 
 - **Truly Asynchronous**: Built with `asyncio` and `aiofiles` for non-blocking file I/O.
 - **High-Performance Text Processing**: Significantly faster than the standard `gzip` library for text and JSONL file operations.
