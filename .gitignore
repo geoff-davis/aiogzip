@@ -58,6 +58,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# uv
+uv.lock
+.uv/
+
 # IDE / Editor specific files
 .idea/
 .vscode/
