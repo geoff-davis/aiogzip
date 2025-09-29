@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiogzip"
+version = "0.1.0"
+authors = [
+  { name="Geoff Davis", email="geoff@keksi.ai" },
+]
+description = "Asynchronous gzip file reader/writer with aiocsv support."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Framework :: AsyncIO",
+    "Topic :: System :: Archiving :: Compression",
+]
+dependencies = [
+    "aiofiles>=23.0.0",
+]
+[project.optional-dependencies]
+csv = [
+    "aiocsv>=1.2.0",
+]
+[project.urls]
+Homepage = "https://github.com/geoff-davis/aiogzip"
+Issues = "https://github.com/geoff-davis/aiogzip/issues"
