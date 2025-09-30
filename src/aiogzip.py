@@ -29,6 +29,19 @@ Recommended usage patterns:
 3. Interoperability with gzip.open():
     # Files are fully compatible between AsyncGzipFile and gzip.open()
     # No special handling needed for file format compatibility
+
+Error Handling Strategy:
+    This module follows a consistent exception handling pattern:
+
+    1. Specific exceptions first: zlib.error for compression/decompression errors
+    2. OSError/IOError: Re-raised as-is to preserve original I/O error information
+    3. Generic Exception: Caught and wrapped in OSError with context for unexpected errors
+    4. All conversions use 'from e' for proper exception chaining and debugging
+
+    This ensures:
+    - Consistent error types (OSError) for all operation failures
+    - Preservation of original error information through exception chaining
+    - Clear error messages indicating which operation failed
 """
 
 import os
@@ -241,6 +254,9 @@ class AsyncGzipBinaryFile:
                 await self._file.write(compressed)
         except zlib.error as e:
             raise OSError(f"Error compressing data: {e}") from e
+        except (OSError, IOError):
+            # Re-raise I/O errors as-is
+            raise
         except Exception as e:
             raise OSError(f"Unexpected error during compression: {e}") from e
 
@@ -302,35 +318,40 @@ class AsyncGzipBinaryFile:
 
         try:
             compressed_chunk = await self._file.read(self._chunk_size)
-            if not compressed_chunk:
-                self._eof = True  # pyrefly: ignore
-                # Decompressor might have leftover data
-                try:
-                    self._buffer.extend(self._engine.flush())  # type: ignore
-                except zlib.error as e:
-                    raise OSError(f"Error finalizing gzip decompression: {e}") from e
-                return
-
-            try:
-                decompressed = self._engine.decompress(compressed_chunk)  # type: ignore
-                self._buffer.extend(decompressed)  # More efficient than +=
-
-                # Handle multi-member gzip archives (created by append mode)
-                # Loop to handle multiple members in the unused data
-                while self._engine.unused_data:  # type: ignore
-                    # Start a new decompressor for the next member
-                    unused = self._engine.unused_data  # type: ignore
-                    self._engine = zlib.decompressobj(wbits=GZIP_WBITS)  # type: ignore
-                    # Decompress the unused data with the new decompressor
-                    if unused:
-                        decompressed = self._engine.decompress(unused)  # type: ignore
-                        self._buffer.extend(decompressed)
-
-            except zlib.error as e:
-                raise OSError(f"Error decompressing gzip data: {e}") from e
-        except OSError:
-            # Re-raise OSError (including our custom ones)
+        except (OSError, IOError):
+            # Re-raise I/O errors as-is
             raise
+        except Exception as e:
+            raise OSError(f"Error reading from file: {e}") from e
+
+        if not compressed_chunk:
+            # End of file - flush any remaining data from decompressor
+            self._eof = True
+            try:
+                remaining = self._engine.flush()  # type: ignore
+                if remaining:
+                    self._buffer.extend(remaining)
+            except zlib.error as e:
+                raise OSError(f"Error finalizing gzip decompression: {e}") from e
+            return
+
+        # Decompress the chunk
+        try:
+            decompressed = self._engine.decompress(compressed_chunk)  # type: ignore
+            self._buffer.extend(decompressed)
+
+            # Handle multi-member gzip archives (created by append mode)
+            # Loop to handle multiple members in the unused data
+            while self._engine.unused_data:  # type: ignore
+                # Start a new decompressor for the next member
+                unused = self._engine.unused_data  # type: ignore
+                self._engine = zlib.decompressobj(wbits=GZIP_WBITS)  # type: ignore
+                # Decompress the unused data with the new decompressor
+                if unused:
+                    decompressed = self._engine.decompress(unused)  # type: ignore
+                    self._buffer.extend(decompressed)
+        except zlib.error as e:
+            raise OSError(f"Error decompressing gzip data: {e}") from e
         except Exception as e:
             raise OSError(f"Unexpected error during decompression: {e}") from e
 

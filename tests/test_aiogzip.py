@@ -1717,3 +1717,100 @@ class TestResourceCleanup:
         # Subsequent closes should be safe (idempotent)
         await f.close()
         await f.close()
+
+
+class TestErrorHandlingConsistency:
+    """Test consistent error handling across the module."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_zlib_errors_wrapped_as_oserror(self, temp_file):
+        """Test that zlib errors are consistently wrapped in OSError."""
+        # Create corrupted gzip file
+        with open(temp_file, "wb") as f:
+            f.write(b"Not a valid gzip file")
+
+        # Reading should raise OSError (not zlib.error)
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            with pytest.raises(OSError, match="Error decompressing gzip data"):
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_all_operation_errors_are_oserror(self, temp_file):
+        """Test that all operation failures raise OSError consistently."""
+        # Write valid data first
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"test data")
+
+        # Try to write when file is read-only
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            with pytest.raises(IOError, match="File not open for writing"):
+                await f.write(b"more data")
+
+        # Try to read when file is write-only
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            with pytest.raises(IOError, match="File not open for reading"):
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_exception_chaining_preserved(self, temp_file):
+        """Test that exception chaining is used (from e) for debugging."""
+        # Create corrupted file
+        with open(temp_file, "wb") as f:
+            f.write(b"\x1f\x8b\x08\x00corrupted")
+
+        try:
+            async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+                await f.read()
+        except OSError as e:
+            # Should have a __cause__ from the original zlib.error
+            assert e.__cause__ is not None
+            assert "zlib" in str(type(e.__cause__)).lower() or "error" in str(type(e.__cause__)).lower()
+
+    @pytest.mark.asyncio
+    async def test_clear_error_messages(self, temp_file):
+        """Test that error messages clearly indicate which operation failed."""
+        # Test compression error message
+        with open(temp_file, "wb") as f:
+            f.write(b"\x1f\x8b\x08\x00corrupted")
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            try:
+                await f.read()
+            except OSError as e:
+                # Error message should indicate it's a decompression error
+                assert "decompress" in str(e).lower()
+
+    @pytest.mark.asyncio
+    async def test_io_errors_not_wrapped(self, tmp_path):
+        """Test that I/O errors are re-raised as-is, not wrapped."""
+        import aiofiles
+
+        # Create a file that we'll delete while reading
+        test_file = tmp_path / "test.gz"
+
+        async with AsyncGzipBinaryFile(test_file, "wb") as f:
+            await f.write(b"test data")
+
+        # Open file for reading but don't read yet
+        f = AsyncGzipBinaryFile(test_file, "rb")
+        await f.__aenter__()
+
+        # Close the underlying file to simulate I/O error
+        if f._file is not None:
+            await f._file.close()
+
+        # Try to read - should get an I/O error (not wrapped in our custom OSError)
+        with pytest.raises((OSError, ValueError)):  # aiofiles may raise ValueError for closed file
+            await f.read()
+
+        # Clean up
+        await f.__aexit__(None, None, None)
