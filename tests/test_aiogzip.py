@@ -1324,3 +1324,292 @@ class TestProtocols:
 
         read_writer: WithAsyncReadWrite = MockReadWriter()
         assert read_writer is not None
+
+
+class TestPathlibSupport:
+    """Test support for pathlib.Path objects."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_binary_file_with_path_object(self, temp_file):
+        """Test AsyncGzipBinaryFile with pathlib.Path object."""
+        from pathlib import Path
+
+        path_obj = Path(temp_file)
+        test_data = b"Hello, Path!"
+
+        # Write with Path object
+        async with AsyncGzipBinaryFile(path_obj, "wb") as f:
+            await f.write(test_data)
+
+        # Read with Path object
+        async with AsyncGzipBinaryFile(path_obj, "rb") as f:
+            read_data = await f.read()
+
+        assert read_data == test_data
+
+    @pytest.mark.asyncio
+    async def test_text_file_with_path_object(self, temp_file):
+        """Test AsyncGzipTextFile with pathlib.Path object."""
+        from pathlib import Path
+
+        path_obj = Path(temp_file)
+        test_text = "Hello, Path!"
+
+        # Write with Path object
+        async with AsyncGzipTextFile(path_obj, "wt") as f:
+            await f.write(test_text)
+
+        # Read with Path object
+        async with AsyncGzipTextFile(path_obj, "rt") as f:
+            read_text = await f.read()
+
+        assert read_text == test_text
+
+    @pytest.mark.asyncio
+    async def test_factory_with_path_object(self, temp_file):
+        """Test AsyncGzipFile factory with pathlib.Path object."""
+        from pathlib import Path
+
+        path_obj = Path(temp_file)
+        test_data = b"Hello, Factory!"
+
+        # Write with Path object
+        async with AsyncGzipFile(path_obj, "wb") as f:
+            await f.write(test_data)
+
+        # Read with Path object
+        async with AsyncGzipFile(path_obj, "rb") as f:
+            read_data = await f.read()
+
+        assert read_data == test_data
+
+    @pytest.mark.asyncio
+    async def test_path_with_bytes(self, temp_file):
+        """Test with bytes path (os.PathLike)."""
+        path_bytes = temp_file.encode('utf-8')
+        test_data = b"Hello, bytes path!"
+
+        # Write with bytes path
+        async with AsyncGzipBinaryFile(path_bytes, "wb") as f:
+            await f.write(test_data)
+
+        # Read with bytes path
+        async with AsyncGzipBinaryFile(path_bytes, "rb") as f:
+            read_data = await f.read()
+
+        assert read_data == test_data
+
+
+class TestClosefdParameter:
+    """Test closefd parameter behavior."""
+
+    @pytest.mark.asyncio
+    async def test_closefd_true_closes_file(self, tmp_path):
+        """Test that closefd=True closes the underlying file object."""
+        import aiofiles
+
+        p = tmp_path / "test_closefd_true.gz"
+
+        # Open file and pass to AsyncGzipBinaryFile with closefd=True
+        file_handle = await aiofiles.open(p, "wb")
+
+        async with AsyncGzipBinaryFile(None, "wb", fileobj=file_handle, closefd=True) as f:
+            await f.write(b"test data")
+
+        # File should be closed after context manager exit
+        # Attempting to write should fail
+        with pytest.raises((ValueError, AttributeError)):
+            await file_handle.write(b"more data")
+
+    @pytest.mark.asyncio
+    async def test_closefd_false_keeps_file_open(self, tmp_path):
+        """Test that closefd=False keeps the underlying file object open."""
+        import aiofiles
+
+        p = tmp_path / "test_closefd_false.gz"
+
+        # Open file and pass to AsyncGzipBinaryFile with closefd=False
+        file_handle = await aiofiles.open(p, "wb")
+
+        async with AsyncGzipBinaryFile(None, "wb", fileobj=file_handle, closefd=False) as f:
+            await f.write(b"test data")
+
+        # File should still be open after context manager exit
+        # We should be able to write more data
+        await file_handle.write(b"more data")
+        await file_handle.close()
+
+        # Verify both writes succeeded
+        async with aiofiles.open(p, "rb") as f:
+            content = await f.read()
+
+        # The file should contain gzipped data followed by "more data"
+        assert len(content) > 0
+
+    @pytest.mark.asyncio
+    async def test_closefd_default_closes_owned_file(self, tmp_path):
+        """Test that default closefd behavior closes file when we own it."""
+        p = tmp_path / "test_closefd_default.gz"
+
+        # When filename is provided (not fileobj), we own the file
+        f = AsyncGzipBinaryFile(p, "wb")
+        async with f:
+            await f.write(b"test data")
+
+        # Internal file should be closed
+        assert f._is_closed is True
+
+    @pytest.mark.asyncio
+    async def test_closefd_with_text_file(self, tmp_path):
+        """Test closefd parameter with AsyncGzipTextFile."""
+        import aiofiles
+
+        p = tmp_path / "test_text_closefd.gz"
+
+        # Open file and pass to AsyncGzipTextFile with closefd=False
+        file_handle = await aiofiles.open(p, "wb")
+
+        async with AsyncGzipTextFile(None, "wt", fileobj=file_handle, closefd=False) as f:
+            await f.write("test text")
+
+        # File should still be accessible
+        # Close it manually
+        await file_handle.close()
+
+
+class TestAppendMode:
+    """Test append mode operations and limitations."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_append_mode_binary(self, temp_file):
+        """Test append mode with binary data.
+
+        Note: Appending to gzip files creates a multi-member gzip archive.
+        Standard gzip tools can read these, but they're not commonly used.
+        """
+        # Write initial data
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"first write")
+
+        # Append more data
+        async with AsyncGzipBinaryFile(temp_file, "ab") as f:
+            await f.write(b"second write")
+
+        # Read back - should get concatenated decompressed data
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+
+        # Standard gzip readers handle multi-member archives by concatenating
+        assert data == b"first writesecond write"
+
+    @pytest.mark.asyncio
+    async def test_append_mode_text(self, temp_file):
+        """Test append mode with text data."""
+        # Write initial data
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("first line\n")
+
+        # Append more data
+        async with AsyncGzipTextFile(temp_file, "at") as f:
+            await f.write("second line\n")
+
+        # Read back
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            data = await f.read()
+
+        assert data == "first line\nsecond line\n"
+
+    @pytest.mark.asyncio
+    async def test_append_mode_multiple_appends(self, temp_file):
+        """Test multiple append operations."""
+        # Initial write
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"part1")
+
+        # First append
+        async with AsyncGzipBinaryFile(temp_file, "ab") as f:
+            await f.write(b"part2")
+
+        # Second append
+        async with AsyncGzipBinaryFile(temp_file, "ab") as f:
+            await f.write(b"part3")
+
+        # Read back all data
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+
+        assert data == b"part1part2part3"
+
+    @pytest.mark.asyncio
+    async def test_append_to_empty_file(self, temp_file):
+        """Test appending to an empty/new file (should work like write)."""
+        # Append to a new file
+        async with AsyncGzipBinaryFile(temp_file, "ab") as f:
+            await f.write(b"appended data")
+
+        # Read back
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+
+        assert data == b"appended data"
+
+    @pytest.mark.asyncio
+    async def test_append_mode_interoperability_with_gzip(self, temp_file):
+        """Test that append mode works with standard gzip library."""
+        # Write with AsyncGzipBinaryFile
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"async write")
+
+        # Append with standard gzip
+        with gzip.open(temp_file, "ab") as f:
+            f.write(b" gzip append")
+
+        # Read with AsyncGzipBinaryFile
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+
+        assert data == b"async write gzip append"
+
+    @pytest.mark.asyncio
+    async def test_cannot_read_in_append_mode(self, temp_file):
+        """Test that reading is not allowed in append mode."""
+        async with AsyncGzipBinaryFile(temp_file, "ab") as f:
+            with pytest.raises(IOError, match="File not open for reading"):
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_append_mode_with_line_iteration(self, temp_file):
+        """Test line iteration after appending text data."""
+        # Write initial lines
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("line1\nline2\n")
+
+        # Append more lines
+        async with AsyncGzipTextFile(temp_file, "at") as f:
+            await f.write("line3\nline4\n")
+
+        # Read lines
+        lines = []
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            async for line in f:
+                lines.append(line)
+
+        assert lines == ["line1\n", "line2\n", "line3\n", "line4\n"]

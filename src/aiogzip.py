@@ -39,6 +39,55 @@ from typing import Protocol, Union
 import aiofiles
 
 
+# Validation helper functions
+def _validate_filename(filename: Union[str, bytes, Path] | None, fileobj) -> None:
+    """Validate filename parameter.
+
+    Args:
+        filename: The filename to validate
+        fileobj: The fileobj parameter (for checking if at least one is provided)
+
+    Raises:
+        ValueError: If both filename and fileobj are None, or if filename is empty
+        TypeError: If filename is not a string, bytes, or PathLike object
+    """
+    if filename is None and fileobj is None:
+        raise ValueError("Either filename or fileobj must be provided")
+    if filename is not None:
+        if not isinstance(filename, (str, bytes, os.PathLike)):
+            raise TypeError("Filename must be a string, bytes, or PathLike object")
+        if isinstance(filename, str) and not filename:
+            raise ValueError("Filename cannot be empty")
+
+
+def _validate_chunk_size(chunk_size: int) -> None:
+    """Validate chunk_size parameter.
+
+    Args:
+        chunk_size: The chunk size to validate
+
+    Raises:
+        ValueError: If chunk size is invalid
+    """
+    if chunk_size <= 0:
+        raise ValueError("Chunk size must be positive")
+    if chunk_size > 10 * 1024 * 1024:  # 10MB limit
+        raise ValueError("Chunk size too large (max 10MB)")
+
+
+def _validate_compresslevel(compresslevel: int) -> None:
+    """Validate compresslevel parameter.
+
+    Args:
+        compresslevel: The compression level to validate
+
+    Raises:
+        ValueError: If compression level is not between 0 and 9
+    """
+    if not (0 <= compresslevel <= 9):
+        raise ValueError("Compression level must be between 0 and 9")
+
+
 class WithAsyncRead(Protocol):
     """Protocol for async file-like objects that can be read."""
 
@@ -100,20 +149,10 @@ class AsyncGzipBinaryFile:
         fileobj: WithAsyncReadWrite | None = None,
         closefd: bool = True,
     ) -> None:
-        # Validate inputs
-        if filename is None and fileobj is None:
-            raise ValueError("Either filename or fileobj must be provided")
-        if filename is not None:
-            if not isinstance(filename, (str, bytes, os.PathLike)):
-                raise TypeError("Filename must be a string, bytes, or PathLike object")
-            if isinstance(filename, str) and not filename:
-                raise ValueError("Filename cannot be empty")
-        if chunk_size <= 0:
-            raise ValueError("Chunk size must be positive")
-        if chunk_size > 10 * 1024 * 1024:  # 10MB limit
-            raise ValueError("Chunk size too large (max 10MB)")
-        if not (0 <= compresslevel <= 9):
-            raise ValueError("Compression level must be between 0 and 9")
+        # Validate inputs using shared validation functions
+        _validate_filename(filename, fileobj)
+        _validate_chunk_size(chunk_size)
+        _validate_compresslevel(compresslevel)
 
         # Validate mode
         valid_modes = {"r", "rb", "w", "wb", "a", "ab"}
@@ -159,7 +198,7 @@ class AsyncGzipBinaryFile:
 
         # The 'wbits' parameter is crucial.
         # 31 is a magic number for zlib (16 + 15) that enables gzip format.
-        if "w" in self._mode:
+        if "w" in self._mode or "a" in self._mode:
             self._engine = zlib.compressobj(level=self._compresslevel, wbits=31)  # type: ignore
         else:  # 'r' in self._mode
             self._engine = zlib.decompressobj(wbits=31)  # type: ignore
@@ -248,7 +287,11 @@ class AsyncGzipBinaryFile:
         return data_to_return
 
     async def _fill_buffer(self):
-        """Internal helper to read a compressed chunk and decompress it."""
+        """Internal helper to read a compressed chunk and decompress it.
+
+        Handles multi-member gzip archives (created by append mode) by detecting
+        when one member ends and starting a new decompressor for the next member.
+        """
         if self._eof or self._file is None:
             return
 
@@ -266,6 +309,18 @@ class AsyncGzipBinaryFile:
             try:
                 decompressed = self._engine.decompress(compressed_chunk)  # type: ignore
                 self._buffer.extend(decompressed)  # More efficient than +=
+
+                # Handle multi-member gzip archives (created by append mode)
+                # Loop to handle multiple members in the unused data
+                while self._engine.unused_data:  # type: ignore
+                    # Start a new decompressor for the next member
+                    unused = self._engine.unused_data  # type: ignore
+                    self._engine = zlib.decompressobj(wbits=31)  # type: ignore
+                    # Decompress the unused data with the new decompressor
+                    if unused:
+                        decompressed = self._engine.decompress(unused)  # type: ignore
+                        self._buffer.extend(decompressed)
+
             except zlib.error as e:
                 raise OSError(f"Error decompressing gzip data: {e}") from e
         except OSError:
@@ -279,7 +334,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             return
 
-        if "w" in self._mode and self._file is not None:
+        if ("w" in self._mode or "a" in self._mode) and self._file is not None:
             # Flush the compressor to write the gzip trailer
             remaining_data = self._engine.flush()  # type: ignore
             if remaining_data:
@@ -340,18 +395,12 @@ class AsyncGzipTextFile:
         fileobj: WithAsyncReadWrite | None = None,
         closefd: bool = True,
     ) -> None:
-        # Validate inputs
-        if filename is None and fileobj is None:
-            raise ValueError("Either filename or fileobj must be provided")
-        if filename is not None:
-            if not isinstance(filename, (str, bytes, os.PathLike)):
-                raise TypeError("Filename must be a string, bytes, or PathLike object")
-            if isinstance(filename, str) and not filename:
-                raise ValueError("Filename cannot be empty")
-        if chunk_size <= 0:
-            raise ValueError("Chunk size must be positive")
-        if chunk_size > 10 * 1024 * 1024:  # 10MB limit
-            raise ValueError("Chunk size too large (max 10MB)")
+        # Validate inputs using shared validation functions
+        _validate_filename(filename, fileobj)
+        _validate_chunk_size(chunk_size)
+        _validate_compresslevel(compresslevel)
+
+        # Validate text-specific parameters
         if not encoding:
             raise ValueError("Encoding cannot be empty")
         if errors is None:
@@ -370,8 +419,6 @@ class AsyncGzipTextFile:
             raise ValueError(
                 f"Invalid errors value '{errors}'. Valid values: {', '.join(sorted(valid_errors))}"
             )
-        if not (0 <= compresslevel <= 9):
-            raise ValueError("Compression level must be between 0 and 9")
 
         # Validate mode
         valid_modes = {"r", "rt", "w", "wt", "a", "at"}
