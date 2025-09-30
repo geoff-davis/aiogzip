@@ -47,7 +47,7 @@ Error Handling Strategy:
 import os
 import zlib
 from pathlib import Path
-from typing import Any, Protocol, Union
+from typing import Any, Protocol
 
 import aiofiles
 
@@ -57,6 +57,12 @@ import aiofiles
 # 31 = 16 (gzip format) + 15 (maximum window size)
 GZIP_WBITS = 31
 
+# Maximum allowed chunk size for reading/writing (10 MB)
+MAX_CHUNK_SIZE = 10 * 1024 * 1024
+
+# Default chunk size for line reading in text mode (8 KB)
+LINE_READ_CHUNK_SIZE = 8192
+
 # Type alias for zlib compression/decompression objects
 # These are the return types of zlib.compressobj() and zlib.decompressobj()
 # Using Any because the actual types (zlib.Compress/Decompress) aren't directly accessible
@@ -64,7 +70,7 @@ ZlibEngine = Any
 
 
 # Validation helper functions
-def _validate_filename(filename: Union[str, bytes, Path] | None, fileobj) -> None:
+def _validate_filename(filename: str | bytes | Path | None, fileobj) -> None:
     """Validate filename parameter.
 
     Args:
@@ -95,8 +101,8 @@ def _validate_chunk_size(chunk_size: int) -> None:
     """
     if chunk_size <= 0:
         raise ValueError("Chunk size must be positive")
-    if chunk_size > 10 * 1024 * 1024:  # 10MB limit
-        raise ValueError("Chunk size too large (max 10MB)")
+    if chunk_size > MAX_CHUNK_SIZE:
+        raise ValueError(f"Chunk size too large (max {MAX_CHUNK_SIZE // (1024 * 1024)}MB)")
 
 
 def _validate_compresslevel(compresslevel: int) -> None:
@@ -166,7 +172,7 @@ class AsyncGzipBinaryFile:
 
     def __init__(
         self,
-        filename: Union[str, bytes, Path] | None,
+        filename: str | bytes | Path | None,
         mode: str = "rb",
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         compresslevel: int = 6,
@@ -463,7 +469,7 @@ class AsyncGzipTextFile:
 
     def __init__(
         self,
-        filename: Union[str, bytes, Path] | None,
+        filename: str | bytes | Path | None,
         mode: str = "rt",
         chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
         encoding: str = "utf-8",
@@ -755,7 +761,7 @@ class AsyncGzipTextFile:
                 return line + "\n"  # Preserve the newline
 
             # Read more data
-            chunk: str = await self.read(8192)
+            chunk: str = await self.read(LINE_READ_CHUNK_SIZE)
             if not chunk:  # EOF
                 if self._line_buffer:
                     result = self._line_buffer
@@ -796,7 +802,7 @@ class AsyncGzipTextFile:
                 return line + "\n"  # Preserve the newline
 
             # Read more data
-            chunk: str = await self.read(8192)
+            chunk: str = await self.read(LINE_READ_CHUNK_SIZE)
             if not chunk:  # EOF
                 if self._line_buffer:
                     result = self._line_buffer
