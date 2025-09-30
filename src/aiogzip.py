@@ -47,7 +47,7 @@ Error Handling Strategy:
 import os
 import zlib
 from pathlib import Path
-from typing import Protocol, Union
+from typing import Any, Protocol, Union
 
 import aiofiles
 
@@ -56,6 +56,11 @@ import aiofiles
 # The wbits parameter for zlib that enables gzip format
 # 31 = 16 (gzip format) + 15 (maximum window size)
 GZIP_WBITS = 31
+
+# Type alias for zlib compression/decompression objects
+# These are the return types of zlib.compressobj() and zlib.decompressobj()
+# Using Any because the actual types (zlib.Compress/Decompress) aren't directly accessible
+ZlibEngine = Any
 
 
 # Validation helper functions
@@ -198,7 +203,7 @@ class AsyncGzipBinaryFile:
             raise ValueError(f"Invalid mode: {mode}")
 
         self._file = None
-        self._engine = None  # type: ignore
+        self._engine: ZlibEngine = None
         self._buffer = bytearray()  # Use bytearray for efficient buffer growth
         self._is_closed: bool = False
         self._eof: bool = False
@@ -217,9 +222,9 @@ class AsyncGzipBinaryFile:
 
         # Initialize compression/decompression engine based on mode
         if "w" in self._mode or "a" in self._mode:
-            self._engine = zlib.compressobj(level=self._compresslevel, wbits=GZIP_WBITS)  # type: ignore
+            self._engine = zlib.compressobj(level=self._compresslevel, wbits=GZIP_WBITS)
         else:  # 'r' in self._mode
-            self._engine = zlib.decompressobj(wbits=GZIP_WBITS)  # type: ignore
+            self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
 
         return self
 
@@ -249,7 +254,7 @@ class AsyncGzipBinaryFile:
             raise TypeError("write() argument must be bytes, not str")
 
         try:
-            compressed = self._engine.compress(data)  # type: ignore
+            compressed = self._engine.compress(data)
             if compressed:
                 await self._file.write(compressed)
         except zlib.error as e:
@@ -328,7 +333,7 @@ class AsyncGzipBinaryFile:
             # End of file - flush any remaining data from decompressor
             self._eof = True
             try:
-                remaining = self._engine.flush()  # type: ignore
+                remaining = self._engine.flush()
                 if remaining:
                     self._buffer.extend(remaining)
             except zlib.error as e:
@@ -337,23 +342,63 @@ class AsyncGzipBinaryFile:
 
         # Decompress the chunk
         try:
-            decompressed = self._engine.decompress(compressed_chunk)  # type: ignore
+            decompressed = self._engine.decompress(compressed_chunk)
             self._buffer.extend(decompressed)
 
             # Handle multi-member gzip archives (created by append mode)
             # Loop to handle multiple members in the unused data
-            while self._engine.unused_data:  # type: ignore
+            while self._engine.unused_data:
                 # Start a new decompressor for the next member
-                unused = self._engine.unused_data  # type: ignore
-                self._engine = zlib.decompressobj(wbits=GZIP_WBITS)  # type: ignore
+                unused = self._engine.unused_data
+                self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
                 # Decompress the unused data with the new decompressor
                 if unused:
-                    decompressed = self._engine.decompress(unused)  # type: ignore
+                    decompressed = self._engine.decompress(unused)
                     self._buffer.extend(decompressed)
         except zlib.error as e:
             raise OSError(f"Error decompressing gzip data: {e}") from e
         except Exception as e:
             raise OSError(f"Unexpected error during decompression: {e}") from e
+
+    async def flush(self) -> None:
+        """
+        Flush any buffered compressed data to the file.
+
+        In write/append mode, this forces any buffered compressed data to be
+        written to the underlying file. Note that this does NOT write the gzip
+        trailer - use close() for that.
+
+        In read mode, this is a no-op for compatibility with the file API.
+
+        Examples:
+            async with AsyncGzipBinaryFile("file.gz", "wb") as f:
+                await f.write(b"Hello")
+                await f.flush()  # Ensure data is written
+                await f.write(b" World")
+        """
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
+
+        if ("w" in self._mode or "a" in self._mode) and self._file is not None:
+            # Flush any buffered compressed data (but not the final trailer)
+            # Using Z_SYNC_FLUSH allows us to flush without ending the stream
+            try:
+                flushed_data = self._engine.flush(zlib.Z_SYNC_FLUSH)
+                if flushed_data:
+                    await self._file.write(flushed_data)
+
+                # Also flush the underlying file if it has a flush method
+                flush_method = getattr(self._file, "flush", None)
+                if callable(flush_method):
+                    result = flush_method()
+                    if hasattr(result, "__await__"):
+                        await result
+            except zlib.error as e:
+                raise OSError(f"Error flushing compressed data: {e}") from e
+            except (OSError, IOError):
+                raise
+            except Exception as e:
+                raise OSError(f"Unexpected error during flush: {e}") from e
 
     async def close(self):
         """Flushes any remaining compressed data and closes the file."""
@@ -366,7 +411,7 @@ class AsyncGzipBinaryFile:
         try:
             if ("w" in self._mode or "a" in self._mode) and self._file is not None:
                 # Flush the compressor to write the gzip trailer
-                remaining_data = self._engine.flush()  # type: ignore
+                remaining_data = self._engine.flush()
                 if remaining_data:
                     await self._file.write(remaining_data)
 
@@ -480,7 +525,7 @@ class AsyncGzipTextFile:
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
-        self._binary_file = None  # type: ignore
+        self._binary_file: AsyncGzipBinaryFile | None = None
         self._text_buffer: str = ""
         self._is_closed: bool = False
         self._pending_bytes: bytes = b""  # Buffer for incomplete multi-byte sequences
@@ -720,6 +765,68 @@ class AsyncGzipTextFile:
                     raise StopAsyncIteration
 
             self._line_buffer += chunk
+
+    async def readline(self) -> str:
+        """
+        Read and return one line from the file.
+
+        A line is defined as text ending with a newline character ('\\n').
+        If the file ends without a newline, the last line is returned without one.
+
+        Returns:
+            str: The next line from the file, including the newline if present.
+                 Returns empty string at EOF.
+
+        Examples:
+            async with AsyncGzipTextFile("file.gz", "rt") as f:
+                line = await f.readline()  # Read one line
+                while line:
+                    print(line.rstrip())
+                    line = await f.readline()
+        """
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
+        if "r" not in self._mode:
+            raise IOError("File not open for reading")
+
+        # Try to get a line from our buffer
+        while True:
+            if "\n" in self._line_buffer:
+                line, self._line_buffer = self._line_buffer.split("\n", 1)
+                return line + "\n"  # Preserve the newline
+
+            # Read more data
+            chunk: str = await self.read(8192)
+            if not chunk:  # EOF
+                if self._line_buffer:
+                    result = self._line_buffer
+                    self._line_buffer = ""  # Clear buffer
+                    return result  # Last line without newline
+                else:
+                    return ""  # EOF with empty buffer
+
+            self._line_buffer += chunk
+
+    async def flush(self) -> None:
+        """
+        Flush any buffered data to the file.
+
+        In write/append mode, this forces any buffered text to be encoded
+        and written to the underlying binary file.
+
+        In read mode, this is a no-op for compatibility with the file API.
+
+        Examples:
+            async with AsyncGzipTextFile("file.gz", "wt") as f:
+                await f.write("Hello")
+                await f.flush()  # Ensure data is written
+                await f.write(" World")
+        """
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
+
+        if self._binary_file is not None:
+            await self._binary_file.flush()
 
     async def close(self):
         """Closes the file."""

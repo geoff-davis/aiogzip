@@ -1814,3 +1814,169 @@ class TestErrorHandlingConsistency:
 
         # Clean up
         await f.__aexit__(None, None, None)
+
+
+class TestNewAPIMethods:
+    """Test new API methods: flush() and readline()."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_binary_flush_method(self, temp_file):
+        """Test flush() method on binary file."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"Hello")
+            await f.flush()  # Should not raise
+            await f.write(b" World")
+            await f.flush()  # Should not raise
+
+        # Verify data was written correctly
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+            assert data == b"Hello World"
+
+    @pytest.mark.asyncio
+    async def test_text_flush_method(self, temp_file):
+        """Test flush() method on text file."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("Hello")
+            await f.flush()  # Should not raise
+            await f.write(" World")
+            await f.flush()  # Should not raise
+
+        # Verify data was written correctly
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            data = await f.read()
+            assert data == "Hello World"
+
+    @pytest.mark.asyncio
+    async def test_flush_on_closed_file_raises(self, temp_file):
+        """Test that flush() raises on closed file."""
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        async with f:
+            await f.write(b"test")
+
+        # After close, flush should raise
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.flush()
+
+    @pytest.mark.asyncio
+    async def test_flush_in_read_mode_is_noop(self, temp_file):
+        """Test that flush() is a no-op in read mode."""
+        # Write some data first
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"test data")
+
+        # Flush in read mode should not raise
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            await f.flush()  # Should be no-op
+            data = await f.read()
+            assert data == b"test data"
+
+    @pytest.mark.asyncio
+    async def test_readline_basic(self, temp_file):
+        """Test basic readline() functionality."""
+        # Write test data with multiple lines
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("Line 1\nLine 2\nLine 3")
+
+        # Read line by line
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            line1 = await f.readline()
+            assert line1 == "Line 1\n"
+
+            line2 = await f.readline()
+            assert line2 == "Line 2\n"
+
+            line3 = await f.readline()
+            assert line3 == "Line 3"  # No newline at end
+
+            eof = await f.readline()
+            assert eof == ""  # EOF returns empty string
+
+    @pytest.mark.asyncio
+    async def test_readline_empty_file(self, temp_file):
+        """Test readline() on empty file."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            pass  # Write nothing
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            line = await f.readline()
+            assert line == ""
+
+    @pytest.mark.asyncio
+    async def test_readline_single_line(self, temp_file):
+        """Test readline() with single line."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("Single line\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            line = await f.readline()
+            assert line == "Single line\n"
+            eof = await f.readline()
+            assert eof == ""
+
+    @pytest.mark.asyncio
+    async def test_readline_vs_iteration(self, temp_file):
+        """Test that readline() and iteration produce same results."""
+        test_data = "Line 1\nLine 2\nLine 3\n"
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(test_data)
+
+        # Read with readline
+        lines_readline = []
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            while True:
+                line = await f.readline()
+                if not line:
+                    break
+                lines_readline.append(line)
+
+        # Read with iteration
+        lines_iter = []
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            async for line in f:
+                lines_iter.append(line)
+
+        assert lines_readline == lines_iter
+
+    @pytest.mark.asyncio
+    async def test_readline_in_write_mode_raises(self, temp_file):
+        """Test that readline() raises in write mode."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            with pytest.raises(IOError, match="File not open for reading"):
+                await f.readline()
+
+    @pytest.mark.asyncio
+    async def test_readline_on_closed_file_raises(self, temp_file):
+        """Test that readline() raises on closed file."""
+        f = AsyncGzipTextFile(temp_file, "wt")
+        async with f:
+            await f.write("test")
+
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.readline()
+
+    @pytest.mark.asyncio
+    async def test_readline_large_lines(self, temp_file):
+        """Test readline() with large lines."""
+        # Create a large line that exceeds buffer size
+        large_line = "x" * 100000 + "\n"
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(large_line)
+            await f.write("small line\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            line1 = await f.readline()
+            assert line1 == large_line
+            line2 = await f.readline()
+            assert line2 == "small line\n"
