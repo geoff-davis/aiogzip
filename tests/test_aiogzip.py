@@ -1613,3 +1613,107 @@ class TestAppendMode:
                 lines.append(line)
 
         assert lines == ["line1\n", "line2\n", "line3\n", "line4\n"]
+
+
+class TestResourceCleanup:
+    """Test proper resource cleanup and concurrent close handling."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_double_close_binary(self, temp_file):
+        """Test that calling close() twice doesn't cause errors."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"test data")
+
+        # File is already closed by context manager
+        # Calling close again should be safe
+        await f.close()
+        await f.close()  # Third close should also be safe
+
+    @pytest.mark.asyncio
+    async def test_double_close_text(self, temp_file):
+        """Test that calling close() twice on text file doesn't cause errors."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("test data")
+
+        # File is already closed by context manager
+        # Calling close again should be safe
+        await f.close()
+        await f.close()  # Third close should also be safe
+
+    @pytest.mark.asyncio
+    async def test_concurrent_close_binary(self, temp_file):
+        """Test concurrent close calls don't cause race conditions."""
+        import asyncio
+
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        async with f:
+            await f.write(b"test data")
+
+        # Attempt to close concurrently
+        # Both should complete without errors
+        await asyncio.gather(
+            f.close(),
+            f.close(),
+            f.close(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_concurrent_close_text(self, temp_file):
+        """Test concurrent close calls on text file don't cause race conditions."""
+        import asyncio
+
+        f = AsyncGzipTextFile(temp_file, "wt")
+        async with f:
+            await f.write("test data")
+
+        # Attempt to close concurrently
+        # Both should complete without errors
+        await asyncio.gather(
+            f.close(),
+            f.close(),
+            f.close(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_operations_after_close_raise_errors(self, temp_file):
+        """Test that operations after close raise appropriate errors."""
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        async with f:
+            await f.write(b"test data")
+
+        # After close, operations should fail
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.write(b"more data")
+
+    @pytest.mark.asyncio
+    async def test_close_with_exception_during_flush(self, temp_file):
+        """Test that close handles exceptions during flush properly."""
+        # Open file but don't use context manager so we can control closure
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        await f.__aenter__()
+        await f.write(b"test data")
+
+        # Close the underlying file first to cause an error during flush
+        if f._file is not None:
+            await f._file.close()
+
+        # Close should mark file as closed even if flush fails
+        # But it should propagate the exception
+        with pytest.raises(Exception):
+            await f.close()
+
+        # File should still be marked as closed
+        assert f._is_closed is True
+
+        # Subsequent closes should be safe (idempotent)
+        await f.close()
+        await f.close()

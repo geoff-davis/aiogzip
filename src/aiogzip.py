@@ -339,20 +339,27 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             return
 
-        if ("w" in self._mode or "a" in self._mode) and self._file is not None:
-            # Flush the compressor to write the gzip trailer
-            remaining_data = self._engine.flush()  # type: ignore
-            if remaining_data:
-                await self._file.write(remaining_data)
-
-        if self._file is not None and (self._owns_file or self._closefd):
-            # Close only if we own it or closefd=True
-            close_method = getattr(self._file, "close", None)
-            if callable(close_method):
-                result = close_method()
-                if hasattr(result, "__await__"):
-                    await result
+        # Mark as closed immediately to prevent concurrent close attempts
         self._is_closed = True
+
+        try:
+            if ("w" in self._mode or "a" in self._mode) and self._file is not None:
+                # Flush the compressor to write the gzip trailer
+                remaining_data = self._engine.flush()  # type: ignore
+                if remaining_data:
+                    await self._file.write(remaining_data)
+
+            if self._file is not None and (self._owns_file or self._closefd):
+                # Close only if we own it or closefd=True
+                close_method = getattr(self._file, "close", None)
+                if callable(close_method):
+                    result = close_method()
+                    if hasattr(result, "__await__"):
+                        await result
+        except Exception:
+            # If an error occurs during close, we're still closed
+            # but we need to propagate the exception
+            raise
 
     def __aiter__(self):
         """Raise error for binary file iteration."""
@@ -698,9 +705,16 @@ class AsyncGzipTextFile:
         if self._is_closed:
             return
 
-        if self._binary_file is not None:
-            await self._binary_file.close()
+        # Mark as closed immediately to prevent concurrent close attempts
         self._is_closed = True
+
+        try:
+            if self._binary_file is not None:
+                await self._binary_file.close()
+        except Exception:
+            # If an error occurs during close, we're still closed
+            # but we need to propagate the exception
+            raise
 
 
 def AsyncGzipFile(filename, mode="rb", **kwargs):
