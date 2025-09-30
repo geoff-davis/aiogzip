@@ -39,6 +39,12 @@ from typing import Protocol, Union
 import aiofiles
 
 
+# Constants
+# The wbits parameter for zlib that enables gzip format
+# 31 = 16 (gzip format) + 15 (maximum window size)
+GZIP_WBITS = 31
+
+
 # Validation helper functions
 def _validate_filename(filename: Union[str, bytes, Path] | None, fileobj) -> None:
     """Validate filename parameter.
@@ -196,12 +202,11 @@ class AsyncGzipBinaryFile:
             self._file = await aiofiles.open(self._filename, self._file_mode)
             self._owns_file = True
 
-        # The 'wbits' parameter is crucial.
-        # 31 is a magic number for zlib (16 + 15) that enables gzip format.
+        # Initialize compression/decompression engine based on mode
         if "w" in self._mode or "a" in self._mode:
-            self._engine = zlib.compressobj(level=self._compresslevel, wbits=31)  # type: ignore
+            self._engine = zlib.compressobj(level=self._compresslevel, wbits=GZIP_WBITS)  # type: ignore
         else:  # 'r' in self._mode
-            self._engine = zlib.decompressobj(wbits=31)  # type: ignore
+            self._engine = zlib.decompressobj(wbits=GZIP_WBITS)  # type: ignore
 
         return self
 
@@ -315,7 +320,7 @@ class AsyncGzipBinaryFile:
                 while self._engine.unused_data:  # type: ignore
                     # Start a new decompressor for the next member
                     unused = self._engine.unused_data  # type: ignore
-                    self._engine = zlib.decompressobj(wbits=31)  # type: ignore
+                    self._engine = zlib.decompressobj(wbits=GZIP_WBITS)  # type: ignore
                     # Decompress the unused data with the new decompressor
                     if unused:
                         decompressed = self._engine.decompress(unused)  # type: ignore
