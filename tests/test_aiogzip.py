@@ -549,14 +549,166 @@ class TestAsyncGzipTextFile:
             read_data = f.read()
             assert read_data == sample_text
 
-        # Write with gzip.open
-        with gzip.open(temp_file, "wt") as f:
-            f.write(sample_text)
 
-        # Read with AsyncGzipTextFile
+class TestTextErrorsBehavior:
+    """Tests for errors= behavior matching gzip semantics."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_read_errors_strict_raises_on_invalid_bytes(self, temp_file):
+        """Reading invalid UTF-8 with errors=strict should raise UnicodeDecodeError."""
+        invalid = b"hello " + b"\xff" + b" world"
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(invalid)
+
+        async with AsyncGzipTextFile(
+            temp_file, "rt", encoding="utf-8", errors="strict"
+        ) as f:
+            with pytest.raises(UnicodeDecodeError):
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_read_errors_replace_inserts_replacement_char(self, temp_file):
+        """errors=replace should insert U+FFFD for undecodable bytes."""
+        invalid = b"good " + b"\xff" + b" text"
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(invalid)
+
+        async with AsyncGzipTextFile(
+            temp_file, "rt", encoding="utf-8", errors="replace"
+        ) as f:
+            data = await f.read()
+            assert data == "good \ufffd text"
+
+    @pytest.mark.asyncio
+    async def test_read_errors_ignore_drops_undecodable_bytes(self, temp_file):
+        """errors=ignore should drop undecodable bytes."""
+        invalid = b"good " + b"\xff" + b" text"
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(invalid)
+
+        async with AsyncGzipTextFile(
+            temp_file, "rt", encoding="utf-8", errors="ignore"
+        ) as f:
+            data = await f.read()
+            assert data == "good  text"
+
+    @pytest.mark.asyncio
+    async def test_write_errors_strict_raises_on_unencodable(self, temp_file):
+        """Writing with unencodable chars using strict should raise UnicodeEncodeError."""
+        text = "ascii and emoji 🚀"
+        async with AsyncGzipTextFile(
+            temp_file, "wt", encoding="ascii", errors="strict"
+        ) as f:
+            with pytest.raises(UnicodeEncodeError):
+                await f.write(text)  # pyrefly: ignore
+
+    @pytest.mark.asyncio
+    async def test_write_errors_ignore_allows_unencodable(self, temp_file):
+        """errors=ignore should drop unencodable characters on write."""
+        text = "ascii and emoji 🚀"
+        async with AsyncGzipTextFile(
+            temp_file, "wt", encoding="ascii", errors="ignore"
+        ) as f:
+            await f.write(text)  # pyrefly: ignore
+
+        # Read back; content should have emoji removed
+        async with AsyncGzipTextFile(
+            temp_file, "rt", encoding="ascii", errors="strict"
+        ) as f:
+            data = await f.read()
+            assert data == "ascii and emoji "
+
+
+class TestTextNewlineBehavior:
+    """Tests for newline handling similar to TextIOWrapper semantics."""
+
+    @pytest.fixture
+    def temp_file(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_read_universal_newlines_default(self, temp_file):
+        # Prepare data containing CRLF and CR line endings
+        raw_text = "line1\r\nline2\rline3\nline4"
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            # newline='' disables translation on write so we store exact bytes
+            await f.write(raw_text)  # pyrefly: ignore
+
+        # Default newline=None should translate to \n on read
         async with AsyncGzipTextFile(temp_file, "rt") as f:
-            read_data = await f.read()
-            assert read_data == sample_text
+            data = await f.read()
+            assert data == "line1\nline2\nline3\nline4"
+
+    @pytest.mark.asyncio
+    async def test_write_translate_default(self, temp_file):
+        # Default newline=None should translate \n -> os.linesep when writing
+        text = "a\nb\n"
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(text)  # pyrefly: ignore
+
+        # Read back raw bytes with binary API and check platform linesep occurrence
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+        decoded = data.decode("utf-8")
+        assert decoded == ("a" + os.linesep + "b" + os.linesep)
+
+    @pytest.mark.asyncio
+    async def test_write_newline_explicit(self, temp_file):
+        text = "a\nb\n"
+        async with AsyncGzipTextFile(temp_file, "wt", newline="\r\n") as f:
+            await f.write(text)  # pyrefly: ignore
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+        decoded = data.decode("utf-8")
+        assert decoded == "a\r\nb\r\n"
+
+    @pytest.mark.asyncio
+    async def test_no_translation_newline_empty(self, temp_file):
+        text = "a\nb\n"
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write(text)  # pyrefly: ignore
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+        assert data.decode("utf-8") == text
+
+
+class TestFileobjSupport:
+    """Tests for wrapping an existing async file-like object via fileobj."""
+
+    @pytest.mark.asyncio
+    async def test_fileobj_roundtrip(self, tmp_path):
+        # Create a real file to obtain an aiofiles handle
+        p = tmp_path / "via_fileobj.gz"
+
+        # Use aiofiles directly to open and pass as fileobj
+        import aiofiles
+
+        async with aiofiles.open(p, "wb") as raw:
+            async with AsyncGzipBinaryFile(None, "wb", fileobj=raw, closefd=False) as f:
+                await f.write(b"hello fileobj")
+
+        # Now read using fileobj as well
+        async with aiofiles.open(p, "rb") as raw_r:
+            async with AsyncGzipBinaryFile(
+                None, "rb", fileobj=raw_r, closefd=False
+            ) as f:
+                data = await f.read()
+                assert data == b"hello fileobj"
 
 
 class TestAiocsvIntegration:
@@ -688,6 +840,16 @@ class TestEdgeCases:
         with pytest.raises(ValueError, match="Filename cannot be empty"):
             AsyncGzipTextFile("")
 
+        with pytest.raises(
+            ValueError, match="Either filename or fileobj must be provided"
+        ):
+            AsyncGzipBinaryFile(None)
+
+        with pytest.raises(
+            ValueError, match="Either filename or fileobj must be provided"
+        ):
+            AsyncGzipTextFile(None)
+
         with pytest.raises(TypeError, match="Filename must be a string"):
             AsyncGzipBinaryFile(123)  # pyrefly: ignore
 
@@ -754,6 +916,30 @@ class TestEdgeCases:
         """Test invalid encoding inputs."""
         with pytest.raises(ValueError, match="Encoding cannot be empty"):
             AsyncGzipTextFile("test.gz", encoding="")
+
+    def test_invalid_errors(self):
+        """Test invalid errors inputs."""
+        with pytest.raises(ValueError, match="Invalid errors value"):
+            AsyncGzipTextFile("test.gz", errors="invalid")
+
+        with pytest.raises(ValueError, match="Errors cannot be None"):
+            AsyncGzipTextFile("test.gz", errors=None)
+
+    def test_valid_errors_values(self):
+        """Test that all valid errors values are accepted."""
+        valid_errors = [
+            "strict",
+            "ignore",
+            "replace",
+            "backslashreplace",
+            "surrogateescape",
+            "xmlcharrefreplace",
+            "namereplace",
+        ]
+        for error_val in valid_errors:
+            # Should not raise an exception
+            f = AsyncGzipTextFile("test.gz", errors=error_val)
+            assert f._errors == error_val
 
     @pytest.mark.asyncio
     async def test_empty_file_operations(self, temp_file):
@@ -865,10 +1051,10 @@ class TestEdgeCases:
         ]
 
         for test_str in test_strings:
-            async with AsyncGzipTextFile(temp_file, "wt") as f:
+            async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
                 await f.write(test_str)
 
-            async with AsyncGzipTextFile(temp_file, "rt") as f:
+            async with AsyncGzipTextFile(temp_file, "rt", newline="") as f:
                 read_str = await f.read()
                 assert read_str == test_str
 

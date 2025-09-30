@@ -93,16 +93,21 @@ class AsyncGzipBinaryFile:
 
     def __init__(
         self,
-        filename: Union[str, bytes, Path],
+        filename: Union[str, bytes, Path] | None,
         mode: str = "rb",
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         compresslevel: int = 6,
+        fileobj: WithAsyncReadWrite | None = None,
+        closefd: bool = True,
     ) -> None:
         # Validate inputs
-        if not filename:
-            raise ValueError("Filename cannot be empty")
-        if not isinstance(filename, (str, bytes, os.PathLike)):
-            raise TypeError("Filename must be a string, bytes, or PathLike object")
+        if filename is None and fileobj is None:
+            raise ValueError("Either filename or fileobj must be provided")
+        if filename is not None:
+            if not isinstance(filename, (str, bytes, os.PathLike)):
+                raise TypeError("Filename must be a string, bytes, or PathLike object")
+            if isinstance(filename, str) and not filename:
+                raise ValueError("Filename cannot be empty")
         if chunk_size <= 0:
             raise ValueError("Chunk size must be positive")
         if chunk_size > 10 * 1024 * 1024:  # 10MB limit
@@ -121,6 +126,8 @@ class AsyncGzipBinaryFile:
         self._mode = mode
         self._chunk_size = chunk_size
         self._compresslevel = compresslevel
+        self._external_file = fileobj
+        self._closefd = closefd
 
         # Determine the underlying file mode based on gzip mode
         if mode.startswith("r"):
@@ -137,10 +144,18 @@ class AsyncGzipBinaryFile:
         self._buffer = bytearray()  # Use bytearray for efficient buffer growth
         self._is_closed: bool = False
         self._eof: bool = False
+        self._owns_file: bool = False
 
     async def __aenter__(self) -> "AsyncGzipBinaryFile":
         """Enter the async context manager and initialize resources."""
-        self._file = await aiofiles.open(self._filename, self._file_mode)
+        if self._external_file is not None:
+            self._file = self._external_file
+            self._owns_file = False
+        else:
+            if self._filename is None:
+                raise ValueError("Filename must be provided when fileobj is not given")
+            self._file = await aiofiles.open(self._filename, self._file_mode)
+            self._owns_file = True
 
         # The 'wbits' parameter is crucial.
         # 31 is a magic number for zlib (16 + 15) that enables gzip format.
@@ -270,8 +285,13 @@ class AsyncGzipBinaryFile:
             if remaining_data:
                 await self._file.write(remaining_data)
 
-        if self._file is not None:
-            await self._file.close()
+        if self._file is not None and (self._owns_file or self._closefd):
+            # Close only if we own it or closefd=True
+            close_method = getattr(self._file, "close", None)
+            if callable(close_method):
+                result = close_method()
+                if hasattr(result, "__await__"):
+                    await result
         self._is_closed = True
 
     def __aiter__(self):
@@ -310,23 +330,46 @@ class AsyncGzipTextFile:
 
     def __init__(
         self,
-        filename: Union[str, bytes, Path],
+        filename: Union[str, bytes, Path] | None,
         mode: str = "rt",
         chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
         encoding: str = "utf-8",
+        errors: str = "strict",
+        newline: str | None = None,
         compresslevel: int = 6,
+        fileobj: WithAsyncReadWrite | None = None,
+        closefd: bool = True,
     ) -> None:
         # Validate inputs
-        if not filename:
-            raise ValueError("Filename cannot be empty")
-        if not isinstance(filename, (str, bytes, os.PathLike)):
-            raise TypeError("Filename must be a string, bytes, or PathLike object")
+        if filename is None and fileobj is None:
+            raise ValueError("Either filename or fileobj must be provided")
+        if filename is not None:
+            if not isinstance(filename, (str, bytes, os.PathLike)):
+                raise TypeError("Filename must be a string, bytes, or PathLike object")
+            if isinstance(filename, str) and not filename:
+                raise ValueError("Filename cannot be empty")
         if chunk_size <= 0:
             raise ValueError("Chunk size must be positive")
         if chunk_size > 10 * 1024 * 1024:  # 10MB limit
             raise ValueError("Chunk size too large (max 10MB)")
         if not encoding:
             raise ValueError("Encoding cannot be empty")
+        if errors is None:
+            raise ValueError("Errors cannot be None")
+        # Validate errors parameter - same values as Python's open()
+        valid_errors = {
+            "strict",
+            "ignore",
+            "replace",
+            "backslashreplace",
+            "surrogateescape",
+            "xmlcharrefreplace",
+            "namereplace",
+        }
+        if errors not in valid_errors:
+            raise ValueError(
+                f"Invalid errors value '{errors}'. Valid values: {', '.join(sorted(valid_errors))}"
+            )
         if not (0 <= compresslevel <= 9):
             raise ValueError("Compression level must be between 0 and 9")
 
@@ -341,7 +384,11 @@ class AsyncGzipTextFile:
         self._mode = mode
         self._chunk_size = chunk_size
         self._encoding = encoding
+        self._errors = errors
+        self._newline = newline
         self._compresslevel = compresslevel
+        self._external_file = fileobj
+        self._closefd = closefd
 
         # Determine the underlying binary file mode
         if mode.startswith("r"):
@@ -386,10 +433,12 @@ class AsyncGzipTextFile:
     async def __aenter__(self):
         """Enter the async context manager and initialize resources."""
         self._binary_file = AsyncGzipBinaryFile(
-            str(self._filename),
+            str(self._filename) if self._filename is not None else None,
             self._binary_mode,
             self._chunk_size,
             self._compresslevel,
+            fileobj=self._external_file,
+            closefd=self._closefd,
         )  # pyrefly: ignore
         await self._binary_file.__aenter__()  # pyrefly: ignore
         return self
@@ -419,8 +468,19 @@ class AsyncGzipTextFile:
         if not isinstance(data, str):
             raise TypeError("write() argument must be str, not bytes")
 
+        # Translate newlines according to Python's text I/O semantics
+        text_to_encode = data
+        if self._newline is None:
+            # Translate \n to os.linesep on write
+            text_to_encode = text_to_encode.replace("\n", os.linesep)
+        elif self._newline in ("\n", "\r", "\r\n"):
+            text_to_encode = text_to_encode.replace("\n", self._newline)
+        else:
+            # newline == '' means no translation; any other value treat as no translation
+            pass
+
         # Encode string to bytes
-        encoded_data = data.encode(self._encoding)
+        encoded_data = text_to_encode.encode(self._encoding, errors=self._errors)
         return await self._binary_file.write(encoded_data)
 
     async def read(self, size: int = -1) -> str:
@@ -452,6 +512,7 @@ class AsyncGzipTextFile:
             all_data = self._pending_bytes + raw_data
             self._pending_bytes = b""  # pyrefly: ignore
             decoded = self._safe_decode(all_data)
+            decoded = self._apply_newline_decoding(decoded)
             # Combine buffered text with newly decoded data
             result = self._text_data + decoded
             self._text_data = ""  # pyrefly: ignore
@@ -483,7 +544,7 @@ class AsyncGzipTextFile:
                     all_data
                 )
                 self._pending_bytes = remaining_bytes
-                self._text_data += decoded_chunk
+                self._text_data += self._apply_newline_decoding(decoded_chunk)
 
             # Return the requested number of characters
             result = self._text_data[:size] if size > 0 else self._text_data
@@ -500,11 +561,9 @@ class AsyncGzipTextFile:
         if not data:
             return ""
 
-        try:
-            return data.decode(self._encoding)
-        except UnicodeDecodeError:
-            # If all else fails, use error replacement
-            return data.decode(self._encoding, errors="replace")
+        # For read(-1), we are at logical EOF for this read operation.
+        # Defer to the configured error policy (default: strict).
+        return data.decode(self._encoding, errors=self._errors)
 
     def _safe_decode_with_remainder(self, data: bytes) -> tuple[str, bytes]:
         """
@@ -515,24 +574,44 @@ class AsyncGzipTextFile:
         if not data:
             return "", b""
 
+        # First, try a strict decode to see if the buffer is fully decodable.
         try:
             return data.decode(self._encoding), b""
-        except UnicodeDecodeError:
-            # Handle incomplete multi-byte sequences at the end
-            # Use the pre-calculated max incomplete bytes for this encoding
-            # This optimization changes O(n²) worst case to O(1) for common encodings
+        except UnicodeDecodeError as strict_err:
+            # Attempt to detect an incomplete multi-byte sequence at the end
+            # and buffer it for the next read.
             max_check = min(self._max_incomplete_bytes, len(data))
-
             for i in range(1, max_check + 1):
                 try:
-                    decoded = data[:-i].decode(self._encoding)
-                    remaining = data[-i:]
-                    return decoded, remaining
+                    decoded_prefix = data[:-i].decode(self._encoding)
+                    remaining_suffix = data[-i:]
+                    return decoded_prefix, remaining_suffix
                 except UnicodeDecodeError:
                     continue
 
-            # If we still can't decode, use error replacement
-            return data.decode(self._encoding, errors="replace"), b""
+            # If not a boundary issue, honor the configured errors policy.
+            if self._errors == "strict":
+                raise strict_err
+            # Non-strict: decode with the provided policy and do not carry remainder
+            return data.decode(self._encoding, errors=self._errors), b""
+
+    def _apply_newline_decoding(self, text: str) -> str:
+        """Apply newline decoding/translation semantics similar to TextIOWrapper.
+
+        - newline is None: universal newline translation on input -> normalize CRLF/CR to \n
+        - newline is '': no translation
+        - newline is one of '\n', '\r', '\r\n': no translation on input
+        """
+        if not text:
+            return text
+        if self._newline is None:
+            # Universal newline translation
+            # First convert CRLF to LF, then CR to LF
+            text = text.replace("\r\n", "\n")
+            text = text.replace("\r", "\n")
+            return text
+        # newline '' or explicit newline: do not translate on input
+        return text
 
     def __aiter__(self):
         """Make AsyncGzipTextFile iterable for line-by-line reading."""
