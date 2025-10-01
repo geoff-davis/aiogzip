@@ -1395,7 +1395,7 @@ class TestPathlibSupport:
     @pytest.mark.asyncio
     async def test_path_with_bytes(self, temp_file):
         """Test with bytes path (os.PathLike)."""
-        path_bytes = temp_file.encode('utf-8')
+        path_bytes = temp_file.encode("utf-8")
         test_data = b"Hello, bytes path!"
 
         # Write with bytes path
@@ -1422,7 +1422,9 @@ class TestClosefdParameter:
         # Open file and pass to AsyncGzipBinaryFile with closefd=True
         file_handle = await aiofiles.open(p, "wb")
 
-        async with AsyncGzipBinaryFile(None, "wb", fileobj=file_handle, closefd=True) as f:
+        async with AsyncGzipBinaryFile(
+            None, "wb", fileobj=file_handle, closefd=True
+        ) as f:
             await f.write(b"test data")
 
         # File should be closed after context manager exit
@@ -1440,7 +1442,9 @@ class TestClosefdParameter:
         # Open file and pass to AsyncGzipBinaryFile with closefd=False
         file_handle = await aiofiles.open(p, "wb")
 
-        async with AsyncGzipBinaryFile(None, "wb", fileobj=file_handle, closefd=False) as f:
+        async with AsyncGzipBinaryFile(
+            None, "wb", fileobj=file_handle, closefd=False
+        ) as f:
             await f.write(b"test data")
 
         # File should still be open after context manager exit
@@ -1478,7 +1482,9 @@ class TestClosefdParameter:
         # Open file and pass to AsyncGzipTextFile with closefd=False
         file_handle = await aiofiles.open(p, "wb")
 
-        async with AsyncGzipTextFile(None, "wt", fileobj=file_handle, closefd=False) as f:
+        async with AsyncGzipTextFile(
+            None, "wt", fileobj=file_handle, closefd=False
+        ) as f:
             await f.write("test text")
 
         # File should still be accessible
@@ -1773,7 +1779,10 @@ class TestErrorHandlingConsistency:
         except OSError as e:
             # Should have a __cause__ from the original zlib.error
             assert e.__cause__ is not None
-            assert "zlib" in str(type(e.__cause__)).lower() or "error" in str(type(e.__cause__)).lower()
+            assert (
+                "zlib" in str(type(e.__cause__)).lower()
+                or "error" in str(type(e.__cause__)).lower()
+            )
 
     @pytest.mark.asyncio
     async def test_clear_error_messages(self, temp_file):
@@ -1792,8 +1801,6 @@ class TestErrorHandlingConsistency:
     @pytest.mark.asyncio
     async def test_io_errors_not_wrapped(self, tmp_path):
         """Test that I/O errors are re-raised as-is, not wrapped."""
-        import aiofiles
-
         # Create a file that we'll delete while reading
         test_file = tmp_path / "test.gz"
 
@@ -1809,7 +1816,9 @@ class TestErrorHandlingConsistency:
             await f._file.close()
 
         # Try to read - should get an I/O error (not wrapped in our custom OSError)
-        with pytest.raises((OSError, ValueError)):  # aiofiles may raise ValueError for closed file
+        with pytest.raises(
+            (OSError, ValueError)
+        ):  # aiofiles may raise ValueError for closed file
             await f.read()
 
         # Clean up

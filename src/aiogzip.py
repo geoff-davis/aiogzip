@@ -299,13 +299,13 @@ class AsyncGzipBinaryFile:
         if size == -1:
             # Return buffered data + read remaining (no recursion)
             chunks = [bytes(self._buffer)] if self._buffer else []
-            self._buffer = bytearray()
+            del self._buffer[:]  # Clear while retaining capacity
 
             while not self._eof:
                 await self._fill_buffer()
                 if self._buffer:
                     chunks.append(bytes(self._buffer))
-                    self._buffer = bytearray()
+                    del self._buffer[:]  # Clear while retaining capacity
 
             return b"".join(chunks)
         else:
