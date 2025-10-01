@@ -1,5 +1,9 @@
 """
-AsyncGzipFile - Asynchronous gzip file reader/writer with aiocsv support
+AsyncGzipFile - Asynchronous gzip file reader/writer with aiocsv support"""
+
+__version__ = "0.2.0"
+
+"""
 
 This module provides AsyncGzipBinaryFile and AsyncGzipTextFile, async replacements
 for gzip.open() with proper separation of binary and text operations.

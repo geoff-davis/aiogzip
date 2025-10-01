@@ -77,13 +77,22 @@ asyncio.run(main())
 
 ## Performance
 
-`aiogzip` is a specialized tool that excels in text-based, async workflows but may be slower than the standard library for binary operations.
+`aiogzip` is optimized for text-based async workflows and provides excellent performance across different scenarios:
 
-According to the benchmarks, `aiogzip` is:
+**Text Operations** (where aiogzip excels):
+- **2.4x faster** for bulk text read/write operations (33 MB/s vs 13.8 MB/s)
+- **2.0x faster** for JSONL processing workflows
+- **1.7M lines/sec** for line-by-line iteration
+- `async for` and `readline()` have equivalent performance
 
-- **4.3x faster** for general text file operations.
-- **1.6x faster** when processing structured text like JSONL files.
-- **1.1x slower** for binary file operations using 1KB chunk sizes.
+**Binary Operations** (comparable to standard gzip):
+- **1.14x faster** with many small chunks (1.65M chunks/sec) - better overhead handling
+- **~50 MB/s** throughput for bulk operations (comparable to gzip's ~52 MB/s)
+- **Equivalent performance** for typical 64KB chunked streaming
+
+**Concurrency** (with simulated I/O):
+- **1.5x faster** when processing multiple files with I/O delays
+- Enables non-blocking concurrent file operations
 
 The key is to match the tool to the task. Use `aiogzip` where its async and text-handling capabilities provide the most significant advantage.
 
@@ -102,17 +111,20 @@ The key is to match the tool to the task. Use `aiogzip` where its async and text
 
 ✅ **Recommended for:**
 
-- Async applications processing text, CSV, or JSONL files.
-- Streaming text-based data pipelines.
-- Applications where async integration and concurrent file processing are more important than raw binary I/O speed.
+- **Text file processing**: 2.4x performance advantage for text operations
+- **Async applications**: Processing CSV, JSONL, or log files in async pipelines
+- **Concurrent workflows**: Processing multiple files simultaneously
+- **Many small writes**: Better overhead handling (1.65M small chunks/sec)
+- **Integration with async libraries**: Works seamlessly with `aiohttp`, `aiocsv`, etc.
 
 ### When to Use Standard `gzip`
 
 ❌ **Consider standard `gzip` for:**
 
-- Purely synchronous applications.
-- Applications that are highly memory-constrained, as `aiogzip` may use more memory during decompression of highly compressible data due to internal buffering.
-- Workloads dominated by binary file I/O where maximum performance is essential.
+- **Purely synchronous applications**: No async event loop overhead
+- **Simple binary file operations**: Comparable performance (~50 MB/s for both)
+- **Memory-constrained environments**: `aiogzip` may use more memory for buffering
+- **Seeking/metadata operations**: Not yet supported by `aiogzip`
 
 ---
 
