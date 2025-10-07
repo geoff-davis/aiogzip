@@ -3,6 +3,7 @@
 import gzip
 import os
 import tempfile
+from typing import Union
 
 import aiocsv
 import pytest
@@ -1306,7 +1307,7 @@ class TestProtocols:
         """Test WithAsyncWrite protocol."""
 
         class MockWriter:
-            async def write(self, data: str | bytes) -> int:
+            async def write(self, data: Union[str, bytes]) -> int:
                 return len(data)
 
         writer: WithAsyncWrite = MockWriter()
@@ -1316,10 +1317,10 @@ class TestProtocols:
         """Test WithAsyncReadWrite protocol."""
 
         class MockReadWriter:
-            async def read(self, size: int = -1) -> str | bytes:
+            async def read(self, size: int = -1) -> Union[str, bytes]:
                 return "test data"
 
-            async def write(self, data: str | bytes) -> int:
+            async def write(self, data: Union[str, bytes]) -> int:
                 return len(data)
 
         read_writer: WithAsyncReadWrite = MockReadWriter()

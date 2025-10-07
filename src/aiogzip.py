@@ -51,7 +51,7 @@ Error Handling Strategy:
 import os
 import zlib
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, Union, Tuple, Optional
 
 import aiofiles
 
@@ -74,7 +74,7 @@ ZlibEngine = Any
 
 
 # Validation helper functions
-def _validate_filename(filename: str | bytes | Path | None, fileobj) -> None:
+def _validate_filename(filename: Union[str, bytes, Path, None], fileobj) -> None:
     """Validate filename parameter.
 
     Args:
@@ -106,7 +106,9 @@ def _validate_chunk_size(chunk_size: int) -> None:
     if chunk_size <= 0:
         raise ValueError("Chunk size must be positive")
     if chunk_size > MAX_CHUNK_SIZE:
-        raise ValueError(f"Chunk size too large (max {MAX_CHUNK_SIZE // (1024 * 1024)}MB)")
+        raise ValueError(
+            f"Chunk size too large (max {MAX_CHUNK_SIZE // (1024 * 1024)}MB)"
+        )
 
 
 def _validate_compresslevel(compresslevel: int) -> None:
@@ -125,20 +127,20 @@ def _validate_compresslevel(compresslevel: int) -> None:
 class WithAsyncRead(Protocol):
     """Protocol for async file-like objects that can be read."""
 
-    async def read(self, size: int = -1) -> str | bytes: ...
+    async def read(self, size: int = -1) -> Union[str, bytes]: ...
 
 
 class WithAsyncWrite(Protocol):
     """Protocol for async file-like objects that can be written."""
 
-    async def write(self, data: str | bytes) -> int: ...
+    async def write(self, data: Union[str, bytes]) -> int: ...
 
 
 class WithAsyncReadWrite(Protocol):
     """Protocol for async file-like objects that can be read and written."""
 
-    async def read(self, size: int = -1) -> str | bytes: ...
-    async def write(self, data: str | bytes) -> int: ...
+    async def read(self, size: int = -1) -> Union[str, bytes]: ...
+    async def write(self, data: Union[str, bytes]) -> int: ...
 
 
 class AsyncGzipBinaryFile:
@@ -176,11 +178,11 @@ class AsyncGzipBinaryFile:
 
     def __init__(
         self,
-        filename: str | bytes | Path | None,
+        filename: Union[str, bytes, Path, None],
         mode: str = "rb",
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         compresslevel: int = 6,
-        fileobj: WithAsyncReadWrite | None = None,
+        fileobj: Optional[WithAsyncReadWrite] = None,
         closefd: bool = True,
     ) -> None:
         # Validate inputs using shared validation functions
@@ -473,14 +475,14 @@ class AsyncGzipTextFile:
 
     def __init__(
         self,
-        filename: str | bytes | Path | None,
+        filename: Union[str, bytes, Path, None],
         mode: str = "rt",
         chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
         encoding: str = "utf-8",
         errors: str = "strict",
-        newline: str | None = None,
+        newline: Union[str, None] = None,
         compresslevel: int = 6,
-        fileobj: WithAsyncReadWrite | None = None,
+        fileobj: Optional[WithAsyncReadWrite] = None,
         closefd: bool = True,
     ) -> None:
         # Validate inputs using shared validation functions
@@ -535,7 +537,7 @@ class AsyncGzipTextFile:
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
-        self._binary_file: AsyncGzipBinaryFile | None = None
+        self._binary_file: Optional[AsyncGzipBinaryFile] = None
         self._text_buffer: str = ""
         self._is_closed: bool = False
         self._pending_bytes: bytes = b""  # Buffer for incomplete multi-byte sequences
@@ -700,7 +702,7 @@ class AsyncGzipTextFile:
         # Defer to the configured error policy (default: strict).
         return data.decode(self._encoding, errors=self._errors)
 
-    def _safe_decode_with_remainder(self, data: bytes) -> tuple[str, bytes]:
+    def _safe_decode_with_remainder(self, data: bytes) -> Tuple[str, bytes]:
         """
         Safely decode bytes to string, handling multi-byte characters
         that might be split across buffer boundaries. Returns both the decoded

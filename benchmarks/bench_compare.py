@@ -10,10 +10,10 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 
-def load_results(filepath: Path) -> dict[str, Any]:
+def load_results(filepath: Path) -> Dict[str, Any]:
     """Load benchmark results from JSON file."""
     with open(filepath) as f:
         return json.load(f)
@@ -69,7 +69,9 @@ def compare_results(baseline: dict, current: dict) -> None:
         # Truncate long names
         display_name = name[:38] + ".." if len(name) > 40 else name
 
-        print(f"{display_name:<40} {baseline_time:>10.3f}s {current_time:>10.3f}s {change_str:<12}")
+        print(
+            f"{display_name:<40} {baseline_time:>10.3f}s {current_time:>10.3f}s {change_str:<12}"
+        )
 
     # Summary
     print("\n" + "=" * 70)
@@ -95,7 +97,9 @@ def compare_results(baseline: dict, current: dict) -> None:
 
     if total_baseline > 0:
         overall_change = ((total_current - total_baseline) / total_baseline) * 100
-        print(f"\nOverall: {total_baseline:.3f}s → {total_current:.3f}s ({overall_change:+.1f}%)")
+        print(
+            f"\nOverall: {total_baseline:.3f}s → {total_current:.3f}s ({overall_change:+.1f}%)"
+        )
 
 
 def main():
