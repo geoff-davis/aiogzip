@@ -352,6 +352,16 @@ class TestAsyncGzipBinaryFile:
             assert remaining_data == sample_data[10:]
 
     @pytest.mark.asyncio
+    async def test_binary_read_negative_size_returns_all(self, temp_file, sample_data):
+        """Negative size arguments should read the entire remaining stream."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(sample_data)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read(-5)
+            assert data == sample_data
+
+    @pytest.mark.asyncio
     async def test_binary_large_data(self, temp_file, large_data):
         """Test with large data in binary mode."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -436,6 +446,24 @@ class TestAsyncGzipTextFile:
             # Read remaining data
             remaining_data = await f.read()
             assert remaining_data == sample_text[10:]
+
+    @pytest.mark.asyncio
+    async def test_text_read_negative_size_returns_all(self, temp_file, sample_text):
+        """Negative size should behave the same as read(-1)."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(sample_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            data = await f.read(-42)
+            assert data == sample_text
+
+    @pytest.mark.asyncio
+    async def test_text_write_returns_character_count(self, temp_file):
+        """write() should report the number of characters, not bytes."""
+        text = "snowman ☃ and rocket 🚀"
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            written = await f.write(text)
+            assert written == len(text)
 
     @pytest.mark.asyncio
     async def test_text_read_all_after_partial_with_buffering(self, temp_file):

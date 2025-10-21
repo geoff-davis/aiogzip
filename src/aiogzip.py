@@ -301,6 +301,11 @@ class AsyncGzipBinaryFile:
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
 
+        if size is None:
+            size = -1
+        if size < 0:
+            size = -1
+
         # If size is -1, read all data in chunks to avoid memory issues
         if size == -1:
             # Return buffered data + read remaining (no recursion)
@@ -618,7 +623,8 @@ class AsyncGzipTextFile:
 
         # Encode string to bytes
         encoded_data = text_to_encode.encode(self._encoding, errors=self._errors)
-        return await self._binary_file.write(encoded_data)
+        await self._binary_file.write(encoded_data)
+        return len(text_to_encode)
 
     async def read(self, size: int = -1) -> str:
         """
@@ -641,6 +647,11 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
+
+        if size is None:
+            size = -1
+        if size < 0:
+            size = -1
 
         if size == -1:
             # Read all remaining data (including any buffered text)
