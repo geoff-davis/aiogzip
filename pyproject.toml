@@ -43,3 +43,6 @@ py-modules = ["aiogzip"]
 
 [tool.setuptools.dynamic]
 version = { attr = "aiogzip.__version__" }
+
+[tool.ruff.per-file-ignores]
+"src/aiogzip.py" = ["E402"]

@@ -85,17 +85,20 @@ asyncio.run(main())
 `aiogzip` is optimized for text-based async workflows and provides excellent performance across different scenarios:
 
 **Text Operations** (where aiogzip excels):
+
 - **2.4x faster** for bulk text read/write operations (33 MB/s vs 13.8 MB/s)
 - **2.0x faster** for JSONL processing workflows
 - **1.7M lines/sec** for line-by-line iteration
 - `async for` and `readline()` have equivalent performance
 
 **Binary Operations** (comparable to standard gzip):
+
 - **1.14x faster** with many small chunks (1.65M chunks/sec) - better overhead handling
 - **~50 MB/s** throughput for bulk operations (comparable to gzip's ~52 MB/s)
 - **Equivalent performance** for typical 64KB chunked streaming
 
 **Concurrency** (with simulated I/O):
+
 - **1.5x faster** when processing multiple files with I/O delays
 - Enables non-blocking concurrent file operations
 
