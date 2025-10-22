@@ -1,7 +1,7 @@
 """
 AsyncGzipFile - Asynchronous gzip file reader/writer with aiocsv support"""
 
-__version__ = "0.2.5"
+__version__ = "0.3"
 
 """
 
@@ -446,7 +446,7 @@ class AsyncGzipBinaryFile:
 
     def __aiter__(self):
         """Raise error for binary file iteration."""
-        raise ValueError("AsyncGzipBinaryFile can only be iterated in text mode")
+        raise TypeError("AsyncGzipBinaryFile can only be iterated in text mode")
 
 
 class AsyncGzipTextFile:
@@ -624,7 +624,7 @@ class AsyncGzipTextFile:
         # Encode string to bytes
         encoded_data = text_to_encode.encode(self._encoding, errors=self._errors)
         await self._binary_file.write(encoded_data)
-        return len(text_to_encode)
+        return len(data)
 
     async def read(self, size: int = -1) -> str:
         """

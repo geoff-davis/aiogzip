@@ -212,7 +212,7 @@ class TestAsyncGzipFile:
             await f.write(b"test data")  # pyrefly: ignore
 
         async with AsyncGzipFile(temp_file, "rb") as f:
-            with pytest.raises(ValueError, match="can only be iterated in text mode"):
+            with pytest.raises(TypeError, match="can only be iterated in text mode"):
                 async for line in f:
                     pass
 
@@ -464,6 +464,19 @@ class TestAsyncGzipTextFile:
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             written = await f.write(text)
             assert written == len(text)
+
+    @pytest.mark.asyncio
+    async def test_text_write_character_count_with_newline_translation(self, temp_file):
+        """Character count should ignore newline expansion during encoding."""
+        text = "line1\nline2\n"
+        async with AsyncGzipTextFile(temp_file, "wt", newline="\r\n") as f:
+            written = await f.write(text)
+            assert written == len(text)
+
+        # Ensure newline translation actually occurred in the stored bytes.
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+        assert data.count(b"\r\n") == text.count("\n")
 
     @pytest.mark.asyncio
     async def test_text_read_all_after_partial_with_buffering(self, temp_file):

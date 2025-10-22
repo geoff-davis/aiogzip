@@ -1,7 +1,7 @@
 # src/aiogzip/__init__.py
 """AsyncGzipFile - Asynchronous gzip file reader/writer."""
 
-__version__ = "0.2.5"
+__version__ = "0.3"
 
 from .aiogzip import (
     AsyncGzipBinaryFile,

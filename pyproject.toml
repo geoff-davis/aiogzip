@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aiogzip"
-version = "0.2.5"
+version = "0.3"
 authors = [
   { name="Geoff Davis", email="geoff@keksi.ai" },
 ]
