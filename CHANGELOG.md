@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3] - Unreleased
+## [Unreleased]
+
+## [0.3] - 2025-10-21
 
 - Fix handling of negative `size` values so reads return the full remaining payload in both binary and text modes.
 - Make `AsyncGzipTextFile.write()` report the number of characters written instead of encoded byte counts.
