@@ -38,7 +38,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install .[dev,csv]
 
-      # Step 4: Run pytest
-      - name: Run tests with pytest
+      # Step 4: Run pytest with coverage
+      - name: Run tests with pytest and coverage
         run: |
-          pytest
+          pytest --cov --cov-report=term-missing --cov-report=xml --cov-report=html
+
+      # Step 5: Upload coverage to Codecov (optional)
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.12'
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false

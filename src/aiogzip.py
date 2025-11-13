@@ -551,6 +551,7 @@ class AsyncGzipTextFile:
         )
         self._line_buffer: str = ""  # Initialize line buffer here for efficiency
         self._max_incomplete_bytes = self._determine_max_incomplete_bytes()
+        self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
 
     def _determine_max_incomplete_bytes(self) -> int:
         """
@@ -653,6 +654,10 @@ class AsyncGzipTextFile:
         if size < 0:
             size = -1
 
+        # Handle read(0) - should return empty string without draining buffer
+        if size == 0:
+            return ""
+
         if size == -1:
             # Read all remaining data (including any buffered text)
             raw_data: bytes = await self._binary_file.read(-1)
@@ -743,20 +748,80 @@ class AsyncGzipTextFile:
             # Non-strict: decode with the provided policy and do not carry remainder
             return data.decode(self._encoding, errors=self._errors), b""
 
+    def _get_line_terminator_pos(self, text: str) -> tuple[int, int]:
+        """Find position of line terminator in text based on newline mode.
+
+        Returns:
+            Tuple of (position, length) where position is index of first terminator
+            character and length is the terminator length (1 or 2).
+            Returns (-1, 0) if no terminator found.
+        """
+        if self._newline is None or self._newline == "":
+            # Universal newlines: accept \n, \r, or \r\n
+            pos_n = text.find("\n")
+            pos_r = text.find("\r")
+
+            if pos_n == -1 and pos_r == -1:
+                return (-1, 0)
+            elif pos_n == -1:
+                # Only \r found, check if \r\n
+                if pos_r + 1 < len(text) and text[pos_r + 1] == "\n":
+                    return (pos_r, 2)
+                return (pos_r, 1)
+            elif pos_r == -1:
+                return (pos_n, 1)
+            else:
+                # Both found, use whichever comes first
+                if pos_r < pos_n:
+                    if pos_r + 1 == pos_n:  # \r\n sequence
+                        return (pos_r, 2)
+                    return (pos_r, 1)
+                return (pos_n, 1)
+        elif self._newline == "\n":
+            pos = text.find("\n")
+            return (pos, 1) if pos != -1 else (-1, 0)
+        elif self._newline == "\r":
+            pos = text.find("\r")
+            return (pos, 1) if pos != -1 else (-1, 0)
+        elif self._newline == "\r\n":
+            pos = text.find("\r\n")
+            return (pos, 2) if pos != -1 else (-1, 0)
+        else:
+            # Fallback to \n
+            pos = text.find("\n")
+            return (pos, 1) if pos != -1 else (-1, 0)
+
     def _apply_newline_decoding(self, text: str) -> str:
         """Apply newline decoding/translation semantics similar to TextIOWrapper.
 
         - newline is None: universal newline translation on input -> normalize CRLF/CR to \n
         - newline is '': no translation
         - newline is one of '\n', '\r', '\r\n': no translation on input
+
+        Handles CRLF sequences split across chunk boundaries by tracking trailing \r.
         """
         if not text:
             return text
         if self._newline is None:
             # Universal newline translation
-            # First convert CRLF to LF, then CR to LF
+            # Handle trailing \r from previous chunk
+            if self._trailing_cr and text and text[0] == "\n":
+                # Previous chunk ended with \r, this starts with \n - it's a CRLF
+                # Remove the \n since the \r was already converted to \n in previous chunk
+                text = text[1:]
+
+            # Reset trailing CR flag
+            self._trailing_cr = False
+
+            # Check if this chunk ends with \r (before we do replacements)
+            # This \r might be followed by \n in the next chunk
+            if text and text[-1] == "\r":
+                self._trailing_cr = True
+
+            # Convert CRLF to LF, then remaining CR to LF
             text = text.replace("\r\n", "\n")
             text = text.replace("\r", "\n")
+
             return text
         # newline '' or explicit newline: do not translate on input
         return text
@@ -772,10 +837,13 @@ class AsyncGzipTextFile:
 
         # Read until we get a complete line
         while True:
-            # Try to get a line from our buffer
-            if "\n" in self._line_buffer:
-                line, self._line_buffer = self._line_buffer.split("\n", 1)
-                return line + "\n"  # Preserve the newline
+            # Try to get a line from our buffer using newline-aware search
+            pos, length = self._get_line_terminator_pos(self._line_buffer)
+            if pos != -1:
+                # Found a line terminator
+                line = self._line_buffer[: pos + length]
+                self._line_buffer = self._line_buffer[pos + length :]
+                return line
 
             # Read more data
             chunk: str = await self.read(LINE_READ_CHUNK_SIZE)
@@ -812,11 +880,14 @@ class AsyncGzipTextFile:
         if "r" not in self._mode:
             raise IOError("File not open for reading")
 
-        # Try to get a line from our buffer
+        # Try to get a line from our buffer using newline-aware search
         while True:
-            if "\n" in self._line_buffer:
-                line, self._line_buffer = self._line_buffer.split("\n", 1)
-                return line + "\n"  # Preserve the newline
+            pos, length = self._get_line_terminator_pos(self._line_buffer)
+            if pos != -1:
+                # Found a line terminator
+                line = self._line_buffer[: pos + length]
+                self._line_buffer = self._line_buffer[pos + length :]
+                return line
 
             # Read more data
             chunk: str = await self.read(LINE_READ_CHUNK_SIZE)

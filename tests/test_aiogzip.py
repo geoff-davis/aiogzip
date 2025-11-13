@@ -2911,12 +2911,11 @@ class TestNewlineHandlingBugs:
         assert result == expected, f"Got {newline_count} newlines instead of 1, CRLF was split incorrectly"
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="BUG: Line iteration doesn't respect newline='\\r' mode", strict=True)
     async def test_line_iteration_with_cr_only_newline(self, temp_file):
         """Test that line iteration respects newline='\\r' mode.
 
-        BUG: __anext__/readline always search for '\\n' regardless of newline mode.
-        Files with bare \\r line endings fail to split correctly.
+        FIXED: __anext__/readline now respect newline mode parameter.
+        Files with bare \\r line endings split correctly.
         """
         # Write file with CR-only line endings
         async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
@@ -2938,9 +2937,11 @@ class TestNewlineHandlingBugs:
         # but it should at least attempt to handle \r as a terminator
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="BUG: readline doesn't respect newline='\\r' mode", strict=True)
     async def test_readline_with_cr_only_newline(self, temp_file):
-        """Test that readline respects newline='\\r' mode."""
+        """Test that readline respects newline='\\r' mode.
+
+        FIXED: readline now respects newline mode parameter.
+        """
         async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
             await f.write("line1\rline2\rline3")
 
