@@ -2859,3 +2859,149 @@ class TestLowPriorityEdgeCases:
             await f.flush()
 
         await f.__aexit__(None, None, None)
+
+
+class TestNewlineHandlingBugs:
+    """Tests for newline handling bugs identified in code review."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_crlf_split_across_chunk_boundary(self, temp_file):
+        """Test that CRLF split across chunk boundaries is handled correctly.
+
+        BUG: _apply_newline_decoding is stateless, so when \\r\\n is split across
+        chunks, the \\r at end of chunk1 gets converted to \\n, then the \\n at
+        start of chunk2 is kept, resulting in \\n\\n (two line breaks).
+        """
+        # Create text with CRLF positioned to split across chunk boundary
+        chunk_size = 1024
+
+        # Position CRLF so \r is at byte 1023 and \n is at byte 1024
+        # After UTF-8 encoding, we need to account for compression effects
+        # Use a predictable pattern
+        text = "x" * (chunk_size - 10) + "\r\n" + "y" * 100
+
+        # Write with newline='' to preserve exact CRLF
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write(text)
+
+        # Read back with default newline=None (universal newlines)
+        # Should convert all CRLF to LF
+        async with AsyncGzipTextFile(temp_file, "rt", chunk_size=chunk_size) as f:
+            # Force small chunk size at binary level to trigger split
+            f._binary_file._chunk_size = 100  # Very small to force CRLF split
+            result = await f.read()
+
+        # Should have exactly one newline, not two
+        # Bug causes "\r\n" → "\n\n"
+        expected = "x" * (chunk_size - 10) + "\n" + "y" * 100
+
+        # Count newlines in result
+        newline_count = result.count("\n")
+
+        # This will FAIL with current implementation if CRLF splits
+        assert result == expected, f"Got {newline_count} newlines instead of 1, CRLF was split incorrectly"
+
+    @pytest.mark.asyncio
+    @pytest.mark.xfail(reason="BUG: Line iteration doesn't respect newline='\\r' mode", strict=True)
+    async def test_line_iteration_with_cr_only_newline(self, temp_file):
+        """Test that line iteration respects newline='\\r' mode.
+
+        BUG: __anext__/readline always search for '\\n' regardless of newline mode.
+        Files with bare \\r line endings fail to split correctly.
+        """
+        # Write file with CR-only line endings
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write("line1\rline2\rline3")
+
+        # Read with newline='\r' - should split on \r
+        lines = []
+        async with AsyncGzipTextFile(temp_file, "rt", newline="\r") as f:
+            async for line in f:
+                lines.append(line)
+
+        # BUG: Current implementation will NOT split on \r, returning entire file
+        # Expected behavior: split into 3 lines
+        # Actual behavior: 1 line containing "line1\rline2\rline3"
+
+        # This will FAIL with current implementation
+        assert len(lines) == 3, f"Expected 3 lines, got {len(lines)}: {lines}"
+        # Note: Python's TextIOWrapper behavior with newline='\r' is complex
+        # but it should at least attempt to handle \r as a terminator
+
+    @pytest.mark.asyncio
+    @pytest.mark.xfail(reason="BUG: readline doesn't respect newline='\\r' mode", strict=True)
+    async def test_readline_with_cr_only_newline(self, temp_file):
+        """Test that readline respects newline='\\r' mode."""
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write("line1\rline2\rline3")
+
+        async with AsyncGzipTextFile(temp_file, "rt", newline="\r") as f:
+            line1 = await f.readline()
+            line2 = await f.readline()
+            line3 = await f.readline()
+
+        # BUG: Will likely return entire file as line1
+        # This will FAIL with current implementation
+        assert line1 == "line1\r", f"Expected 'line1\\r', got {repr(line1)}"
+        assert line2 == "line2\r", f"Expected 'line2\\r', got {repr(line2)}"
+        assert line3 == "line3", f"Expected 'line3', got {repr(line3)}"
+
+    @pytest.mark.asyncio
+    async def test_read_zero_returns_empty_string(self, temp_file):
+        """Test that read(0) returns empty string, not buffered text.
+
+        BUG: AsyncGzipTextFile.read(0) returns entire buffered text instead of ''.
+        This violates TextIOBase contract and drains the buffer unexpectedly.
+        """
+        test_text = "Hello, World! This is a test."
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(test_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Read some data to fill internal buffer
+            first_part = await f.read(5)
+            assert first_part == "Hello"
+
+            # Now call read(0) - should return empty string without draining buffer
+            empty = await f.read(0)
+
+            # BUG: Current implementation returns buffered text
+            # This will FAIL with current implementation
+            assert empty == "", f"read(0) should return '', got {repr(empty)}"
+
+            # Verify buffer wasn't drained - we should still be able to read remaining
+            rest = await f.read()
+            assert rest == ", World! This is a test.", f"Buffer was drained! Got {repr(rest)}"
+
+    @pytest.mark.asyncio
+    async def test_read_zero_binary_returns_empty_bytes(self, temp_file):
+        """Test that binary read(0) returns empty bytes."""
+        test_data = b"Hello, World! This is a test."
+
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(test_data)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            # Read some data to fill internal buffer
+            first_part = await f.read(5)
+            assert first_part == b"Hello"
+
+            # Now call read(0) - should return empty bytes
+            empty = await f.read(0)
+
+            # Binary mode might have same bug
+            assert empty == b"", f"read(0) should return b'', got {repr(empty)}"
+
+            # Verify buffer wasn't drained
+            rest = await f.read()
+            assert rest == b", World! This is a test."
