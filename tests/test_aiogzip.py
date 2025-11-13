@@ -2031,3 +2031,137 @@ class TestNewAPIMethods:
             assert line1 == large_line
             line2 = await f.readline()
             assert line2 == "small line\n"
+
+
+class TestHighPriorityEdgeCases:
+    """Test high priority edge cases for improved coverage."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_unexpected_compression_error(self, temp_file):
+        """Test that unexpected errors during compression are wrapped in OSError."""
+
+        class MockEngine:
+            """Mock compression engine that raises unexpected error."""
+            def compress(self, data):
+                raise RuntimeError("Unexpected error")
+            def flush(self, mode=None):
+                return b""
+
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        await f.__aenter__()
+
+        # Replace engine with our mock
+        f._engine = MockEngine()
+
+        with pytest.raises(OSError, match="Unexpected error during compression"):
+            await f.write(b"test data")
+
+        await f.__aexit__(None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_unexpected_decompression_error(self, temp_file):
+        """Test that unexpected errors during decompression are wrapped in OSError."""
+
+        # First write valid data
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"test data")
+
+        class MockEngine:
+            """Mock decompression engine that raises unexpected error."""
+            def decompress(self, data):
+                raise RuntimeError("Unexpected decompress error")
+            @property
+            def unused_data(self):
+                return b""
+
+        # Now read with mocked decompressor
+        f = AsyncGzipBinaryFile(temp_file, "rb")
+        await f.__aenter__()
+
+        # Replace engine with our mock
+        f._engine = MockEngine()
+
+        with pytest.raises(OSError, match="Unexpected error during decompression"):
+            await f.read()
+
+        await f.__aexit__(None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_decompression_finalization_error(self, temp_file):
+        """Test error handling when finalizing gzip decompression at EOF."""
+        import zlib
+
+        # Write valid data
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"test data")
+
+        class MockEngine:
+            """Mock decompression engine that raises error on flush."""
+            def __init__(self):
+                self._called_decompress = False
+
+            def decompress(self, data):
+                self._called_decompress = True
+                # First call works, subsequent calls fail
+                return b""
+
+            def flush(self):
+                raise zlib.error("Finalization error")
+
+            @property
+            def unused_data(self):
+                return b""
+
+        f = AsyncGzipBinaryFile(temp_file, "rb")
+        await f.__aenter__()
+
+        # Replace engine after opening
+        f._engine = MockEngine()
+
+        with pytest.raises(OSError, match="Error finalizing gzip decompression"):
+            await f.read()
+
+        await f.__aexit__(None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_unexpected_flush_error(self, temp_file):
+        """Test that unexpected errors during flush are wrapped in OSError."""
+        import zlib
+
+        class MockEngine:
+            """Mock compression engine that raises unexpected error on flush."""
+            def __init__(self):
+                self.flush_count = 0
+
+            def compress(self, data):
+                return b"compressed"
+
+            def flush(self, mode=zlib.Z_SYNC_FLUSH):
+                self.flush_count += 1
+                # Only raise on the first explicit flush call, not on close
+                if self.flush_count == 1:
+                    raise RuntimeError("Unexpected flush error")
+                return b""
+
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        await f.__aenter__()
+        await f.write(b"test data")
+
+        # Replace engine with our mock
+        mock_engine = MockEngine()
+        f._engine = mock_engine
+
+        with pytest.raises(OSError, match="Unexpected error during flush"):
+            await f.flush()
+
+        # Now manually close, allowing the second flush to succeed
+        await f.__aexit__(None, None, None)
