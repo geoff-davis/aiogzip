@@ -2635,3 +2635,158 @@ class TestMediumPriorityEdgeCases:
         f = AsyncGzipTextFile(temp_file, "wt", encoding="shift_jis")
         # Unknown encoding should default to safe fallback of 8
         assert f._max_incomplete_bytes == 8
+
+
+class TestLowPriorityEdgeCases:
+    """Test low priority edge cases for improved coverage."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_binary_read_on_closed_file(self, temp_file):
+        """Test that reading on closed binary file raises ValueError."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"test")
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            await f.read()
+            # File is now at EOF but still open
+
+        # Now file is closed
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.read()
+
+    @pytest.mark.asyncio
+    async def test_text_read_on_closed_file(self, temp_file):
+        """Test that reading on closed text file raises ValueError."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("test")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            await f.read()
+
+        # Now file is closed
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.read()
+
+    @pytest.mark.asyncio
+    async def test_binary_read_without_context_manager(self, temp_file):
+        """Test that reading without entering context manager raises ValueError."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"test")
+
+        f = AsyncGzipBinaryFile(temp_file, "rb")
+        # Don't enter context manager
+        with pytest.raises(ValueError, match="File not opened"):
+            await f.read()
+
+    @pytest.mark.asyncio
+    async def test_text_read_without_context_manager(self, temp_file):
+        """Test that reading without entering context manager raises ValueError."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("test")
+
+        f = AsyncGzipTextFile(temp_file, "rt")
+        # Don't enter context manager
+        with pytest.raises(ValueError, match="File not opened"):
+            await f.read()
+
+    @pytest.mark.asyncio
+    async def test_binary_write_on_closed_file(self, temp_file):
+        """Test that writing on closed binary file raises ValueError."""
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        async with f:
+            await f.write(b"test")
+
+        # Now file is closed
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.write(b"more")
+
+    @pytest.mark.asyncio
+    async def test_text_write_on_closed_file(self, temp_file):
+        """Test that writing on closed text file raises ValueError."""
+        f = AsyncGzipTextFile(temp_file, "wt")
+        async with f:
+            await f.write("test")
+
+        # Now file is closed
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.write("more")
+
+    @pytest.mark.asyncio
+    async def test_text_write_in_read_mode(self, temp_file):
+        """Test that write in read mode raises IOError."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("test")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            with pytest.raises(IOError, match="File not open for writing"):
+                await f.write("should fail")
+
+    @pytest.mark.asyncio
+    async def test_text_read_in_write_mode(self, temp_file):
+        """Test that read in write mode raises IOError."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            with pytest.raises(IOError, match="File not open for reading"):
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_iteration_on_closed_text_file(self, temp_file):
+        """Test that iteration on closed text file raises StopAsyncIteration."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("line1\nline2\n")
+
+        f = AsyncGzipTextFile(temp_file, "rt")
+        async with f:
+            # Read one line
+            line = await f.__anext__()
+            assert line == "line1\n"
+
+        # Now closed - should raise StopAsyncIteration
+        with pytest.raises(StopAsyncIteration):
+            await f.__anext__()
+
+    @pytest.mark.asyncio
+    async def test_file_without_final_newline_iteration(self, temp_file):
+        """Test iteration handles file without final newline correctly."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("line1\nline2")  # No final newline
+
+        lines = []
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            async for line in f:
+                lines.append(line)
+
+        # Should get both lines, second without newline
+        assert lines == ["line1\n", "line2"]
+
+    @pytest.mark.asyncio
+    async def test_text_flush_on_closed_file(self, temp_file):
+        """Test that flush on closed text file raises ValueError."""
+        f = AsyncGzipTextFile(temp_file, "wt")
+        async with f:
+            await f.write("test")
+
+        # Now closed
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.flush()
+
+    @pytest.mark.asyncio
+    async def test_text_file_close_idempotent(self, temp_file):
+        """Test that closing text file multiple times is safe."""
+        f = AsyncGzipTextFile(temp_file, "wt")
+        async with f:
+            await f.write("test")
+
+        # First close (done by context manager)
+        # Second close should be safe
+        await f.close()
+        # Third close should also be safe
+        await f.close()
