@@ -2304,3 +2304,104 @@ class TestHighPriorityEdgeCases:
             read_text = await f.read()
 
         assert read_text == test_text
+
+    @pytest.mark.asyncio
+    async def test_multi_member_empty_member(self, temp_file):
+        """Test reading multi-member gzip with an empty member."""
+        # Create a multi-member gzip file with one empty member
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"first part")
+
+        # Append an empty member
+        async with AsyncGzipBinaryFile(temp_file, "ab") as f:
+            pass  # Write nothing
+
+        # Append more data
+        async with AsyncGzipBinaryFile(temp_file, "ab") as f:
+            await f.write(b"third part")
+
+        # Read should concatenate all members
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+
+        assert data == b"first partthird part"
+
+    @pytest.mark.asyncio
+    async def test_multi_member_many_members(self, temp_file):
+        """Test reading multi-member gzip with many members."""
+        # Create multiple members
+        for i in range(10):
+            async with AsyncGzipBinaryFile(temp_file, "ab" if i > 0 else "wb") as f:
+                await f.write(f"part{i}".encode())
+
+        # Read should concatenate all
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+
+        expected = b"".join(f"part{i}".encode() for i in range(10))
+        assert data == expected
+
+    @pytest.mark.asyncio
+    async def test_multi_member_partial_read(self, temp_file):
+        """Test partial reading of multi-member gzip."""
+        # Create multi-member file
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"AAAA")
+
+        async with AsyncGzipBinaryFile(temp_file, "ab") as f:
+            await f.write(b"BBBB")
+
+        async with AsyncGzipBinaryFile(temp_file, "ab") as f:
+            await f.write(b"CCCC")
+
+        # Read in small chunks across member boundaries
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            part1 = await f.read(6)  # Should span first two members
+            part2 = await f.read(6)  # Should span into third member
+            part3 = await f.read()   # Rest
+
+        assert part1 + part2 + part3 == b"AAAABBBBCCCC"
+
+    @pytest.mark.asyncio
+    async def test_multi_member_unused_data_handling(self, temp_file):
+        """Test that unused_data from multi-member archives is handled correctly."""
+        import gzip
+
+        # Create multi-member file using standard gzip
+        with gzip.open(temp_file, "wb") as f:
+            f.write(b"member1")
+
+        with gzip.open(temp_file, "ab") as f:
+            f.write(b"member2")
+
+        with gzip.open(temp_file, "ab") as f:
+            f.write(b"member3")
+
+        # Read and verify all members are concatenated
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+
+        assert data == b"member1member2member3"
+
+    @pytest.mark.asyncio
+    async def test_reading_after_eof_repeatedly(self, temp_file):
+        """Test that reading after EOF works correctly."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"test data")
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            # Read all data
+            data1 = await f.read()
+            assert data1 == b"test data"
+
+            # Read after EOF should return empty
+            data2 = await f.read()
+            assert data2 == b""
+
+            # Read after EOF again should still return empty
+            data3 = await f.read()
+            assert data3 == b""
+
+            # Partial read after EOF
+            data4 = await f.read(100)
+            assert data4 == b""
