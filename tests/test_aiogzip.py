@@ -2790,3 +2790,72 @@ class TestLowPriorityEdgeCases:
         await f.close()
         # Third close should also be safe
         await f.close()
+
+    @pytest.mark.asyncio
+    async def test_binary_write_in_read_mode(self, temp_file):
+        """Test that write in read mode raises IOError for binary files."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"test")
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            with pytest.raises(IOError, match="File not open for writing"):
+                await f.write(b"should fail")
+
+    @pytest.mark.asyncio
+    async def test_text_write_without_context_manager(self, temp_file):
+        """Test that write without context manager raises ValueError."""
+        f = AsyncGzipTextFile(temp_file, "wt")
+        # Don't enter context manager
+        with pytest.raises(ValueError, match="File not opened"):
+            await f.write("should fail")
+
+    @pytest.mark.asyncio
+    async def test_zlib_compress_error_path(self, temp_file):
+        """Test zlib compression error is wrapped in OSError."""
+        import zlib
+
+        class MockEngine:
+            """Mock compression engine that raises zlib.error."""
+            def compress(self, data):
+                raise zlib.error("Compression error")
+            def flush(self, mode=None):
+                return b""
+
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        await f.__aenter__()
+        f._engine = MockEngine()
+
+        with pytest.raises(OSError, match="Error compressing data"):
+            await f.write(b"test")
+
+        await f.__aexit__(None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_zlib_flush_error_path(self, temp_file):
+        """Test zlib flush error is wrapped in OSError."""
+        import zlib
+
+        class MockEngine:
+            """Mock compression engine that raises zlib.error on flush."""
+            def __init__(self):
+                self.flush_count = 0
+
+            def compress(self, data):
+                return b"compressed"
+
+            def flush(self, mode=zlib.Z_SYNC_FLUSH):
+                self.flush_count += 1
+                # Raise on first flush, succeed on close
+                if self.flush_count == 1:
+                    raise zlib.error("Flush error")
+                return b""
+
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        await f.__aenter__()
+        await f.write(b"test")
+        f._engine = MockEngine()
+
+        with pytest.raises(OSError, match="Error flushing compressed data"):
+            await f.flush()
+
+        await f.__aexit__(None, None, None)
