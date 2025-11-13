@@ -2547,3 +2547,91 @@ class TestMediumPriorityEdgeCases:
 
         await f.__aexit__(None, None, None)
         await real_file.close()
+
+    @pytest.mark.asyncio
+    async def test_read_with_none_size_binary(self, temp_file):
+        """Test that read(None) works correctly in binary mode (converts to -1)."""
+        test_data = b"Hello, World! This is test data."
+
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(test_data)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            # read(None) should read all data
+            data = await f.read(None)
+            assert data == test_data
+
+    @pytest.mark.asyncio
+    async def test_read_with_none_size_text(self, temp_file):
+        """Test that read(None) works correctly in text mode (converts to -1)."""
+        test_text = "Hello, World! This is test text."
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(test_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # read(None) should read all data
+            data = await f.read(None)
+            assert data == test_text
+
+    @pytest.mark.asyncio
+    async def test_unusual_encoding_shift_jis(self, temp_file):
+        """Test with shift_jis encoding (Japanese)."""
+        test_text = "こんにちは世界"  # "Hello World" in Japanese
+
+        async with AsyncGzipTextFile(temp_file, "wt", encoding="shift_jis") as f:
+            await f.write(test_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt", encoding="shift_jis") as f:
+            data = await f.read()
+            assert data == test_text
+
+    @pytest.mark.asyncio
+    async def test_unusual_encoding_iso_8859_1(self, temp_file):
+        """Test with iso-8859-1 encoding (Latin-1)."""
+        test_text = "Café résumé naïve"
+
+        async with AsyncGzipTextFile(temp_file, "wt", encoding="iso-8859-1") as f:
+            await f.write(test_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt", encoding="iso-8859-1") as f:
+            data = await f.read()
+            assert data == test_text
+
+    @pytest.mark.asyncio
+    async def test_unusual_encoding_cp1252(self, temp_file):
+        """Test with cp1252 encoding (Windows-1252)."""
+        test_text = "Euro sign: € and other symbols"
+
+        async with AsyncGzipTextFile(temp_file, "wt", encoding="cp1252") as f:
+            await f.write(test_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt", encoding="cp1252") as f:
+            data = await f.read()
+            assert data == test_text
+
+    @pytest.mark.asyncio
+    async def test_max_incomplete_bytes_detection_utf8(self, temp_file):
+        """Test that UTF-8 is detected correctly for max incomplete bytes."""
+        # This tests the _determine_max_incomplete_bytes method
+        f = AsyncGzipTextFile(temp_file, "wt", encoding="utf-8")
+        assert f._max_incomplete_bytes == 4
+
+        f = AsyncGzipTextFile(temp_file, "wt", encoding="UTF-8")
+        assert f._max_incomplete_bytes == 4
+
+    @pytest.mark.asyncio
+    async def test_max_incomplete_bytes_detection_ascii(self, temp_file):
+        """Test that ASCII is detected correctly for max incomplete bytes."""
+        f = AsyncGzipTextFile(temp_file, "wt", encoding="ascii")
+        assert f._max_incomplete_bytes == 1
+
+        f = AsyncGzipTextFile(temp_file, "wt", encoding="latin-1")
+        assert f._max_incomplete_bytes == 1
+
+    @pytest.mark.asyncio
+    async def test_max_incomplete_bytes_detection_unknown(self, temp_file):
+        """Test that unknown encodings get safe fallback for max incomplete bytes."""
+        f = AsyncGzipTextFile(temp_file, "wt", encoding="shift_jis")
+        # Unknown encoding should default to safe fallback of 8
+        assert f._max_incomplete_bytes == 8
