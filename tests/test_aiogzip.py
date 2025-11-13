@@ -2405,3 +2405,145 @@ class TestHighPriorityEdgeCases:
             # Partial read after EOF
             data4 = await f.read(100)
             assert data4 == b""
+
+
+class TestMediumPriorityEdgeCases:
+    """Test medium priority edge cases for improved coverage."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_async_flush_on_underlying_file(self, temp_file):
+        """Test that async flush method on underlying file object is awaited."""
+
+        class AsyncFileWithAsyncFlush:
+            """Mock file object with async flush method."""
+            def __init__(self, real_file):
+                self.real_file = real_file
+                self.flush_called = False
+
+            async def write(self, data):
+                return await self.real_file.write(data)
+
+            async def flush(self):
+                """Async flush method that should be detected and awaited."""
+                self.flush_called = True
+                # Call real file's flush if it exists
+                if hasattr(self.real_file, 'flush'):
+                    flush_method = self.real_file.flush
+                    if callable(flush_method):
+                        result = flush_method()
+                        if hasattr(result, '__await__'):
+                            await result
+
+            async def close(self):
+                await self.real_file.close()
+
+        import aiofiles
+
+        # Create a real aiofiles handle
+        real_file = await aiofiles.open(temp_file, "wb")
+
+        # Wrap it with our mock that has async flush
+        mock_file = AsyncFileWithAsyncFlush(real_file)
+
+        # Use it as fileobj
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=mock_file, closefd=False)
+        await f.__aenter__()
+        await f.write(b"test data")
+
+        # Call flush - should detect and await the async flush
+        await f.flush()
+
+        # Verify our async flush was called
+        assert mock_file.flush_called is True
+
+        await f.__aexit__(None, None, None)
+        await real_file.close()
+
+    @pytest.mark.asyncio
+    async def test_async_close_on_underlying_file(self, temp_file):
+        """Test that async close method on underlying file object is awaited."""
+
+        class AsyncFileWithAsyncClose:
+            """Mock file object with async close method."""
+            def __init__(self, real_file):
+                self.real_file = real_file
+                self.close_called = False
+
+            async def write(self, data):
+                return await self.real_file.write(data)
+
+            async def close(self):
+                """Async close method that should be detected and awaited."""
+                self.close_called = True
+                await self.real_file.close()
+
+        import aiofiles
+
+        # Create a real aiofiles handle
+        real_file = await aiofiles.open(temp_file, "wb")
+
+        # Wrap it with our mock that has async close
+        mock_file = AsyncFileWithAsyncClose(real_file)
+
+        # Use it as fileobj with closefd=True to trigger close
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=mock_file, closefd=True)
+        await f.__aenter__()
+        await f.write(b"test data")
+
+        # Close should detect and await the async close
+        await f.__aexit__(None, None, None)
+
+        # Verify our async close was called
+        assert mock_file.close_called is True
+
+    @pytest.mark.asyncio
+    async def test_sync_flush_on_underlying_file(self, temp_file):
+        """Test that sync flush method on underlying file object is called."""
+
+        class FileWithSyncFlush:
+            """Mock file object with sync flush method."""
+            def __init__(self, real_file):
+                self.real_file = real_file
+                self.flush_called = False
+
+            async def write(self, data):
+                return await self.real_file.write(data)
+
+            def flush(self):
+                """Sync flush method that should be detected and called."""
+                self.flush_called = True
+                # Don't call real file's flush to keep it simple
+
+            async def close(self):
+                await self.real_file.close()
+
+        import aiofiles
+
+        # Create a real aiofiles handle
+        real_file = await aiofiles.open(temp_file, "wb")
+
+        # Wrap it with our mock that has sync flush
+        mock_file = FileWithSyncFlush(real_file)
+
+        # Use it as fileobj
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=mock_file, closefd=False)
+        await f.__aenter__()
+        await f.write(b"test data")
+
+        # Call flush - should detect and call the sync flush
+        await f.flush()
+
+        # Verify our sync flush was called
+        assert mock_file.flush_called is True
+
+        await f.__aexit__(None, None, None)
+        await real_file.close()
