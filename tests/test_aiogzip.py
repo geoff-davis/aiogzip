@@ -2165,3 +2165,142 @@ class TestHighPriorityEdgeCases:
 
         # Now manually close, allowing the second flush to succeed
         await f.__aexit__(None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_multibyte_split_at_start(self, temp_file):
+        """Test multibyte character incomplete at the very start of a chunk."""
+        # Create a string where a 4-byte emoji is split right at chunk boundary
+        # UTF-8 emoji "🚀" = b'\xf0\x9f\x9a\x80' (4 bytes)
+        chunk_size = 1024
+
+        # Put emoji at positions that will split across chunk boundaries
+        test_text = "a" * (chunk_size - 1) + "🚀" + "b" * 100
+
+        async with AsyncGzipTextFile(temp_file, "wt", encoding="utf-8") as f:
+            await f.write(test_text)
+
+        # Read with small chunks to force splits
+        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8", chunk_size=chunk_size) as f:
+            # Force small binary reads
+            f._binary_file._chunk_size = chunk_size
+            read_content = await f.read()
+
+        assert read_content == test_text
+
+    @pytest.mark.asyncio
+    async def test_multibyte_incomplete_with_errors_ignore(self, temp_file):
+        """Test incomplete multibyte sequence handling with errors='ignore'."""
+        # Write data with an incomplete UTF-8 sequence at the end
+        # We'll write raw bytes with binary mode
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            # Valid UTF-8 "test" followed by incomplete 4-byte sequence (only 2 bytes)
+            await f.write(b"test\xf0\x9f")
+
+        # Read with errors='ignore' should skip incomplete bytes
+        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8", errors="ignore") as f:
+            data = await f.read()
+            # Should only get "test", incomplete sequence ignored
+            assert data == "test"
+
+    @pytest.mark.asyncio
+    async def test_multibyte_incomplete_with_errors_replace(self, temp_file):
+        """Test incomplete multibyte sequence handling with errors='replace'."""
+        # Write data with an incomplete UTF-8 sequence at the end
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            # Valid UTF-8 "test" followed by incomplete 4-byte sequence (only 2 bytes)
+            await f.write(b"test\xf0\x9f")
+
+        # Read with errors='replace' should replace incomplete bytes with U+FFFD
+        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8", errors="replace") as f:
+            data = await f.read()
+            # Should get "test" followed by replacement characters
+            assert data.startswith("test")
+            assert "\ufffd" in data
+
+    @pytest.mark.asyncio
+    async def test_empty_data_in_safe_decode_with_remainder(self, temp_file):
+        """Test that empty data in _safe_decode_with_remainder returns empty string."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("test")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Test the internal method directly
+            result, remainder = f._safe_decode_with_remainder(b"")
+            assert result == ""
+            assert remainder == b""
+
+    @pytest.mark.asyncio
+    async def test_multibyte_all_split_positions(self, temp_file):
+        """Test multibyte character split at different positions (1, 2, 3 bytes)."""
+        # UTF-8 emoji "🚀" = b'\xf0\x9f\x9a\x80' (4 bytes)
+        # We'll test splits after 1, 2, and 3 bytes
+
+        for split_pos in [1, 2, 3]:
+            chunk_size = 1024
+            # Position emoji so it splits at different points
+            prefix_len = chunk_size - split_pos
+            test_text = "a" * prefix_len + "🚀test"
+
+            async with AsyncGzipTextFile(temp_file, "wt", encoding="utf-8") as f:
+                await f.write(test_text)
+
+            async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8", chunk_size=chunk_size) as f:
+                f._binary_file._chunk_size = chunk_size
+                read_content = await f.read()
+
+            assert read_content == test_text, f"Failed at split position {split_pos}"
+
+    @pytest.mark.asyncio
+    async def test_multiple_multibyte_characters_at_boundaries(self, temp_file):
+        """Test multiple multibyte characters at chunk boundaries."""
+        chunk_size = 1024
+
+        # Create text with multiple emojis positioned at boundaries
+        # Each emoji is 4 bytes in UTF-8
+        text_parts = []
+        for i in range(5):
+            text_parts.append("x" * (chunk_size - 2))
+            text_parts.append("🚀")
+
+        test_text = "".join(text_parts)
+
+        async with AsyncGzipTextFile(temp_file, "wt", encoding="utf-8") as f:
+            await f.write(test_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8", chunk_size=chunk_size) as f:
+            f._binary_file._chunk_size = chunk_size
+            # Read in small increments to stress test boundary handling
+            result = ""
+            while True:
+                chunk = await f.read(100)
+                if not chunk:
+                    break
+                result += chunk
+
+        assert result == test_text
+
+    @pytest.mark.asyncio
+    async def test_utf16_encoding_incomplete_handling(self, temp_file):
+        """Test UTF-16 encoding with potential incomplete sequences."""
+        test_text = "Hello 世界 🚀"
+
+        async with AsyncGzipTextFile(temp_file, "wt", encoding="utf-16") as f:
+            await f.write(test_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-16") as f:
+            read_text = await f.read()
+
+        assert read_text == test_text
+
+    @pytest.mark.asyncio
+    async def test_utf32_encoding_incomplete_handling(self, temp_file):
+        """Test UTF-32 encoding with potential incomplete sequences."""
+        test_text = "Hello 世界 🚀"
+
+        async with AsyncGzipTextFile(temp_file, "wt", encoding="utf-32") as f:
+            await f.write(test_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-32") as f:
+            read_text = await f.read()
+
+        assert read_text == test_text
