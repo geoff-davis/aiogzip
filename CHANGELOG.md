@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Support gzip-compatible mode strings (e.g., `xb`, `rb+`, `xt`, `rt+`) while rejecting only invalid binary/text combinations
+- Treat `newline=''` the same as CPython by keeping CRLF pairs intact when they cross chunk boundaries
+- Allow arbitrary codec error handlers (e.g., `surrogatepass`, user-registered handlers) in text mode instead of rejecting unknown values
 - Accept `bytes`/`Path` filenames in `AsyncGzipTextFile` by avoiding accidental stringification and add regression tests
 - Restore `readline(limit)` parity with `gzip.open` by supporting the optional limit argument and buffering leftovers correctly
 - Allow `AsyncGzipBinaryFile.write()` to consume any bytes-like object (bytearray/memoryview/etc.) and emit clearer `TypeError`s for unsupported inputs
@@ -16,6 +19,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Tests for exclusive-create and read/write-plus modes, newline='' boundary handling, and custom error handlers
 - Tests for bytes-path support, buffer-protocol writes, and `readline(limit)` semantics
 - Comprehensive test coverage improvements: 113 → 162 tests (+49 tests)
 - Test coverage increased from 84.13% to 88.47%

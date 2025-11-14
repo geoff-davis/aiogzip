@@ -124,6 +124,46 @@ def _validate_compresslevel(compresslevel: int) -> None:
         raise ValueError("Compression level must be between 0 and 9")
 
 
+def _parse_mode_tokens(mode: str) -> tuple[str, bool, bool, bool]:
+    """Parse a mode string into (op, saw_b, saw_t, plus) flags."""
+    if not isinstance(mode, str):
+        raise TypeError("mode must be a string")
+    if not mode:
+        raise ValueError("Mode string cannot be empty")
+
+    op: Optional[str] = None
+    saw_b = False
+    saw_t = False
+    plus = False
+
+    for ch in mode:
+        if ch in {"r", "w", "a", "x"}:
+            if op is not None:
+                raise ValueError("Mode string can only specify one of r, w, a, or x")
+            op = ch
+        elif ch == "b":
+            if saw_b:
+                raise ValueError("Mode string cannot specify 'b' more than once")
+            saw_b = True
+        elif ch == "t":
+            if saw_t:
+                raise ValueError("Mode string cannot specify 't' more than once")
+            saw_t = True
+        elif ch == "+":
+            if plus:
+                raise ValueError("Mode string cannot include '+' more than once")
+            plus = True
+        else:
+            raise ValueError(f"Invalid mode character '{ch}'")
+
+    if op is None:
+        raise ValueError("Mode string must include one of 'r', 'w', 'a', or 'x'")
+    if saw_b and saw_t:
+        raise ValueError("Mode string cannot include both 'b' and 't'")
+
+    return op, saw_b, saw_t, plus
+
+
 class WithAsyncRead(Protocol):
     """Protocol for async file-like objects that can be read."""
 
@@ -190,29 +230,28 @@ class AsyncGzipBinaryFile:
         _validate_chunk_size(chunk_size)
         _validate_compresslevel(compresslevel)
 
-        # Validate mode
-        valid_modes = {"r", "rb", "w", "wb", "a", "ab"}
-        if mode not in valid_modes:
-            raise ValueError(
-                f"Invalid mode '{mode}'. Valid modes: {', '.join(sorted(valid_modes))}"
-            )
+        # Validate mode and derive file characteristics
+        mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
+        if saw_t:
+            raise ValueError("Binary mode cannot include text ('t')")
+        if mode_op not in {"r", "w", "a", "x"}:
+            raise ValueError(f"Invalid mode '{mode}'.")
 
         self._filename = filename
         self._mode = mode
+        self._mode_op = mode_op
+        self._mode_plus = plus
+        self._writing_mode = mode_op in {"w", "a", "x"}
         self._chunk_size = chunk_size
         self._compresslevel = compresslevel
         self._external_file = fileobj
         self._closefd = closefd
 
         # Determine the underlying file mode based on gzip mode
-        if mode.startswith("r"):
-            self._file_mode = "rb"
-        elif mode.startswith("w"):
-            self._file_mode = "wb"
-        elif mode.startswith("a"):
-            self._file_mode = "ab"
-        else:
-            raise ValueError(f"Invalid mode: {mode}")
+        file_mode_suffix = "b"
+        self._file_mode = f"{mode_op}{file_mode_suffix}"
+        if plus:
+            self._file_mode += "+"
 
         self._file = None
         self._engine: ZlibEngine = None
@@ -233,9 +272,9 @@ class AsyncGzipBinaryFile:
             self._owns_file = True
 
         # Initialize compression/decompression engine based on mode
-        if "w" in self._mode or "a" in self._mode:
+        if self._writing_mode:
             self._engine = zlib.compressobj(level=self._compresslevel, wbits=GZIP_WBITS)
-        else:  # 'r' in self._mode
+        else:  # read mode
             self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
 
         return self
@@ -255,7 +294,7 @@ class AsyncGzipBinaryFile:
             async with AsyncGzipBinaryFile("file.gz", "wb") as f:
                 await f.write(b"Hello, World!")  # Bytes input
         """
-        if "w" not in self._mode and "a" not in self._mode:
+        if not self._writing_mode:
             raise IOError("File not open for writing")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
@@ -316,7 +355,7 @@ class AsyncGzipBinaryFile:
                 data = await f.read()  # Returns bytes
                 partial = await f.read(100)  # Returns first 100 bytes
         """
-        if "r" not in self._mode:
+        if self._mode_op != "r":
             raise IOError("File not open for reading")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
@@ -418,7 +457,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
 
-        if ("w" in self._mode or "a" in self._mode) and self._file is not None:
+        if self._writing_mode and self._file is not None:
             # Flush any buffered compressed data (but not the final trailer)
             # Using Z_SYNC_FLUSH allows us to flush without ending the stream
             try:
@@ -448,7 +487,7 @@ class AsyncGzipBinaryFile:
         self._is_closed = True
 
         try:
-            if ("w" in self._mode or "a" in self._mode) and self._file is not None:
+            if self._writing_mode and self._file is not None:
                 # Flush the compressor to write the gzip trailer
                 remaining_data = self._engine.flush()
                 if remaining_data:
@@ -522,30 +561,18 @@ class AsyncGzipTextFile:
             raise ValueError("Encoding cannot be empty")
         if errors is None:
             raise ValueError("Errors cannot be None")
-        # Validate errors parameter - same values as Python's open()
-        valid_errors = {
-            "strict",
-            "ignore",
-            "replace",
-            "backslashreplace",
-            "surrogateescape",
-            "xmlcharrefreplace",
-            "namereplace",
-        }
-        if errors not in valid_errors:
-            raise ValueError(
-                f"Invalid errors value '{errors}'. Valid values: {', '.join(sorted(valid_errors))}"
-            )
 
-        # Validate mode
-        valid_modes = {"r", "rt", "w", "wt", "a", "at"}
-        if mode not in valid_modes:
-            raise ValueError(
-                f"Invalid mode '{mode}'. Valid modes: {', '.join(sorted(valid_modes))}"
-            )
+        mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
+        if saw_b:
+            raise ValueError("Text mode cannot include binary ('b')")
+        if mode_op not in {"r", "w", "a", "x"}:
+            raise ValueError(f"Invalid mode '{mode}'.")
 
         self._filename = filename
         self._mode = mode
+        self._mode_op = mode_op
+        self._mode_plus = plus
+        self._writing_mode = mode_op in {"w", "a", "x"}
         self._chunk_size = chunk_size
         self._encoding = encoding
         self._errors = errors
@@ -555,14 +582,9 @@ class AsyncGzipTextFile:
         self._closefd = closefd
 
         # Determine the underlying binary file mode
-        if mode.startswith("r"):
-            self._binary_mode = "rb"
-        elif mode.startswith("w"):
-            self._binary_mode = "wb"
-        elif mode.startswith("a"):
-            self._binary_mode = "ab"
-        else:
-            raise ValueError(f"Invalid mode: {mode}")
+        self._binary_mode = f"{mode_op}b"
+        if plus:
+            self._binary_mode += "+"
 
         self._binary_file: Optional[AsyncGzipBinaryFile] = None
         self._text_buffer: str = ""
@@ -624,7 +646,7 @@ class AsyncGzipTextFile:
             async with AsyncGzipTextFile("file.gz", "wt") as f:
                 await f.write("Hello, World!")  # String input
         """
-        if "w" not in self._mode and "a" not in self._mode:
+        if not self._writing_mode:
             raise IOError("File not open for writing")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
@@ -665,7 +687,7 @@ class AsyncGzipTextFile:
                 text = await f.read()  # Returns string
                 partial = await f.read(100)  # Returns first 100 chars as string
         """
-        if "r" not in self._mode:
+        if self._mode_op != "r":
             raise IOError("File not open for reading")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
@@ -771,6 +793,12 @@ class AsyncGzipTextFile:
             # Non-strict: decode with the provided policy and do not carry remainder
             return data.decode(self._encoding, errors=self._errors), b""
 
+    def _at_stream_eof(self) -> bool:
+        """Return True if the underlying binary file has reached EOF."""
+        if self._binary_file is None:
+            return True
+        return bool(self._binary_file._eof)
+
     def _get_line_terminator_pos(self, text: str) -> Tuple[int, int]:
         """Find position of line terminator in text based on newline mode.
 
@@ -786,20 +814,27 @@ class AsyncGzipTextFile:
 
             if pos_n == -1 and pos_r == -1:
                 return (-1, 0)
-            elif pos_n == -1:
-                # Only \r found, check if \r\n
-                if pos_r + 1 < len(text) and text[pos_r + 1] == "\n":
-                    return (pos_r, 2)
-                return (pos_r, 1)
-            elif pos_r == -1:
-                return (pos_n, 1)
-            else:
-                # Both found, use whichever comes first
-                if pos_r < pos_n:
-                    if pos_r + 1 == pos_n:  # \r\n sequence
-                        return (pos_r, 2)
-                    return (pos_r, 1)
-                return (pos_n, 1)
+
+            candidate = (-1, 0)
+
+            if pos_n != -1:
+                candidate = (pos_n, 1)
+
+            if pos_r != -1:
+                cr_length = 2 if pos_r + 1 < len(text) and text[pos_r + 1] == "\n" else 1
+                cr_is_trailing = pos_r + 1 == len(text)
+                should_wait_for_lf = (
+                    self._newline == ""
+                    and cr_length == 1
+                    and cr_is_trailing
+                    and not self._at_stream_eof()
+                )
+                if not should_wait_for_lf:
+                    cr_candidate = (pos_r, cr_length)
+                    if candidate[0] == -1 or pos_r < candidate[0]:
+                        candidate = cr_candidate
+
+            return candidate
         elif self._newline == "\n":
             pos = text.find("\n")
             return (pos, 1) if pos != -1 else (-1, 0)
@@ -904,7 +939,7 @@ class AsyncGzipTextFile:
         """
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
-        if "r" not in self._mode:
+        if self._mode_op != "r":
             raise IOError("File not open for reading")
 
         if limit is None:

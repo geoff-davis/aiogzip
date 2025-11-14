@@ -62,14 +62,19 @@ class TestAsyncGzipFile:
         assert gz_file._mode == "wt"
         assert gz_file._binary_mode == "wb"  # pyrefly: ignore
 
+        gz_file = AsyncGzipFile("test.gz", "xb")
+        assert gz_file._mode == "xb"
+        assert gz_file._file_mode == "xb"  # pyrefly: ignore
+
+        gz_file = AsyncGzipFile("test.gz", "xt")
+        assert gz_file._mode == "xt"
+        assert gz_file._binary_mode == "xb"  # pyrefly: ignore
+
         gz_file = AsyncGzipFile("test.gz", "wb", chunk_size=1024)
         assert gz_file._chunk_size == 1024
 
     def test_init_invalid_mode(self):
         """Test initialization with invalid mode raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid mode"):
-            AsyncGzipFile("test.gz", "x")
-
         with pytest.raises(ValueError, match="Invalid mode"):
             AsyncGzipFile("test.gz", "invalid")
 
@@ -383,6 +388,32 @@ class TestAsyncGzipBinaryFile:
                 await f.write("string data")  # pyrefly: ignore
 
     @pytest.mark.asyncio
+    async def test_binary_mode_xb(self, temp_file, sample_data):
+        """Exclusive create mode should work for binary files."""
+        exclusive_path = temp_file + ".xb"
+        if os.path.exists(exclusive_path):
+            os.unlink(exclusive_path)
+
+        async with AsyncGzipBinaryFile(exclusive_path, "xb") as f:
+            await f.write(sample_data)
+
+        async with AsyncGzipBinaryFile(exclusive_path, "rb") as f:
+            assert await f.read() == sample_data
+
+        os.unlink(exclusive_path)
+
+    @pytest.mark.asyncio
+    async def test_binary_mode_rb_plus_allows_read_only(self, temp_file, sample_data):
+        """rb+ should open successfully but still disallow writes, matching gzip."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(sample_data)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb+") as f:
+            assert await f.read() == sample_data
+            with pytest.raises(IOError, match="File not open for writing"):
+                await f.write(sample_data)
+
+    @pytest.mark.asyncio
     async def test_binary_bytes_path(self, temp_file, sample_data):
         """Ensure binary mode accepts bytes paths."""
         path_bytes = os.fsencode(temp_file)
@@ -551,6 +582,68 @@ class TestAsyncGzipTextFile:
 
         async with AsyncGzipTextFile(path_bytes, "rt") as f:
             assert await f.read() == sample_text
+
+    @pytest.mark.asyncio
+    async def test_text_mode_xt(self, temp_file, sample_text):
+        """Exclusive create mode should be supported for text files."""
+        exclusive_path = temp_file + ".xt"
+        if os.path.exists(exclusive_path):
+            os.unlink(exclusive_path)
+
+        async with AsyncGzipTextFile(exclusive_path, "xt") as f:
+            await f.write(sample_text)
+
+        async with AsyncGzipTextFile(exclusive_path, "rt") as f:
+            assert await f.read() == sample_text
+
+        os.unlink(exclusive_path)
+
+    @pytest.mark.asyncio
+    async def test_text_mode_rt_plus(self, temp_file, sample_text):
+        """rt+ should open for reading while still forbidding writes."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(sample_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt+") as f:
+            assert await f.read() == sample_text
+            with pytest.raises(IOError, match="File not open for writing"):
+                await f.write("more")  # pyrefly: ignore
+
+    @pytest.mark.asyncio
+    async def test_text_newline_empty_handles_split_crlf(self, temp_file):
+        """newline='' should treat split CRLF sequences as a single newline."""
+        data = "line1\r\nline2\r\n"
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write(data)
+
+        async with AsyncGzipTextFile(temp_file, "rt", newline="") as f:
+            f._binary_file._chunk_size = 1
+            first = await f.readline()
+            second = await f.readline()
+            assert first == "line1\r\n"
+            assert second == "line2\r\n"
+
+    @pytest.mark.asyncio
+    async def test_text_newline_empty_trailing_cr(self, temp_file):
+        """A trailing CR without LF should still terminate the final line."""
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write("solo\r")
+
+        async with AsyncGzipTextFile(temp_file, "rt", newline="") as f:
+            f._binary_file._chunk_size = 1
+            line = await f.readline()
+            assert line == "solo\r"
+            assert await f.readline() == ""
+
+    @pytest.mark.asyncio
+    async def test_text_custom_error_handler(self, temp_file):
+        """Arbitrary codecs error handlers (e.g., surrogatepass) should be accepted."""
+        text = "snowman ☃"
+        async with AsyncGzipTextFile(temp_file, "wt", errors="surrogatepass") as f:
+            await f.write(text)
+
+        async with AsyncGzipTextFile(temp_file, "rt", errors="surrogatepass") as f:
+            assert await f.read() == text
 
     @pytest.mark.asyncio
     async def test_text_readline_limit(self, temp_file):
@@ -987,23 +1080,23 @@ class TestEdgeCases:
             AsyncGzipTextFile("test.gz", mode="invalid")
 
         # Test that binary file rejects text modes
-        with pytest.raises(ValueError, match="Invalid mode 'rt'"):
+        with pytest.raises(ValueError, match="text \\('t'\\)"):
             AsyncGzipBinaryFile("test.gz", mode="rt")
 
-        with pytest.raises(ValueError, match="Invalid mode 'wt'"):
+        with pytest.raises(ValueError, match="text \\('t'\\)"):
             AsyncGzipBinaryFile("test.gz", mode="wt")
 
-        with pytest.raises(ValueError, match="Invalid mode 'at'"):
+        with pytest.raises(ValueError, match="text \\('t'\\)"):
             AsyncGzipBinaryFile("test.gz", mode="at")
 
         # Test that text file rejects binary modes
-        with pytest.raises(ValueError, match="Invalid mode 'rb'"):
+        with pytest.raises(ValueError, match="binary \\('b'\\)"):
             AsyncGzipTextFile("test.gz", mode="rb")
 
-        with pytest.raises(ValueError, match="Invalid mode 'wb'"):
+        with pytest.raises(ValueError, match="binary \\('b'\\)"):
             AsyncGzipTextFile("test.gz", mode="wb")
 
-        with pytest.raises(ValueError, match="Invalid mode 'ab'"):
+        with pytest.raises(ValueError, match="binary \\('b'\\)"):
             AsyncGzipTextFile("test.gz", mode="ab")
 
     def test_invalid_encoding(self):
@@ -1013,9 +1106,8 @@ class TestEdgeCases:
 
     def test_invalid_errors(self):
         """Test invalid errors inputs."""
-        with pytest.raises(ValueError, match="Invalid errors value"):
-            AsyncGzipTextFile("test.gz", errors="invalid")
-
+        # Arbitrary error handlers should now be accepted
+        AsyncGzipTextFile("test.gz", errors="invalid")
         with pytest.raises(ValueError, match="Errors cannot be None"):
             AsyncGzipTextFile("test.gz", errors=None)
 
