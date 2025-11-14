@@ -124,7 +124,7 @@ def _validate_compresslevel(compresslevel: int) -> None:
         raise ValueError("Compression level must be between 0 and 9")
 
 
-def _parse_mode_tokens(mode: str) -> tuple[str, bool, bool, bool]:
+def _parse_mode_tokens(mode: str) -> Tuple[str, bool, bool, bool]:
     """Parse a mode string into (op, saw_b, saw_t, plus) flags."""
     if not isinstance(mode, str):
         raise TypeError("mode must be a string")
