@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Fix `read(0)` to return empty string without draining internal buffer, conforming to TextIOBase contract
+- Fix CRLF sequences split across chunk boundaries causing duplicate newlines (was converting `\r\n` to `\n\n`)
+- Fix line iteration (`__anext__`) to respect newline mode parameter (`\r`, `\n`, `\r\n`, universal)
+- Fix `readline()` to respect newline mode parameter, ensuring consistent behavior with iteration
+
+### Added
+- Comprehensive test coverage improvements: 113 → 162 tests (+49 tests)
+- Test coverage increased from 84.13% to 88.47%
+- Tests for exception handling edge cases (unexpected errors in compression/decompression/flush)
+- Tests for Unicode boundary detection (multibyte character splits across chunks)
+- Tests for multi-member gzip archives (empty members, many members, partial reads)
+- Tests for async flush/close on custom file objects
+- Tests for unusual encodings (shift_jis, iso-8859-1, cp1252, UTF-16/32)
+- Tests for closed file operations and iteration edge cases
+- Tests documenting and verifying newline handling fixes
+
 ## [0.3] - 2025-10-21
 
 - Fix handling of negative `size` values so reads return the full remaining payload in both binary and text modes.
