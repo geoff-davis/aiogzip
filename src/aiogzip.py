@@ -11,7 +11,7 @@ for gzip.open() with proper separation of binary and text operations.
 Recommended usage patterns:
 
 1. Basic file operations:
-    from aiogzip.aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
+    from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 
     # Binary mode
     async with AsyncGzipBinaryFile("data.gz", "wb") as f:
@@ -22,7 +22,7 @@ Recommended usage patterns:
         await f.write("Hello, World!")
 
 2. CSV processing with aiocsv:
-    from aiogzip.aiogzip import AsyncGzipTextFile
+    from aiogzip import AsyncGzipTextFile
     import aiocsv
 
     async with AsyncGzipTextFile("data.csv.gz", "rt") as f:
@@ -244,7 +244,7 @@ class AsyncGzipBinaryFile:
         """Exit the context manager, flushing and closing the file."""
         await self.close()
 
-    async def write(self, data: bytes) -> int:
+    async def write(self, data: Union[bytes, bytearray, memoryview]) -> int:
         """
         Compresses and writes binary data to the file.
 
@@ -262,11 +262,10 @@ class AsyncGzipBinaryFile:
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
 
-        if not isinstance(data, bytes):
-            raise TypeError("write() argument must be bytes, not str")
+        buffer = self._coerce_byteslike(data)
 
         try:
-            compressed = self._engine.compress(data)
+            compressed = self._engine.compress(buffer)
             if compressed:
                 await self._file.write(compressed)
         except zlib.error as e:
@@ -277,7 +276,30 @@ class AsyncGzipBinaryFile:
         except Exception as e:
             raise OSError(f"Unexpected error during compression: {e}") from e
 
-        return len(data)
+        return len(buffer)
+
+    @staticmethod
+    def _coerce_byteslike(data: Any) -> Union[bytes, bytearray, memoryview]:
+        """Accept bytes-like inputs while preserving efficient paths for bytes."""
+        if isinstance(data, (bytes, bytearray)):
+            return data
+        if isinstance(data, memoryview):
+            if not data.contiguous:
+                return data.tobytes()
+            if data.itemsize != 1:
+                return data.cast("B")
+            return data
+        try:
+            view = memoryview(data)
+        except TypeError as exc:
+            raise TypeError(
+                f"write() argument must be a bytes-like object, not {type(data).__name__}"
+            ) from exc
+        if not view.contiguous:
+            return view.tobytes()
+        if view.itemsize != 1:
+            return view.cast("B")
+        return view
 
     async def read(self, size: int = -1) -> bytes:
         """
@@ -575,8 +597,9 @@ class AsyncGzipTextFile:
 
     async def __aenter__(self):
         """Enter the async context manager and initialize resources."""
+        filename = os.fspath(self._filename) if self._filename is not None else None
         self._binary_file = AsyncGzipBinaryFile(
-            str(self._filename) if self._filename is not None else None,
+            filename,
             self._binary_mode,
             self._chunk_size,
             self._compresslevel,
@@ -857,12 +880,16 @@ class AsyncGzipTextFile:
 
             self._line_buffer += chunk
 
-    async def readline(self) -> str:
+    async def readline(self, limit: int = -1) -> str:
         """
         Read and return one line from the file.
 
         A line is defined as text ending with a newline character ('\\n').
         If the file ends without a newline, the last line is returned without one.
+
+        Args:
+            limit: Maximum number of characters to return. Stops at newline,
+                EOF, or once the limit is reached (matching TextIOBase semantics).
 
         Returns:
             str: The next line from the file, including the newline if present.
@@ -880,26 +907,40 @@ class AsyncGzipTextFile:
         if "r" not in self._mode:
             raise IOError("File not open for reading")
 
+        if limit is None:
+            limit = -1
+        if limit == 0:
+            return ""
+
         # Try to get a line from our buffer using newline-aware search
         while True:
             pos, length = self._get_line_terminator_pos(self._line_buffer)
             if pos != -1:
                 # Found a line terminator
-                line = self._line_buffer[: pos + length]
-                self._line_buffer = self._line_buffer[pos + length :]
+                end = pos + length
+                line = self._line_buffer[:end]
+                self._line_buffer = self._line_buffer[end:]
+            elif limit != -1 and len(self._line_buffer) >= limit:
+                line = self._line_buffer[:limit]
+                self._line_buffer = self._line_buffer[limit:]
                 return line
-
-            # Read more data
-            chunk: str = await self.read(LINE_READ_CHUNK_SIZE)
-            if not chunk:  # EOF
-                if self._line_buffer:
-                    result = self._line_buffer
-                    self._line_buffer = ""  # Clear buffer
-                    return result  # Last line without newline
+            else:
+                # Read more data
+                chunk: str = await self.read(LINE_READ_CHUNK_SIZE)
+                if not chunk:  # EOF
+                    if not self._line_buffer:
+                        return ""  # EOF with empty buffer
+                    line = self._line_buffer
+                    self._line_buffer = ""
                 else:
-                    return ""  # EOF with empty buffer
+                    self._line_buffer += chunk
+                    continue
 
-            self._line_buffer += chunk
+            if limit != -1 and len(line) > limit:
+                # Preserve leftover characters (including newline) for the next call
+                self._line_buffer = line[limit:] + self._line_buffer
+                line = line[:limit]
+            return line
 
     async def flush(self) -> None:
         """

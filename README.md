@@ -155,19 +155,26 @@ This project uses `setuptools` for packaging.
    cd aiogzip
    ```
 
-2. **Create a virtual environment and install dependencies**:
+2. **Install dependencies (uv recommended)**:
+
+   ```bash
+   uv sync --all-extras --group dev
+   ```
+
+   This will create (or update) the local `.venv` and install the project plus the `csv`
+   extra and development dependencies. If you prefer to manage environments manually:
 
    ```bash
    python -m venv .venv
    source .venv/bin/activate
-   pip install -e ".[csv]"  # Install in editable mode with extras
-   pip install -e ".[dev]" # Install dev dependencies
+   pip install -e ".[csv]"
+   pip install -e ".[dev]"
    ```
 
 3. **Run tests**:
 
    ```bash
-   pytest
+   uv run pytest
    ```
 
 ## License

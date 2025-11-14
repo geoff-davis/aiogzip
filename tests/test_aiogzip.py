@@ -181,7 +181,9 @@ class TestAsyncGzipFile:
     async def test_write_type_error_binary(self, temp_file):
         """Test write with wrong type in binary mode."""
         async with AsyncGzipFile(temp_file, "wb") as gz_file:
-            with pytest.raises(TypeError, match="write\\(\\) argument must be bytes"):
+            with pytest.raises(
+                TypeError, match="write\\(\\) argument must be a bytes-like object"
+            ):
                 await gz_file.write("string data")  # pyrefly: ignore
 
     @pytest.mark.asyncio
@@ -375,8 +377,31 @@ class TestAsyncGzipBinaryFile:
     async def test_binary_type_error(self, temp_file):
         """Test type error when writing string to binary file."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
-            with pytest.raises(TypeError, match="write\\(\\) argument must be bytes"):
+            with pytest.raises(
+                TypeError, match="write\\(\\) argument must be a bytes-like object"
+            ):
                 await f.write("string data")  # pyrefly: ignore
+
+    @pytest.mark.asyncio
+    async def test_binary_bytes_path(self, temp_file, sample_data):
+        """Ensure binary mode accepts bytes paths."""
+        path_bytes = os.fsencode(temp_file)
+
+        async with AsyncGzipBinaryFile(path_bytes, "wb") as f:
+            await f.write(sample_data)
+
+        async with AsyncGzipBinaryFile(path_bytes, "rb") as f:
+            assert await f.read() == sample_data
+
+    @pytest.mark.asyncio
+    async def test_binary_accepts_bytearray_and_memoryview(self, temp_file):
+        """Binary writes should support general buffer-protocol inputs."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(bytearray(b"abc"))
+            await f.write(memoryview(b"def"))
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.read() == b"abcdef"
 
     @pytest.mark.asyncio
     async def test_binary_interoperability_with_gzip(self, temp_file, sample_data):
@@ -515,6 +540,33 @@ class TestAsyncGzipTextFile:
         async with AsyncGzipTextFile(temp_file, "rt") as f:
             read_data = await f.read()
             assert read_data == large_text
+
+    @pytest.mark.asyncio
+    async def test_text_bytes_path(self, temp_file, sample_text):
+        """Ensure text mode accepts bytes filenames."""
+        path_bytes = os.fsencode(temp_file)
+
+        async with AsyncGzipTextFile(path_bytes, "wt") as f:
+            await f.write(sample_text)
+
+        async with AsyncGzipTextFile(path_bytes, "rt") as f:
+            assert await f.read() == sample_text
+
+    @pytest.mark.asyncio
+    async def test_text_readline_limit(self, temp_file):
+        """readline(limit) should stop after limit characters."""
+        text = "abcdef\nXYZ\n"
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(text)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            part = await f.readline(5)
+            assert part == "abcde"
+            rest = await f.readline()
+            assert rest == "f\n"
+            final = await f.readline()
+            assert final == "XYZ\n"
 
     @pytest.mark.asyncio
     async def test_text_line_iteration(self, temp_file):
