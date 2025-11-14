@@ -771,7 +771,7 @@ class AsyncGzipTextFile:
             # Non-strict: decode with the provided policy and do not carry remainder
             return data.decode(self._encoding, errors=self._errors), b""
 
-    def _get_line_terminator_pos(self, text: str) -> tuple[int, int]:
+    def _get_line_terminator_pos(self, text: str) -> Tuple[int, int]:
         """Find position of line terminator in text based on newline mode.
 
         Returns:
