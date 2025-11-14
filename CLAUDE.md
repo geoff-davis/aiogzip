@@ -95,7 +95,7 @@ Tests are organized by priority:
 
 ## CI/CD Notes
 
-The project uses GitHub Actions which tests against Python 3.8, 3.9, 3.10, 3.11, and 3.12.
+The project uses GitHub Actions which tests against Python 3.8, 3.9, 3.10, 3.11, 3.12, and 3.13.
 
 **Any Python 3.9+ only syntax will fail CI!**
 
