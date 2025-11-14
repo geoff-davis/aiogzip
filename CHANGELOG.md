@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Fix CRLF sequences split across chunk boundaries causing duplicate newlines (was converting `\r\n` to `\n\n`)
 - Fix line iteration (`__anext__`) to respect newline mode parameter (`\r`, `\n`, `\r\n`, universal)
 - Fix `readline()` to respect newline mode parameter, ensuring consistent behavior with iteration
+- Fix Python 3.8 compatibility by using `Tuple` instead of `tuple` in type hints (PEP 585 syntax not supported in 3.8)
 
 ### Added
 
