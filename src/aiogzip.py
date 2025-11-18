@@ -257,6 +257,7 @@ class AsyncGzipBinaryFile:
         self._file: Any = None
         self._engine: ZlibEngine = None
         self._buffer = bytearray()  # Use bytearray for efficient buffer growth
+        self._buffer_offset: int = 0  # Offset to the start of valid data in _buffer
         self._is_closed: bool = False
         self._eof: bool = False
         self._owns_file: bool = False
@@ -378,8 +379,12 @@ class AsyncGzipBinaryFile:
         # If size is -1, read all data in chunks to avoid memory issues
         if size == -1:
             # Return buffered data + read remaining (no recursion)
-            chunks = [bytes(self._buffer)] if self._buffer else []
+            chunks = []
+            if self._buffer_offset < len(self._buffer):
+                chunks.append(bytes(self._buffer[self._buffer_offset :]))
+
             del self._buffer[:]  # Clear while retaining capacity
+            self._buffer_offset = 0
 
             while not self._eof:
                 await self._fill_buffer()
@@ -390,13 +395,31 @@ class AsyncGzipBinaryFile:
             return b"".join(chunks)
         else:
             # Otherwise, read until the buffer has enough data to satisfy the request.
-            while len(self._buffer) < size and not self._eof:
+            while (len(self._buffer) - self._buffer_offset) < size and not self._eof:
+                # If buffer has too much garbage at the front, compact it
+                if self._buffer_offset > 64 * 1024:
+                    del self._buffer[: self._buffer_offset]
+                    self._buffer_offset = 0
+
                 await self._fill_buffer()
 
-            data_to_return = bytes(self._buffer[:size])
-            del self._buffer[:size]  # More efficient than slicing for bytearray
+            # Determine how much we can actually read
+            available = len(self._buffer) - self._buffer_offset
+            actual_read_size = min(size, available)
 
-        return data_to_return
+            data_to_return = bytes(
+                self._buffer[
+                    self._buffer_offset : self._buffer_offset + actual_read_size
+                ]
+            )
+            self._buffer_offset += actual_read_size
+
+            # If we consumed everything, reset to keep buffer clean
+            if self._buffer_offset >= len(self._buffer):
+                del self._buffer[:]
+                self._buffer_offset = 0
+
+            return data_to_return
 
     async def _fill_buffer(self) -> None:
         """Internal helper to read a compressed chunk and decompress it.
