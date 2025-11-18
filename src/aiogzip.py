@@ -634,8 +634,8 @@ class AsyncGzipTextFile:
             self._compresslevel,
             fileobj=self._external_file,
             closefd=self._closefd,
-        )  # pyrefly: ignore
-        await self._binary_file.__aenter__()  # pyrefly: ignore
+        )
+        await self._binary_file.__aenter__()
         return self
 
     async def __aexit__(
@@ -717,16 +717,45 @@ class AsyncGzipTextFile:
 
         if size == -1:
             # Read all remaining data (including any buffered text)
-            raw_data: bytes = await self._binary_file.read(-1)
-            # Combine with any pending bytes
-            all_data = self._pending_bytes + raw_data
-            self._pending_bytes = b""  # pyrefly: ignore
-            decoded = self._safe_decode(all_data)
-            decoded = self._apply_newline_decoding(decoded)
-            # Combine buffered text with newly decoded data
-            result = self._text_data + decoded
-            self._text_data = ""  # pyrefly: ignore
-            return result
+            # We read in chunks to avoid holding the entire compressed AND decompressed
+            # data in memory simultaneously.
+            chunks = [self._text_data]
+            self._text_data = ""
+
+            # Process any pending bytes first
+            if self._pending_bytes:
+                # This is tricky: we need more data to decode the pending bytes.
+                # We'll just let the loop handle it.
+                pass
+
+            while not self._binary_file._eof:
+                raw_chunk = await self._binary_file.read(self._chunk_size)
+                if not raw_chunk:
+                    break
+
+                all_data = self._pending_bytes + raw_chunk
+                self._pending_bytes = b""
+
+                # When reading all, we can use 'ignore' or 'replace' errors immediately
+                # if we are at the very end, but here we are in a loop.
+                # We use the safe decode which buffers incomplete bytes.
+                decoded_chunk, remaining_bytes = self._safe_decode_with_remainder(
+                    all_data
+                )
+                self._pending_bytes = remaining_bytes
+
+                if decoded_chunk:
+                    chunks.append(self._apply_newline_decoding(decoded_chunk))
+
+            # End of file: decode any remaining pending bytes
+            if self._pending_bytes:
+                decoded = self._pending_bytes.decode(
+                    self._encoding, errors=self._errors
+                )
+                chunks.append(self._apply_newline_decoding(decoded))
+                self._pending_bytes = b""
+
+            return "".join(chunks)
         else:
             # Check if we have enough data in our text buffer
             if len(self._text_data) >= size:
@@ -740,13 +769,13 @@ class AsyncGzipTextFile:
                 chars_needed = size - len(self._text_data)
                 bytes_estimate = chars_needed * 4
                 chunk_size = max(4096, min(bytes_estimate, 64 * 1024))
-                raw_chunk: bytes = await self._binary_file.read(chunk_size)
+                new_raw_chunk: bytes = await self._binary_file.read(chunk_size)
 
-                if not raw_chunk:
+                if not new_raw_chunk:
                     break
 
                 # Combine with any pending bytes
-                all_data = self._pending_bytes + raw_chunk
+                all_data = self._pending_bytes + new_raw_chunk
                 self._pending_bytes = b""  # pyrefly: ignore
 
                 # Decode the chunk safely
