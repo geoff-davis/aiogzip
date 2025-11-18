@@ -52,7 +52,7 @@ package-dir = {"" = "src"}
 py-modules = ["aiogzip"]
 
 [tool.setuptools.package-data]
-"" = ["py.typed"]
+"aiogzip" = ["py.typed"]
 
 [tool.setuptools.dynamic]
 version = { attr = "aiogzip.__version__" }

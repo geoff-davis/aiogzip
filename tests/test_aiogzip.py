@@ -1051,9 +1051,6 @@ class TestEdgeCases:
         with pytest.raises(ValueError, match="Chunk size must be positive"):
             AsyncGzipBinaryFile("test.gz", chunk_size=-1)
 
-        with pytest.raises(ValueError, match="Chunk size too large"):
-            AsyncGzipBinaryFile("test.gz", chunk_size=11 * 1024 * 1024)
-
     def test_invalid_compression_level(self):
         """Test invalid compression level inputs."""
         with pytest.raises(

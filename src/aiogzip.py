@@ -61,9 +61,6 @@ import aiofiles
 # 31 = 16 (gzip format) + 15 (maximum window size)
 GZIP_WBITS = 31
 
-# Maximum allowed chunk size for reading/writing (10 MB)
-MAX_CHUNK_SIZE = 10 * 1024 * 1024
-
 # Default chunk size for line reading in text mode (8 KB)
 LINE_READ_CHUNK_SIZE = 8192
 
@@ -105,10 +102,6 @@ def _validate_chunk_size(chunk_size: int) -> None:
     """
     if chunk_size <= 0:
         raise ValueError("Chunk size must be positive")
-    if chunk_size > MAX_CHUNK_SIZE:
-        raise ValueError(
-            f"Chunk size too large (max {MAX_CHUNK_SIZE // (1024 * 1024)}MB)"
-        )
 
 
 def _validate_compresslevel(compresslevel: int) -> None:

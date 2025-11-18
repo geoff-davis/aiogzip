@@ -38,9 +38,10 @@ When processing multiple files, especially where I/O latency (disk/network) is i
 
 ### 1. Choose the Right Chunk Size
 
-The default `chunk_size` is 64KB.
+The default `chunk_size` is 64KB, and there is intentionally **no upper bound**.
 - **Increase it** (e.g., `128*1024` or `1024*1024`) for large file throughput if you have memory to spare.
 - **Decrease it** if you are memory constrained and processing massive files.
+- If you push chunk sizes into the multi-megabyte range, budget the extra memory per open file to avoid accidental OOMs.
 
 ```python
 # Example: Using a larger chunk size for speed
