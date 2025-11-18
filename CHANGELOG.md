@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Comprehensive test coverage for error conditions and edge cases in `tests/test_edge_cases_and_errors.py`.
+- `pre-commit` configuration with `ruff` and `mypy` for code quality enforcement.
+- Initial MkDocs documentation structure and configuration.
+
+### Changed
+
+- Updated `pyproject.toml` with development dependencies and tooling configurations.
+
+### Fixed
+
+- Resolved import sorting and formatting issues across the project with Ruff v0.14.5.
+
+### Refactor
+
+- Modernized `AsyncGzipTextFile` to use `codecs.getincrementaldecoder` for improved memory efficiency and simplified text decoding logic.
+- Removed obsolete manual buffering (`_pending_bytes`, `_text_data`, `_line_buffer`) in `AsyncGzipTextFile`, in favor of a unified `_text_buffer`.
+- Simplified `read`, `readline`, and iteration logic in `AsyncGzipTextFile`.
+- Cleaned up `tests/test_aiogzip.py` by removing assertions for obsolete internal state attributes.
+
+### Performance
+
+- Optimized `AsyncGzipBinaryFile` buffer handling by replacing `bytearray` deletion with an offset pointer to avoid excessive data movement during read operations.
+
 ## [0.4] - 2025-11-14
 
 ### Fixed
