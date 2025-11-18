@@ -6,8 +6,9 @@ Tests specific optimizations and low-level operations.
 
 import time
 
-from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 from bench_common import BenchmarkBase
+
+from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 
 
 class MicroBenchmarks(BenchmarkBase):

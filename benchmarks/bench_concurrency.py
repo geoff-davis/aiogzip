@@ -8,8 +8,9 @@ import asyncio
 import gzip
 import time
 
-from aiogzip import AsyncGzipBinaryFile
 from bench_common import BenchmarkBase
+
+from aiogzip import AsyncGzipBinaryFile
 
 
 class ConcurrencyBenchmarks(BenchmarkBase):

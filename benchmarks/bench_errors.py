@@ -6,8 +6,9 @@ Tests error handling and edge cases.
 
 import time
 
-from aiogzip import AsyncGzipBinaryFile
 from bench_common import BenchmarkBase
+
+from aiogzip import AsyncGzipBinaryFile
 
 
 class ErrorsBenchmarks(BenchmarkBase):

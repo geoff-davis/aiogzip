@@ -6,8 +6,9 @@ Tests compression ratios and format compatibility.
 
 import gzip
 
-from aiogzip import AsyncGzipBinaryFile
 from bench_common import BenchmarkBase, format_size
+
+from aiogzip import AsyncGzipBinaryFile
 
 
 class CompressionBenchmarks(BenchmarkBase):

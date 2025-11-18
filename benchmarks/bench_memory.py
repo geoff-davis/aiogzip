@@ -6,8 +6,9 @@ Tests memory usage and efficiency.
 
 import time
 
-from aiogzip import AsyncGzipBinaryFile
 from bench_common import BenchmarkBase
+
+from aiogzip import AsyncGzipBinaryFile
 
 try:
     import psutil  # noqa: F401

@@ -8,8 +8,9 @@ import gzip
 import json
 import time
 
-from aiogzip import AsyncGzipTextFile
 from bench_common import BenchmarkBase
+
+from aiogzip import AsyncGzipTextFile
 
 
 class ScenariosBenchmarks(BenchmarkBase):

@@ -1,4 +1,5 @@
 import pytest
+
 from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 
 

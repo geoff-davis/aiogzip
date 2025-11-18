@@ -7,8 +7,9 @@ Tests core read/write performance in binary and text modes.
 import gzip
 import time
 
-from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 from bench_common import BenchmarkBase, format_speedup
+
+from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 
 
 class IoBenchmarks(BenchmarkBase):

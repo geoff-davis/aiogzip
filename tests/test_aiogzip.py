@@ -7,6 +7,7 @@ from typing import Union
 
 import aiocsv
 import pytest
+
 from aiogzip import (
     AsyncGzipBinaryFile,
     AsyncGzipFile,
@@ -1320,9 +1321,9 @@ class TestPerformanceAndMemory:
                 # Note: gzip decompression can produce large buffers due to compression ratios
                 # and the current implementation accumulates decompressed data in memory
                 # This is a known limitation of the current streaming implementation
-                assert (
-                    memory_increase < 200 * 1024 * 1024
-                ), f"Memory usage too high: {memory_increase / 1024 / 1024:.1f}MB"
+                assert memory_increase < 200 * 1024 * 1024, (
+                    f"Memory usage too high: {memory_increase / 1024 / 1024:.1f}MB"
+                )
 
         assert total_read == len(large_data)
 
@@ -1434,9 +1435,9 @@ class TestPerformanceAndMemory:
                     memory_increase = current_memory - initial_memory
 
                     # Memory increase should be reasonable
-                    assert (
-                        memory_increase < 100 * 1024 * 1024
-                    ), f"Memory usage too high: {memory_increase / 1024 / 1024:.1f}MB"
+                    assert memory_increase < 100 * 1024 * 1024, (
+                        f"Memory usage too high: {memory_increase / 1024 / 1024:.1f}MB"
+                    )
 
         assert lines_read == 100000
 
@@ -3046,9 +3047,9 @@ class TestNewlineHandlingBugs:
         newline_count = result.count("\n")
 
         # This will FAIL with current implementation if CRLF splits
-        assert (
-            result == expected
-        ), f"Got {newline_count} newlines instead of 1, CRLF was split incorrectly"
+        assert result == expected, (
+            f"Got {newline_count} newlines instead of 1, CRLF was split incorrectly"
+        )
 
     @pytest.mark.asyncio
     async def test_line_iteration_with_cr_only_newline(self, temp_file):
@@ -3122,9 +3123,9 @@ class TestNewlineHandlingBugs:
 
             # Verify buffer wasn't drained - we should still be able to read remaining
             rest = await f.read()
-            assert (
-                rest == ", World! This is a test."
-            ), f"Buffer was drained! Got {repr(rest)}"
+            assert rest == ", World! This is a test.", (
+                f"Buffer was drained! Got {repr(rest)}"
+            )
 
     @pytest.mark.asyncio
     async def test_read_zero_binary_returns_empty_bytes(self, temp_file):
