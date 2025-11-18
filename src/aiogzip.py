@@ -50,6 +50,8 @@ Error Handling Strategy:
 
 import codecs
 import os
+import struct
+import time
 import zlib
 from pathlib import Path
 from typing import Any, Optional, Protocol, Tuple, Union
@@ -63,6 +65,13 @@ GZIP_WBITS = 31
 
 # Default chunk size for line reading in text mode (8 KB)
 LINE_READ_CHUNK_SIZE = 8192
+
+# gzip header constants
+GZIP_FLAG_FNAME = 0x08
+GZIP_METHOD_DEFLATE = 8
+GZIP_OS_UNKNOWN = 255
+_COMPRESS_LEVEL_FAST = 1
+_COMPRESS_LEVEL_BEST = 9
 
 # Type alias for zlib compression/decompression objects
 # These are the return types of zlib.compressobj() and zlib.decompressobj()
@@ -115,6 +124,91 @@ def _validate_compresslevel(compresslevel: int) -> None:
     """
     if not (0 <= compresslevel <= 9):
         raise ValueError("Compression level must be between 0 and 9")
+
+
+def _normalize_mtime(mtime: Optional[Union[int, float]]) -> Optional[int]:
+    """Validate and normalize mtime values."""
+    if mtime is None:
+        return None
+    if not isinstance(mtime, (int, float)):
+        raise TypeError("mtime must be an int or float if provided")
+    if mtime < 0:
+        raise ValueError("mtime must be non-negative")
+    return int(mtime)
+
+
+def _validate_original_filename(
+    filename: Optional[Union[str, bytes]],
+) -> Optional[Union[str, bytes]]:
+    """Validate optional original filename parameter."""
+    if filename is None or isinstance(filename, (str, bytes)):
+        return filename
+    raise TypeError("original_filename must be a string or bytes if provided")
+
+
+def _derive_header_filename(
+    explicit: Optional[Union[str, bytes]],
+    fallback: Union[str, bytes, os.PathLike[str], os.PathLike[bytes], None],
+) -> bytes:
+    """Derive the filename stored in the gzip header."""
+    candidate: Union[str, bytes, os.PathLike[str], os.PathLike[bytes], None] = (
+        explicit if explicit is not None else fallback
+    )
+    if candidate is None:
+        return b""
+
+    if isinstance(candidate, os.PathLike):
+        candidate = os.fspath(candidate)
+
+    if isinstance(candidate, bytes):
+        base_bytes = os.path.basename(candidate)
+        if base_bytes.endswith(b".gz"):
+            base_bytes = base_bytes[:-3]
+        return base_bytes
+
+    if isinstance(candidate, str):
+        base_str = os.path.basename(candidate)
+        if base_str.endswith(".gz"):
+            base_str = base_str[:-3]
+        try:
+            return base_str.encode("latin-1")
+        except UnicodeEncodeError:
+            return b""
+
+    raise TypeError("original_filename must be a string or bytes if provided")
+
+
+def _build_gzip_header(
+    filename_bytes: bytes, mtime: Optional[int], compresslevel: int
+) -> bytes:
+    """Construct a gzip header matching CPython's gzip implementation."""
+    header = bytearray()
+    header.extend(b"\x1f\x8b")
+    header.append(GZIP_METHOD_DEFLATE)
+    flags = GZIP_FLAG_FNAME if filename_bytes else 0
+    header.append(flags)
+    seconds = int(time.time()) if mtime is None else int(mtime)
+    header.extend(struct.pack("<I", seconds))
+
+    if compresslevel == _COMPRESS_LEVEL_BEST:
+        xfl = 2
+    elif compresslevel == _COMPRESS_LEVEL_FAST:
+        xfl = 4
+    else:
+        xfl = 0
+    header.append(xfl)
+    header.append(GZIP_OS_UNKNOWN)
+
+    if filename_bytes:
+        header.extend(filename_bytes)
+        header.append(0)
+
+    return bytes(header)
+
+
+def _build_gzip_trailer(crc: int, size: int) -> bytes:
+    """Construct the gzip trailer (CRC32 + uncompressed size)."""
+    return struct.pack("<II", crc & 0xFFFFFFFF, size & 0xFFFFFFFF)
 
 
 def _parse_mode_tokens(mode: str) -> Tuple[str, bool, bool, bool]:
@@ -216,6 +310,8 @@ class AsyncGzipBinaryFile:
         mode: str = "rb",
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         compresslevel: int = 6,
+        mtime: Optional[Union[int, float]] = None,
+        original_filename: Optional[Union[str, bytes]] = None,
         fileobj: Optional[WithAsyncReadWrite] = None,
         closefd: bool = True,
     ) -> None:
@@ -238,6 +334,8 @@ class AsyncGzipBinaryFile:
         self._writing_mode = mode_op in {"w", "a", "x"}
         self._chunk_size = chunk_size
         self._compresslevel = compresslevel
+        self._header_mtime = _normalize_mtime(mtime)
+        self._header_filename_override = _validate_original_filename(original_filename)
         self._external_file = fileobj
         self._closefd = closefd
 
@@ -254,6 +352,8 @@ class AsyncGzipBinaryFile:
         self._is_closed: bool = False
         self._eof: bool = False
         self._owns_file: bool = False
+        self._crc: int = 0
+        self._input_size: int = 0
 
     async def __aenter__(self) -> "AsyncGzipBinaryFile":
         """Enter the async context manager and initialize resources."""
@@ -270,7 +370,17 @@ class AsyncGzipBinaryFile:
 
         # Initialize compression/decompression engine based on mode
         if self._writing_mode:
-            self._engine = zlib.compressobj(level=self._compresslevel, wbits=GZIP_WBITS)
+            self._engine = zlib.compressobj(
+                level=self._compresslevel, wbits=-zlib.MAX_WBITS
+            )
+            header = _build_gzip_header(
+                _derive_header_filename(self._header_filename_override, self._filename),
+                self._header_mtime,
+                self._compresslevel,
+            )
+            await self._file.write(header)
+            self._crc = 0
+            self._input_size = 0
         else:  # read mode
             self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
 
@@ -304,6 +414,8 @@ class AsyncGzipBinaryFile:
             raise ValueError("File not opened. Use async context manager.")
 
         buffer = self._coerce_byteslike(data)
+        self._crc = zlib.crc32(buffer, self._crc)
+        self._input_size += len(buffer)
 
         try:
             compressed = self._engine.compress(buffer)
@@ -516,6 +628,8 @@ class AsyncGzipBinaryFile:
                 remaining_data = self._engine.flush()
                 if remaining_data:
                     await self._file.write(remaining_data)
+                trailer = _build_gzip_trailer(self._crc, self._input_size)
+                await self._file.write(trailer)
 
             if self._file is not None and (self._owns_file or self._closefd):
                 # Close only if we own it or closefd=True
@@ -572,6 +686,8 @@ class AsyncGzipTextFile:
         errors: str = "strict",
         newline: Union[str, None] = None,
         compresslevel: int = 6,
+        mtime: Optional[Union[int, float]] = None,
+        original_filename: Optional[Union[str, bytes]] = None,
         fileobj: Optional[WithAsyncReadWrite] = None,
         closefd: bool = True,
     ) -> None:
@@ -602,6 +718,8 @@ class AsyncGzipTextFile:
         self._errors = errors
         self._newline = newline
         self._compresslevel = compresslevel
+        self._header_mtime = _normalize_mtime(mtime)
+        self._header_filename_override = _validate_original_filename(original_filename)
         self._external_file = fileobj
         self._closefd = closefd
 
@@ -624,10 +742,12 @@ class AsyncGzipTextFile:
         """Enter the async context manager and initialize resources."""
         filename = os.fspath(self._filename) if self._filename is not None else None
         self._binary_file = AsyncGzipBinaryFile(
-            filename,
-            self._binary_mode,
-            self._chunk_size,
-            self._compresslevel,
+            filename=filename,
+            mode=self._binary_mode,
+            chunk_size=self._chunk_size,
+            compresslevel=self._compresslevel,
+            mtime=self._header_mtime,
+            original_filename=self._header_filename_override,
             fileobj=self._external_file,
             closefd=self._closefd,
         )

@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Comprehensive test coverage for error conditions and edge cases in `tests/test_edge_cases_and_errors.py`.
 - `pre-commit` configuration with `ruff` and `mypy` for code quality enforcement.
 - Initial MkDocs documentation structure and configuration.
+- Ability to set gzip header `mtime` and original filename metadata for deterministic archives.
 
 ### Changed
 

@@ -2,8 +2,11 @@
 # pyrefly: disable=all
 import gzip
 import os
+import struct
 import tempfile
-from typing import Union
+import time
+from pathlib import Path
+from typing import Dict, Union
 
 import aiocsv
 import pytest
@@ -16,6 +19,21 @@ from aiogzip import (
     WithAsyncReadWrite,
     WithAsyncWrite,
 )
+
+
+def _parse_gzip_header_bytes(
+    path: Union[str, os.PathLike[str]],
+) -> Dict[str, Union[int, bytes]]:
+    raw = Path(path).read_bytes()
+    assert len(raw) >= 10
+    flags = raw[3]
+    mtime = struct.unpack("<I", raw[4:8])[0]
+    filename = b""
+    if flags & 0x08:
+        terminator = raw.find(b"\x00", 10)
+        assert terminator != -1
+        filename = raw[10:terminator]
+    return {"flags": flags, "mtime": mtime, "filename": filename}
 
 
 class TestAsyncGzipFile:
@@ -452,6 +470,51 @@ class TestAsyncGzipBinaryFile:
         async with AsyncGzipBinaryFile(temp_file, "rb") as f:
             read_data = await f.read()
             assert read_data == sample_data
+
+    @pytest.mark.asyncio
+    async def test_binary_custom_header_metadata(self, tmp_path):
+        """Binary writer should honor provided mtime and original filename."""
+        target = tmp_path / "custom_meta.gz"
+        async with AsyncGzipBinaryFile(
+            target, "wb", mtime=0, original_filename="report.csv"
+        ) as f:
+            await f.write(b"payload")
+
+        header = _parse_gzip_header_bytes(target)
+        assert header["mtime"] == 0
+        assert header["filename"] == b"report.csv"
+        assert header["flags"] & 0x08
+
+        with gzip.open(target, "rb") as fh:
+            assert fh.read() == b"payload"
+
+    @pytest.mark.asyncio
+    async def test_binary_header_defaults_to_basename(self, tmp_path):
+        """When no original filename provided, derive from the gzip path."""
+        target = tmp_path / "dataset.gz"
+        async with AsyncGzipBinaryFile(target, "wb") as f:
+            await f.write(b"x")
+
+        header = _parse_gzip_header_bytes(target)
+        assert header["filename"] == b"dataset"
+        # Allow slight timing differences
+        assert abs(header["mtime"] - int(time.time())) < 10
+
+    @pytest.mark.asyncio
+    async def test_text_custom_header_metadata(self, tmp_path):
+        """Text writer should forward metadata options to the binary layer."""
+        target = tmp_path / "text_meta.gz"
+        async with AsyncGzipTextFile(
+            target, "wt", mtime=12345, original_filename=b"notes.txt"
+        ) as f:
+            await f.write("hello")
+
+        header = _parse_gzip_header_bytes(target)
+        assert header["mtime"] == 12345
+        assert header["filename"] == b"notes.txt"
+
+        with gzip.open(target, "rt") as fh:
+            assert fh.read() == "hello"
 
 
 class TestAsyncGzipTextFile:
