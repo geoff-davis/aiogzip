@@ -86,15 +86,15 @@ asyncio.run(main())
 
 **Text Operations** (where aiogzip excels):
 
-- **2.4x faster** for bulk text read/write operations (33 MB/s vs 13.8 MB/s)
-- **2.0x faster** for JSONL processing workflows
-- **1.7M lines/sec** for line-by-line iteration
+- **2.5x faster** for bulk text read/write operations (35 MB/s vs 14 MB/s)
+- **1.8x faster** for JSONL processing workflows
+- **1.2M lines/sec** for line-by-line iteration
 - `async for` and `readline()` have equivalent performance
 
 **Binary Operations** (comparable to standard gzip):
 
-- **1.14x faster** with many small chunks (1.65M chunks/sec) - better overhead handling
-- **~50 MB/s** throughput for bulk operations (comparable to gzip's ~52 MB/s)
+- **1.3x faster** with many small chunks (1.7M chunks/sec) - better overhead handling
+- **~52 MB/s** throughput for bulk operations (comparable to gzip's ~53 MB/s)
 - **Equivalent performance** for typical 64KB chunked streaming
 
 **Concurrency** (with simulated I/O):
@@ -119,10 +119,10 @@ The key is to match the tool to the task. Use `aiogzip` where its async and text
 
 ✅ **Recommended for:**
 
-- **Text file processing**: 2.4x performance advantage for text operations
+- **Text file processing**: 2.5x performance advantage for text operations
 - **Async applications**: Processing CSV, JSONL, or log files in async pipelines
 - **Concurrent workflows**: Processing multiple files simultaneously
-- **Many small writes**: Better overhead handling (1.65M small chunks/sec)
+- **Many small writes**: Better overhead handling (1.7M small chunks/sec)
 - **Integration with async libraries**: Works seamlessly with `aiohttp`, `aiocsv`, etc.
 
 ### When to Use Standard `gzip`
@@ -130,7 +130,7 @@ The key is to match the tool to the task. Use `aiogzip` where its async and text
 ❌ **Consider standard `gzip` for:**
 
 - **Purely synchronous applications**: No async event loop overhead
-- **Simple binary file operations**: Comparable performance (~50 MB/s for both)
+- **Simple binary file operations**: Comparable performance (~52 MB/s for both)
 - **Memory-constrained environments**: `aiogzip` may use more memory for buffering
 - **Seeking/metadata operations**: Not yet supported by `aiogzip`
 
