@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - `pre-commit` configuration with `ruff` and `mypy` for code quality enforcement.
 - Initial MkDocs documentation structure and configuration.
 - Ability to set gzip header `mtime` and original filename metadata for deterministic archives.
+- Async wrappers for `seek`, `tell`, `peek`, `readinto`, and `fileno` to improve drop-in compatibility with `gzip.GzipFile`.
 
 ### Changed
 

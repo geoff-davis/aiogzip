@@ -354,6 +354,7 @@ class AsyncGzipBinaryFile:
         self._owns_file: bool = False
         self._crc: int = 0
         self._input_size: int = 0
+        self._position: int = 0
 
     async def __aenter__(self) -> "AsyncGzipBinaryFile":
         """Enter the async context manager and initialize resources."""
@@ -383,6 +384,7 @@ class AsyncGzipBinaryFile:
             self._input_size = 0
         else:  # read mode
             self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
+            self._position = 0
 
         return self
 
@@ -394,6 +396,103 @@ class AsyncGzipBinaryFile:
     ) -> None:
         """Exit the context manager, flushing and closing the file."""
         await self.close()
+
+    # File API compatibility helpers
+    async def tell(self) -> int:
+        """Return the current uncompressed file position."""
+        return self._position
+
+    async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
+        """Move to a new file position, mirroring gzip.GzipFile semantics."""
+        if self._file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        if self._writing_mode:
+            if whence == os.SEEK_CUR:
+                target = self._position + offset
+            elif whence == os.SEEK_SET:
+                target = offset
+            else:
+                raise ValueError("Seek from end not supported in write mode")
+            if target < self._position:
+                raise OSError("Negative seek in write mode")
+            count = target - self._position
+            if count > 0:
+                zero_chunk = b"\x00" * min(1024, count)
+                remaining = count
+                while remaining > 0:
+                    chunk = (
+                        zero_chunk
+                        if remaining >= len(zero_chunk)
+                        else zero_chunk[:remaining]
+                    )
+                    await self.write(chunk)
+                    remaining -= len(chunk)
+            return self._position
+
+        if whence == os.SEEK_SET:
+            target = offset
+        elif whence == os.SEEK_CUR:
+            target = self._position + offset
+        elif whence == os.SEEK_END:
+            raise ValueError("Seek from end not supported in read mode")
+        else:
+            raise ValueError("Invalid whence value")
+
+        if target < 0:
+            raise OSError("Negative seek in read mode")
+
+        if target < self._position:
+            await self._rewind_reader()
+
+        await self._consume_bytes(target - self._position)
+        return self._position
+
+    def raw(self) -> Any:
+        """Expose the underlying file object for advanced integrations."""
+        return self._file
+
+    def fileno(self) -> int:
+        """Return the underlying file descriptor number."""
+        if self._file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        fileno_method = getattr(self._file, "fileno", None)
+        if fileno_method is None:
+            raise OSError("Underlying file object does not expose fileno()")
+        result = fileno_method()
+        if hasattr(result, "__await__"):
+            raise OSError("fileno() cannot be awaited on the underlying file object")
+        return int(result)
+
+    async def peek(self, size: int = -1) -> bytes:
+        """Return up to size bytes without advancing the read position."""
+        if self._mode_op != "r":
+            raise OSError("File not open for reading")
+        if self._file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        available = len(self._buffer) - self._buffer_offset
+        target = size
+        if target is None or target < 0:
+            target = available if available > 0 else 1
+        while available < target and not self._eof:
+            await self._fill_buffer()
+            available = len(self._buffer) - self._buffer_offset
+            if available == 0:
+                break
+        end = self._buffer_offset + min(target, available)
+        return bytes(self._buffer[self._buffer_offset : end])
+
+    async def readinto(self, b: Union[bytearray, memoryview]) -> int:
+        """Read bytes directly into a pre-allocated, writable buffer."""
+        if self._mode_op != "r":
+            raise OSError("File not open for reading")
+        if self._file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        view = memoryview(b)
+        if view.readonly:
+            raise TypeError("readinto() argument must be writable")
+        data = await self.read(len(view))
+        view[: len(data)] = data
+        return len(data)
 
     async def write(self, data: Union[bytes, bytearray, memoryview]) -> int:
         """
@@ -416,6 +515,7 @@ class AsyncGzipBinaryFile:
         buffer = self._coerce_byteslike(data)
         self._crc = zlib.crc32(buffer, self._crc)
         self._input_size += len(buffer)
+        self._position = self._input_size
 
         try:
             compressed = self._engine.compress(buffer)
@@ -485,8 +585,11 @@ class AsyncGzipBinaryFile:
         if size == -1:
             # Return buffered data + read remaining (no recursion)
             chunks = []
+            total_read = 0
             if self._buffer_offset < len(self._buffer):
-                chunks.append(bytes(self._buffer[self._buffer_offset :]))
+                chunk = bytes(self._buffer[self._buffer_offset :])
+                chunks.append(chunk)
+                total_read += len(chunk)
 
             del self._buffer[:]  # Clear while retaining capacity
             self._buffer_offset = 0
@@ -494,10 +597,14 @@ class AsyncGzipBinaryFile:
             while not self._eof:
                 await self._fill_buffer()
                 if self._buffer:
-                    chunks.append(bytes(self._buffer))
+                    chunk = bytes(self._buffer)
+                    chunks.append(chunk)
+                    total_read += len(chunk)
                     del self._buffer[:]  # Clear while retaining capacity
 
-            return b"".join(chunks)
+            data = b"".join(chunks)
+            self._position += total_read
+            return data
         else:
             # Otherwise, read until the buffer has enough data to satisfy the request.
             while (len(self._buffer) - self._buffer_offset) < size and not self._eof:
@@ -518,6 +625,7 @@ class AsyncGzipBinaryFile:
                 ]
             )
             self._buffer_offset += actual_read_size
+            self._position += actual_read_size
 
             # If we consumed everything, reset to keep buffer clean
             if self._buffer_offset >= len(self._buffer):
@@ -573,6 +681,45 @@ class AsyncGzipBinaryFile:
             raise OSError(f"Error decompressing gzip data: {e}") from e
         except Exception as e:
             raise OSError(f"Unexpected error during decompression: {e}") from e
+
+    async def _consume_bytes(self, amount: int) -> None:
+        """Advance the read position by consuming bytes without returning them."""
+        remaining = amount
+        while remaining > 0:
+            available = len(self._buffer) - self._buffer_offset
+            if available <= 0:
+                if self._eof:
+                    break
+                await self._fill_buffer()
+                available = len(self._buffer) - self._buffer_offset
+                if available <= 0 and self._eof:
+                    break
+            take = min(remaining, available)
+            self._buffer_offset += take
+            self._position += take
+            remaining -= take
+            if self._buffer_offset >= len(self._buffer):
+                del self._buffer[:]
+                self._buffer_offset = 0
+
+    async def _rewind_reader(self) -> None:
+        """Rewind the underlying file and reset decompression state."""
+        if self._file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        seek_method = getattr(self._file, "seek", None)
+        if not callable(seek_method):
+            raise OSError("Underlying file is not seekable")
+        result = seek_method(0, os.SEEK_SET)
+        if hasattr(result, "__await__"):
+            await result
+        else:
+            # synchronous seek already performed
+            pass
+        self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
+        del self._buffer[:]
+        self._buffer_offset = 0
+        self._eof = False
+        self._position = 0
 
     async def flush(self) -> None:
         """
@@ -762,6 +909,32 @@ class AsyncGzipTextFile:
     ) -> None:
         """Exit the context manager, flushing and closing the file."""
         await self.close()
+
+    # File API compatibility helpers
+    async def tell(self) -> int:
+        if self._binary_file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        return await self._binary_file.tell()
+
+    async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
+        if self._binary_file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        self._decoder = codecs.getincrementaldecoder(self._encoding)(
+            errors=self._errors
+        )
+        self._text_buffer = ""
+        self._trailing_cr = False
+        return await self._binary_file.seek(offset, whence)
+
+    def fileno(self) -> int:
+        if self._binary_file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        return self._binary_file.fileno()
+
+    def raw(self) -> Any:
+        if self._binary_file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        return self._binary_file.raw()
 
     async def write(self, data: str) -> int:
         """

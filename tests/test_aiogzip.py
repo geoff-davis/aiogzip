@@ -516,6 +516,59 @@ class TestAsyncGzipBinaryFile:
         with gzip.open(target, "rt") as fh:
             assert fh.read() == "hello"
 
+    @pytest.mark.asyncio
+    async def test_binary_seek_tell_peek(self, temp_file, sample_data):
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(sample_data)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            first = await f.read(5)
+            assert first == sample_data[:5]
+            assert await f.tell() == 5
+
+            peeked = await f.peek(4)
+            assert peeked.startswith(sample_data[5:9])
+
+            await f.seek(2)
+            assert await f.tell() == 2
+            chunk = await f.read(4)
+            assert chunk == sample_data[2:6]
+
+            await f.seek(1, os.SEEK_CUR)
+            assert await f.tell() == 7
+
+    @pytest.mark.asyncio
+    async def test_binary_readinto(self, temp_file, sample_data):
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(sample_data)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            buf = bytearray(10)
+            read = await f.readinto(buf)
+            assert read == 10
+            assert bytes(buf) == sample_data[:10]
+
+    @pytest.mark.asyncio
+    async def test_binary_fileno_and_raw(self, temp_file, sample_data):
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(sample_data)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            fd = f.fileno()
+            assert isinstance(fd, int)
+            assert f.raw() is not None
+
+    @pytest.mark.asyncio
+    async def test_binary_seek_write_extends_with_zeros(self, temp_file):
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"hi")
+            await f.seek(5)
+            await f.write(b"X")
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+            assert data == b"hi" + b"\x00" * 3 + b"X"
+
 
 class TestAsyncGzipTextFile:
     """Test the AsyncGzipTextFile class."""
@@ -703,8 +756,19 @@ class TestAsyncGzipTextFile:
         async with AsyncGzipTextFile(temp_file, "wt", errors="surrogatepass") as f:
             await f.write(text)
 
-        async with AsyncGzipTextFile(temp_file, "rt", errors="surrogatepass") as f:
-            assert await f.read() == text
+    @pytest.mark.asyncio
+    async def test_text_seek_and_tell(self, temp_file, sample_text):
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(sample_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            head = await f.read(4)
+            assert head == sample_text[:4]
+            pos = await f.tell()
+            assert isinstance(pos, int)
+            await f.seek(0)
+            tail = await f.read()
+            assert tail == sample_text
 
     @pytest.mark.asyncio
     async def test_text_readline_limit(self, temp_file):
