@@ -47,6 +47,10 @@ coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
+# MkDocs
+site/
+
+# Pytest
 .pytest_cache/
 
 # Environments
