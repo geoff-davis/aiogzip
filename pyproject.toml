@@ -51,6 +51,9 @@ Homepage = "https://github.com/geoff-davis/aiogzip"
 package-dir = {"" = "src"}
 py-modules = ["aiogzip"]
 
+[tool.setuptools.package-data]
+"" = ["py.typed"]
+
 [tool.setuptools.dynamic]
 version = { attr = "aiogzip.__version__" }
 
