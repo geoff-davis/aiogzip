@@ -41,5 +41,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Examples: examples.md
+  - Performance: performance.md
   - API Reference: api.md
   - Contributing: contributing.md

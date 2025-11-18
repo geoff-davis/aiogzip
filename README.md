@@ -6,178 +6,50 @@
 [![PyPI version](https://img.shields.io/pypi/v/aiogzip.svg)](https://pypi.org/project/aiogzip/)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/aiogzip.svg)
 [![Tests](https://github.com/geoff-davis/aiogzip/workflows/Python%20CI/badge.svg)](https://github.com/geoff-davis/aiogzip/actions)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://geoff-davis.github.io/aiogzip/)
 
 `aiogzip` provides a fast, simple, and asyncio-native interface for handling `.gz` files, making it a useful complement to Python's built-in `gzip` module for asynchronous applications.
 
-It is designed for high-performance I/O operations, especially for text-based data pipelines, and integrates seamlessly with other `async` libraries like `aiocsv`.
+**🚀 [Read the Documentation](https://geoff-davis.github.io/aiogzip/)**
 
 ## Features
 
-- **Truly Asynchronous**: Built with `asyncio` and `aiofiles` for non-blocking file I/O.
-- **High-Performance Text Processing**: Significantly faster than the standard `gzip` library for text and JSONL file operations.
-- **Simple API**: Mimics the interface of `gzip.open()`, making it easy to adopt.
-- **Separate Binary and Text Modes**: `AsyncGzipBinaryFile` and `AsyncGzipTextFile` provide clear, type-safe handling of data.
-- **Excellent Compression Quality**: Achieves compression ratios nearly identical to the standard `gzip` module.
-- **`aiocsv` Integration**: Read and write compressed CSV files effortlessly.
-
----
-
-## Installation
-
-Install `aiogzip` using pip. To include optional `aiocsv` support, specify the `[csv]` extra.
-
-```bash
-# Standard installation
-pip install aiogzip
-
-# With aiocsv support
-pip install aiogzip[csv]
-```
-
----
+- **Truly Asynchronous**: Built with `asyncio` and `aiofiles`.
+- **High-Performance**: Optimized buffer handling for fast I/O.
+- **Drop-in Replacement**: Mimics `gzip.open()`.
+- **Type-Safe**: Distinct `AsyncGzipBinaryFile` and `AsyncGzipTextFile`.
+- **`aiocsv` Ready**: Seamless integration for CSV pipelines.
 
 ## Quickstart
 
-Using `aiogzip` is as simple as using the standard `gzip` module, but with `async`/`await`.
-
-### Writing to a Compressed File
+```bash
+pip install aiogzip
+```
 
 ```python
 import asyncio
 from aiogzip import AsyncGzipFile
 
 async def main():
-    # Write binary data
+    # Write
     async with AsyncGzipFile("file.gz", "wb") as f:
         await f.write(b"Hello, async world!")
 
-    # Write text data
-    async with AsyncGzipFile("file.txt.gz", "wt") as f:
-        await f.write("This is a text file.")
-
-asyncio.run(main())
-```
-
-### Reading from a Compressed File
-
-```python
-import asyncio
-from aiogzip import AsyncGzipFile
-
-async def main():
-    # Read the entire file
+    # Read
     async with AsyncGzipFile("file.gz", "rb") as f:
-        content = await f.read()
-        print(content)
-
-    # Iterate over lines in a text file
-    async with AsyncGzipFile("file.txt.gz", "rt") as f:
-        async for line in f:
-            print(line.strip())
+        print(await f.read())
 
 asyncio.run(main())
 ```
-
----
 
 ## Performance
 
-`aiogzip` is optimized for text-based async workflows and provides excellent performance across different scenarios:
+- **Text I/O**: ~2.5x faster than standard gzip.
+- **Concurrency**: Non-blocking I/O allows for efficient concurrent processing.
+- **Memory**: Optimized buffer management for stable memory usage.
 
-**Text Operations** (where aiogzip excels):
+See the [Performance Guide](https://geoff-davis.github.io/aiogzip/performance/) for detailed benchmarks.
 
-- **2.5x faster** for bulk text read/write operations (35 MB/s vs 14 MB/s)
-- **1.8x faster** for JSONL processing workflows
-- **1.2M lines/sec** for line-by-line iteration
-- `async for` and `readline()` have equivalent performance
+## Contributing
 
-**Binary Operations** (comparable to standard gzip):
-
-- **1.3x faster** with many small chunks (1.7M chunks/sec) - better overhead handling
-- **~52 MB/s** throughput for bulk operations (comparable to gzip's ~53 MB/s)
-- **Equivalent performance** for typical 64KB chunked streaming
-
-**Concurrency** (with simulated I/O):
-
-- **1.5x faster** when processing multiple files with I/O delays
-- Enables non-blocking concurrent file operations
-
-The key is to match the tool to the task. Use `aiogzip` where its async and text-handling capabilities provide the most significant advantage.
-
-### Async and Concurrent Processing Benefits
-
-`aiogzip` excels in scenarios where you need to process multiple files concurrently or integrate with other async libraries:
-
-- **Concurrent file processing**: Process multiple `.gz` files simultaneously without blocking
-- **Async pipeline integration**: Seamlessly works with `aiocsv`, `aiohttp`, and other async libraries
-- **Non-blocking I/O**: Allows your application to handle other tasks while file operations are in progress
-- **Better resource utilization**: More efficient use of system resources in I/O-bound applications
-
-**Note**: The benefits of async are most visible when there's actual I/O latency (network storage, remote APIs, etc.) or when mixing file operations with other async tasks. For purely local file processing on SSDs, the async overhead may exceed the benefits due to minimal I/O wait times.
-
-### When to Use `aiogzip`
-
-✅ **Recommended for:**
-
-- **Text file processing**: 2.5x performance advantage for text operations
-- **Async applications**: Processing CSV, JSONL, or log files in async pipelines
-- **Concurrent workflows**: Processing multiple files simultaneously
-- **Many small writes**: Better overhead handling (1.7M small chunks/sec)
-- **Integration with async libraries**: Works seamlessly with `aiohttp`, `aiocsv`, etc.
-
-### When to Use Standard `gzip`
-
-❌ **Consider standard `gzip` for:**
-
-- **Purely synchronous applications**: No async event loop overhead
-- **Simple binary file operations**: Comparable performance (~52 MB/s for both)
-- **Memory-constrained environments**: `aiogzip` may use more memory for buffering
-- **Seeking/metadata operations**: Not yet supported by `aiogzip`
-
----
-
-## Limitations
-
-`aiogzip` focuses on the most common file-based read/write operations and does not implement the full API of the standard `gzip` module. Notably, it does not currently support:
-
-- In-memory compression/decompression (e.g., `gzip.compress`/`gzip.decompress`).
-- The `seek()` and `tell()` methods for navigating within a file stream.
-- Reading or writing gzip headers and metadata like `mtime`.
-
-## Development
-
-This project uses `setuptools` for packaging.
-
-1. **Clone the repository**:
-
-   ```bash
-   git clone https://github.com/geoff-davis/aiogzip.git
-   cd aiogzip
-   ```
-
-2. **Install dependencies (uv recommended)**:
-
-   ```bash
-   uv sync --all-extras --group dev
-   ```
-
-   This will create (or update) the local `.venv` and install the project plus the `csv`
-   extra and development dependencies. If you prefer to manage environments manually:
-
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -e ".[csv]"
-   pip install -e ".[dev]"
-   ```
-
-3. **Run tests**:
-
-   ```bash
-   uv run pytest
-   ```
-
-## License
-
-This project is licensed under the **MIT License**. See the
-[`LICENSE`](https://github.com/geoff-davis/aiogzip/blob/main/LICENSE ) file for details.
+See [CONTRIBUTING.md](docs/contributing.md) for development instructions.
