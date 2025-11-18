@@ -48,6 +48,7 @@ Error Handling Strategy:
     - Clear error messages indicating which operation failed
 """
 
+import codecs
 import os
 import zlib
 from pathlib import Path
@@ -594,35 +595,14 @@ class AsyncGzipTextFile:
             self._binary_mode += "+"
 
         self._binary_file: Optional[AsyncGzipBinaryFile] = None
-        self._text_buffer: str = ""
         self._is_closed: bool = False
-        self._pending_bytes: bytes = b""  # Buffer for incomplete multi-byte sequences
-        self._text_data: str = (
-            ""  # Buffer for decoded text data that hasn't been returned yet
+
+        # Decoder and buffer state
+        self._decoder = codecs.getincrementaldecoder(self._encoding)(
+            errors=self._errors
         )
-        self._line_buffer: str = ""  # Initialize line buffer here for efficiency
-        self._max_incomplete_bytes = self._determine_max_incomplete_bytes()
+        self._text_buffer: str = ""  # Central buffer for decoded text
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
-
-    def _determine_max_incomplete_bytes(self) -> int:
-        """
-        Determine the maximum number of bytes an incomplete character sequence
-        can have for the current encoding. This is calculated once at init time
-        for efficiency.
-
-        Returns:
-            Maximum bytes to check for incomplete sequences at buffer boundaries
-        """
-        encoding_lower = self._encoding.lower().replace("-", "").replace("_", "")
-        if encoding_lower in ("utf8", "utf8"):
-            return 4  # UTF-8: max 4 bytes per character
-        elif encoding_lower.startswith("utf16") or encoding_lower.startswith("utf32"):
-            return 4  # UTF-16/32: max 4 bytes
-        elif encoding_lower in ("ascii", "latin1", "iso88591"):
-            return 1  # Single-byte encodings
-        else:
-            # For unknown encodings, use a safe fallback
-            return 8
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
@@ -684,6 +664,36 @@ class AsyncGzipTextFile:
         await self._binary_file.write(encoded_data)
         return len(data)
 
+    async def _read_chunk_and_decode(self) -> bool:
+        """Read a chunk of binary data, decode it, and append to text buffer.
+
+        Returns:
+            bool: True if data was added to the buffer, False if EOF was reached.
+        """
+        if self._binary_file is None:
+            return False
+
+        if self._binary_file._eof:
+            return False
+
+        raw_chunk = await self._binary_file.read(self._chunk_size)
+        if not raw_chunk:
+            # EOF: flush the decoder
+            final_decoded = self._decoder.decode(b"", final=True)
+            if final_decoded:
+                self._text_buffer += self._apply_newline_decoding(final_decoded)
+                return True
+            return False
+
+        # Decode incrementally (buffering incomplete bytes internally)
+        decoded_chunk = self._decoder.decode(raw_chunk, final=False)
+
+        if decoded_chunk:
+            self._text_buffer += self._apply_newline_decoding(decoded_chunk)
+            return True
+
+        return True  # We read bytes but produced no text (incomplete multibyte char), still not EOF
+
     async def read(self, size: int = -1) -> str:
         """
         Reads and decodes text data from the file.
@@ -716,123 +726,31 @@ class AsyncGzipTextFile:
             return ""
 
         if size == -1:
-            # Read all remaining data (including any buffered text)
-            # We read in chunks to avoid holding the entire compressed AND decompressed
-            # data in memory simultaneously.
-            chunks = [self._text_data]
-            self._text_data = ""
+            # Read all remaining data
+            # We use a list to accumulate chunks for performance
+            chunks = [self._text_buffer]
+            self._text_buffer = ""
 
-            # Process any pending bytes first
-            if self._pending_bytes:
-                # This is tricky: we need more data to decode the pending bytes.
-                # We'll just let the loop handle it.
-                pass
-
-            while not self._binary_file._eof:
-                raw_chunk = await self._binary_file.read(self._chunk_size)
-                if not raw_chunk:
+            while True:
+                has_more = await self._read_chunk_and_decode()
+                if not has_more:
                     break
-
-                all_data = self._pending_bytes + raw_chunk
-                self._pending_bytes = b""
-
-                # When reading all, we can use 'ignore' or 'replace' errors immediately
-                # if we are at the very end, but here we are in a loop.
-                # We use the safe decode which buffers incomplete bytes.
-                decoded_chunk, remaining_bytes = self._safe_decode_with_remainder(
-                    all_data
-                )
-                self._pending_bytes = remaining_bytes
-
-                if decoded_chunk:
-                    chunks.append(self._apply_newline_decoding(decoded_chunk))
-
-            # End of file: decode any remaining pending bytes
-            if self._pending_bytes:
-                decoded = self._pending_bytes.decode(
-                    self._encoding, errors=self._errors
-                )
-                chunks.append(self._apply_newline_decoding(decoded))
-                self._pending_bytes = b""
+                if self._text_buffer:
+                    chunks.append(self._text_buffer)
+                    self._text_buffer = ""
 
             return "".join(chunks)
         else:
             # Check if we have enough data in our text buffer
-            if len(self._text_data) >= size:
-                result = self._text_data[:size]
-                self._text_data = self._text_data[size:]
-                return result
-
-            # Read more data if needed
-            while len(self._text_data) < size and not self._binary_file._eof:
-                # Read a chunk of bytes (estimate bytes needed, UTF-8 can be up to 4 bytes per char)
-                chars_needed = size - len(self._text_data)
-                bytes_estimate = chars_needed * 4
-                chunk_size = max(4096, min(bytes_estimate, 64 * 1024))
-                new_raw_chunk: bytes = await self._binary_file.read(chunk_size)
-
-                if not new_raw_chunk:
+            while len(self._text_buffer) < size:
+                has_more = await self._read_chunk_and_decode()
+                if not has_more:
                     break
 
-                # Combine with any pending bytes
-                all_data = self._pending_bytes + new_raw_chunk
-                self._pending_bytes = b""  # pyrefly: ignore
-
-                # Decode the chunk safely
-                decoded_chunk, remaining_bytes = self._safe_decode_with_remainder(
-                    all_data
-                )
-                self._pending_bytes = remaining_bytes
-                self._text_data += self._apply_newline_decoding(decoded_chunk)
-
             # Return the requested number of characters
-            result = self._text_data[:size] if size > 0 else self._text_data
-            self._text_data = (
-                self._text_data[size:] if size > 0 else ""  # pyrefly: ignore
-            )  # pyrefly: ignore
+            result = self._text_buffer[:size]
+            self._text_buffer = self._text_buffer[size:]
             return result
-
-    def _safe_decode(self, data: bytes) -> str:
-        """
-        Safely decode bytes to string, handling multi-byte UTF-8 characters
-        that might be split across buffer boundaries.
-        """
-        if not data:
-            return ""
-
-        # For read(-1), we are at logical EOF for this read operation.
-        # Defer to the configured error policy (default: strict).
-        return data.decode(self._encoding, errors=self._errors)
-
-    def _safe_decode_with_remainder(self, data: bytes) -> Tuple[str, bytes]:
-        """
-        Safely decode bytes to string, handling multi-byte characters
-        that might be split across buffer boundaries. Returns both the decoded
-        string and any remaining bytes that couldn't be decoded.
-        """
-        if not data:
-            return "", b""
-
-        # First, try a strict decode to see if the buffer is fully decodable.
-        try:
-            return data.decode(self._encoding), b""
-        except UnicodeDecodeError as strict_err:
-            # Attempt to detect an incomplete multi-byte sequence at the end
-            # and buffer it for the next read.
-            max_check = min(self._max_incomplete_bytes, len(data))
-            for i in range(1, max_check + 1):
-                try:
-                    decoded_prefix = data[:-i].decode(self._encoding)
-                    remaining_suffix = data[-i:]
-                    return decoded_prefix, remaining_suffix
-                except UnicodeDecodeError:
-                    continue
-
-            # If not a boundary issue, honor the configured errors policy.
-            if self._errors == "strict":
-                raise strict_err
-            # Non-strict: decode with the provided policy and do not carry remainder
-            return data.decode(self._encoding, errors=self._errors), b""
 
     def _at_stream_eof(self) -> bool:
         """Return True if the underlying binary file has reached EOF."""
@@ -939,24 +857,23 @@ class AsyncGzipTextFile:
         # Read until we get a complete line
         while True:
             # Try to get a line from our buffer using newline-aware search
-            pos, length = self._get_line_terminator_pos(self._line_buffer)
+            pos, length = self._get_line_terminator_pos(self._text_buffer)
             if pos != -1:
                 # Found a line terminator
-                line = self._line_buffer[: pos + length]
-                self._line_buffer = self._line_buffer[pos + length :]
+                line = self._text_buffer[: pos + length]
+                self._text_buffer = self._text_buffer[pos + length :]
                 return line
 
             # Read more data
-            chunk: str = await self.read(LINE_READ_CHUNK_SIZE)
-            if not chunk:  # EOF
-                if self._line_buffer:
-                    result = self._line_buffer
-                    self._line_buffer = ""  # Clear buffer
+            has_more = await self._read_chunk_and_decode()
+            if not has_more:
+                # EOF
+                if self._text_buffer:
+                    result = self._text_buffer
+                    self._text_buffer = ""  # Clear buffer
                     return result  # Last line without newline
                 else:
                     raise StopAsyncIteration
-
-            self._line_buffer += chunk
 
     async def readline(self, limit: int = -1) -> str:
         """
@@ -992,31 +909,31 @@ class AsyncGzipTextFile:
 
         # Try to get a line from our buffer using newline-aware search
         while True:
-            pos, length = self._get_line_terminator_pos(self._line_buffer)
+            pos, length = self._get_line_terminator_pos(self._text_buffer)
             if pos != -1:
                 # Found a line terminator
                 end = pos + length
-                line = self._line_buffer[:end]
-                self._line_buffer = self._line_buffer[end:]
-            elif limit != -1 and len(self._line_buffer) >= limit:
-                line = self._line_buffer[:limit]
-                self._line_buffer = self._line_buffer[limit:]
+                line = self._text_buffer[:end]
+                self._text_buffer = self._text_buffer[end:]
+            elif limit != -1 and len(self._text_buffer) >= limit:
+                line = self._text_buffer[:limit]
+                self._text_buffer = self._text_buffer[limit:]
                 return line
             else:
                 # Read more data
-                chunk: str = await self.read(LINE_READ_CHUNK_SIZE)
-                if not chunk:  # EOF
-                    if not self._line_buffer:
-                        return ""  # EOF with empty buffer
-                    line = self._line_buffer
-                    self._line_buffer = ""
+                has_more = await self._read_chunk_and_decode()
+                if not has_more:
+                    # EOF
+                    if not self._text_buffer:
+                        return ""
+                    line = self._text_buffer
+                    self._text_buffer = ""
                 else:
-                    self._line_buffer += chunk
                     continue
 
             if limit != -1 and len(line) > limit:
                 # Preserve leftover characters (including newline) for the next call
-                self._line_buffer = line[limit:] + self._line_buffer
+                self._text_buffer = line[limit:] + self._text_buffer
                 line = line[:limit]
             return line
 
@@ -1050,6 +967,11 @@ class AsyncGzipTextFile:
         self._is_closed = True
 
         try:
+            if not self._writing_mode:
+                # Flush the decoder to ensure all buffered bytes are processed
+                # This is important for handling incomplete multi-byte characters at EOF
+                self._decoder.decode(b"", final=True)
+
             if self._binary_file is not None:
                 await self._binary_file.close()
         except Exception:

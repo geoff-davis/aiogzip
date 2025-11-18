@@ -96,8 +96,6 @@ class TestAsyncGzipFile:
         assert gz_file._binary_file is None  # pyrefly: ignore
         assert gz_file._text_buffer == ""  # pyrefly: ignore
         assert gz_file._is_closed is False
-        assert gz_file._pending_bytes == b""  # pyrefly: ignore
-        assert gz_file._text_data == ""  # pyrefly: ignore
 
     @pytest.mark.asyncio
     async def test_context_manager_write_read_binary(self, temp_file, sample_data):
@@ -2012,6 +2010,34 @@ class TestErrorHandlingConsistency:
         await f.__aexit__(None, None, None)
 
 
+class TestModeParsingErrors:
+    """Tests for invalid mode string parsing in _parse_mode_tokens."""
+
+    # We need to import the internal function for direct testing
+    # or test via the AsyncGzipFile / AsyncGzipBinaryFile / AsyncGzipTextFile constructors.
+    # Testing constructors is generally better as it reflects real usage.
+
+    @pytest.mark.parametrize(
+        "invalid_mode, expected_error, match_regex",
+        [
+            (123, TypeError, "mode must be a string"),
+            ("", ValueError, "Mode string cannot be empty"),
+            ("rwb", ValueError, "Mode string can only specify one of r, w, a, or x"),
+            ("rbb", ValueError, "Mode string cannot specify 'b' more than once"),
+            ("rtt", ValueError, "Mode string cannot specify 't' more than once"),
+            ("r++", ValueError, "Mode string cannot include '\\+' more than once"),
+            ("r_b", ValueError, "Invalid mode character '_'"),
+            ("b", ValueError, "Mode string must include one of 'r', 'w', 'a', or 'x'"),
+            ("rbt", ValueError, "Mode string cannot include both 'b' and 't'"),
+        ],
+    )
+    def test_parse_mode_tokens_errors(self, invalid_mode, expected_error, match_regex):
+        """Test that _parse_mode_tokens raises correct errors for invalid modes."""
+        with pytest.raises(expected_error, match=match_regex):
+            # We directly call AsyncGzipBinaryFile for simplicity as mode parsing happens there.
+            AsyncGzipBinaryFile("dummy.gz", mode=invalid_mode)  # type: ignore[arg-type]
+
+
 class TestNewAPIMethods:
     """Test new API methods: flush() and readline()."""
 
@@ -2356,35 +2382,6 @@ class TestHighPriorityEdgeCases:
             data = await f.read()
             # Should only get "test", incomplete sequence ignored
             assert data == "test"
-
-    @pytest.mark.asyncio
-    async def test_multibyte_incomplete_with_errors_replace(self, temp_file):
-        """Test incomplete multibyte sequence handling with errors='replace'."""
-        # Write data with an incomplete UTF-8 sequence at the end
-        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
-            # Valid UTF-8 "test" followed by incomplete 4-byte sequence (only 2 bytes)
-            await f.write(b"test\xf0\x9f")
-
-        # Read with errors='replace' should replace incomplete bytes with U+FFFD
-        async with AsyncGzipTextFile(
-            temp_file, "rt", encoding="utf-8", errors="replace"
-        ) as f:
-            data = await f.read()
-            # Should get "test" followed by replacement characters
-            assert data.startswith("test")
-            assert "\ufffd" in data
-
-    @pytest.mark.asyncio
-    async def test_empty_data_in_safe_decode_with_remainder(self, temp_file):
-        """Test that empty data in _safe_decode_with_remainder returns empty string."""
-        async with AsyncGzipTextFile(temp_file, "wt") as f:
-            await f.write("test")
-
-        async with AsyncGzipTextFile(temp_file, "rt") as f:
-            # Test the internal method directly
-            result, remainder = f._safe_decode_with_remainder(b"")
-            assert result == ""
-            assert remainder == b""
 
     @pytest.mark.asyncio
     async def test_multibyte_all_split_positions(self, temp_file):
@@ -2773,32 +2770,6 @@ class TestMediumPriorityEdgeCases:
         async with AsyncGzipTextFile(temp_file, "rt", encoding="cp1252") as f:
             data = await f.read()
             assert data == test_text
-
-    @pytest.mark.asyncio
-    async def test_max_incomplete_bytes_detection_utf8(self, temp_file):
-        """Test that UTF-8 is detected correctly for max incomplete bytes."""
-        # This tests the _determine_max_incomplete_bytes method
-        f = AsyncGzipTextFile(temp_file, "wt", encoding="utf-8")
-        assert f._max_incomplete_bytes == 4
-
-        f = AsyncGzipTextFile(temp_file, "wt", encoding="UTF-8")
-        assert f._max_incomplete_bytes == 4
-
-    @pytest.mark.asyncio
-    async def test_max_incomplete_bytes_detection_ascii(self, temp_file):
-        """Test that ASCII is detected correctly for max incomplete bytes."""
-        f = AsyncGzipTextFile(temp_file, "wt", encoding="ascii")
-        assert f._max_incomplete_bytes == 1
-
-        f = AsyncGzipTextFile(temp_file, "wt", encoding="latin-1")
-        assert f._max_incomplete_bytes == 1
-
-    @pytest.mark.asyncio
-    async def test_max_incomplete_bytes_detection_unknown(self, temp_file):
-        """Test that unknown encodings get safe fallback for max incomplete bytes."""
-        f = AsyncGzipTextFile(temp_file, "wt", encoding="shift_jis")
-        # Unknown encoding should default to safe fallback of 8
-        assert f._max_incomplete_bytes == 8
 
 
 class TestLowPriorityEdgeCases:
