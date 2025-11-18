@@ -10,7 +10,8 @@ from aiogzip import AsyncGzipBinaryFile
 from bench_common import BenchmarkBase
 
 try:
-    import psutil
+    import psutil  # noqa: F401
+
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
@@ -27,11 +28,12 @@ class MemoryBenchmarks(BenchmarkBase):
                 "Memory efficiency",
                 "memory",
                 0.0,
-                status="skipped (psutil not installed)"
+                status="skipped (psutil not installed)",
             )
             return
 
         import psutil
+
         process = psutil.Process()
 
         # Generate 5MB of data
@@ -63,7 +65,7 @@ class MemoryBenchmarks(BenchmarkBase):
             duration,
             memory_increase_mb=f"{memory_increase:.1f}",
             memory_ratio=f"{memory_ratio:.2f}x",
-            status="OK" if memory_ratio < 5.0 else "HIGH"
+            status="OK" if memory_ratio < 5.0 else "HIGH",
         )
 
     async def run_all(self):

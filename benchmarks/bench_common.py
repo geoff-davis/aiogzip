@@ -14,7 +14,7 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, List, Dict, Callable, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 @dataclass
@@ -203,7 +203,7 @@ def format_speedup(aiogzip_time: float, gzip_time: float) -> str:
     if speedup >= 1.0:
         return f"{speedup:.2f}x faster"
     else:
-        return f"{1/speedup:.2f}x slower"
+        return f"{1 / speedup:.2f}x slower"
 
 
 def format_size(bytes_size: int) -> str:

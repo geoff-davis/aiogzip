@@ -51,10 +51,9 @@ Error Handling Strategy:
 import os
 import zlib
 from pathlib import Path
-from typing import Any, Protocol, Union, Tuple, Optional
+from typing import Any, Optional, Protocol, Tuple, Union
 
 import aiofiles
-
 
 # Constants
 # The wbits parameter for zlib that enables gzip format
@@ -74,7 +73,7 @@ ZlibEngine = Any
 
 
 # Validation helper functions
-def _validate_filename(filename: Union[str, bytes, Path, None], fileobj) -> None:
+def _validate_filename(filename: Union[str, bytes, Path, None], fileobj: Any) -> None:
     """Validate filename parameter.
 
     Args:
@@ -181,6 +180,7 @@ class WithAsyncReadWrite(Protocol):
 
     async def read(self, size: int = -1) -> Union[str, bytes]: ...
     async def write(self, data: Union[str, bytes]) -> int: ...
+    async def close(self) -> None: ...
 
 
 class AsyncGzipBinaryFile:
@@ -253,7 +253,7 @@ class AsyncGzipBinaryFile:
         if plus:
             self._file_mode += "+"
 
-        self._file = None
+        self._file: Any = None
         self._engine: ZlibEngine = None
         self._buffer = bytearray()  # Use bytearray for efficient buffer growth
         self._is_closed: bool = False
@@ -268,7 +268,9 @@ class AsyncGzipBinaryFile:
         else:
             if self._filename is None:
                 raise ValueError("Filename must be provided when fileobj is not given")
-            self._file = await aiofiles.open(self._filename, self._file_mode)
+            self._file = await aiofiles.open(  # type: ignore
+                self._filename, self._file_mode
+            )
             self._owns_file = True
 
         # Initialize compression/decompression engine based on mode
@@ -279,7 +281,12 @@ class AsyncGzipBinaryFile:
 
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> None:
         """Exit the context manager, flushing and closing the file."""
         await self.close()
 
@@ -295,7 +302,7 @@ class AsyncGzipBinaryFile:
                 await f.write(b"Hello, World!")  # Bytes input
         """
         if not self._writing_mode:
-            raise IOError("File not open for writing")
+            raise OSError("File not open for writing")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
@@ -309,7 +316,7 @@ class AsyncGzipBinaryFile:
                 await self._file.write(compressed)
         except zlib.error as e:
             raise OSError(f"Error compressing data: {e}") from e
-        except (OSError, IOError):
+        except OSError:
             # Re-raise I/O errors as-is
             raise
         except Exception as e:
@@ -356,7 +363,7 @@ class AsyncGzipBinaryFile:
                 partial = await f.read(100)  # Returns first 100 bytes
         """
         if self._mode_op != "r":
-            raise IOError("File not open for reading")
+            raise OSError("File not open for reading")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
@@ -390,7 +397,7 @@ class AsyncGzipBinaryFile:
 
         return data_to_return
 
-    async def _fill_buffer(self):
+    async def _fill_buffer(self) -> None:
         """Internal helper to read a compressed chunk and decompress it.
 
         Handles multi-member gzip archives (created by append mode) by detecting
@@ -401,7 +408,7 @@ class AsyncGzipBinaryFile:
 
         try:
             compressed_chunk = await self._file.read(self._chunk_size)
-        except (OSError, IOError):
+        except OSError:
             # Re-raise I/O errors as-is
             raise
         except Exception as e:
@@ -473,12 +480,12 @@ class AsyncGzipBinaryFile:
                         await result
             except zlib.error as e:
                 raise OSError(f"Error flushing compressed data: {e}") from e
-            except (OSError, IOError):
+            except OSError:
                 raise
             except Exception as e:
                 raise OSError(f"Unexpected error during flush: {e}") from e
 
-    async def close(self):
+    async def close(self) -> None:
         """Flushes any remaining compressed data and closes the file."""
         if self._is_closed:
             return
@@ -505,7 +512,7 @@ class AsyncGzipBinaryFile:
             # but we need to propagate the exception
             raise
 
-    def __aiter__(self):
+    def __aiter__(self) -> Any:
         """Raise error for binary file iteration."""
         raise TypeError("AsyncGzipBinaryFile can only be iterated in text mode")
 
@@ -617,7 +624,7 @@ class AsyncGzipTextFile:
             # For unknown encodings, use a safe fallback
             return 8
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
         filename = os.fspath(self._filename) if self._filename is not None else None
         self._binary_file = AsyncGzipBinaryFile(
@@ -631,7 +638,12 @@ class AsyncGzipTextFile:
         await self._binary_file.__aenter__()  # pyrefly: ignore
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> None:
         """Exit the context manager, flushing and closing the file."""
         await self.close()
 
@@ -647,7 +659,7 @@ class AsyncGzipTextFile:
                 await f.write("Hello, World!")  # String input
         """
         if not self._writing_mode:
-            raise IOError("File not open for writing")
+            raise OSError("File not open for writing")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
@@ -688,7 +700,7 @@ class AsyncGzipTextFile:
                 partial = await f.read(100)  # Returns first 100 chars as string
         """
         if self._mode_op != "r":
-            raise IOError("File not open for reading")
+            raise OSError("File not open for reading")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
@@ -821,7 +833,9 @@ class AsyncGzipTextFile:
                 candidate = (pos_n, 1)
 
             if pos_r != -1:
-                cr_length = 2 if pos_r + 1 < len(text) and text[pos_r + 1] == "\n" else 1
+                cr_length = (
+                    2 if pos_r + 1 < len(text) and text[pos_r + 1] == "\n" else 1
+                )
                 cr_is_trailing = pos_r + 1 == len(text)
                 should_wait_for_lf = (
                     self._newline == ""
@@ -884,11 +898,11 @@ class AsyncGzipTextFile:
         # newline '' or explicit newline: do not translate on input
         return text
 
-    def __aiter__(self):
+    def __aiter__(self) -> "AsyncGzipTextFile":
         """Make AsyncGzipTextFile iterable for line-by-line reading."""
         return self
 
-    async def __anext__(self):
+    async def __anext__(self) -> str:
         """Return the next line from the file."""
         if self._is_closed:
             raise StopAsyncIteration
@@ -940,7 +954,7 @@ class AsyncGzipTextFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
-            raise IOError("File not open for reading")
+            raise OSError("File not open for reading")
 
         if limit is None:
             limit = -1
@@ -998,7 +1012,7 @@ class AsyncGzipTextFile:
         if self._binary_file is not None:
             await self._binary_file.flush()
 
-    async def close(self):
+    async def close(self) -> None:
         """Closes the file."""
         if self._is_closed:
             return
@@ -1015,7 +1029,9 @@ class AsyncGzipTextFile:
             raise
 
 
-def AsyncGzipFile(filename, mode="rb", **kwargs):
+def AsyncGzipFile(
+    filename: Union[str, bytes, Path, None], mode: str = "rb", **kwargs: Any
+) -> Union[AsyncGzipBinaryFile, AsyncGzipTextFile]:
     """
     Factory function that returns the appropriate AsyncGzip class based on mode.
 

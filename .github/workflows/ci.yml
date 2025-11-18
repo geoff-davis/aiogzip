@@ -38,7 +38,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install .[dev,csv]
 
-      # Step 4: Run pytest with coverage
+      # Step 4: Lint with Ruff
+      - name: Lint with Ruff
+        run: |
+          ruff check .
+
+      # Step 5: Check formatting with Ruff
+      - name: Check formatting with Ruff
+        run: |
+          ruff format --check .
+
+      # Step 6: Type check with Mypy
+      - name: Type check with Mypy
+        run: |
+          mypy src
+
+      # Step 7: Run tests with pytest and coverage
       - name: Run tests with pytest and coverage
         run: |
           pytest --cov --cov-report=term-missing --cov-report=xml --cov-report=html

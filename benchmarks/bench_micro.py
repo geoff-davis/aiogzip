@@ -38,7 +38,7 @@ class MicroBenchmarks(BenchmarkBase):
             "micro",
             avg_time,
             iterations=iterations,
-            avg_time_ms=f"{avg_time*1000:.3f}ms"
+            avg_time_ms=f"{avg_time * 1000:.3f}ms",
         )
 
     async def benchmark_line_iteration(self):
@@ -68,7 +68,7 @@ class MicroBenchmarks(BenchmarkBase):
             "micro",
             avg_time,
             iterations=iterations,
-            avg_time_ms=f"{avg_time*1000:.3f}ms"
+            avg_time_ms=f"{avg_time * 1000:.3f}ms",
         )
 
     async def benchmark_readline_loop(self):
@@ -101,7 +101,7 @@ class MicroBenchmarks(BenchmarkBase):
             "micro",
             avg_time,
             iterations=iterations,
-            avg_time_ms=f"{avg_time*1000:.3f}ms"
+            avg_time_ms=f"{avg_time * 1000:.3f}ms",
         )
 
     async def benchmark_small_writes(self):
@@ -119,7 +119,7 @@ class MicroBenchmarks(BenchmarkBase):
             "Small writes (1000 x 120 bytes)",
             "micro",
             duration,
-            ops_per_sec=f"{1000/duration:.0f}"
+            ops_per_sec=f"{1000 / duration:.0f}",
         )
 
     async def run_all(self):

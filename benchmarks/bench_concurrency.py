@@ -52,7 +52,7 @@ class ConcurrencyBenchmarks(BenchmarkBase):
         speedup = sync_time / async_time if async_time > 0 else 0
 
         # Calculate theoretical minimum times
-        theoretical_sync_min = num_files * 0.01  # Sequential delays
+        num_files * 0.01  # Sequential delays
         theoretical_async_min = 0.01  # Parallel delays
 
         self.add_result(
@@ -63,7 +63,7 @@ class ConcurrencyBenchmarks(BenchmarkBase):
             sync_time=f"{sync_time:.3f}s",
             speedup=f"{speedup:.2f}x",
             delay_saved=f"{sync_time - async_time:.3f}s",
-            async_efficiency=f"{theoretical_async_min/async_time*100:.0f}%"
+            async_efficiency=f"{theoretical_async_min / async_time * 100:.0f}%",
         )
 
     async def benchmark_mixed_workload(self):
@@ -118,7 +118,7 @@ class ConcurrencyBenchmarks(BenchmarkBase):
             async_time,
             async_time=f"{async_time:.3f}s",
             sync_time=f"{sync_time:.3f}s",
-            speedup=f"{speedup:.2f}x"
+            speedup=f"{speedup:.2f}x",
         )
 
     async def run_all(self):

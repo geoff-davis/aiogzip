@@ -6,7 +6,7 @@ Tests error handling and edge cases.
 
 import time
 
-from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
+from aiogzip import AsyncGzipBinaryFile
 from bench_common import BenchmarkBase
 
 
@@ -29,14 +29,14 @@ class ErrorsBenchmarks(BenchmarkBase):
         try:
             async with AsyncGzipBinaryFile(test_file, "wb") as f:
                 await f.read()
-        except IOError:
+        except OSError:
             errors_caught += 1
 
         # Try to write to read-mode file
         try:
             async with AsyncGzipBinaryFile(test_file, "rb") as f:
                 await f.write(b"data")
-        except IOError:
+        except OSError:
             errors_caught += 1
 
         # Try operations on closed file
@@ -55,7 +55,7 @@ class ErrorsBenchmarks(BenchmarkBase):
             "errors",
             duration,
             errors_caught=errors_caught,
-            avg_time_per_error=f"{duration/errors_caught*1000:.2f}ms"
+            avg_time_per_error=f"{duration / errors_caught * 1000:.2f}ms",
         )
 
     async def benchmark_corrupted_data(self):
@@ -70,7 +70,9 @@ class ErrorsBenchmarks(BenchmarkBase):
         start = time.perf_counter()
         try:
             # Overwrite with actual corrupted gzip header
-            test_file.write_bytes(b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff" + b"corrupted")
+            test_file.write_bytes(
+                b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff" + b"corrupted"
+            )
             async with AsyncGzipBinaryFile(test_file, "rb") as f:
                 await f.read()
             caught_error = False
@@ -79,10 +81,7 @@ class ErrorsBenchmarks(BenchmarkBase):
         duration = time.perf_counter() - start
 
         self.add_result(
-            "Corrupted data handling",
-            "errors",
-            duration,
-            error_detected=caught_error
+            "Corrupted data handling", "errors", duration, error_detected=caught_error
         )
 
     async def run_all(self):

@@ -52,7 +52,7 @@ class ScenariosBenchmarks(BenchmarkBase):
             aiogzip_time=f"{aiogzip_time:.3f}s",
             gzip_time=f"{gzip_time:.3f}s",
             records=len(records_aiogzip),
-            speedup=f"{speedup:.2f}x"
+            speedup=f"{speedup:.2f}x",
         )
 
     async def run_all(self):

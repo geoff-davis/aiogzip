@@ -44,7 +44,9 @@ async def run_category(category: str, data_size_mb: int = 1):
         return None
 
     # Instantiate the benchmark class
-    benchmark_class_name = "".join(word.capitalize() for word in category.split("_")) + "Benchmarks"
+    benchmark_class_name = (
+        "".join(word.capitalize() for word in category.split("_")) + "Benchmarks"
+    )
     if not hasattr(module, benchmark_class_name):
         print(f"Error: {module_name} does not have class {benchmark_class_name}")
         return None
@@ -73,33 +75,23 @@ async def run_category(category: str, data_size_mb: int = 1):
 async def main():
     parser = argparse.ArgumentParser(description="Run aiogzip benchmarks")
     parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Run all benchmark categories"
+        "--all", action="store_true", help="Run all benchmark categories"
     )
     parser.add_argument(
         "--category",
         "-c",
         type=str,
-        help=f"Run specific categories (comma-separated). Options: {', '.join(CATEGORIES.keys())}"
+        help=f"Run specific categories (comma-separated). Options: {', '.join(CATEGORIES.keys())}",
     )
     parser.add_argument(
         "--quick",
         action="store_true",
-        help=f"Run quick benchmarks ({', '.join(QUICK_CATEGORIES)})"
+        help=f"Run quick benchmarks ({', '.join(QUICK_CATEGORIES)})",
     )
     parser.add_argument(
-        "--size",
-        type=int,
-        default=1,
-        help="Data size in MB (default: 1)"
+        "--size", type=int, default=1, help="Data size in MB (default: 1)"
     )
-    parser.add_argument(
-        "--output",
-        "-o",
-        type=str,
-        help="Save results to JSON file"
-    )
+    parser.add_argument("--output", "-o", type=str, help="Save results to JSON file")
 
     args = parser.parse_args()
 
@@ -127,12 +119,13 @@ async def main():
         output_path = Path(args.output)
         # Save consolidated results
         import json
+
         data = {
             "categories": categories_to_run,
             "data_size_mb": args.size,
-            "results": [r.to_dict() for r in all_results]
+            "results": [r.to_dict() for r in all_results],
         }
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             json.dump(data, f, indent=2)
         print(f"\nResults saved to {output_path}")
 

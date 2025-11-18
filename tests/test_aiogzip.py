@@ -7,7 +7,6 @@ from typing import Union
 
 import aiocsv
 import pytest
-
 from aiogzip import (
     AsyncGzipBinaryFile,
     AsyncGzipFile,
@@ -220,7 +219,7 @@ class TestAsyncGzipFile:
 
         async with AsyncGzipFile(temp_file, "rb") as f:
             with pytest.raises(TypeError, match="can only be iterated in text mode"):
-                async for line in f:
+                async for _line in f:
                     pass
 
     @pytest.mark.asyncio
@@ -955,7 +954,8 @@ class TestAiocsvIntegration:
         # Write CSV data
         async with AsyncGzipFile(temp_file, "wt") as f:
             writer = aiocsv.AsyncDictWriter(
-                f, fieldnames=["id", "name", "email", "age"]  # pyrefly: ignore
+                f,
+                fieldnames=["id", "name", "email", "age"],  # pyrefly: ignore
             )
             for row in test_data:
                 await writer.writerow(row)
@@ -963,7 +963,8 @@ class TestAiocsvIntegration:
         # Read CSV data
         async with AsyncGzipFile(temp_file, "rt") as f:
             reader = aiocsv.AsyncDictReader(
-                f, fieldnames=["id", "name", "email", "age"]  # pyrefly: ignore
+                f,
+                fieldnames=["id", "name", "email", "age"],  # pyrefly: ignore
             )
             rows = []
             async for row in reader:
@@ -1426,7 +1427,7 @@ class TestPerformanceAndMemory:
         lines_read = 0
 
         async with AsyncGzipTextFile(temp_file, "rt") as f:
-            async for line in f:
+            async for _line in f:
                 lines_read += 1
 
                 # Check memory usage periodically
@@ -1900,7 +1901,7 @@ class TestResourceCleanup:
 
         # Close should mark file as closed even if flush fails
         # But it should propagate the exception
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             await f.close()
 
         # File should still be marked as closed
@@ -2195,8 +2196,10 @@ class TestHighPriorityEdgeCases:
 
         class MockEngine:
             """Mock compression engine that raises unexpected error."""
+
             def compress(self, data):
                 raise RuntimeError("Unexpected error")
+
             def flush(self, mode=None):
                 return b""
 
@@ -2221,8 +2224,10 @@ class TestHighPriorityEdgeCases:
 
         class MockEngine:
             """Mock decompression engine that raises unexpected error."""
+
             def decompress(self, data):
                 raise RuntimeError("Unexpected decompress error")
+
             @property
             def unused_data(self):
                 return b""
@@ -2250,6 +2255,7 @@ class TestHighPriorityEdgeCases:
 
         class MockEngine:
             """Mock decompression engine that raises error on flush."""
+
             def __init__(self):
                 self._called_decompress = False
 
@@ -2283,6 +2289,7 @@ class TestHighPriorityEdgeCases:
 
         class MockEngine:
             """Mock compression engine that raises unexpected error on flush."""
+
             def __init__(self):
                 self.flush_count = 0
 
@@ -2324,7 +2331,9 @@ class TestHighPriorityEdgeCases:
             await f.write(test_text)
 
         # Read with small chunks to force splits
-        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8", chunk_size=chunk_size) as f:
+        async with AsyncGzipTextFile(
+            temp_file, "rt", encoding="utf-8", chunk_size=chunk_size
+        ) as f:
             # Force small binary reads
             f._binary_file._chunk_size = chunk_size
             read_content = await f.read()
@@ -2341,7 +2350,9 @@ class TestHighPriorityEdgeCases:
             await f.write(b"test\xf0\x9f")
 
         # Read with errors='ignore' should skip incomplete bytes
-        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8", errors="ignore") as f:
+        async with AsyncGzipTextFile(
+            temp_file, "rt", encoding="utf-8", errors="ignore"
+        ) as f:
             data = await f.read()
             # Should only get "test", incomplete sequence ignored
             assert data == "test"
@@ -2355,7 +2366,9 @@ class TestHighPriorityEdgeCases:
             await f.write(b"test\xf0\x9f")
 
         # Read with errors='replace' should replace incomplete bytes with U+FFFD
-        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8", errors="replace") as f:
+        async with AsyncGzipTextFile(
+            temp_file, "rt", encoding="utf-8", errors="replace"
+        ) as f:
             data = await f.read()
             # Should get "test" followed by replacement characters
             assert data.startswith("test")
@@ -2388,7 +2401,9 @@ class TestHighPriorityEdgeCases:
             async with AsyncGzipTextFile(temp_file, "wt", encoding="utf-8") as f:
                 await f.write(test_text)
 
-            async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8", chunk_size=chunk_size) as f:
+            async with AsyncGzipTextFile(
+                temp_file, "rt", encoding="utf-8", chunk_size=chunk_size
+            ) as f:
                 f._binary_file._chunk_size = chunk_size
                 read_content = await f.read()
 
@@ -2402,7 +2417,7 @@ class TestHighPriorityEdgeCases:
         # Create text with multiple emojis positioned at boundaries
         # Each emoji is 4 bytes in UTF-8
         text_parts = []
-        for i in range(5):
+        for _i in range(5):
             text_parts.append("x" * (chunk_size - 2))
             text_parts.append("🚀")
 
@@ -2411,7 +2426,9 @@ class TestHighPriorityEdgeCases:
         async with AsyncGzipTextFile(temp_file, "wt", encoding="utf-8") as f:
             await f.write(test_text)
 
-        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8", chunk_size=chunk_size) as f:
+        async with AsyncGzipTextFile(
+            temp_file, "rt", encoding="utf-8", chunk_size=chunk_size
+        ) as f:
             f._binary_file._chunk_size = chunk_size
             # Read in small increments to stress test boundary handling
             result = ""
@@ -2502,7 +2519,7 @@ class TestHighPriorityEdgeCases:
         async with AsyncGzipBinaryFile(temp_file, "rb") as f:
             part1 = await f.read(6)  # Should span first two members
             part2 = await f.read(6)  # Should span into third member
-            part3 = await f.read()   # Rest
+            part3 = await f.read()  # Rest
 
         assert part1 + part2 + part3 == b"AAAABBBBCCCC"
 
@@ -2569,6 +2586,7 @@ class TestMediumPriorityEdgeCases:
 
         class AsyncFileWithAsyncFlush:
             """Mock file object with async flush method."""
+
             def __init__(self, real_file):
                 self.real_file = real_file
                 self.flush_called = False
@@ -2580,11 +2598,11 @@ class TestMediumPriorityEdgeCases:
                 """Async flush method that should be detected and awaited."""
                 self.flush_called = True
                 # Call real file's flush if it exists
-                if hasattr(self.real_file, 'flush'):
+                if hasattr(self.real_file, "flush"):
                     flush_method = self.real_file.flush
                     if callable(flush_method):
                         result = flush_method()
-                        if hasattr(result, '__await__'):
+                        if hasattr(result, "__await__"):
                             await result
 
             async def close(self):
@@ -2618,6 +2636,7 @@ class TestMediumPriorityEdgeCases:
 
         class AsyncFileWithAsyncClose:
             """Mock file object with async close method."""
+
             def __init__(self, real_file):
                 self.real_file = real_file
                 self.close_called = False
@@ -2655,6 +2674,7 @@ class TestMediumPriorityEdgeCases:
 
         class FileWithSyncFlush:
             """Mock file object with sync flush method."""
+
             def __init__(self, real_file):
                 self.real_file = real_file
                 self.flush_called = False
@@ -2960,8 +2980,10 @@ class TestLowPriorityEdgeCases:
 
         class MockEngine:
             """Mock compression engine that raises zlib.error."""
+
             def compress(self, data):
                 raise zlib.error("Compression error")
+
             def flush(self, mode=None):
                 return b""
 
@@ -2981,6 +3003,7 @@ class TestLowPriorityEdgeCases:
 
         class MockEngine:
             """Mock compression engine that raises zlib.error on flush."""
+
             def __init__(self):
                 self.flush_count = 0
 
@@ -3052,7 +3075,9 @@ class TestNewlineHandlingBugs:
         newline_count = result.count("\n")
 
         # This will FAIL with current implementation if CRLF splits
-        assert result == expected, f"Got {newline_count} newlines instead of 1, CRLF was split incorrectly"
+        assert (
+            result == expected
+        ), f"Got {newline_count} newlines instead of 1, CRLF was split incorrectly"
 
     @pytest.mark.asyncio
     async def test_line_iteration_with_cr_only_newline(self, temp_file):
@@ -3126,7 +3151,9 @@ class TestNewlineHandlingBugs:
 
             # Verify buffer wasn't drained - we should still be able to read remaining
             rest = await f.read()
-            assert rest == ", World! This is a test.", f"Buffer was drained! Got {repr(rest)}"
+            assert (
+                rest == ", World! This is a test."
+            ), f"Buffer was drained! Got {repr(rest)}"
 
     @pytest.mark.asyncio
     async def test_read_zero_binary_returns_empty_bytes(self, temp_file):

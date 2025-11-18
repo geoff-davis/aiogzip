@@ -49,7 +49,7 @@ class CompressionBenchmarks(BenchmarkBase):
                 aiogzip_size=format_size(aiogzip_size),
                 gzip_size=format_size(gzip_size),
                 aiogzip_ratio=f"{aiogzip_ratio:.2f}x",
-                gzip_ratio=f"{gzip_ratio:.2f}x"
+                gzip_ratio=f"{gzip_ratio:.2f}x",
             )
 
     async def run_all(self):

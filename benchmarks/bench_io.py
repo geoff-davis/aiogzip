@@ -26,7 +26,7 @@ class IoBenchmarks(BenchmarkBase):
         start = time.perf_counter()
         async with AsyncGzipBinaryFile(aiogzip_file, "wb") as f:
             for i in range(0, len(binary_data), chunk_size):
-                await f.write(binary_data[i:i + chunk_size])
+                await f.write(binary_data[i : i + chunk_size])
         aiogzip_write_time = time.perf_counter() - start
 
         # Benchmark aiogzip read
@@ -39,7 +39,7 @@ class IoBenchmarks(BenchmarkBase):
         start = time.perf_counter()
         with gzip.open(gzip_file, "wb") as f:
             for i in range(0, len(binary_data), chunk_size):
-                f.write(binary_data[i:i + chunk_size])
+                f.write(binary_data[i : i + chunk_size])
         gzip_write_time = time.perf_counter() - start
 
         # Benchmark gzip read
@@ -52,7 +52,9 @@ class IoBenchmarks(BenchmarkBase):
         total_gzip = gzip_write_time + gzip_read_time
 
         num_chunks = len(binary_data) // chunk_size
-        aiogzip_chunks_per_sec = num_chunks / aiogzip_write_time if aiogzip_write_time > 0 else 0
+        aiogzip_chunks_per_sec = (
+            num_chunks / aiogzip_write_time if aiogzip_write_time > 0 else 0
+        )
 
         self.add_result(
             "Binary I/O (10-byte chunks, stress test)",
@@ -64,7 +66,7 @@ class IoBenchmarks(BenchmarkBase):
             gzip_read=f"{gzip_read_time:.3f}s",
             speedup=format_speedup(total_aiogzip, total_gzip),
             chunks_written=num_chunks,
-            chunks_per_sec=f"{aiogzip_chunks_per_sec:.0f}"
+            chunks_per_sec=f"{aiogzip_chunks_per_sec:.0f}",
         )
 
     async def benchmark_binary_bulk(self):
@@ -82,7 +84,7 @@ class IoBenchmarks(BenchmarkBase):
         # Benchmark aiogzip bulk read
         start = time.perf_counter()
         async with AsyncGzipBinaryFile(aiogzip_file, "rb") as f:
-            data = await f.read()
+            await f.read()
         aiogzip_read_time = time.perf_counter() - start
 
         # Benchmark gzip bulk write
@@ -115,7 +117,7 @@ class IoBenchmarks(BenchmarkBase):
             gzip_read=f"{gzip_read_time:.3f}s",
             speedup=format_speedup(total_aiogzip, total_gzip),
             aiogzip_throughput=f"{aiogzip_throughput:.1f} MB/s",
-            gzip_throughput=f"{gzip_throughput:.1f} MB/s"
+            gzip_throughput=f"{gzip_throughput:.1f} MB/s",
         )
 
     async def benchmark_binary_chunked(self):
@@ -130,7 +132,7 @@ class IoBenchmarks(BenchmarkBase):
         start = time.perf_counter()
         async with AsyncGzipBinaryFile(aiogzip_file, "wb") as f:
             for i in range(0, len(binary_data), chunk_size):
-                await f.write(binary_data[i:i + chunk_size])
+                await f.write(binary_data[i : i + chunk_size])
         aiogzip_write_time = time.perf_counter() - start
 
         # Benchmark aiogzip chunked read
@@ -148,7 +150,7 @@ class IoBenchmarks(BenchmarkBase):
         start = time.perf_counter()
         with gzip.open(gzip_file, "wb") as f:
             for i in range(0, len(binary_data), chunk_size):
-                f.write(binary_data[i:i + chunk_size])
+                f.write(binary_data[i : i + chunk_size])
         gzip_write_time = time.perf_counter() - start
 
         # Benchmark gzip chunked read
@@ -173,7 +175,7 @@ class IoBenchmarks(BenchmarkBase):
             aiogzip_read=f"{aiogzip_read_time:.3f}s",
             gzip_write=f"{gzip_write_time:.3f}s",
             gzip_read=f"{gzip_read_time:.3f}s",
-            speedup=format_speedup(total_aiogzip, total_gzip)
+            speedup=format_speedup(total_aiogzip, total_gzip),
         )
 
     async def benchmark_text_operations(self):
@@ -210,7 +212,7 @@ class IoBenchmarks(BenchmarkBase):
         total_gzip = gzip_write_time + gzip_read_time
 
         # Calculate throughput
-        text_size_mb = len(text_data.encode('utf-8')) / (1024 * 1024)
+        text_size_mb = len(text_data.encode("utf-8")) / (1024 * 1024)
         aiogzip_throughput = text_size_mb / total_aiogzip if total_aiogzip > 0 else 0
         gzip_throughput = text_size_mb / total_gzip if total_gzip > 0 else 0
 
@@ -224,7 +226,7 @@ class IoBenchmarks(BenchmarkBase):
             gzip_read=f"{gzip_read_time:.3f}s",
             speedup=format_speedup(total_aiogzip, total_gzip),
             aiogzip_throughput=f"{aiogzip_throughput:.1f} MB/s",
-            gzip_throughput=f"{gzip_throughput:.1f} MB/s"
+            gzip_throughput=f"{gzip_throughput:.1f} MB/s",
         )
 
     async def benchmark_line_iteration(self):
@@ -270,7 +272,7 @@ class IoBenchmarks(BenchmarkBase):
 
         start = time.perf_counter()
         with gzip.open(gzip_file, "rt") as f:
-            gzip_lines = list(f)
+            list(f)
         gzip_time = time.perf_counter() - start
 
         self.add_result(
@@ -280,8 +282,10 @@ class IoBenchmarks(BenchmarkBase):
             async_for_time=f"{iteration_time:.3f}s",
             readline_time=f"{readline_time:.3f}s",
             gzip_iteration=f"{gzip_time:.3f}s",
-            async_for_vs_readline=f"{readline_time/iteration_time:.2f}x" if iteration_time > 0 else "N/A",
-            lines_per_sec=f"{len(iter_lines)/iteration_time:.0f}"
+            async_for_vs_readline=f"{readline_time / iteration_time:.2f}x"
+            if iteration_time > 0
+            else "N/A",
+            lines_per_sec=f"{len(iter_lines) / iteration_time:.0f}",
         )
 
     async def benchmark_flush_operations(self):
@@ -291,7 +295,7 @@ class IoBenchmarks(BenchmarkBase):
         # Write with multiple flushes
         start = time.perf_counter()
         async with AsyncGzipBinaryFile(test_file, "wb") as f:
-            for i in range(100):
+            for _i in range(100):
                 await f.write(b"test data " * 100)
                 await f.flush()
         duration = time.perf_counter() - start
@@ -300,7 +304,7 @@ class IoBenchmarks(BenchmarkBase):
             "Flush operations (100 flushes)",
             "io",
             duration,
-            ops_per_sec=f"{100/duration:.0f}"
+            ops_per_sec=f"{100 / duration:.0f}",
         )
 
     async def benchmark_readline(self):
@@ -327,7 +331,7 @@ class IoBenchmarks(BenchmarkBase):
             "readline() (1000 lines)",
             "io",
             duration,
-            lines_per_sec=f"{len(lines)/duration:.0f}"
+            lines_per_sec=f"{len(lines) / duration:.0f}",
         )
 
     async def run_all(self):
