@@ -20,6 +20,7 @@
 - **Reproducible Archives**: Control gzip `mtime` and embedded filenames.
 - **Type-Safe**: Distinct `AsyncGzipBinaryFile` and `AsyncGzipTextFile`.
 - **`aiocsv` Ready**: Seamless integration for CSV pipelines.
+- **Predictable Performance**: Backward seeks rewind the stream and re-decompress data (same as `gzip.GzipFile`), so treat random access as O(n) and prefer forward-only patterns when possible.
 
 ## Quickstart
 
