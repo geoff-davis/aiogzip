@@ -884,6 +884,7 @@ class AsyncGzipTextFile:
         )
         self._text_buffer: str = ""  # Central buffer for decoded text
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
+        self._line_offset: int = 0  # Track logical character position for tell()
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
@@ -914,17 +915,26 @@ class AsyncGzipTextFile:
     async def tell(self) -> int:
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
-        return await self._binary_file.tell()
+        bytes_offset = await self._binary_file.tell()
+        pending_bytes, _ = self._decoder.getstate()
+        flag = 1 if pending_bytes else 0
+        return (bytes_offset << 1) | flag
 
     async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
-        self._decoder = codecs.getincrementaldecoder(self._encoding)(
-            errors=self._errors
-        )
+        if whence != os.SEEK_SET:
+            raise OSError("AsyncGzipTextFile seek() only supports SEEK_SET")
+        byte_offset = offset >> 1
+        remainder = offset & 1
+        await self._binary_file.seek(byte_offset)
+        self._decoder.reset()
+        if remainder:
+            # Prime the decoder with a single null byte to preserve state flag
+            self._decoder.decode(b"\x00", final=False)
         self._text_buffer = ""
         self._trailing_cr = False
-        return await self._binary_file.seek(offset, whence)
+        return offset
 
     def fileno(self) -> int:
         if self._binary_file is None:

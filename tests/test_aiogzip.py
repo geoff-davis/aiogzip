@@ -765,10 +765,19 @@ class TestAsyncGzipTextFile:
             head = await f.read(4)
             assert head == sample_text[:4]
             pos = await f.tell()
-            assert isinstance(pos, int)
+            assert pos % 2 == 0
             await f.seek(0)
-            tail = await f.read()
-            assert tail == sample_text
+            entire = await f.read()
+            assert entire == sample_text
+
+        async with AsyncGzipTextFile(temp_file, "wt") as wf:
+            await wf.write("ééé")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            await f.read(1)
+            await f.tell()
+            await f.seek(0)
+            assert await f.read() == "ééé"
 
     @pytest.mark.asyncio
     async def test_text_readline_limit(self, temp_file):
