@@ -4,6 +4,7 @@ import gzip
 import io
 import os
 import struct
+import tarfile
 import tempfile
 import time
 from pathlib import Path
@@ -601,6 +602,48 @@ class TestAsyncGzipBinaryFile:
         async with AsyncGzipBinaryFile(temp_file, "rb") as f:
             data = await f.read()
             assert data == b"hi" + b"\x00" * 3 + b"X"
+
+    @pytest.mark.asyncio
+    async def test_tarfile_like_iteration(self, tmp_path):
+        """Simulate tarfile's seek/tell pattern over a gzip tarball."""
+        tar_path = tmp_path / "archive.tar.gz"
+        file1 = tmp_path / "inner1.txt"
+        file2 = tmp_path / "inner2.txt"
+        contents = {
+            "inner1.txt": "alpha\nbeta",
+            "inner2.txt": "gamma",
+        }
+        file1.write_text(contents["inner1.txt"], encoding="utf-8")
+        file2.write_text(contents["inner2.txt"], encoding="utf-8")
+        with tarfile.open(tar_path, "w:gz") as tar:
+            tar.add(file1, arcname="inner1.txt")
+            tar.add(file2, arcname="inner2.txt")
+
+        seen = []
+        async with AsyncGzipBinaryFile(tar_path, "rb") as f:
+            while True:
+                header = await f.read(512)
+                if not header or header == b"\x00" * 512:
+                    break
+                info = tarfile.TarInfo.frombuf(
+                    header, encoding="utf-8", errors="surrogateescape"
+                )
+                seen.append(info.name)
+                file_start = await f.tell()
+                data = await f.read(info.size)
+                if info.name in contents:
+                    assert data.decode("utf-8") == contents[info.name]
+                # Rewind to verify backward seek behavior
+                await f.seek(file_start)
+                if data:
+                    assert await f.read(1) == data[:1]
+                await f.seek(file_start + info.size)
+                pad = (-info.size) % 512
+                if pad:
+                    await f.seek(await f.tell() + pad)
+
+        actual = [name for name in seen if name in contents]
+        assert sorted(actual) == sorted(contents.keys())
 
 
 class TestAsyncGzipTextFile:
