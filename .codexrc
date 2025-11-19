@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "before_commit": [
+    {
+      "name": "Pre-commit hooks",
+      "command": ["pre-commit", "run", "--all-files"]
+    },
+    {
+      "name": "Test suite",
+      "command": ["uv", "run", "pytest"]
+    }
+  ]
+}
