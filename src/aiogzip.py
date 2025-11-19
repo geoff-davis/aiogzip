@@ -49,6 +49,7 @@ Error Handling Strategy:
 """
 
 import codecs
+import io
 import os
 import struct
 import time
@@ -457,10 +458,12 @@ class AsyncGzipBinaryFile:
             raise ValueError("File not opened. Use async context manager.")
         fileno_method = getattr(self._file, "fileno", None)
         if fileno_method is None:
-            raise OSError("Underlying file object does not expose fileno()")
+            raise io.UnsupportedOperation("fileno() not supported by underlying file")
         result = fileno_method()
         if hasattr(result, "__await__"):
-            raise OSError("fileno() cannot be awaited on the underlying file object")
+            raise io.UnsupportedOperation(
+                "fileno() is not awaitable in underlying file"
+            )
         return int(result)
 
     async def peek(self, size: int = -1) -> bytes:

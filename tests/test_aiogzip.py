@@ -1,6 +1,7 @@
 # pyrefly: ignore
 # pyrefly: disable=all
 import gzip
+import io
 import os
 import struct
 import tempfile
@@ -557,6 +558,20 @@ class TestAsyncGzipBinaryFile:
             fd = f.fileno()
             assert isinstance(fd, int)
             assert f.raw() is not None
+
+    @pytest.mark.asyncio
+    async def test_binary_fileno_missing(self, temp_file, sample_data):
+        class NoFileno:
+            async def write(self, data):
+                return len(data)
+
+            async def read(self, size=-1):
+                return b""
+
+        f = AsyncGzipBinaryFile(temp_file, "rb")
+        f._file = NoFileno()
+        with pytest.raises(io.UnsupportedOperation, match="fileno\\(\\)"):
+            f.fileno()
 
     @pytest.mark.asyncio
     async def test_binary_seek_write_extends_with_zeros(self, temp_file):
