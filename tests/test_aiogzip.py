@@ -574,6 +574,24 @@ class TestAsyncGzipBinaryFile:
             f.fileno()
 
     @pytest.mark.asyncio
+    async def test_binary_read1_and_readinto1(self, temp_file, sample_data):
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(sample_data)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read1(10)
+            assert len(data) == 10
+            buf = bytearray(5)
+            read = await f.readinto1(buf)
+            assert read == 5
+
+    def test_binary_seekable_and_writable_flags(self, temp_file):
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        assert f.seekable()
+        assert f.writable()
+        assert not f.readable()
+
+    @pytest.mark.asyncio
     async def test_binary_seek_write_extends_with_zeros(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"hi")

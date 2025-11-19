@@ -497,6 +497,28 @@ class AsyncGzipBinaryFile:
         view[: len(data)] = data
         return len(data)
 
+    async def read1(self, size: int = -1) -> bytes:
+        """Read up to size bytes from the buffer without looping."""
+        return await self.read(size)
+
+    async def readinto1(self, b: Union[bytearray, memoryview]) -> int:
+        """Read directly into the buffer without looping."""
+        return await self.readinto(b)
+
+    def readable(self) -> bool:
+        return self._mode_op == "r"
+
+    def writable(self) -> bool:
+        return self._writing_mode
+
+    def seekable(self) -> bool:
+        return True
+
+    async def rewind(self) -> None:
+        if self._mode_op != "r":
+            raise OSError("Can't rewind in write mode")
+        await self.seek(0)
+
     async def write(self, data: Union[bytes, bytearray, memoryview]) -> int:
         """
         Compresses and writes binary data to the file.
@@ -1324,3 +1346,12 @@ def AsyncGzipFile(
         return AsyncGzipTextFile(filename, mode, **kwargs)
     else:
         return AsyncGzipBinaryFile(filename, mode, **kwargs)
+
+    def readable(self) -> bool:
+        return self._mode_op == "r"
+
+    def writable(self) -> bool:
+        return self._writing_mode
+
+    def seekable(self) -> bool:
+        return True
