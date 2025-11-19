@@ -16,7 +16,7 @@
 
 - **Truly Asynchronous**: Built with `asyncio` and `aiofiles`.
 - **High-Performance**: Optimized buffer handling for fast I/O.
-- **Drop-in Replacement**: Mimics `gzip.open()` with async `seek`, `tell`, `peek`, and `readinto` support.
+- **Drop-in Replacement**: Mimics `gzip.open()` with async `seek`, `tell`, `peek`, and `readinto` support; verified against tarfile-style access patterns and aiocsv workflows.
 - **Reproducible Archives**: Control gzip `mtime` and embedded filenames.
 - **Type-Safe**: Distinct `AsyncGzipBinaryFile` and `AsyncGzipTextFile`.
 - **`aiocsv` Ready**: Seamless integration for CSV pipelines.
