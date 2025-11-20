@@ -11,10 +11,9 @@ authors = [
 description = "Asynchronous gzip file reader/writer with aiocsv support."
 readme = "README.md"
 requires-python = ">=3.8"
-license = { file = "LICENSE" }
+license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Framework :: AsyncIO",
     "Topic :: System :: Archiving :: Compression",
@@ -49,7 +48,7 @@ Homepage = "https://github.com/geoff-davis/aiogzip"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["aiogzip"]
+packages = ["aiogzip"]
 
 [tool.setuptools.package-data]
 "aiogzip" = ["py.typed"]
@@ -73,7 +72,7 @@ select = [
 ignore = ["E501"]  # Line too long (handled by formatter usually, but good to ignore)
 
 [tool.ruff.lint.per-file-ignores]
-"src/aiogzip.py" = ["E402"]
+"src/aiogzip/__init__.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.9"

@@ -31,3 +31,10 @@ def test_version_consistency():
     assert module.__version__ == aiogzip.__version__, (
         "aiogzip exposes inconsistent __version__ values"
     )
+
+
+def test_py_typed_marker_shipped():
+    """py.typed should be installed alongside the aiogzip package."""
+    module_path = Path(aiogzip.__file__)
+    marker = module_path.with_name("py.typed")
+    assert marker.exists(), "py.typed marker missing from installed package"

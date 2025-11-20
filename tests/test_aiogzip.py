@@ -592,6 +592,17 @@ class TestAsyncGzipBinaryFile:
         assert f.writable()
         assert not f.readable()
 
+    def test_text_seekable_and_writable_flags(self, temp_file):
+        reader = AsyncGzipTextFile(temp_file, "rt")
+        assert reader.seekable()
+        assert reader.readable()
+        assert not reader.writable()
+
+        writer = AsyncGzipTextFile(temp_file, "wt")
+        assert writer.seekable()
+        assert writer.writable()
+        assert not writer.readable()
+
     @pytest.mark.asyncio
     async def test_binary_seek_write_extends_with_zeros(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -854,6 +865,36 @@ class TestAsyncGzipTextFile:
             await f.tell()
             await f.seek(0)
             assert await f.read() == "ééé"
+
+    @pytest.mark.asyncio
+    async def test_text_seek_cookie_restores_buffer(self, temp_file):
+        text = "abcdefghijklmnopqrstuvwxyz"
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(text)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            first = await f.read(5)
+            assert first == text[:5]
+            cookie = await f.tell()
+            remaining = await f.read()
+            assert remaining == text[5:]
+            await f.seek(cookie)
+            replay = await f.read()
+            assert replay == remaining
+
+    @pytest.mark.asyncio
+    async def test_text_seek_cookie_handles_multibyte(self, temp_file):
+        text = "éå漢字"
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(text)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            await f.read(1)
+            cookie = await f.tell()
+            rest = await f.read()
+            await f.seek(cookie)
+            replay = await f.read()
+            assert replay == rest
 
     @pytest.mark.asyncio
     async def test_text_readline_limit(self, temp_file):

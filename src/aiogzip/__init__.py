@@ -1,7 +1,7 @@
 """
 AsyncGzipFile - Asynchronous gzip file reader/writer with aiocsv support"""
 
-__version__ = "0.4"
+__version__ = "1.0.0"
 
 """
 
@@ -54,8 +54,9 @@ import os
 import struct
 import time
 import zlib
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Protocol, Tuple, Union
+from typing import Any, Dict, Optional, Protocol, Tuple, Union
 
 import aiofiles
 
@@ -270,6 +271,16 @@ class WithAsyncReadWrite(Protocol):
     async def read(self, size: int = -1) -> Union[str, bytes]: ...
     async def write(self, data: Union[str, bytes]) -> int: ...
     async def close(self) -> None: ...
+
+
+@dataclass(frozen=True)
+class _TextCookieState:
+    """Internal snapshot of decoder/buffer state for tell()/seek() cookies."""
+
+    byte_offset: int
+    decoder_state: Tuple[Any, int]
+    text_buffer: str
+    trailing_cr: bool
 
 
 class AsyncGzipBinaryFile:
@@ -910,6 +921,7 @@ class AsyncGzipTextFile:
         self._text_buffer: str = ""  # Central buffer for decoded text
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
         self._line_offset: int = 0  # Track logical character position for tell()
+        self._cookie_cache: Dict[int, _TextCookieState] = {}
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
@@ -941,15 +953,32 @@ class AsyncGzipTextFile:
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
         bytes_offset = await self._binary_file.tell()
-        pending_bytes, _ = self._decoder.getstate()
+        decoder_state = self._decoder.getstate()
+        pending_bytes, _ = decoder_state
         flag = 1 if pending_bytes else 0
-        return (bytes_offset << 1) | flag
+        cookie = (bytes_offset << 1) | flag
+        self._cookie_cache[cookie] = _TextCookieState(
+            byte_offset=bytes_offset,
+            decoder_state=decoder_state,
+            text_buffer=self._text_buffer,
+            trailing_cr=self._trailing_cr,
+        )
+        return cookie
 
     async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
         if whence != os.SEEK_SET:
             raise OSError("AsyncGzipTextFile seek() only supports SEEK_SET")
+
+        cached_state = self._cookie_cache.get(offset)
+        if cached_state is not None:
+            await self._binary_file.seek(cached_state.byte_offset)
+            self._decoder.setstate(cached_state.decoder_state)
+            self._text_buffer = cached_state.text_buffer
+            self._trailing_cr = cached_state.trailing_cr
+            return offset
+
         byte_offset = offset >> 1
         remainder = offset & 1
         await self._binary_file.seek(byte_offset)
@@ -970,6 +999,15 @@ class AsyncGzipTextFile:
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
         return self._binary_file.raw()
+
+    def readable(self) -> bool:
+        return self._mode_op == "r"
+
+    def writable(self) -> bool:
+        return self._writing_mode
+
+    def seekable(self) -> bool:
+        return True
 
     async def write(self, data: str) -> int:
         """
@@ -1309,6 +1347,7 @@ class AsyncGzipTextFile:
 
         # Mark as closed immediately to prevent concurrent close attempts
         self._is_closed = True
+        self._cookie_cache.clear()
 
         try:
             if not self._writing_mode:
@@ -1346,12 +1385,3 @@ def AsyncGzipFile(
         return AsyncGzipTextFile(filename, mode, **kwargs)
     else:
         return AsyncGzipBinaryFile(filename, mode, **kwargs)
-
-    def readable(self) -> bool:
-        return self._mode_op == "r"
-
-    def writable(self) -> bool:
-        return self._writing_mode
-
-    def seekable(self) -> bool:
-        return True
