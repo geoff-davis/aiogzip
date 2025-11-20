@@ -24,7 +24,7 @@ from aiogzip import (
 
 
 def _parse_gzip_header_bytes(
-    path: Union[str, os.PathLike[str]],
+    path: Union[str, os.PathLike],
 ) -> Dict[str, Union[int, bytes]]:
     raw = Path(path).read_bytes()
     assert len(raw) >= 10

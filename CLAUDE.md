@@ -49,9 +49,11 @@ Before committing code changes, verify:
    grep -r "list\[" src/
    grep -r "dict\[" src/
    grep -r "set\[" src/
+   grep -r "PathLike\[" src/
    ```
 
    All should return no results! Use `Tuple`, `List`, `Dict`, `Set` from `typing` instead.
+   For PathLike, use plain `os.PathLike` (not `os.PathLike[str]`).
 
 2. **Run tests locally:**
 
@@ -59,7 +61,7 @@ Before committing code changes, verify:
    pytest --cov --cov-report=term-missing
    ```
 
-   Ensure all 173+ tests pass with good coverage.
+   Ensure all 209+ tests pass with good coverage.
 
 3. **Check imports:**
 
@@ -68,6 +70,21 @@ Before committing code changes, verify:
    ```
 
    Make sure these are imported if used.
+
+4. **Test with Python 3.8 (optional but recommended):**
+
+   If you have pyenv installed:
+
+   ```bash
+   pyenv install 3.8.18  # One-time setup
+   pyenv exec python3.8 -c "import aiogzip"  # Quick import test
+   ```
+
+   Or use nox for multi-version testing:
+
+   ```bash
+   nox  # Tests against all supported Python versions
+   ```
 
 ## Test Coverage Best Practices
 
