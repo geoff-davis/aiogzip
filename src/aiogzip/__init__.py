@@ -150,10 +150,10 @@ def _validate_original_filename(
 
 def _derive_header_filename(
     explicit: Optional[Union[str, bytes]],
-    fallback: Union[str, bytes, os.PathLike[str], os.PathLike[bytes], None],
+    fallback: Union[str, bytes, os.PathLike, None],
 ) -> bytes:
     """Derive the filename stored in the gzip header."""
-    candidate: Union[str, bytes, os.PathLike[str], os.PathLike[bytes], None] = (
+    candidate: Union[str, bytes, os.PathLike, None] = (
         explicit if explicit is not None else fallback
     )
     if candidate is None:
