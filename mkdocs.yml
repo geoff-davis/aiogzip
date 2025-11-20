@@ -9,7 +9,9 @@ theme:
   name: material
   features:
     - navigation.sections
+    - navigation.top
     - content.code.copy
+    - content.code.annotate
   palette:
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
@@ -38,6 +40,19 @@ plugins:
           options:
             show_root_heading: true
             show_source: true
+            show_signature_annotations: true
+            separate_signature: true
+            docstring_style: google
+            merge_init_into_class: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
 
 nav:
   - Home: index.md

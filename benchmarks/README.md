@@ -21,46 +21,60 @@ uv run python benchmarks/bench_compare.py baseline.json current.json
 ## Benchmark Categories
 
 ### 1. 🚀 I/O Benchmarks (`bench_io.py`)
+
 Core read/write performance:
+
 - Binary I/O with small (10-byte) chunks
 - Text I/O operations
 - Flush operations (100 flushes)
 - Line-by-line reading with `readline()` (1000 lines)
 
 ### 2. 💾 Memory Benchmarks (`bench_memory.py`)
+
 Memory usage and efficiency:
+
 - Memory consumption during 5MB file operations
 - Memory overhead ratios (requires `psutil`)
 - Memory efficiency status (OK if < 5.0x ratio)
 
 ### 3. ⚡ Concurrency Benchmarks (`bench_concurrency.py`)
+
 Async concurrency benefits:
+
 - Concurrent file operations (50 files)
 - Comparison: async concurrent vs sync sequential
 - Real-world async performance gains
 
 ### 4. 🗜️ Compression Benchmarks (`bench_compression.py`)
+
 Compression analysis:
+
 - Random data (incompressible baseline)
 - Highly compressible data (repetitive patterns)
 - Text data compression
 - Compression ratios vs standard gzip
 
 ### 5. 🌍 Real-World Scenarios (`bench_scenarios.py`)
+
 Practical use cases:
+
 - JSONL processing (write → read → parse)
 - Complete workflows with realistic data
 - End-to-end performance testing
 
 ### 6. 🛡️ Error Handling (`bench_errors.py`)
+
 Robustness and error recovery:
+
 - Invalid operation detection
 - Corrupted data handling
 - Edge case performance
 - Error handling overhead
 
 ### 7. 🔬 Micro-Benchmarks (`bench_micro.py`)
+
 Fine-grained performance measurements:
+
 - read(-1) on 1MB files (100 iterations)
 - Line iteration efficiency (10K lines)
 - readline() loop performance (10K lines)
@@ -109,6 +123,7 @@ uv run python benchmarks/bench_compare.py baseline.json current.json
 ### Prerequisites
 
 Core benchmarks work out of the box. For memory benchmarks, install `psutil`:
+
 ```bash
 uv add psutil
 ```
@@ -198,8 +213,8 @@ class MycategoryBenchmarks(BenchmarkBase):
         await self.benchmark_my_feature()
 ```
 
-3. Register in `run_benchmarks.py` CATEGORIES dict
-4. Update documentation
+1. Register in `run_benchmarks.py` CATEGORIES dict
+2. Update documentation
 
 ## Comparing Results
 
@@ -219,12 +234,12 @@ uv run python benchmarks/bench_compare.py baseline.json current.json
 ```
 
 The comparison tool shows:
+
 - Side-by-side benchmark times
 - Percentage changes
 - Improvements (>5% faster) marked with ✓
 - Regressions (>5% slower) marked with ✗
 - Overall summary statistics
-
 
 ## Benefits
 

@@ -1,22 +1,54 @@
-repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
-    hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-added-large-files
+# Pre-commit hooks for aiogzip
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
 
+repos:
+  # Ruff - Fast Python linter (replaces flake8, isort, etc.)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.5
     hooks:
+      # Run the linter
       - id: ruff
-        args: [ --fix ]
+        args: [--fix]
+      # Run the formatter
       - id: ruff-format
 
+  # Mypy - Static type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
+    rev: v1.18.2
     hooks:
       - id: mypy
         files: ^src/
-        additional_dependencies: [types-aiofiles]
+        additional_dependencies:
+          - types-aiofiles
+
+  # General code quality checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Check for files that would conflict in case-insensitive filesystems
+      - id: check-case-conflict
+      # Check for merge conflicts
+      - id: check-merge-conflict
+      # Check YAML syntax
+      - id: check-yaml
+      # Check TOML syntax
+      - id: check-toml
+      # Ensure files end with newline
+      - id: end-of-file-fixer
+      # Trim trailing whitespace
+      - id: trailing-whitespace
+      # Check for accidentally committed large files
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      # Prevent committing directly to main
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, master]
+
+  # Markdown linting
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.19.0
+    hooks:
+      - id: markdownlint-cli2
+        args: [--fix]
+        files: \.(md|markdown)$

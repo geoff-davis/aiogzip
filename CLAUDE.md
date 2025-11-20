@@ -10,7 +10,8 @@ This document contains important reminders and best practices for maintaining th
 
 Python 3.8 does NOT support PEP 585 (using built-in types for generics). Always use `typing` module imports:
 
-#### ❌ DON'T (Python 3.9+ only):
+#### ❌ DON'T (Python 3.9+ only)
+
 ```python
 def function() -> tuple[int, int]:
     pass
@@ -22,7 +23,8 @@ def function() -> dict[str, int]:
     pass
 ```
 
-#### ✅ DO (Python 3.8+ compatible):
+#### ✅ DO (Python 3.8+ compatible)
+
 ```python
 from typing import Tuple, List, Dict
 
@@ -41,24 +43,30 @@ def function() -> Dict[str, int]:
 Before committing code changes, verify:
 
 1. **Type hints compatibility:**
+
    ```bash
    grep -r "tuple\[" src/
    grep -r "list\[" src/
    grep -r "dict\[" src/
    grep -r "set\[" src/
    ```
+
    All should return no results! Use `Tuple`, `List`, `Dict`, `Set` from `typing` instead.
 
 2. **Run tests locally:**
+
    ```bash
    pytest --cov --cov-report=term-missing
    ```
+
    Ensure all 173+ tests pass with good coverage.
 
 3. **Check imports:**
+
    ```python
    from typing import Tuple, List, Dict, Set, Optional, Union, Any
    ```
+
    Make sure these are imported if used.
 
 ## Test Coverage Best Practices
@@ -71,6 +79,7 @@ Before committing code changes, verify:
 ### Test Organization
 
 Tests are organized by priority:
+
 - `TestHighPriorityEdgeCases` - Security & data integrity
 - `TestMediumPriorityEdgeCases` - Robustness
 - `TestLowPriorityEdgeCases` - Defensive validations
@@ -79,16 +88,19 @@ Tests are organized by priority:
 ## Known Issues & Gotchas
 
 ### Newline Handling
+
 - CRLF sequences can split across chunk boundaries
 - Must track `_trailing_cr` state to prevent `\r\n` → `\n\n`
 - Use `_get_line_terminator_pos()` helper for newline-aware searching
 
 ### Unicode Handling
+
 - Multibyte characters can split across buffers
 - Use `_safe_decode_with_remainder()` to handle incomplete sequences
 - Different encodings have different max incomplete byte counts
 
 ### Error Handling
+
 - Always wrap zlib errors in OSError with descriptive messages
 - Use `from e` for proper exception chaining
 - Test both expected (zlib.error) and unexpected (RuntimeError) error paths
@@ -100,6 +112,7 @@ The project uses GitHub Actions which tests against Python 3.8, 3.9, 3.10, 3.11,
 **Any Python 3.9+ only syntax will fail CI!**
 
 Common causes of CI failures:
+
 - PEP 585 type hints (most common)
 - PEP 604 union operator (`X | Y` instead of `Union[X, Y]`)
 - Match statements (Python 3.10+)
@@ -126,6 +139,7 @@ mypy src/aiogzip.py
 ## Commit Message Format
 
 Use conventional commit style:
+
 ```
 Fix/Add/Update: Short description
 
@@ -135,6 +149,7 @@ Fixes: #123
 ```
 
 Always include:
+
 - 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 - Co-Authored-By: Claude <noreply@anthropic.com>
 

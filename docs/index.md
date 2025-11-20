@@ -73,10 +73,15 @@ async def main():
 asyncio.run(main())
 ```
 
-## Limitations
+## Compatibility
 
-`aiogzip` focuses on the most common file-based read/write operations and does not implement the full API of the standard `gzip` module. Notably, it does not currently support:
+`aiogzip` provides comprehensive compatibility with the standard `gzip` module's `GzipFile` API, including:
 
-- In-memory compression/decompression (e.g., `gzip.compress`/`gzip.decompress`).
-- The `seek()` and `tell()` methods for navigating within a file stream.
-- Reading or writing gzip headers and metadata like `mtime`.
+- ✅ `seek()` and `tell()` methods for stream navigation (with the same performance characteristics as `gzip.GzipFile`)
+- ✅ `peek()` and `readinto()` for advanced reading patterns
+- ✅ Reading and writing gzip headers and metadata (e.g., `mtime`, `original_filename`)
+- ✅ Text and binary mode operations with proper encoding/decoding
+- ✅ Full compatibility with `tarfile` for reading `.tar.gz` archives
+- ✅ Seamless integration with `aiocsv` for CSV processing
+
+**Note:** `aiogzip` focuses on file-based operations and does not currently support in-memory compression/decompression (e.g., `gzip.compress`/`gzip.decompress`).

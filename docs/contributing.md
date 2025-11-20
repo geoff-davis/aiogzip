@@ -4,14 +4,14 @@ Contributions are welcome! This project uses `setuptools` for packaging and mode
 
 ## Development Setup
 
-1.  **Clone the repository**:
+1. **Clone the repository**:
 
     ```bash
     git clone https://github.com/geoff-davis/aiogzip.git
     cd aiogzip
     ```
 
-2.  **Install dependencies**:
+2. **Install dependencies**:
 
     We recommend using a virtual environment.
 
@@ -21,7 +21,7 @@ Contributions are welcome! This project uses `setuptools` for packaging and mode
     pip install -e ".[dev,csv,docs]"
     ```
 
-3.  **Install Pre-commit Hooks**:
+3. **Install Pre-commit Hooks**:
 
     This project uses `pre-commit` to ensure code quality.
 
