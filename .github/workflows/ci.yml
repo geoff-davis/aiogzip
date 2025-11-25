@@ -69,3 +69,5 @@ jobs:
         if: matrix.python-version == '3.12'
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERAGE_PATH: .coverage
+          VERBOSE: "true"
