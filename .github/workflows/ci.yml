@@ -56,15 +56,11 @@ jobs:
       # Step 7: Run tests with pytest and coverage
       - name: Run tests with pytest and coverage
         run: |
-          pytest --cov --cov-report=term-missing --cov-report=xml --cov-report=html
+          pytest --cov --cov-report=term-missing --cov-report=xml
 
-      # Step 5: Upload coverage to Codecov (optional)
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
+      # Step 8: Post coverage comment on PR
+      - name: Coverage comment
+        uses: py-cov-action/python-coverage-comment-action@v3
         if: matrix.python-version == '3.12'
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
