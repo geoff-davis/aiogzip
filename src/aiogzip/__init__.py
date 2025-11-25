@@ -56,7 +56,7 @@ import time
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Protocol, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Protocol, Tuple, Union
 
 import aiofiles
 
@@ -1318,6 +1318,75 @@ class AsyncGzipTextFile:
                 self._text_buffer = line[limit:] + self._text_buffer
                 line = line[:limit]
             return line
+
+    async def readlines(self, hint: int = -1) -> List[str]:
+        """
+        Read and return a list of lines from the file.
+
+        Args:
+            hint: Optional size hint. If given and greater than 0, lines totaling
+                approximately hint bytes are read (counted before decoding).
+                The actual number of bytes read may be more or less than hint.
+                If hint is -1 or not given, all remaining lines are read.
+
+        Returns:
+            List[str]: A list of lines from the file, each including any trailing
+            newline character.
+
+        Examples:
+            async with AsyncGzipTextFile("file.gz", "rt") as f:
+                lines = await f.readlines()  # Read all lines
+                for line in lines:
+                    print(line.rstrip())
+
+            # With size hint
+            async with AsyncGzipTextFile("file.gz", "rt") as f:
+                lines = await f.readlines(1024)  # Read ~1KB of lines
+        """
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
+        if self._mode_op != "r":
+            raise OSError("File not open for reading")
+
+        lines: List[str] = []
+        total_size = 0
+
+        while True:
+            line = await self.readline()
+            if not line:
+                break
+            lines.append(line)
+            total_size += len(line)
+            if hint > 0 and total_size >= hint:
+                break
+
+        return lines
+
+    async def writelines(self, lines: Iterable[str]) -> None:
+        """
+        Write a list of lines to the file.
+
+        Note that newlines are not added automatically; each string in the
+        iterable should include its own line terminator if desired.
+
+        Args:
+            lines: An iterable of strings to write.
+
+        Examples:
+            async with AsyncGzipTextFile("file.gz", "wt") as f:
+                await f.writelines(["line1\\n", "line2\\n", "line3\\n"])
+
+            # From a generator
+            async with AsyncGzipTextFile("file.gz", "wt") as f:
+                await f.writelines(f"{i}\\n" for i in range(100))
+        """
+        if not self._writing_mode:
+            raise OSError("File not open for writing")
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
+
+        for line in lines:
+            await self.write(line)
 
     async def flush(self) -> None:
         """

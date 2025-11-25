@@ -2454,6 +2454,167 @@ class TestNewAPIMethods:
             line2 = await f.readline()
             assert line2 == "small line\n"
 
+    @pytest.mark.asyncio
+    async def test_readlines_basic(self, temp_file):
+        """Test basic readlines() functionality."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("Line 1\nLine 2\nLine 3\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            lines = await f.readlines()
+            assert lines == ["Line 1\n", "Line 2\n", "Line 3\n"]
+
+    @pytest.mark.asyncio
+    async def test_readlines_no_trailing_newline(self, temp_file):
+        """Test readlines() when last line has no newline."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("Line 1\nLine 2\nLine 3")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            lines = await f.readlines()
+            assert lines == ["Line 1\n", "Line 2\n", "Line 3"]
+
+    @pytest.mark.asyncio
+    async def test_readlines_empty_file(self, temp_file):
+        """Test readlines() on empty file."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            pass  # Write nothing
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            lines = await f.readlines()
+            assert lines == []
+
+    @pytest.mark.asyncio
+    async def test_readlines_with_hint(self, temp_file):
+        """Test readlines() with size hint."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            # Write many lines
+            for i in range(100):
+                await f.write(f"Line {i}\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Request ~50 characters worth of lines
+            lines = await f.readlines(50)
+            # Should get some lines but not all
+            assert len(lines) > 0
+            assert len(lines) < 100
+            # Total characters should be approximately >= hint
+            total_chars = sum(len(line) for line in lines)
+            assert total_chars >= 50
+
+    @pytest.mark.asyncio
+    async def test_readlines_in_write_mode_raises(self, temp_file):
+        """Test that readlines() raises in write mode."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            with pytest.raises(OSError, match="File not open for reading"):
+                await f.readlines()
+
+    @pytest.mark.asyncio
+    async def test_readlines_on_closed_file_raises(self, temp_file):
+        """Test that readlines() raises on closed file."""
+        f = AsyncGzipTextFile(temp_file, "wt")
+        async with f:
+            await f.write("test")
+
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.readlines()
+
+    @pytest.mark.asyncio
+    async def test_writelines_basic(self, temp_file):
+        """Test basic writelines() functionality."""
+        lines = ["Line 1\n", "Line 2\n", "Line 3\n"]
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.writelines(lines)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            result = await f.readlines()
+            assert result == lines
+
+    @pytest.mark.asyncio
+    async def test_writelines_generator(self, temp_file):
+        """Test writelines() with a generator."""
+
+        def line_generator():
+            for i in range(5):
+                yield f"Line {i}\n"
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.writelines(line_generator())
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            lines = await f.readlines()
+            assert lines == ["Line 0\n", "Line 1\n", "Line 2\n", "Line 3\n", "Line 4\n"]
+
+    @pytest.mark.asyncio
+    async def test_writelines_empty_list(self, temp_file):
+        """Test writelines() with empty list."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.writelines([])
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            content = await f.read()
+            assert content == ""
+
+    @pytest.mark.asyncio
+    async def test_writelines_no_newlines(self, temp_file):
+        """Test that writelines() does not add newlines automatically."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.writelines(["a", "b", "c"])
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            content = await f.read()
+            assert content == "abc"
+
+    @pytest.mark.asyncio
+    async def test_writelines_in_read_mode_raises(self, temp_file):
+        """Test that writelines() raises in read mode."""
+        # Create file first
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("test")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            with pytest.raises(OSError, match="File not open for writing"):
+                await f.writelines(["line"])
+
+    @pytest.mark.asyncio
+    async def test_writelines_on_closed_file_raises(self, temp_file):
+        """Test that writelines() raises on closed file."""
+        f = AsyncGzipTextFile(temp_file, "wt")
+        async with f:
+            await f.write("test")
+
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.writelines(["line"])
+
+    @pytest.mark.asyncio
+    async def test_readlines_writelines_roundtrip(self, temp_file):
+        """Test that writelines(readlines()) preserves data."""
+        original_lines = ["First line\n", "Second line\n", "Third line without newline"]
+
+        # Write original
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.writelines(original_lines)
+
+        # Read back
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            read_lines = await f.readlines()
+
+        # Write to new file
+        temp_file2 = temp_file + ".copy"
+        try:
+            async with AsyncGzipTextFile(temp_file2, "wt") as f:
+                await f.writelines(read_lines)
+
+            # Read from copy
+            async with AsyncGzipTextFile(temp_file2, "rt") as f:
+                final_lines = await f.readlines()
+
+            assert final_lines == original_lines
+        finally:
+            if os.path.exists(temp_file2):
+                os.unlink(temp_file2)
+
 
 class TestHighPriorityEdgeCases:
     """Test high priority edge cases for improved coverage."""
