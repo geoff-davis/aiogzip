@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- `readlines()` method for `AsyncGzipTextFile` for efficient bulk line reading.
+- `writelines()` method for `AsyncGzipTextFile` for efficient bulk line writing.
+- `name` property on both `AsyncGzipBinaryFile` and `AsyncGzipTextFile` returning the underlying filename.
+- `BUFFER_COMPACTION_THRESHOLD` class constant for configurable buffer management.
+- `MAX_COOKIE_CACHE_SIZE` class constant with automatic eviction to prevent unbounded memory growth.
+- Made `AsyncGzipBinaryFileProtocol` and `AsyncGzipTextFileProtocol` `@runtime_checkable` for duck-typing support.
+- 15 new tests in `TestAdditionalCoverage` class covering edge cases and new features.
+
+### Changed
+
+- Added `__slots__` to `AsyncGzipBinaryFile` and `AsyncGzipTextFile` for improved memory efficiency.
+- Refactored `readline()` control flow for improved clarity and maintainability.
+- Switched CI coverage reporting to py-cov-action/python-coverage-comment-action.
+- Test count increased from 209 to 253 tests.
+- Coverage improved from 85.13% to 87.92%.
+
 ## [1.0.0] - 2025-11-19
 
 ### Added
