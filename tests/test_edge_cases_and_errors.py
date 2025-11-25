@@ -256,3 +256,227 @@ class TestEdgeCasesAndErrors:
             TypeError, match="AsyncGzipBinaryFile can only be iterated in text mode"
         ):
             f.__aiter__()
+
+
+class TestAdditionalCoverage:
+    """Additional tests to improve code coverage."""
+
+    @pytest.mark.asyncio
+    async def test_derive_header_filename_type_error(self, tmp_path):
+        """Test _derive_header_filename raises TypeError for invalid type."""
+        from aiogzip import _derive_header_filename
+
+        # Pass an invalid type (not str, bytes, or Path)
+        with pytest.raises(TypeError, match="original_filename must be"):
+            _derive_header_filename(12345, None)
+
+    @pytest.mark.asyncio
+    async def test_derive_header_filename_unicode_error(self, tmp_path):
+        """Test _derive_header_filename handles UnicodeEncodeError gracefully."""
+        from aiogzip import _derive_header_filename
+
+        # Characters that can't be encoded to latin-1
+        result = _derive_header_filename("日本語.gz", None)
+        assert result == b""
+
+    @pytest.mark.asyncio
+    async def test_rewind_in_write_mode_raises(self, tmp_path):
+        """Test rewind() raises error in write mode."""
+        p = tmp_path / "test.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"test")
+            with pytest.raises(OSError, match="Can't rewind in write mode"):
+                await f.rewind()
+
+    @pytest.mark.asyncio
+    async def test_peek_in_write_mode_raises(self, tmp_path):
+        """Test peek() raises error in write mode."""
+        p = tmp_path / "test.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            with pytest.raises(OSError, match="File not open for reading"):
+                await f.peek()
+
+    @pytest.mark.asyncio
+    async def test_readinto_in_write_mode_raises(self, tmp_path):
+        """Test readinto() raises error in write mode."""
+        p = tmp_path / "test.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            buf = bytearray(10)
+            with pytest.raises(OSError, match="File not open for reading"):
+                await f.readinto(buf)
+
+    @pytest.mark.asyncio
+    async def test_seek_invalid_whence(self, tmp_path):
+        """Test seek() with invalid whence value."""
+        p = tmp_path / "test.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"test data")
+
+        async with AsyncGzipBinaryFile(p, "rb") as f:
+            with pytest.raises(ValueError, match="Invalid whence"):
+                await f.seek(0, 99)  # Invalid whence
+
+    @pytest.mark.asyncio
+    async def test_seek_end_in_write_mode(self, tmp_path):
+        """Test seek(SEEK_END) in write mode raises error."""
+        import os
+
+        p = tmp_path / "test.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"test data")
+            with pytest.raises(ValueError, match="Seek from end not supported"):
+                await f.seek(0, os.SEEK_END)
+
+    @pytest.mark.asyncio
+    async def test_seek_end_in_read_mode(self, tmp_path):
+        """Test seek(SEEK_END) in read mode raises error."""
+        import os
+
+        p = tmp_path / "test.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"test data")
+
+        async with AsyncGzipBinaryFile(p, "rb") as f:
+            with pytest.raises(ValueError, match="Seek from end not supported"):
+                await f.seek(0, os.SEEK_END)
+
+    @pytest.mark.asyncio
+    async def test_fileno_no_fileno_method(self, tmp_path):
+        """Test fileno() raises when underlying file has no fileno."""
+        import io
+
+        class NoFilenoFile:
+            async def read(self, size=-1):
+                return b""
+
+            async def write(self, data):
+                return len(data)
+
+            async def close(self):
+                pass
+
+        p = tmp_path / "test.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"test")
+
+        # Create a fake file object without fileno
+        fake_file = NoFilenoFile()
+        f = AsyncGzipBinaryFile(None, "rb", fileobj=fake_file)
+        await f.__aenter__()
+        try:
+            with pytest.raises(io.UnsupportedOperation, match="fileno"):
+                f.fileno()
+        finally:
+            await f.__aexit__(None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_cookie_cache_eviction(self, tmp_path):
+        """Test that cookie cache evicts old entries when full."""
+        p = tmp_path / "test.gz"
+
+        # Create a file with enough content
+        async with AsyncGzipTextFile(p, "wt") as f:
+            for i in range(100):
+                await f.write(f"Line {i}\n")
+
+        async with AsyncGzipTextFile(p, "rt") as f:
+            # Temporarily reduce cache size for testing
+            original_max = f.MAX_COOKIE_CACHE_SIZE
+            f.__class__.MAX_COOKIE_CACHE_SIZE = 10
+
+            try:
+                # Call tell() many times to fill the cache
+                for _ in range(20):
+                    await f.tell()
+                    await f.read(5)
+
+                # Cache should have been trimmed
+                assert len(f._cookie_cache) <= 10
+            finally:
+                f.__class__.MAX_COOKIE_CACHE_SIZE = original_max
+
+    @pytest.mark.asyncio
+    async def test_text_seek_non_seek_set(self, tmp_path):
+        """Test text file seek() with non-SEEK_SET whence."""
+        import os
+
+        p = tmp_path / "test.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("Hello World")
+
+        async with AsyncGzipTextFile(p, "rt") as f:
+            with pytest.raises(OSError, match="only supports SEEK_SET"):
+                await f.seek(0, os.SEEK_CUR)
+
+    @pytest.mark.asyncio
+    async def test_coerce_byteslike_invalid_type(self, tmp_path):
+        """Test _coerce_byteslike with invalid type."""
+        from aiogzip import AsyncGzipBinaryFile
+
+        p = tmp_path / "test.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            with pytest.raises(TypeError, match="must be a bytes-like object"):
+                await f.write("string not allowed")  # type: ignore
+
+    @pytest.mark.asyncio
+    async def test_runtime_checkable_protocols(self):
+        """Test that protocols are runtime checkable."""
+        from aiogzip import WithAsyncRead, WithAsyncReadWrite, WithAsyncWrite
+
+        class MockReader:
+            async def read(self, size=-1):
+                return b""
+
+        class MockWriter:
+            async def write(self, data):
+                return len(data)
+
+        class MockReadWriter:
+            async def read(self, size=-1):
+                return b""
+
+            async def write(self, data):
+                return len(data)
+
+            async def close(self):
+                pass
+
+        reader = MockReader()
+        writer = MockWriter()
+        readwriter = MockReadWriter()
+
+        assert isinstance(reader, WithAsyncRead)
+        assert isinstance(writer, WithAsyncWrite)
+        assert isinstance(readwriter, WithAsyncReadWrite)
+
+    @pytest.mark.asyncio
+    async def test_get_line_terminator_explicit_cr(self, tmp_path):
+        """Test line terminator detection with explicit CR newline mode."""
+        p = tmp_path / "test.gz"
+
+        # Write with CR line endings
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"line1\rline2\rline3")
+
+        # Read with explicit CR newline mode
+        async with AsyncGzipTextFile(p, "rt", newline="\r") as f:
+            line1 = await f.readline()
+            line2 = await f.readline()
+            assert line1 == "line1\r"
+            assert line2 == "line2\r"
+
+    @pytest.mark.asyncio
+    async def test_get_line_terminator_explicit_crlf(self, tmp_path):
+        """Test line terminator detection with explicit CRLF newline mode."""
+        p = tmp_path / "test.gz"
+
+        # Write with CRLF line endings
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"line1\r\nline2\r\nline3")
+
+        # Read with explicit CRLF newline mode
+        async with AsyncGzipTextFile(p, "rt", newline="\r\n") as f:
+            line1 = await f.readline()
+            line2 = await f.readline()
+            assert line1 == "line1\r\n"
+            assert line2 == "line2\r\n"
