@@ -2556,6 +2556,109 @@ class TestNewAPIMethods:
             assert line2 == "small line\n"
 
     @pytest.mark.asyncio
+    async def test_readline_with_limit(self, temp_file):
+        """Test readline() with limit parameter."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("Hello World\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Read only 5 characters
+            part1 = await f.readline(5)
+            assert part1 == "Hello"
+            # Read remaining (including newline)
+            part2 = await f.readline()
+            assert part2 == " World\n"
+            # EOF
+            eof = await f.readline()
+            assert eof == ""
+
+    @pytest.mark.asyncio
+    async def test_readline_limit_at_newline(self, temp_file):
+        """Test readline() with limit exactly at newline position."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("abc\ndef\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Limit of 4 should get "abc\n"
+            line1 = await f.readline(4)
+            assert line1 == "abc\n"
+            # Next readline should get "def\n"
+            line2 = await f.readline()
+            assert line2 == "def\n"
+
+    @pytest.mark.asyncio
+    async def test_readline_limit_before_newline(self, temp_file):
+        """Test readline() with limit before newline."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("abcdef\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Limit of 3 should get "abc"
+            part1 = await f.readline(3)
+            assert part1 == "abc"
+            # Limit of 3 should get "def"
+            part2 = await f.readline(3)
+            assert part2 == "def"
+            # Next should get just newline
+            part3 = await f.readline()
+            assert part3 == "\n"
+
+    @pytest.mark.asyncio
+    async def test_readline_limit_larger_than_line(self, temp_file):
+        """Test readline() with limit larger than the line."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("short\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Limit of 100 should return the whole line
+            line = await f.readline(100)
+            assert line == "short\n"
+
+    @pytest.mark.asyncio
+    async def test_readline_limit_zero(self, temp_file):
+        """Test readline() with limit=0."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("Hello\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Limit of 0 should return empty string
+            result = await f.readline(0)
+            assert result == ""
+            # File position should not change
+            line = await f.readline()
+            assert line == "Hello\n"
+
+    @pytest.mark.asyncio
+    async def test_readline_limit_on_file_without_newline(self, temp_file):
+        """Test readline() with limit on file that has no trailing newline."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("Hello World")  # No newline
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Read with limit
+            part1 = await f.readline(5)
+            assert part1 == "Hello"
+            # Read rest
+            part2 = await f.readline()
+            assert part2 == " World"
+            # EOF
+            eof = await f.readline()
+            assert eof == ""
+
+    @pytest.mark.asyncio
+    async def test_readline_limit_multiple_lines(self, temp_file):
+        """Test readline() with limit across multiple calls."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("Line1\nLine2\nLine3\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            # Read with various limits
+            assert await f.readline(3) == "Lin"
+            assert await f.readline(3) == "e1\n"
+            assert await f.readline(10) == "Line2\n"
+            assert await f.readline() == "Line3\n"
+
+    @pytest.mark.asyncio
     async def test_readlines_basic(self, temp_file):
         """Test basic readlines() functionality."""
         async with AsyncGzipTextFile(temp_file, "wt") as f:

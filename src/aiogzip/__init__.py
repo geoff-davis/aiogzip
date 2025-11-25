@@ -1318,32 +1318,38 @@ class AsyncGzipTextFile:
         # Try to get a line from our buffer using newline-aware search
         while True:
             pos, length = self._get_line_terminator_pos(self._text_buffer)
+
             if pos != -1:
-                # Found a line terminator
+                # Found a line terminator - extract the line
                 end = pos + length
                 line = self._text_buffer[:end]
                 self._text_buffer = self._text_buffer[end:]
-            elif limit != -1 and len(self._text_buffer) >= limit:
+                # Apply limit if specified
+                if limit != -1 and len(line) > limit:
+                    self._text_buffer = line[limit:] + self._text_buffer
+                    line = line[:limit]
+                return line
+
+            # No terminator found - check if we have enough data for limit
+            if limit != -1 and len(self._text_buffer) >= limit:
                 line = self._text_buffer[:limit]
                 self._text_buffer = self._text_buffer[limit:]
                 return line
-            else:
-                # Read more data
-                has_more = await self._read_chunk_and_decode()
-                if not has_more:
-                    # EOF
-                    if not self._text_buffer:
-                        return ""
-                    line = self._text_buffer
-                    self._text_buffer = ""
-                else:
-                    continue
 
-            if limit != -1 and len(line) > limit:
-                # Preserve leftover characters (including newline) for the next call
-                self._text_buffer = line[limit:] + self._text_buffer
-                line = line[:limit]
-            return line
+            # Need more data - try to read
+            has_more = await self._read_chunk_and_decode()
+            if not has_more:
+                # EOF reached - return whatever is in the buffer
+                if not self._text_buffer:
+                    return ""
+                line = self._text_buffer
+                self._text_buffer = ""
+                # Apply limit if specified
+                if limit != -1 and len(line) > limit:
+                    self._text_buffer = line[limit:] + self._text_buffer
+                    line = line[:limit]
+                return line
+            # Loop continues to search for terminator in newly read data
 
     async def readlines(self, hint: int = -1) -> List[str]:
         """
