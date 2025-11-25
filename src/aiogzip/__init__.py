@@ -56,7 +56,17 @@ import time
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Protocol, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    Union,
+    runtime_checkable,
+)
 
 import aiofiles
 
@@ -77,7 +87,8 @@ _COMPRESS_LEVEL_BEST = 9
 
 # Type alias for zlib compression/decompression objects
 # These are the return types of zlib.compressobj() and zlib.decompressobj()
-# Using Any because the actual types (zlib.Compress/Decompress) aren't directly accessible
+# The actual types (zlib.Compress/zlib.Decompress) are C extension types that
+# aren't exposed in the type stubs, so we use Any at runtime and for type checking
 ZlibEngine = Any
 
 
@@ -253,18 +264,21 @@ def _parse_mode_tokens(mode: str) -> Tuple[str, bool, bool, bool]:
     return op, saw_b, saw_t, plus
 
 
+@runtime_checkable
 class WithAsyncRead(Protocol):
     """Protocol for async file-like objects that can be read."""
 
     async def read(self, size: int = -1) -> Union[str, bytes]: ...
 
 
+@runtime_checkable
 class WithAsyncWrite(Protocol):
     """Protocol for async file-like objects that can be written."""
 
     async def write(self, data: Union[str, bytes]) -> int: ...
 
 
+@runtime_checkable
 class WithAsyncReadWrite(Protocol):
     """Protocol for async file-like objects that can be read and written."""
 
@@ -314,7 +328,33 @@ class AsyncGzipBinaryFile:
             data = f.read()  # Works perfectly!
     """
 
+    __slots__ = (
+        "_filename",
+        "_mode",
+        "_mode_op",
+        "_mode_plus",
+        "_writing_mode",
+        "_chunk_size",
+        "_compresslevel",
+        "_header_mtime",
+        "_header_filename_override",
+        "_external_file",
+        "_closefd",
+        "_file_mode",
+        "_file",
+        "_engine",
+        "_buffer",
+        "_buffer_offset",
+        "_is_closed",
+        "_eof",
+        "_owns_file",
+        "_crc",
+        "_input_size",
+        "_position",
+    )
+
     DEFAULT_CHUNK_SIZE = 64 * 1024  # 64 KB
+    BUFFER_COMPACTION_THRESHOLD = 64 * 1024  # Compact buffer when offset exceeds this
 
     def __init__(
         self,
@@ -658,7 +698,7 @@ class AsyncGzipBinaryFile:
             # Otherwise, read until the buffer has enough data to satisfy the request.
             while (len(self._buffer) - self._buffer_offset) < size and not self._eof:
                 # If buffer has too much garbage at the front, compact it
-                if self._buffer_offset > 64 * 1024:
+                if self._buffer_offset > self.BUFFER_COMPACTION_THRESHOLD:
                     del self._buffer[: self._buffer_offset]
                     self._buffer_offset = 0
 
@@ -873,6 +913,34 @@ class AsyncGzipTextFile:
                 print(line.strip())
     """
 
+    __slots__ = (
+        "_filename",
+        "_mode",
+        "_mode_op",
+        "_mode_plus",
+        "_writing_mode",
+        "_chunk_size",
+        "_encoding",
+        "_errors",
+        "_newline",
+        "_compresslevel",
+        "_header_mtime",
+        "_header_filename_override",
+        "_external_file",
+        "_closefd",
+        "_binary_mode",
+        "_binary_file",
+        "_is_closed",
+        "_decoder",
+        "_text_buffer",
+        "_trailing_cr",
+        "_line_offset",
+        "_cookie_cache",
+    )
+
+    # Maximum number of entries to keep in the cookie cache for tell()/seek()
+    MAX_COOKIE_CACHE_SIZE = 1000
+
     def __init__(
         self,
         filename: Union[str, bytes, Path, None],
@@ -970,6 +1038,14 @@ class AsyncGzipTextFile:
         pending_bytes, _ = decoder_state
         flag = 1 if pending_bytes else 0
         cookie = (bytes_offset << 1) | flag
+        # Bound the cache size to prevent unbounded memory growth
+        if len(self._cookie_cache) >= self.MAX_COOKIE_CACHE_SIZE:
+            # Remove oldest entries (first half of the cache)
+            keys_to_remove = list(self._cookie_cache.keys())[
+                : self.MAX_COOKIE_CACHE_SIZE // 2
+            ]
+            for key in keys_to_remove:
+                del self._cookie_cache[key]
         self._cookie_cache[cookie] = _TextCookieState(
             byte_offset=bytes_offset,
             decoder_state=decoder_state,
