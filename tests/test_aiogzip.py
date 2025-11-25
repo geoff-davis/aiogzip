@@ -1845,6 +1845,107 @@ class TestPathlibSupport:
         assert read_data == test_data
 
 
+class TestNameProperty:
+    """Test the name property for file API compatibility."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
+            temp_path = f.name
+        yield temp_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_binary_file_name_with_string(self, temp_file):
+        """Test name property with string filename."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            assert f.name == temp_file
+            await f.write(b"test")
+
+    @pytest.mark.asyncio
+    async def test_binary_file_name_with_path(self, temp_file):
+        """Test name property with Path object."""
+        from pathlib import Path
+
+        path_obj = Path(temp_file)
+        async with AsyncGzipBinaryFile(path_obj, "wb") as f:
+            assert f.name == path_obj
+            await f.write(b"test")
+
+    @pytest.mark.asyncio
+    async def test_binary_file_name_with_bytes(self, temp_file):
+        """Test name property with bytes filename."""
+        path_bytes = temp_file.encode("utf-8")
+        async with AsyncGzipBinaryFile(path_bytes, "wb") as f:
+            assert f.name == path_bytes
+            await f.write(b"test")
+
+    @pytest.mark.asyncio
+    async def test_binary_file_name_with_fileobj(self, temp_file):
+        """Test name property when opened with fileobj."""
+        import aiofiles
+
+        file_handle = await aiofiles.open(temp_file, "wb")
+        try:
+            async with AsyncGzipBinaryFile(
+                None, "wb", fileobj=file_handle, closefd=False
+            ) as f:
+                assert f.name is None
+                await f.write(b"test")
+        finally:
+            await file_handle.close()
+
+    @pytest.mark.asyncio
+    async def test_text_file_name_with_string(self, temp_file):
+        """Test name property on text file with string filename."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            assert f.name == temp_file
+            await f.write("test")
+
+    @pytest.mark.asyncio
+    async def test_text_file_name_with_path(self, temp_file):
+        """Test name property on text file with Path object."""
+        from pathlib import Path
+
+        path_obj = Path(temp_file)
+        async with AsyncGzipTextFile(path_obj, "wt") as f:
+            assert f.name == path_obj
+            await f.write("test")
+
+    @pytest.mark.asyncio
+    async def test_text_file_name_with_fileobj(self, temp_file):
+        """Test name property on text file when opened with fileobj."""
+        import aiofiles
+
+        file_handle = await aiofiles.open(temp_file, "wb")
+        try:
+            async with AsyncGzipTextFile(
+                None, "wt", fileobj=file_handle, closefd=False
+            ) as f:
+                assert f.name is None
+                await f.write("test")
+        finally:
+            await file_handle.close()
+
+    @pytest.mark.asyncio
+    async def test_name_available_before_enter(self, temp_file):
+        """Test that name is available even before entering context manager."""
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        assert f.name == temp_file
+        # Don't enter context manager - just check the name is accessible
+
+    @pytest.mark.asyncio
+    async def test_name_available_after_close(self, temp_file):
+        """Test that name is still available after closing."""
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        async with f:
+            await f.write(b"test")
+        # After close, name should still be available
+        assert f.name == temp_file
+
+
 class TestClosefdParameter:
     """Test closefd parameter behavior."""
 

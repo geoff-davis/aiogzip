@@ -463,6 +463,19 @@ class AsyncGzipBinaryFile:
         """Expose the underlying file object for advanced integrations."""
         return self._file
 
+    @property
+    def name(self) -> Union[str, bytes, Path, None]:
+        """Return the name of the file.
+
+        This property provides compatibility with the standard file API.
+        Returns the filename passed to the constructor, or None if the file
+        was opened with a file object instead of a filename.
+
+        Returns:
+            The filename as str, bytes, or Path, or None if opened via fileobj.
+        """
+        return self._filename
+
     def fileno(self) -> int:
         """Return the underlying file descriptor number."""
         if self._file is None:
@@ -999,6 +1012,19 @@ class AsyncGzipTextFile:
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
         return self._binary_file.raw()
+
+    @property
+    def name(self) -> Union[str, bytes, Path, None]:
+        """Return the name of the file.
+
+        This property provides compatibility with the standard file API.
+        Returns the filename passed to the constructor, or None if the file
+        was opened with a file object instead of a filename.
+
+        Returns:
+            The filename as str, bytes, or Path, or None if opened via fileobj.
+        """
+        return self._filename
 
     def readable(self) -> bool:
         return self._mode_op == "r"
