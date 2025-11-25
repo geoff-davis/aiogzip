@@ -100,7 +100,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [tool.coverage.run]
-source = ["aiogzip"]
+source = ["src/aiogzip"]
 branch = true
 relative_files = true
 omit = [
