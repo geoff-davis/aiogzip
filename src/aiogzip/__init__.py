@@ -1,7 +1,7 @@
 """
 AsyncGzipFile - Asynchronous gzip file reader/writer with aiocsv support"""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 """
 
