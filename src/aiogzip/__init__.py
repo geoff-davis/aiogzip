@@ -365,7 +365,7 @@ class AsyncGzipBinaryFile:
         mtime: Optional[Union[int, float]] = None,
         original_filename: Optional[Union[str, bytes]] = None,
         fileobj: Optional[WithAsyncReadWrite] = None,
-        closefd: bool = True,
+        closefd: Optional[bool] = None,
     ) -> None:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
@@ -389,7 +389,7 @@ class AsyncGzipBinaryFile:
         self._header_mtime = _normalize_mtime(mtime)
         self._header_filename_override = _validate_original_filename(original_filename)
         self._external_file = fileobj
-        self._closefd = closefd
+        self._closefd = closefd if closefd is not None else fileobj is None
 
         # Determine the underlying file mode based on gzip mode
         file_mode_suffix = "b"
@@ -953,7 +953,7 @@ class AsyncGzipTextFile:
         mtime: Optional[Union[int, float]] = None,
         original_filename: Optional[Union[str, bytes]] = None,
         fileobj: Optional[WithAsyncReadWrite] = None,
-        closefd: bool = True,
+        closefd: Optional[bool] = None,
     ) -> None:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
@@ -987,7 +987,7 @@ class AsyncGzipTextFile:
         self._header_mtime = _normalize_mtime(mtime)
         self._header_filename_override = _validate_original_filename(original_filename)
         self._external_file = fileobj
-        self._closefd = closefd
+        self._closefd = closefd if closefd is not None else fileobj is None
 
         # Determine the underlying binary file mode
         self._binary_mode = f"{mode_op}b"

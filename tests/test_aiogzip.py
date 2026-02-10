@@ -2002,6 +2002,22 @@ class TestClosefdParameter:
         assert len(content) > 0
 
     @pytest.mark.asyncio
+    async def test_closefd_default_with_fileobj_keeps_file_open(self, tmp_path):
+        """Default closefd should keep caller-owned fileobj open."""
+        import aiofiles
+
+        p = tmp_path / "test_closefd_default_fileobj.gz"
+
+        file_handle = await aiofiles.open(p, "wb")
+
+        async with AsyncGzipBinaryFile(None, "wb", fileobj=file_handle) as f:
+            await f.write(b"test data")
+
+        # Should still be writable because fileobj ownership stays with caller
+        await file_handle.write(b"more data")
+        await file_handle.close()
+
+    @pytest.mark.asyncio
     async def test_closefd_default_closes_owned_file(self, tmp_path):
         """Test that default closefd behavior closes file when we own it."""
         p = tmp_path / "test_closefd_default.gz"
@@ -2031,6 +2047,20 @@ class TestClosefdParameter:
 
         # File should still be accessible
         # Close it manually
+        await file_handle.close()
+
+    @pytest.mark.asyncio
+    async def test_closefd_default_with_text_fileobj_keeps_file_open(self, tmp_path):
+        """Default closefd should keep caller-owned text-mode fileobj open."""
+        import aiofiles
+
+        p = tmp_path / "test_text_closefd_default.gz"
+        file_handle = await aiofiles.open(p, "wb")
+
+        async with AsyncGzipTextFile(None, "wt", fileobj=file_handle) as f:
+            await f.write("test text")
+
+        await file_handle.write(b"more data")
         await file_handle.close()
 
 
