@@ -3375,6 +3375,20 @@ class TestHighPriorityEdgeCases:
             assert await f.readlines() == [b"line3"]
             assert await f.readline() == b""
 
+    def test_text_stream_properties(self, temp_file):
+        """Text stream metadata properties should be exposed for compatibility."""
+        text = AsyncGzipTextFile(
+            temp_file, "rt", encoding="latin-1", errors="ignore", newline=""
+        )
+        assert text.encoding == "latin-1"
+        assert text.errors == "ignore"
+        assert text.newlines == ""
+
+        default_text = AsyncGzipTextFile(temp_file, "rt")
+        assert default_text.encoding == "utf-8"
+        assert default_text.errors == "strict"
+        assert default_text.newlines is None
+
 
 class TestMediumPriorityEdgeCases:
     """Test medium priority edge cases for improved coverage."""

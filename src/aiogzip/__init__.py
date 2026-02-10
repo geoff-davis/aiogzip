@@ -1280,6 +1280,21 @@ class AsyncGzipTextFile:
         """Return True when this file has been closed."""
         return self._is_closed
 
+    @property
+    def encoding(self) -> str:
+        """Return the configured text encoding."""
+        return self._encoding
+
+    @property
+    def errors(self) -> str:
+        """Return the configured text error handler."""
+        return self._errors
+
+    @property
+    def newlines(self) -> Optional[str]:
+        """Return newline handling configuration."""
+        return self._newline
+
     def readable(self) -> bool:
         return self._mode_op == "r"
 
