@@ -1562,7 +1562,14 @@ def AsyncGzipFile(
     """
     if not isinstance(mode, str):
         raise TypeError("mode must be a string")
-    if "t" in mode:
+    text_mode = "t" in mode
+    if not text_mode:
+        for arg_name in ("encoding", "errors", "newline"):
+            if kwargs.get(arg_name) is not None:
+                raise ValueError(
+                    f"Argument '{arg_name}' not supported in binary mode"
+                )
+    if text_mode:
         return AsyncGzipTextFile(filename, mode, **kwargs)
     else:
         return AsyncGzipBinaryFile(filename, mode, **kwargs)

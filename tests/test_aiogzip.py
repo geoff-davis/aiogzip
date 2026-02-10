@@ -103,6 +103,21 @@ class TestAsyncGzipFile:
         with pytest.raises(TypeError, match="mode must be a string"):
             AsyncGzipFile("test.gz", b"rb")  # type: ignore[arg-type]
 
+    @pytest.mark.parametrize(
+        "kwarg_name, kwarg_value",
+        [
+            ("encoding", "utf-8"),
+            ("errors", "ignore"),
+            ("newline", "\n"),
+        ],
+    )
+    def test_binary_mode_rejects_text_kwargs(self, kwarg_name, kwarg_value):
+        """Binary factory mode should reject text-specific kwargs like gzip.open()."""
+        with pytest.raises(
+            ValueError, match=f"Argument '{kwarg_name}' not supported in binary mode"
+        ):
+            AsyncGzipFile("test.gz", "rb", **{kwarg_name: kwarg_value})
+
     def test_init_invalid_newline_text_mode(self):
         """Text mode should reject unsupported newline values."""
         with pytest.raises(ValueError, match="illegal newline value"):
