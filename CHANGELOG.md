@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Prevent silent data corruption when seeking to evicted text cookies by raising `OSError` for uncached nonzero cookies.
 - Make `peek(0)` behave as a real peek and fix a bug where `peek()` could incorrectly return empty bytes before EOF.
 - Raise `gzip.BadGzipFile` (instead of generic `OSError`) for gzip decompression/finalization errors.
+- Ignore trailing zero padding between/after gzip members while continuing to read valid member payloads.
 
 ### Added
 
@@ -32,6 +33,34 @@ All notable changes to this project will be documented in this file.
   - `peek(0)` and non-empty pre-EOF `peek()` behavior
   - `BadGzipFile` exception type for corrupted streams
 - Added `ty` as an additional static type checker in development tooling and CI, alongside existing `mypy` checks.
+- Binary parity additions:
+  - `closed` and `mtime` properties on `AsyncGzipBinaryFile`
+  - `readline`, `readlines`, and `writelines` for binary streams
+  - `isatty`, `detach`, and `truncate` methods for binary compatibility
+  - async line iteration support for binary reads (`__aiter__` / `__anext__`)
+- Text parity additions:
+  - `encoding`, `errors`, `newlines`, and `buffer` properties on `AsyncGzipTextFile`
+- New compatibility smoke tests for top-level exports and `__all__` stability.
+- New micro-benchmark case for binary long-line `readline` under tiny chunk sizes.
+
+### Changed
+
+- Optimized binary `readline` internals to avoid repeated full-buffer copies in long-line/small-chunk scenarios.
+
+### Refactor
+
+- Split the core implementation into focused internal modules:
+  - `aiogzip._common` (shared constants/helpers/protocols)
+  - `aiogzip._binary` (`AsyncGzipBinaryFile`)
+  - `aiogzip._text` (`AsyncGzipTextFile`)
+- Kept `aiogzip.__init__` as the public API facade and explicit re-export surface.
+- Removed unused internal text state and stale constants no longer used by the implementation.
+- Added explicit internal export list (`__all__`) for `aiogzip._common`.
+
+### Documentation
+
+- Updated contributor docs with the new internal module layout and public API facade guidance.
+- Clarified public-vs-internal module boundaries in the API reference docs.
 
 ## [1.1.0] - 2025-11-25
 
