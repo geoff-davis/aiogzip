@@ -53,8 +53,9 @@ async with AsyncGzipFile(
 
 ## Performance
 
-- **Text I/O**: ~2.5x faster than standard gzip.
-- **Concurrency**: Non-blocking I/O allows for efficient concurrent processing.
+- **Text I/O**: Often ~2-3x faster than standard `gzip` in bulk text workflows.
+- **Binary I/O**: Typically near parity for bulk reads/writes, and can be slower for very small chunk sizes.
+- **Concurrency**: Non-blocking I/O can improve throughput in latency-bound multi-file workloads.
 - **Memory**: Optimized buffer management for stable memory usage.
 
 See the [Performance Guide](https://geoff-davis.github.io/aiogzip/performance/) for detailed benchmarks.
