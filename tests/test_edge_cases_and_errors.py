@@ -434,7 +434,9 @@ class TestAdditionalCoverage:
                     await f.tell()
 
                 assert cookie not in f._cookie_cache
-                with pytest.raises(OSError, match="Cannot seek to uncached text cookie"):
+                with pytest.raises(
+                    OSError, match="Cannot seek to uncached text cookie"
+                ):
                     await f.seek(cookie)
             finally:
                 f.__class__.MAX_COOKIE_CACHE_SIZE = original_max

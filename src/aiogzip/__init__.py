@@ -56,9 +56,7 @@ def AsyncGzipFile(
     if not text_mode:
         for arg_name in ("encoding", "errors", "newline"):
             if kwargs.get(arg_name) is not None:
-                raise ValueError(
-                    f"Argument '{arg_name}' not supported in binary mode"
-                )
+                raise ValueError(f"Argument '{arg_name}' not supported in binary mode")
         kwargs = {
             key: value
             for key, value in kwargs.items()
