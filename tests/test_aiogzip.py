@@ -610,6 +610,20 @@ class TestAsyncGzipBinaryFile:
             assert await f.read() == payload
 
     @pytest.mark.asyncio
+    async def test_binary_peek_from_start_returns_data(self, temp_file):
+        """peek() from a fresh reader should not return empty for valid gzip data."""
+        payload = b"abcdefghijklmnopqrstuvwxyz"
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(payload)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb", chunk_size=9) as f:
+            assert await f.tell() == 0
+            peeked = await f.peek(5)
+            assert peeked != b""
+            assert await f.tell() == 0
+            assert await f.read(len(payload)) == payload
+
+    @pytest.mark.asyncio
     async def test_binary_fileno_and_raw(self, temp_file, sample_data):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(sample_data)

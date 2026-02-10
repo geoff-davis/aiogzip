@@ -545,7 +545,7 @@ class AsyncGzipBinaryFile:
         while available < target and not self._eof:
             await self._fill_buffer()
             available = len(self._buffer) - self._buffer_offset
-            if available == 0:
+            if available == 0 and self._eof:
                 break
         end = self._buffer_offset + min(target, available)
         return bytes(self._buffer[self._buffer_offset : end])
