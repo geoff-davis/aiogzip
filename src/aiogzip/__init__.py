@@ -634,6 +634,85 @@ class AsyncGzipBinaryFile:
         """Read directly into the buffer without looping."""
         return await self.readinto(b)
 
+    async def readline(self, limit: int = -1) -> bytes:
+        """Read and return one line from the binary stream."""
+        if self._mode_op != "r":
+            raise OSError("File not open for reading")
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
+        if self._file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        if limit is None:
+            limit = -1
+        if limit == 0:
+            return b""
+
+        chunks: List[bytes] = []
+        total = 0
+        while True:
+            if self._buffer_offset >= len(self._buffer):
+                if self._eof:
+                    break
+                await self._fill_buffer()
+                if self._buffer_offset >= len(self._buffer) and self._eof:
+                    break
+
+            available = bytes(self._buffer[self._buffer_offset :])
+            if not available:
+                break
+
+            newline_index = available.find(b"\n")
+            take = len(available) if newline_index == -1 else newline_index + 1
+            if limit != -1:
+                take = min(take, limit - total)
+
+            if take > 0:
+                chunk = available[:take]
+                chunks.append(chunk)
+                self._buffer_offset += take
+                self._position += take
+                total += take
+
+            if self._buffer_offset >= len(self._buffer):
+                del self._buffer[:]
+                self._buffer_offset = 0
+
+            if (newline_index != -1 and take == newline_index + 1) or (
+                limit != -1 and total >= limit
+            ):
+                break
+
+        return b"".join(chunks)
+
+    async def readlines(self, hint: int = -1) -> List[bytes]:
+        """Read and return a list of lines from the binary stream."""
+        if self._mode_op != "r":
+            raise OSError("File not open for reading")
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
+
+        lines: List[bytes] = []
+        total = 0
+        while True:
+            line = await self.readline()
+            if not line:
+                break
+            lines.append(line)
+            total += len(line)
+            if hint > 0 and total >= hint:
+                break
+        return lines
+
+    async def writelines(self, lines: Iterable[bytes]) -> None:
+        """Write a sequence of bytes-like lines to the binary stream."""
+        if not self._writing_mode:
+            raise OSError("File not open for writing")
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
+
+        for line in lines:
+            await self.write(line)
+
     def readable(self) -> bool:
         return self._mode_op == "r"
 

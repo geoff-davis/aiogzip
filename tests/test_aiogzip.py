@@ -3362,6 +3362,19 @@ class TestHighPriorityEdgeCases:
             assert await f.read(1) == b"p"
             assert f.mtime == 123456789
 
+    @pytest.mark.asyncio
+    async def test_binary_readline_readlines_and_writelines(self, temp_file):
+        """Binary files should support line-oriented methods like gzip.GzipFile."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.writelines([b"line1\n", b"line2\n", b"line3"])
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.readline() == b"line1\n"
+            assert await f.readline(limit=3) == b"lin"
+            assert await f.readline() == b"e2\n"
+            assert await f.readlines() == [b"line3"]
+            assert await f.readline() == b""
+
 
 class TestMediumPriorityEdgeCases:
     """Test medium priority edge cases for improved coverage."""
