@@ -3391,6 +3391,12 @@ class TestHighPriorityEdgeCases:
         assert default_text.newlines is None
 
     @pytest.mark.asyncio
+    async def test_text_buffer_property(self, temp_file):
+        """Text mode should expose the underlying binary buffer."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            assert f.buffer is f._binary_file
+
+    @pytest.mark.asyncio
     async def test_binary_isatty_detach_and_truncate_compatibility(self, temp_file):
         """Binary stream should expose stdlib-compatible capability methods."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:

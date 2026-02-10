@@ -1327,6 +1327,13 @@ class AsyncGzipTextFile:
         """Return newline handling configuration."""
         return self._newline
 
+    @property
+    def buffer(self) -> AsyncGzipBinaryFile:
+        """Expose the underlying binary gzip stream."""
+        if self._binary_file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        return self._binary_file
+
     def readable(self) -> bool:
         return self._mode_op == "r"
 
