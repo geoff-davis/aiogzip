@@ -3389,6 +3389,16 @@ class TestHighPriorityEdgeCases:
         assert default_text.errors == "strict"
         assert default_text.newlines is None
 
+    @pytest.mark.asyncio
+    async def test_binary_isatty_detach_and_truncate_compatibility(self, temp_file):
+        """Binary stream should expose stdlib-compatible capability methods."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            assert f.isatty() is False
+            with pytest.raises(io.UnsupportedOperation, match="detach"):
+                f.detach()
+            with pytest.raises(io.UnsupportedOperation, match="truncate"):
+                f.truncate()
+
 
 class TestMediumPriorityEdgeCases:
     """Test medium priority edge cases for improved coverage."""

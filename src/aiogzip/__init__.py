@@ -595,6 +595,29 @@ class AsyncGzipBinaryFile:
             )
         return int(result)
 
+    def isatty(self) -> bool:
+        """Return True if the underlying stream is interactive."""
+        if self._file is None:
+            return False
+        isatty_method = getattr(self._file, "isatty", None)
+        if not callable(isatty_method):
+            return False
+        result = isatty_method()
+        if hasattr(result, "__await__"):
+            close_method = getattr(result, "close", None)
+            if callable(close_method):
+                close_method()
+            return False
+        return bool(result)
+
+    def detach(self) -> Any:
+        """Detach is unsupported to mirror gzip.GzipFile behavior."""
+        raise io.UnsupportedOperation("detach")
+
+    def truncate(self, size: Optional[int] = None) -> int:
+        """Truncation is unsupported for gzip-compressed streams."""
+        raise io.UnsupportedOperation("truncate")
+
     async def peek(self, size: int = -1) -> bytes:
         """Return up to size bytes without advancing the read position."""
         if self._mode_op != "r":
