@@ -946,8 +946,8 @@ class AsyncGzipTextFile:
         filename: Union[str, bytes, Path, None],
         mode: str = "rt",
         chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
-        encoding: str = "utf-8",
-        errors: str = "strict",
+        encoding: Optional[str] = "utf-8",
+        errors: Optional[str] = "strict",
         newline: Union[str, None] = None,
         compresslevel: int = 6,
         mtime: Optional[Union[int, float]] = None,
@@ -961,10 +961,12 @@ class AsyncGzipTextFile:
         _validate_compresslevel(compresslevel)
 
         # Validate text-specific parameters
+        if encoding is None:
+            encoding = "utf-8"
         if not encoding:
             raise ValueError("Encoding cannot be empty")
         if errors is None:
-            raise ValueError("Errors cannot be None")
+            errors = "strict"
         if newline not in {None, "", "\n", "\r", "\r\n"}:
             raise ValueError(f"illegal newline value: {newline}")
 

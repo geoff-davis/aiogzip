@@ -56,9 +56,10 @@ class TestEdgeCasesAndErrors:
         with pytest.raises(ValueError, match="Encoding cannot be empty"):
             AsyncGzipTextFile("test.gz", encoding="")
 
-        # None errors
-        with pytest.raises(ValueError, match="Errors cannot be None"):
-            AsyncGzipTextFile("test.gz", errors=None)
+        # None values should be accepted and normalized
+        f = AsyncGzipTextFile("test.gz", encoding=None, errors=None)
+        assert f._encoding == "utf-8"
+        assert f._errors == "strict"
 
         # Text mode cannot include binary (explicit check in init)
         with pytest.raises(ValueError, match="Text mode cannot include binary"):

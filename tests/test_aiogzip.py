@@ -129,6 +129,11 @@ class TestAsyncGzipFile:
         with pytest.raises(ValueError, match="illegal newline value"):
             AsyncGzipFile("test.gz", "rt", newline="bad")
 
+    def test_text_mode_accepts_none_encoding_and_errors(self):
+        """Text mode should accept None for encoding/errors like gzip.open()."""
+        gz_file = AsyncGzipFile("test.gz", "rt", encoding=None, errors=None)
+        assert isinstance(gz_file, AsyncGzipTextFile)
+
     def test_initial_state_binary(self):
         """Test initial state of AsyncGzipFile in binary mode."""
         gz_file = AsyncGzipFile("test.gz", "rb")
@@ -1389,8 +1394,8 @@ class TestEdgeCases:
         """Test invalid errors inputs."""
         # Arbitrary error handlers should now be accepted
         AsyncGzipTextFile("test.gz", errors="invalid")
-        with pytest.raises(ValueError, match="Errors cannot be None"):
-            AsyncGzipTextFile("test.gz", errors=None)
+        f = AsyncGzipTextFile("test.gz", errors=None)
+        assert f._errors == "strict"
 
     def test_valid_errors_values(self):
         """Test that all valid errors values are accepted."""
