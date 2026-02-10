@@ -370,7 +370,6 @@ class AsyncGzipBinaryFile:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
         _validate_chunk_size(chunk_size)
-        _validate_compresslevel(compresslevel)
 
         # Validate mode and derive file characteristics
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
@@ -384,6 +383,8 @@ class AsyncGzipBinaryFile:
         self._mode_op = mode_op
         self._mode_plus = plus
         self._writing_mode = mode_op in {"w", "a", "x"}
+        if self._writing_mode:
+            _validate_compresslevel(compresslevel)
         self._chunk_size = chunk_size
         self._compresslevel = compresslevel
         self._header_mtime = _normalize_mtime(mtime)
@@ -958,7 +959,6 @@ class AsyncGzipTextFile:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
         _validate_chunk_size(chunk_size)
-        _validate_compresslevel(compresslevel)
 
         # Validate text-specific parameters
         if encoding is None:
@@ -981,6 +981,8 @@ class AsyncGzipTextFile:
         self._mode_op = mode_op
         self._mode_plus = plus
         self._writing_mode = mode_op in {"w", "a", "x"}
+        if self._writing_mode:
+            _validate_compresslevel(compresslevel)
         self._chunk_size = chunk_size
         self._encoding = encoding
         self._errors = errors
