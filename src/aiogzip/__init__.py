@@ -679,28 +679,35 @@ class AsyncGzipBinaryFile:
                 await self._fill_buffer()
                 if self._buffer_offset >= len(self._buffer) and self._eof:
                     break
+                if self._buffer_offset >= len(self._buffer):
+                    continue
 
-            available = bytes(self._buffer[self._buffer_offset :])
-            if not available:
+            start = self._buffer_offset
+            end = len(self._buffer)
+            newline_index = self._buffer.find(b"\n", start)
+            if newline_index != -1:
+                end = newline_index + 1
+            if limit != -1:
+                remaining = limit - total
+                if remaining <= 0:
+                    break
+                end = min(end, start + remaining)
+
+            if end <= start:
                 break
 
-            newline_index = available.find(b"\n")
-            take = len(available) if newline_index == -1 else newline_index + 1
-            if limit != -1:
-                take = min(take, limit - total)
-
-            if take > 0:
-                chunk = available[:take]
-                chunks.append(chunk)
-                self._buffer_offset += take
-                self._position += take
-                total += take
+            chunk = bytes(self._buffer[start:end])
+            chunks.append(chunk)
+            consumed = end - start
+            self._buffer_offset = end
+            self._position += consumed
+            total += consumed
 
             if self._buffer_offset >= len(self._buffer):
                 del self._buffer[:]
                 self._buffer_offset = 0
 
-            if (newline_index != -1 and take == newline_index + 1) or (
+            if (newline_index != -1 and end == newline_index + 1) or (
                 limit != -1 and total >= limit
             ):
                 break

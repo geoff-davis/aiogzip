@@ -3376,6 +3376,18 @@ class TestHighPriorityEdgeCases:
             assert await f.readlines() == [b"line3"]
             assert await f.readline() == b""
 
+    @pytest.mark.asyncio
+    async def test_binary_readline_long_line_small_chunk(self, temp_file):
+        """Binary readline should handle long lines split across many chunks."""
+        long_line = (b"x" * 50000) + b"\n"
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(long_line + b"tail")
+
+        async with AsyncGzipBinaryFile(temp_file, "rb", chunk_size=17) as f:
+            assert await f.readline() == long_line
+            assert await f.readline() == b"tail"
+            assert await f.readline() == b""
+
     def test_text_stream_properties(self, temp_file):
         """Text stream metadata properties should be exposed for compatibility."""
         text = AsyncGzipTextFile(
