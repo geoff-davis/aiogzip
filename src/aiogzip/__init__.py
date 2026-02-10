@@ -49,6 +49,7 @@ Error Handling Strategy:
 """
 
 import codecs
+import gzip
 import io
 import os
 import struct
@@ -749,7 +750,9 @@ class AsyncGzipBinaryFile:
                 if remaining:
                     self._buffer.extend(remaining)
             except zlib.error as e:
-                raise OSError(f"Error finalizing gzip decompression: {e}") from e
+                raise gzip.BadGzipFile(
+                    f"Error finalizing gzip decompression: {e}"
+                ) from e
             return
 
         # Decompress the chunk
@@ -768,7 +771,7 @@ class AsyncGzipBinaryFile:
                     decompressed = self._engine.decompress(unused)
                     self._buffer.extend(decompressed)
         except zlib.error as e:
-            raise OSError(f"Error decompressing gzip data: {e}") from e
+            raise gzip.BadGzipFile(f"Error decompressing gzip data: {e}") from e
         except Exception as e:
             raise OSError(f"Unexpected error during decompression: {e}") from e
 

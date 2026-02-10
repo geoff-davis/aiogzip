@@ -1516,7 +1516,7 @@ class TestEdgeCases:
 
         # Try to read it
         async with AsyncGzipBinaryFile(temp_file, "rb") as f:
-            with pytest.raises(OSError, match="Error decompressing gzip data"):
+            with pytest.raises(gzip.BadGzipFile, match="Error decompressing gzip data"):
                 await f.read()
 
     @pytest.mark.asyncio
