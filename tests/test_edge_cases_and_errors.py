@@ -413,6 +413,32 @@ class TestAdditionalCoverage:
                 f.__class__.MAX_COOKIE_CACHE_SIZE = original_max
 
     @pytest.mark.asyncio
+    async def test_text_seek_evicted_cookie_raises(self, tmp_path):
+        """Seeking an evicted cookie should fail instead of returning wrong data."""
+        p = tmp_path / "evicted_cookie.gz"
+        async with AsyncGzipTextFile(p, "wt", newline="") as f:
+            await f.write("aé🙂b" * 600)
+
+        async with AsyncGzipTextFile(p, "rt", newline="", chunk_size=1) as f:
+            original_max = f.MAX_COOKIE_CACHE_SIZE
+            f.__class__.MAX_COOKIE_CACHE_SIZE = 10
+            try:
+                await f.read(5)
+                cookie = await f.tell()
+
+                for _ in range(300):
+                    if cookie not in f._cookie_cache:
+                        break
+                    await f.read(5)
+                    await f.tell()
+
+                assert cookie not in f._cookie_cache
+                with pytest.raises(OSError, match="Cannot seek to uncached text cookie"):
+                    await f.seek(cookie)
+            finally:
+                f.__class__.MAX_COOKIE_CACHE_SIZE = original_max
+
+    @pytest.mark.asyncio
     async def test_text_seek_non_seek_set(self, tmp_path):
         """Test text file seek() non-SEEK_SET semantics."""
         import os

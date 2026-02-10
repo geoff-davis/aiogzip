@@ -1083,13 +1083,14 @@ class AsyncGzipTextFile:
             self._trailing_cr = cached_state.trailing_cr
             return offset
 
+        if offset != 0:
+            raise OSError(
+                "Cannot seek to uncached text cookie; call tell() near the target position"
+            )
+
         byte_offset = offset >> 1
-        remainder = offset & 1
         await self._binary_file.seek(byte_offset)
         self._decoder.reset()
-        if remainder:
-            # Prime the decoder with a single null byte to preserve state flag
-            self._decoder.decode(b"\x00", final=False)
         self._text_buffer = ""
         self._trailing_cr = False
         return offset
