@@ -9,13 +9,16 @@ class TestEdgeCasesAndErrors:
     @pytest.mark.asyncio
     async def test_compresslevel_validation(self):
         """Test validation of compresslevel."""
-        with pytest.raises(
-            ValueError, match="Compression level must be between 0 and 9"
-        ):
-            AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=-1)
+        # -1 is valid (zlib default)
+        AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=-1)
 
         with pytest.raises(
-            ValueError, match="Compression level must be between 0 and 9"
+            ValueError, match="Compression level must be between -1 and 9"
+        ):
+            AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=-2)
+
+        with pytest.raises(
+            ValueError, match="Compression level must be between -1 and 9"
         ):
             AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=10)
 

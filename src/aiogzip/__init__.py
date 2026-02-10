@@ -133,10 +133,10 @@ def _validate_compresslevel(compresslevel: int) -> None:
         compresslevel: The compression level to validate
 
     Raises:
-        ValueError: If compression level is not between 0 and 9
+        ValueError: If compression level is not between -1 and 9
     """
-    if not (0 <= compresslevel <= 9):
-        raise ValueError("Compression level must be between 0 and 9")
+    if not (-1 <= compresslevel <= 9):
+        raise ValueError("Compression level must be between -1 and 9")
 
 
 def _normalize_mtime(mtime: Optional[Union[int, float]]) -> Optional[int]:

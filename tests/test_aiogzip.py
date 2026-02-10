@@ -1349,20 +1349,23 @@ class TestEdgeCases:
 
     def test_invalid_compression_level(self):
         """Test invalid compression level inputs."""
-        with pytest.raises(
-            ValueError, match="Compression level must be between 0 and 9"
-        ):
-            AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=-1)
+        AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=-1)
+        AsyncGzipTextFile("test.gz", mode="wt", compresslevel=-1)
 
         with pytest.raises(
-            ValueError, match="Compression level must be between 0 and 9"
+            ValueError, match="Compression level must be between -1 and 9"
+        ):
+            AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=-2)
+
+        with pytest.raises(
+            ValueError, match="Compression level must be between -1 and 9"
         ):
             AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=10)
 
         with pytest.raises(
-            ValueError, match="Compression level must be between 0 and 9"
+            ValueError, match="Compression level must be between -1 and 9"
         ):
-            AsyncGzipTextFile("test.gz", mode="wt", compresslevel=-1)
+            AsyncGzipTextFile("test.gz", mode="wt", compresslevel=-2)
 
     def test_invalid_mode(self):
         """Test invalid mode inputs."""
