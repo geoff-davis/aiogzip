@@ -118,6 +118,12 @@ class TestAsyncGzipFile:
         ):
             AsyncGzipFile("test.gz", "rb", **{kwarg_name: kwarg_value})
 
+    @pytest.mark.parametrize("kwarg_name", ["encoding", "errors", "newline"])
+    def test_binary_mode_accepts_none_text_kwargs(self, kwarg_name):
+        """Binary factory mode should ignore text kwargs when explicitly set to None."""
+        gz_file = AsyncGzipFile("test.gz", "rb", **{kwarg_name: None})
+        assert isinstance(gz_file, AsyncGzipBinaryFile)
+
     def test_init_invalid_newline_text_mode(self):
         """Text mode should reject unsupported newline values."""
         with pytest.raises(ValueError, match="illegal newline value"):
