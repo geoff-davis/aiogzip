@@ -76,9 +76,6 @@ import aiofiles
 # 31 = 16 (gzip format) + 15 (maximum window size)
 GZIP_WBITS = 31
 
-# Default chunk size for line reading in text mode (8 KB)
-LINE_READ_CHUNK_SIZE = 8192
-
 # gzip header constants
 GZIP_FLAG_FNAME = 0x08
 GZIP_FLAG_FHCRC = 0x02
@@ -1131,7 +1128,6 @@ class AsyncGzipTextFile:
         "_decoder",
         "_text_buffer",
         "_trailing_cr",
-        "_line_offset",
         "_cookie_cache",
     )
 
@@ -1203,7 +1199,6 @@ class AsyncGzipTextFile:
         )
         self._text_buffer: str = ""  # Central buffer for decoded text
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
-        self._line_offset: int = 0  # Track logical character position for tell()
         self._cookie_cache: Dict[int, _TextCookieState] = {}
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
