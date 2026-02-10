@@ -518,6 +518,11 @@ class AsyncGzipBinaryFile:
         """
         return self._filename
 
+    @property
+    def closed(self) -> bool:
+        """Return True when this file has been closed."""
+        return self._is_closed
+
     def fileno(self) -> int:
         """Return the underlying file descriptor number."""
         if self._file is None:
@@ -1123,6 +1128,11 @@ class AsyncGzipTextFile:
             The filename as str, bytes, or Path, or None if opened via fileobj.
         """
         return self._filename
+
+    @property
+    def closed(self) -> bool:
+        """Return True when this file has been closed."""
+        return self._is_closed
 
     def readable(self) -> bool:
         return self._mode_op == "r"

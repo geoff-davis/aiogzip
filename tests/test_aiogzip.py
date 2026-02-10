@@ -3334,6 +3334,23 @@ class TestHighPriorityEdgeCases:
             data4 = await f.read(100)
             assert data4 == b""
 
+    @pytest.mark.asyncio
+    async def test_closed_property_binary_and_text(self, temp_file):
+        """closed should reflect context manager lifecycle like file objects."""
+        binary = AsyncGzipBinaryFile(temp_file, "wb")
+        assert binary.closed is False
+        async with binary:
+            assert binary.closed is False
+            await binary.write(b"data")
+        assert binary.closed is True
+
+        text = AsyncGzipTextFile(temp_file, "rt")
+        assert text.closed is False
+        async with text:
+            assert text.closed is False
+            await text.read()
+        assert text.closed is True
+
 
 class TestMediumPriorityEdgeCases:
     """Test medium priority edge cases for improved coverage."""
