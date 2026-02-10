@@ -1063,8 +1063,17 @@ class AsyncGzipTextFile:
     async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
+        if whence == os.SEEK_CUR:
+            if offset != 0:
+                raise io.UnsupportedOperation("can't do nonzero cur-relative seeks")
+            return await self.tell()
+        if whence == os.SEEK_END:
+            if offset != 0:
+                raise io.UnsupportedOperation("can't do nonzero end-relative seeks")
+            await self.read()
+            return await self.tell()
         if whence != os.SEEK_SET:
-            raise OSError("AsyncGzipTextFile seek() only supports SEEK_SET")
+            raise ValueError("Invalid whence value")
 
         cached_state = self._cookie_cache.get(offset)
         if cached_state is not None:

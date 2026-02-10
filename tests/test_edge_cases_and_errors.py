@@ -1,3 +1,5 @@
+import io
+
 import pytest
 
 from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
@@ -412,7 +414,7 @@ class TestAdditionalCoverage:
 
     @pytest.mark.asyncio
     async def test_text_seek_non_seek_set(self, tmp_path):
-        """Test text file seek() with non-SEEK_SET whence."""
+        """Test text file seek() non-SEEK_SET semantics."""
         import os
 
         p = tmp_path / "test.gz"
@@ -420,8 +422,11 @@ class TestAdditionalCoverage:
             await f.write("Hello World")
 
         async with AsyncGzipTextFile(p, "rt") as f:
-            with pytest.raises(OSError, match="only supports SEEK_SET"):
-                await f.seek(0, os.SEEK_CUR)
+            assert await f.seek(0, os.SEEK_CUR) == await f.tell()
+            with pytest.raises(
+                io.UnsupportedOperation, match="can't do nonzero cur-relative seeks"
+            ):
+                await f.seek(1, os.SEEK_CUR)
 
     @pytest.mark.asyncio
     async def test_coerce_byteslike_invalid_type(self, tmp_path):

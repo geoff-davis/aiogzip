@@ -940,6 +940,38 @@ class TestAsyncGzipTextFile:
             assert replay == rest
 
     @pytest.mark.asyncio
+    async def test_text_seek_cur_and_end_zero(self, temp_file):
+        """Text seek should support zero-offset SEEK_CUR and SEEK_END."""
+        text = "abc\ndef"
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write(text)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            await f.read(2)
+            cur = await f.seek(0, os.SEEK_CUR)
+            assert cur == await f.tell()
+
+            end = await f.seek(0, os.SEEK_END)
+            assert end == await f.tell()
+            assert await f.read() == ""
+
+    @pytest.mark.asyncio
+    async def test_text_seek_nonzero_cur_end_raises(self, temp_file):
+        """Text seek should reject nonzero relative seeks."""
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("abc")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            with pytest.raises(
+                io.UnsupportedOperation, match="can't do nonzero cur-relative seeks"
+            ):
+                await f.seek(1, os.SEEK_CUR)
+            with pytest.raises(
+                io.UnsupportedOperation, match="can't do nonzero end-relative seeks"
+            ):
+                await f.seek(1, os.SEEK_END)
+
+    @pytest.mark.asyncio
     async def test_text_readline_limit(self, temp_file):
         """readline(limit) should stop after limit characters."""
         text = "abcdef\nXYZ\n"
