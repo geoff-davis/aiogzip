@@ -283,3 +283,29 @@ class _TextCookieState:
     decoder_state: Tuple[Any, int]
     text_buffer: str
     trailing_cr: bool
+
+
+__all__ = [
+    "GZIP_WBITS",
+    "GZIP_FLAG_FNAME",
+    "GZIP_FLAG_FHCRC",
+    "GZIP_FLAG_FEXTRA",
+    "GZIP_FLAG_FCOMMENT",
+    "GZIP_METHOD_DEFLATE",
+    "GZIP_OS_UNKNOWN",
+    "ZlibEngine",
+    "_validate_filename",
+    "_validate_chunk_size",
+    "_validate_compresslevel",
+    "_normalize_mtime",
+    "_validate_original_filename",
+    "_derive_header_filename",
+    "_build_gzip_header",
+    "_build_gzip_trailer",
+    "_try_parse_gzip_header_mtime",
+    "_parse_mode_tokens",
+    "WithAsyncRead",
+    "WithAsyncWrite",
+    "WithAsyncReadWrite",
+    "_TextCookieState",
+]
