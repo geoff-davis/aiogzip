@@ -760,16 +760,19 @@ class AsyncGzipBinaryFile:
             decompressed = self._engine.decompress(compressed_chunk)
             self._buffer.extend(decompressed)
 
-            # Handle multi-member gzip archives (created by append mode)
-            # Loop to handle multiple members in the unused data
-            while self._engine.unused_data:
-                # Start a new decompressor for the next member
-                unused = self._engine.unused_data
+            # Handle multi-member gzip archives (created by append mode).
+            # CPython's gzip reader ignores zero padding between/after members,
+            # so strip NUL bytes before attempting to parse another member.
+            unused = self._engine.unused_data
+            while unused:
+                unused = unused.lstrip(b"\x00")
+                if not unused:
+                    break
+
                 self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
-                # Decompress the unused data with the new decompressor
-                if unused:
-                    decompressed = self._engine.decompress(unused)
-                    self._buffer.extend(decompressed)
+                decompressed = self._engine.decompress(unused)
+                self._buffer.extend(decompressed)
+                unused = self._engine.unused_data
         except zlib.error as e:
             raise gzip.BadGzipFile(f"Error decompressing gzip data: {e}") from e
         except Exception as e:

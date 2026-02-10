@@ -3296,6 +3296,22 @@ class TestHighPriorityEdgeCases:
         assert data == b"member1member2member3"
 
     @pytest.mark.asyncio
+    async def test_trailing_zero_padding_is_ignored(self, temp_file):
+        """Trailing zero padding after valid gzip data should be ignored."""
+        with gzip.open(temp_file, "wb") as f:
+            f.write(b"payload")
+
+        with open(temp_file, "ab") as raw:
+            raw.write(b"\x00" * 32)
+
+        # Parity check: stdlib gzip accepts trailing zero padding.
+        with gzip.open(temp_file, "rb") as f:
+            assert f.read() == b"payload"
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.read() == b"payload"
+
+    @pytest.mark.asyncio
     async def test_reading_after_eof_repeatedly(self, temp_file):
         """Test that reading after EOF works correctly."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
