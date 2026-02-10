@@ -1060,9 +1060,18 @@ class AsyncGzipBinaryFile:
             # but we need to propagate the exception
             raise
 
-    def __aiter__(self) -> Any:
-        """Raise error for binary file iteration."""
-        raise TypeError("AsyncGzipBinaryFile can only be iterated in text mode")
+    def __aiter__(self) -> "AsyncGzipBinaryFile":
+        """Make AsyncGzipBinaryFile iterable over newline-delimited chunks."""
+        return self
+
+    async def __anext__(self) -> bytes:
+        """Return the next line from the binary stream."""
+        if self._is_closed:
+            raise StopAsyncIteration
+        line = await self.readline()
+        if line == b"":
+            raise StopAsyncIteration
+        return line
 
 
 class AsyncGzipTextFile:

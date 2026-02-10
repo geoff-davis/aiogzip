@@ -266,13 +266,14 @@ class TestEdgeCasesAndErrors:
             await f.__anext__()
 
     @pytest.mark.asyncio
-    async def test_binary_iter_error(self):
-        """Test binary file raises TypeError on iteration."""
-        f = AsyncGzipBinaryFile("test.gz", "rb")
-        with pytest.raises(
-            TypeError, match="AsyncGzipBinaryFile can only be iterated in text mode"
-        ):
-            f.__aiter__()
+    async def test_binary_iteration_requires_read_mode(self, tmp_path):
+        """Binary iteration should raise if the file is not open for reading."""
+        p = tmp_path / "iter_write.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"data")
+            iterator = f.__aiter__()
+            with pytest.raises(OSError, match="File not open for reading"):
+                await iterator.__anext__()
 
 
 class TestAdditionalCoverage:

@@ -274,15 +274,16 @@ class TestAsyncGzipFile:
                 await gz_file.read()
 
     @pytest.mark.asyncio
-    async def test_line_iteration_binary_mode_error(self, temp_file):
-        """Test that binary mode raises error for line iteration."""
+    async def test_line_iteration_binary_mode(self, temp_file):
+        """Test line iteration in binary mode."""
         async with AsyncGzipFile(temp_file, "wb") as f:
-            await f.write(b"test data")  # pyrefly: ignore
+            await f.write(b"line1\nline2")  # pyrefly: ignore
 
         async with AsyncGzipFile(temp_file, "rb") as f:
-            with pytest.raises(TypeError, match="can only be iterated in text mode"):
-                async for _line in f:
-                    pass
+            lines = []
+            async for line in f:  # pyrefly: ignore
+                lines.append(line)
+            assert lines == [b"line1\n", b"line2"]
 
     @pytest.mark.asyncio
     async def test_line_iteration_text_mode(self, temp_file):
@@ -3398,6 +3399,19 @@ class TestHighPriorityEdgeCases:
                 f.detach()
             with pytest.raises(io.UnsupportedOperation, match="truncate"):
                 f.truncate()
+
+    @pytest.mark.asyncio
+    async def test_binary_async_iteration_reads_lines(self, temp_file):
+        """Binary readers should support async iteration over lines."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"a\nbb\nccc")
+
+        lines = []
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            async for line in f:
+                lines.append(line)
+
+        assert lines == [b"a\n", b"bb\n", b"ccc"]
 
 
 class TestMediumPriorityEdgeCases:
