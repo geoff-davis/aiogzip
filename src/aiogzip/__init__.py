@@ -539,7 +539,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("File not opened. Use async context manager.")
         available = len(self._buffer) - self._buffer_offset
         target = size
-        if target is None or target < 0:
+        if target is None or target <= 0:
             target = available if available > 0 else 1
         while available < target and not self._eof:
             await self._fill_buffer()

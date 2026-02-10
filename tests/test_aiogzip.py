@@ -594,6 +594,22 @@ class TestAsyncGzipBinaryFile:
             assert bytes(buf) == sample_data[:10]
 
     @pytest.mark.asyncio
+    async def test_binary_peek_zero_returns_data_without_advancing(self, temp_file):
+        """peek(0) should still return available bytes like gzip.GzipFile.peek()."""
+        payload = b"abcdef"
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(payload)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            before = await f.tell()
+            peeked = await f.peek(0)
+            after = await f.tell()
+
+            assert peeked != b""
+            assert before == after
+            assert await f.read() == payload
+
+    @pytest.mark.asyncio
     async def test_binary_fileno_and_raw(self, temp_file, sample_data):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(sample_data)
