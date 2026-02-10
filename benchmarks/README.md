@@ -79,6 +79,7 @@ Fine-grained performance measurements:
 - Line iteration efficiency (10K lines)
 - readline() loop performance (10K lines)
 - Small write operations (1000 x 120 bytes)
+- Binary readline stress case (200KB line, 17-byte chunks)
 
 ## Running Benchmarks
 

@@ -123,9 +123,41 @@ class MicroBenchmarks(BenchmarkBase):
             ops_per_sec=f"{1000 / duration:.0f}",
         )
 
+    async def benchmark_binary_readline_long_line_small_chunks(self):
+        """Benchmark binary readline on long lines with tiny compressed chunks."""
+        binary_file = self.temp_mgr.get_path("micro_binary_readline.gz")
+        long_line = (b"x" * 200_000) + b"\n"
+        tail = b"tail"
+
+        async with AsyncGzipBinaryFile(binary_file, "wb") as f:
+            await f.write(long_line + tail)
+
+        iterations = 50
+        total_time = 0.0
+        for _ in range(iterations):
+            start = time.perf_counter()
+            async with AsyncGzipBinaryFile(binary_file, "rb", chunk_size=17) as f:
+                line = await f.readline()
+                rest = await f.readline()
+                eof = await f.readline()
+            total_time += time.perf_counter() - start
+            assert line == long_line
+            assert rest == tail
+            assert eof == b""
+
+        avg_time = total_time / iterations
+        self.add_result(
+            "Binary readline (200KB line, 17-byte chunks)",
+            "micro",
+            avg_time,
+            iterations=iterations,
+            avg_time_ms=f"{avg_time * 1000:.3f}ms",
+        )
+
     async def run_all(self):
         """Run all micro-benchmarks."""
         await self.benchmark_read_all()
         await self.benchmark_line_iteration()
         await self.benchmark_readline_loop()
         await self.benchmark_small_writes()
+        await self.benchmark_binary_readline_long_line_small_chunks()
