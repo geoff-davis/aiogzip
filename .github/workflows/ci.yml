@@ -58,12 +58,17 @@ jobs:
         run: |
           mypy src
 
-      # Step 7: Run tests with pytest and coverage
+      # Step 7: Type check with Ty
+      - name: Type check with Ty
+        run: |
+          ty check src
+
+      # Step 8: Run tests with pytest and coverage
       - name: Run tests with pytest and coverage
         run: |
           pytest --cov --cov-report=term-missing --cov-report=xml
 
-      # Step 8: Post coverage comment on PR
+      # Step 9: Post coverage comment on PR
       - name: Coverage comment
         uses: py-cov-action/python-coverage-comment-action@v3
         if: matrix.python-version == '3.12'

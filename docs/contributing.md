@@ -39,12 +39,13 @@ pytest
 
 ## Code Quality
 
-We use `ruff` for linting and formatting, and `mypy` for static type checking. These are run automatically by pre-commit, but you can run them manually:
+We use `ruff` for linting and formatting, and both `mypy` and `ty` for static type checking. These are run automatically by pre-commit, but you can run them manually:
 
 ```bash
 ruff check .
 ruff format .
 mypy src
+ty check src
 ```
 
 ## Documentation

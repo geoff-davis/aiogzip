@@ -48,6 +48,7 @@ dev = [
     "tomli; python_version < \"3.11\"",
     "ruff>=0.3.0",
     "mypy>=1.0.0",
+    "ty>=0.0.1a16",
     "types-aiofiles",
     "pre-commit",
 ]

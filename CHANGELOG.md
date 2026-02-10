@@ -31,6 +31,7 @@ All notable changes to this project will be documented in this file.
   - uncached text-cookie seek failure behavior
   - `peek(0)` and non-empty pre-EOF `peek()` behavior
   - `BadGzipFile` exception type for corrupted streams
+- Added `ty` as an additional static type checker in development tooling and CI, alongside existing `mypy` checks.
 
 ## [1.1.0] - 2025-11-25
 

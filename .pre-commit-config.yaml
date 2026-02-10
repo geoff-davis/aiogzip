@@ -22,6 +22,15 @@ repos:
         additional_dependencies:
           - types-aiofiles
 
+  # Ty - Additional static type checking
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty
+        entry: ty check src
+        language: system
+        pass_filenames: false
+
   # General code quality checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
