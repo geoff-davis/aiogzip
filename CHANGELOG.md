@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- Reject invalid `newline` values in `AsyncGzipTextFile` (e.g., `newline="bad"`) with `ValueError`, matching stdlib behavior.
+- Align `fileobj` close semantics with `gzip.GzipFile`: default `closefd=False` for caller-provided `fileobj`, while preserving close-on-exit for internally opened filenames.
+- Validate `AsyncGzipFile(mode=...)` type early and raise a consistent `TypeError` for non-string modes.
+- In binary factory modes, reject text-only kwargs (`encoding`, `errors`, `newline`) when non-`None`, and ignore them when explicitly `None`.
+- Accept `encoding=None` and `errors=None` in text mode and normalize to defaults (`utf-8`, `strict`).
+- Ignore `compresslevel` validation in read modes, matching `gzip.open`.
+- Allow `compresslevel=-1` (zlib default) in write modes; keep validation for values outside `[-1, 9]`.
+- Support text `seek(0, SEEK_CUR)` and `seek(0, SEEK_END)`, while rejecting nonzero relative text seeks with `io.UnsupportedOperation` like stdlib.
+- Prevent silent data corruption when seeking to evicted text cookies by raising `OSError` for uncached nonzero cookies.
+- Make `peek(0)` behave as a real peek and fix a bug where `peek()` could incorrectly return empty bytes before EOF.
+- Raise `gzip.BadGzipFile` (instead of generic `OSError`) for gzip decompression/finalization errors.
+
+### Added
+
+- Regression tests for all compatibility and correctness fixes listed above, including:
+  - text newline validation
+  - binary/text `fileobj` default close behavior
+  - factory mode-type validation
+  - binary factory text-kwarg handling (`None` and non-`None`)
+  - text-mode `encoding=None` / `errors=None`
+  - read/write `compresslevel` semantics
+  - text `seek` CUR/END support and nonzero relative seek errors
+  - uncached text-cookie seek failure behavior
+  - `peek(0)` and non-empty pre-EOF `peek()` behavior
+  - `BadGzipFile` exception type for corrupted streams
+
 ## [1.1.0] - 2025-11-25
 
 ### Added
