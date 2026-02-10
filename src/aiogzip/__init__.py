@@ -81,6 +81,9 @@ LINE_READ_CHUNK_SIZE = 8192
 
 # gzip header constants
 GZIP_FLAG_FNAME = 0x08
+GZIP_FLAG_FHCRC = 0x02
+GZIP_FLAG_FEXTRA = 0x04
+GZIP_FLAG_FCOMMENT = 0x10
 GZIP_METHOD_DEFLATE = 8
 GZIP_OS_UNKNOWN = 255
 _COMPRESS_LEVEL_FAST = 1
@@ -225,6 +228,50 @@ def _build_gzip_trailer(crc: int, size: int) -> bytes:
     return struct.pack("<II", crc & 0xFFFFFFFF, size & 0xFFFFFFFF)
 
 
+def _try_parse_gzip_header_mtime(data: bytes) -> Tuple[Optional[int], bool]:
+    """Try parsing gzip header mtime from raw bytes.
+
+    Returns:
+        (mtime, complete)
+        - mtime: Parsed mtime value when available, else None.
+        - complete: True if enough bytes were available to finish parsing header.
+    """
+    if len(data) < 10:
+        return None, False
+    if data[0:2] != b"\x1f\x8b" or data[2] != GZIP_METHOD_DEFLATE:
+        return None, True
+
+    flags = data[3]
+    mtime = struct.unpack("<I", data[4:8])[0]
+    pos = 10
+
+    if flags & GZIP_FLAG_FEXTRA:
+        if len(data) < pos + 2:
+            return None, False
+        xlen = struct.unpack("<H", data[pos : pos + 2])[0]
+        pos += 2 + xlen
+        if len(data) < pos:
+            return None, False
+
+    if flags & GZIP_FLAG_FNAME:
+        terminator = data.find(b"\x00", pos)
+        if terminator == -1:
+            return None, False
+        pos = terminator + 1
+
+    if flags & GZIP_FLAG_FCOMMENT:
+        terminator = data.find(b"\x00", pos)
+        if terminator == -1:
+            return None, False
+        pos = terminator + 1
+
+    if flags & GZIP_FLAG_FHCRC:
+        if len(data) < pos + 2:
+            return None, False
+
+    return mtime, True
+
+
 def _parse_mode_tokens(mode: str) -> Tuple[str, bool, bool, bool]:
     """Parse a mode string into (op, saw_b, saw_t, plus) flags."""
     if not isinstance(mode, str):
@@ -352,6 +399,8 @@ class AsyncGzipBinaryFile:
         "_crc",
         "_input_size",
         "_position",
+        "_mtime",
+        "_header_probe_buffer",
     )
 
     DEFAULT_CHUNK_SIZE = 64 * 1024  # 64 KB
@@ -409,6 +458,8 @@ class AsyncGzipBinaryFile:
         self._crc: int = 0
         self._input_size: int = 0
         self._position: int = 0
+        self._mtime: Optional[int] = None
+        self._header_probe_buffer = bytearray()
 
     async def __aenter__(self) -> "AsyncGzipBinaryFile":
         """Enter the async context manager and initialize resources."""
@@ -439,6 +490,8 @@ class AsyncGzipBinaryFile:
         else:  # read mode
             self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
             self._position = 0
+            self._mtime = None
+            self._header_probe_buffer.clear()
 
         return self
 
@@ -522,6 +575,11 @@ class AsyncGzipBinaryFile:
     def closed(self) -> bool:
         """Return True when this file has been closed."""
         return self._is_closed
+
+    @property
+    def mtime(self) -> Optional[int]:
+        """Return the gzip member mtime after the header has been read."""
+        return self._mtime
 
     def fileno(self) -> int:
         """Return the underlying file descriptor number."""
@@ -746,6 +804,15 @@ class AsyncGzipBinaryFile:
             raise
         except Exception as e:
             raise OSError(f"Error reading from file: {e}") from e
+
+        if self._mtime is None and compressed_chunk:
+            self._header_probe_buffer.extend(compressed_chunk)
+            parsed_mtime, complete = _try_parse_gzip_header_mtime(
+                bytes(self._header_probe_buffer)
+            )
+            if complete:
+                self._mtime = parsed_mtime
+                self._header_probe_buffer.clear()
 
         if not compressed_chunk:
             # End of file - flush any remaining data from decompressor

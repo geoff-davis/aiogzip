@@ -3351,6 +3351,17 @@ class TestHighPriorityEdgeCases:
             await text.read()
         assert text.closed is True
 
+    @pytest.mark.asyncio
+    async def test_binary_mtime_matches_header_after_read(self, temp_file):
+        """mtime should be None before reads and set from the gzip header after reads."""
+        with gzip.GzipFile(temp_file, "wb", mtime=123456789) as f:
+            f.write(b"payload")
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert f.mtime is None
+            assert await f.read(1) == b"p"
+            assert f.mtime == 123456789
+
 
 class TestMediumPriorityEdgeCases:
     """Test medium priority edge cases for improved coverage."""
