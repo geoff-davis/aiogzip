@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-10
+
 ### Fixed
 
 - Reject invalid `newline` values in `AsyncGzipTextFile` (e.g., `newline="bad"`) with `ValueError`, matching stdlib behavior.
