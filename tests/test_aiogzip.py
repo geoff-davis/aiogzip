@@ -98,6 +98,11 @@ class TestAsyncGzipFile:
         with pytest.raises(ValueError, match="Invalid mode"):
             AsyncGzipFile("test.gz", "invalid")
 
+    def test_init_non_string_mode(self):
+        """Factory should validate mode type consistently."""
+        with pytest.raises(TypeError, match="mode must be a string"):
+            AsyncGzipFile("test.gz", b"rb")  # type: ignore[arg-type]
+
     def test_init_invalid_newline_text_mode(self):
         """Text mode should reject unsupported newline values."""
         with pytest.raises(ValueError, match="illegal newline value"):

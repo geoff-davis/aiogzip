@@ -1560,6 +1560,8 @@ def AsyncGzipFile(
         AsyncGzipBinaryFile for binary modes ('rb', 'wb', 'ab')
         AsyncGzipTextFile for text modes ('rt', 'wt', 'at')
     """
+    if not isinstance(mode, str):
+        raise TypeError("mode must be a string")
     if "t" in mode:
         return AsyncGzipTextFile(filename, mode, **kwargs)
     else:

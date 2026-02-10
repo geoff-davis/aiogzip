@@ -33,6 +33,13 @@ class TestEdgeCasesAndErrors:
         with pytest.raises(ValueError, match="Invalid mode"):
             AsyncGzipBinaryFile("test.gz", mode="y")  # Invalid op
 
+    def test_factory_mode_type_error(self):
+        """Factory mode validation should happen before mode probing."""
+        from aiogzip import AsyncGzipFile
+
+        with pytest.raises(TypeError, match="mode must be a string"):
+            AsyncGzipFile("test.gz", mode=123)  # type: ignore[arg-type]
+
     @pytest.mark.asyncio
     async def test_binary_file_filename_none_error(self):
         """Test error when filename is None and no fileobj provided."""
