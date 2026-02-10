@@ -4,6 +4,7 @@ Error handling benchmarks for aiogzip.
 Tests error handling and edge cases.
 """
 
+import gzip
 import time
 
 from bench_common import BenchmarkBase
@@ -63,26 +64,30 @@ class ErrorsBenchmarks(BenchmarkBase):
         """Benchmark handling of corrupted gzip data."""
         test_file = self.temp_mgr.get_path("corrupted.gz")
 
-        # Write invalid gzip data
-        async with AsyncGzipBinaryFile(test_file, "wb") as f:
-            await f.write(b"not valid gzip data")
+        # Write clearly invalid gzip bytes to deterministically trigger BadGzipFile.
+        test_file.write_bytes(b"This is not gzip data")
 
         # Try to read it
         start = time.perf_counter()
+        error_type = "none"
         try:
-            # Overwrite with actual corrupted gzip header
-            test_file.write_bytes(
-                b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff" + b"corrupted"
-            )
             async with AsyncGzipBinaryFile(test_file, "rb") as f:
                 await f.read()
             caught_error = False
-        except Exception:
+        except gzip.BadGzipFile:
             caught_error = True
+            error_type = "BadGzipFile"
+        except Exception as exc:  # pragma: no cover - diagnostic metric only
+            caught_error = True
+            error_type = type(exc).__name__
         duration = time.perf_counter() - start
 
         self.add_result(
-            "Corrupted data handling", "errors", duration, error_detected=caught_error
+            "Corrupted data handling",
+            "errors",
+            duration,
+            error_detected=caught_error,
+            error_type=error_type,
         )
 
     async def run_all(self):
