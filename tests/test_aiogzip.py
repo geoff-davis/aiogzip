@@ -98,6 +98,11 @@ class TestAsyncGzipFile:
         with pytest.raises(ValueError, match="Invalid mode"):
             AsyncGzipFile("test.gz", "invalid")
 
+    def test_init_invalid_newline_text_mode(self):
+        """Text mode should reject unsupported newline values."""
+        with pytest.raises(ValueError, match="illegal newline value"):
+            AsyncGzipFile("test.gz", "rt", newline="bad")
+
     def test_initial_state_binary(self):
         """Test initial state of AsyncGzipFile in binary mode."""
         gz_file = AsyncGzipFile("test.gz", "rb")

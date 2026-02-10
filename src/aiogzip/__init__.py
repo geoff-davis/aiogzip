@@ -965,6 +965,8 @@ class AsyncGzipTextFile:
             raise ValueError("Encoding cannot be empty")
         if errors is None:
             raise ValueError("Errors cannot be None")
+        if newline not in {None, "", "\n", "\r", "\r\n"}:
+            raise ValueError(f"illegal newline value: {newline}")
 
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
         if saw_b:

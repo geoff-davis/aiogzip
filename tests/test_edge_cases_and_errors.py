@@ -61,6 +61,10 @@ class TestEdgeCasesAndErrors:
         with pytest.raises(ValueError, match="Invalid mode"):
             AsyncGzipTextFile("test.gz", mode="y")
 
+        # Invalid newline value
+        with pytest.raises(ValueError, match="illegal newline value"):
+            AsyncGzipTextFile("test.gz", newline="bad")
+
     @pytest.mark.asyncio
     async def test_text_file_plus_mode(self, tmp_path):
         """Test 'rt+' mode handling in AsyncGzipTextFile."""
