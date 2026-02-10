@@ -48,6 +48,17 @@ mypy src
 ty check src
 ```
 
+## Package Layout
+
+Core implementation is split across focused modules in `src/aiogzip`:
+
+- `_common.py`: shared constants, validation helpers, and protocols
+- `_binary.py`: `AsyncGzipBinaryFile` implementation
+- `_text.py`: `AsyncGzipTextFile` implementation
+- `__init__.py`: public API exports and `AsyncGzipFile` factory
+
+When adding new internals, prefer one of the focused modules and keep `__init__.py` as the stable public API surface.
+
 ## Documentation
 
 To build the documentation locally:
