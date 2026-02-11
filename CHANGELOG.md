@@ -4,7 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-02-11
+
 ### Added
+
+- Add Python 3.14 support metadata: include the `Programming Language :: Python :: 3.14` classifier and expand the documented support badge to `3.8-3.14`.
+
+### Changed
+
+- Expand CI test matrix to include Python 3.14.
+- Bump `aiogzip.__version__` to `1.2.2` to align source version metadata with the new release tag.
 
 ## [1.2.1] - 2026-02-11
 
