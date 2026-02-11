@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+## [1.2.1] - 2026-02-11
+
+### Fixed
+
+- Restore `project.license` to table form (`{ text = "MIT" }`) for compatibility with older setuptools used in Python 3.8 editable-install CI jobs.
+
 ## [1.2.0] - 2026-02-10
 
 ### Fixed
