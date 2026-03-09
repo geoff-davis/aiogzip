@@ -241,12 +241,15 @@ class TestAsyncGzipTextFile:
             await f.write(text)
 
         async with AsyncGzipTextFile(temp_file, "rt") as f:
+            assert await f.tell() == 0
+            assert await f.seek(0, os.SEEK_CUR) == 0
             await f.read(2)
             cur = await f.seek(0, os.SEEK_CUR)
             assert cur == await f.tell()
 
             end = await f.seek(0, os.SEEK_END)
-            assert end == await f.tell()
+            assert end == len(text)
+            assert await f.tell() == len(text)
             assert await f.read() == ""
 
     @pytest.mark.asyncio

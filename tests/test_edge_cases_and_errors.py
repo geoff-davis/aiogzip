@@ -490,9 +490,10 @@ class TestAdditionalCoverage:
         async with AsyncGzipTextFile(p, "rt", newline="", chunk_size=4096) as f:
             assert not hasattr(f, "_cookie_cache")
             assert not hasattr(f, "_cookie_lookup")
+            await f.read(1)
             cookie = await f.tell()
             assert isinstance(cookie, int)
-            assert cookie > 0
+            assert cookie < 0
 
     @pytest.mark.asyncio
     async def test_text_seek_cookie_from_other_stream_raises(self, tmp_path):
@@ -522,7 +523,7 @@ class TestAdditionalCoverage:
             with pytest.raises(
                 OSError, match="Cannot seek to invalid text cookie for this stream"
             ):
-                await f.seek(999999)
+                await f.seek(-1)
 
     @pytest.mark.asyncio
     async def test_text_seek_non_seek_set(self, tmp_path):

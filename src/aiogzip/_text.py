@@ -67,6 +67,7 @@ class AsyncGzipTextFile:
         "_binary_mode",
         "_binary_file",
         "_is_closed",
+        "_text_position",
         "_decoder",
         "_text_buffer",
         "_text_buffer_offset",
@@ -83,7 +84,7 @@ class AsyncGzipTextFile:
     _SEEN_LF = 2
     _SEEN_CRLF = 4
     _COOKIE_VERSION = 1
-    _COOKIE_HEADER = struct.Struct(">BQQQiBBI")
+    _COOKIE_HEADER = struct.Struct(">BQQQQiBBI")
 
     def __init__(
         self,
@@ -143,6 +144,7 @@ class AsyncGzipTextFile:
 
         self._binary_file: Optional[AsyncGzipBinaryFile] = None
         self._is_closed: bool = False
+        self._text_position: int = 0
 
         # Decoder and buffer state
         self._decoder = codecs.getincrementaldecoder(self._encoding)(
@@ -196,6 +198,10 @@ class AsyncGzipTextFile:
     async def tell(self) -> int:
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
+        decoder_state = self._decoder.getstate()
+        if self._can_use_plain_position(decoder_state):
+            return self._text_position
+
         if self._buffered_text_len() > 0:
             origin_offset = self._buffer_origin_offset
             decoder_state = self._buffer_origin_decoder_state
@@ -214,6 +220,7 @@ class AsyncGzipTextFile:
             decoder_state=decoder_state,
             trailing_cr=trailing_cr,
             seen_newlines=seen_newlines,
+            logical_position=self._text_position,
             chars_to_skip=chars_to_skip,
         )
 
@@ -233,17 +240,24 @@ class AsyncGzipTextFile:
             raise ValueError("Invalid whence value")
 
         if offset != 0:
+            if offset >= 0:
+                await self._reset_to_start()
+                await self._replay_characters(offset, strict=False)
+                return offset
+
             (
                 origin_offset,
                 decoder_state,
                 trailing_cr,
                 seen_newlines,
+                logical_position,
                 chars_to_skip,
             ) = self._decode_cookie(offset)
             await self._binary_file.seek(origin_offset)
             self._decoder.setstate(decoder_state)
             self._trailing_cr = trailing_cr
             self._seen_newline_types = seen_newlines
+            self._text_position = logical_position - chars_to_skip
             self._set_buffer("")
             self._set_buffer_origin(
                 origin_offset=origin_offset,
@@ -251,21 +265,10 @@ class AsyncGzipTextFile:
                 trailing_cr=trailing_cr,
                 seen_newlines=seen_newlines,
             )
-            await self._replay_characters(chars_to_skip)
-            return offset
+            await self._replay_characters(chars_to_skip, strict=True)
+            return logical_position
 
-        await self._binary_file.seek(0)
-        self._decoder.reset()
-        self._text_buffer = ""
-        self._text_buffer_offset = 0
-        self._trailing_cr = False
-        self._seen_newline_types = 0
-        self._set_buffer_origin(
-            origin_offset=0,
-            decoder_state=self._decoder.getstate(),
-            trailing_cr=False,
-            seen_newlines=0,
-        )
+        await self._reset_to_start()
         return offset
 
     def fileno(self) -> int:
@@ -411,11 +414,39 @@ class AsyncGzipTextFile:
         start = self._text_buffer_offset
         end = start + size
         result = self._text_buffer[start:end]
+        self._text_position += len(result)
         self._text_buffer_offset = end
         if self._text_buffer_offset >= len(self._text_buffer):
             self._text_buffer = ""
             self._text_buffer_offset = 0
         return result
+
+    def _can_use_plain_position(self, decoder_state: Tuple[Any, int]) -> bool:
+        """Return True when the current state is representable as a plain position."""
+        decoder_bytes, decoder_flag = decoder_state
+        return (
+            self._buffered_text_len() == 0
+            and decoder_bytes == b""
+            and decoder_flag == 0
+            and not self._trailing_cr
+        )
+
+    async def _reset_to_start(self) -> None:
+        """Reset the text stream to its initial read state."""
+        if self._binary_file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        await self._binary_file.seek(0)
+        self._decoder.reset()
+        self._text_position = 0
+        self._set_buffer("")
+        self._trailing_cr = False
+        self._seen_newline_types = 0
+        self._set_buffer_origin(
+            origin_offset=0,
+            decoder_state=self._decoder.getstate(),
+            trailing_cr=False,
+            seen_newlines=0,
+        )
 
     def _set_buffer_origin(
         self,
@@ -449,6 +480,7 @@ class AsyncGzipTextFile:
         decoder_state: Tuple[Any, int],
         trailing_cr: bool,
         seen_newlines: int,
+        logical_position: int,
         chars_to_skip: int,
     ) -> int:
         """Serialize the current text state into an opaque int cookie."""
@@ -457,6 +489,7 @@ class AsyncGzipTextFile:
             self._COOKIE_VERSION,
             self._cookie_nonce,
             origin_offset,
+            logical_position,
             chars_to_skip,
             decoder_flag,
             int(trailing_cr),
@@ -464,16 +497,17 @@ class AsyncGzipTextFile:
             len(decoder_bytes),
         )
         payload += decoder_bytes
-        return int.from_bytes(payload, "big")
+        return -(int.from_bytes(payload, "big") + 1)
 
     def _decode_cookie(
         self, cookie: int
-    ) -> Tuple[int, Tuple[bytes, int], bool, int, int]:
+    ) -> Tuple[int, Tuple[bytes, int], bool, int, int, int]:
         """Decode and validate an opaque cookie for this open text stream."""
-        if not isinstance(cookie, int) or cookie <= 0:
+        if not isinstance(cookie, int) or cookie >= 0:
             raise OSError("Cannot seek to invalid text cookie for this stream")
 
-        raw = cookie.to_bytes((cookie.bit_length() + 7) // 8, "big")
+        payload_int = (-cookie) - 1
+        raw = payload_int.to_bytes((payload_int.bit_length() + 7) // 8, "big")
         if len(raw) < self._COOKIE_HEADER.size:
             raise OSError("Cannot seek to invalid text cookie for this stream")
 
@@ -481,6 +515,7 @@ class AsyncGzipTextFile:
             version,
             nonce,
             origin_offset,
+            logical_position,
             chars_to_skip,
             decoder_flag,
             trailing_cr,
@@ -501,17 +536,22 @@ class AsyncGzipTextFile:
             (decoder_bytes, decoder_flag),
             bool(trailing_cr),
             seen_newlines,
+            logical_position,
             chars_to_skip,
         )
 
-    async def _replay_characters(self, chars_to_skip: int) -> None:
+    async def _replay_characters(self, chars_to_skip: int, *, strict: bool) -> None:
         """Replay decoded text forward from a cookie origin to the target position."""
         remaining = chars_to_skip
         while remaining > 0:
             if self._buffered_text_len() == 0:
                 has_more = await self._read_chunk_and_decode()
                 if not has_more:
-                    raise OSError("Cannot seek to invalid text cookie for this stream")
+                    if strict:
+                        raise OSError(
+                            "Cannot seek to invalid text cookie for this stream"
+                        )
+                    break
 
             take = min(remaining, self._buffered_text_len())
             self._consume_buffer(take)
@@ -587,16 +627,16 @@ class AsyncGzipTextFile:
         if size == -1:
             # Read all remaining data
             # We use a list to accumulate chunks for performance
-            chunks = [self._buffered_text()]
-            self._set_buffer("")
+            chunks = []
+            if self._buffered_text_len() > 0:
+                chunks.append(self._consume_buffer(self._buffered_text_len()))
 
             while True:
                 has_more = await self._read_chunk_and_decode()
                 if not has_more:
                     break
                 if self._buffered_text_len() > 0:
-                    chunks.append(self._buffered_text())
-                    self._set_buffer("")
+                    chunks.append(self._consume_buffer(self._buffered_text_len()))
 
             return "".join(chunks)
         else:
@@ -753,8 +793,7 @@ class AsyncGzipTextFile:
             if not has_more:
                 # EOF
                 if self._buffered_text_len() > 0:
-                    result = self._buffered_text()
-                    self._set_buffer("")
+                    result = self._consume_buffer(self._buffered_text_len())
                     return result  # Last line without newline
                 else:
                     raise StopAsyncIteration
@@ -816,9 +855,7 @@ class AsyncGzipTextFile:
                     return ""
                 if limit != -1 and self._buffered_text_len() > limit:
                     return self._consume_buffer(limit)
-                line = self._buffered_text()
-                self._set_buffer("")
-                return line
+                return self._consume_buffer(self._buffered_text_len())
             # Loop continues to search for terminator in newly read data
 
     async def readlines(self, hint: int = -1) -> List[str]:
