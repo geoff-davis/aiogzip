@@ -82,6 +82,9 @@ class AsyncGzipBinaryFile:
         "_position",
         "_mtime",
         "_header_probe_buffer",
+        "_compressed_cache",
+        "_replay_offset",
+        "_cache_rewindable_reads",
     )
 
     DEFAULT_CHUNK_SIZE = 64 * 1024  # 64 KB
@@ -141,6 +144,9 @@ class AsyncGzipBinaryFile:
         self._position: int = 0
         self._mtime: Optional[int] = None
         self._header_probe_buffer = bytearray()
+        self._compressed_cache = bytearray()
+        self._replay_offset: Optional[int] = None
+        self._cache_rewindable_reads: bool = False
 
     async def __aenter__(self) -> "AsyncGzipBinaryFile":
         """Enter the async context manager and initialize resources."""
@@ -173,6 +179,10 @@ class AsyncGzipBinaryFile:
             self._position = 0
             self._mtime = None
             self._header_probe_buffer.clear()
+            self._compressed_cache.clear()
+            self._replay_offset = None
+            seek_method = getattr(self._file, "seek", None)
+            self._cache_rewindable_reads = not callable(seek_method)
 
         return self
 
@@ -599,13 +609,7 @@ class AsyncGzipBinaryFile:
         if self._eof or self._file is None:
             return
 
-        try:
-            compressed_chunk = await self._file.read(self._chunk_size)
-        except OSError:
-            # Re-raise I/O errors as-is
-            raise
-        except Exception as e:
-            raise OSError(f"Error reading from file: {e}") from e
+        compressed_chunk = await self._read_compressed_chunk()
 
         if self._mtime is None and compressed_chunk:
             self._header_probe_buffer.extend(compressed_chunk)
@@ -677,19 +681,47 @@ class AsyncGzipBinaryFile:
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
         seek_method = getattr(self._file, "seek", None)
-        if not callable(seek_method):
-            raise OSError("Underlying file is not seekable")
-        result = seek_method(0, os.SEEK_SET)
-        if hasattr(result, "__await__"):
-            await result
+        if callable(seek_method):
+            result = seek_method(0, os.SEEK_SET)
+            if hasattr(result, "__await__"):
+                await result
+            else:
+                # synchronous seek already performed
+                pass
+        elif self._cache_rewindable_reads:
+            self._replay_offset = 0
         else:
-            # synchronous seek already performed
-            pass
+            raise OSError("Underlying file is not seekable")
         self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
         del self._buffer[:]
         self._buffer_offset = 0
         self._eof = False
         self._position = 0
+
+    async def _read_compressed_chunk(self) -> bytes:
+        """Read the next compressed chunk from cache replay or the underlying file."""
+        if self._file is None:
+            return b""
+
+        if self._replay_offset is not None:
+            end = min(self._replay_offset + self._chunk_size, len(self._compressed_cache))
+            chunk = bytes(self._compressed_cache[self._replay_offset : end])
+            self._replay_offset = end
+            if self._replay_offset >= len(self._compressed_cache):
+                self._replay_offset = None
+            return chunk
+
+        try:
+            chunk = await self._file.read(self._chunk_size)
+        except OSError:
+            # Re-raise I/O errors as-is
+            raise
+        except Exception as e:
+            raise OSError(f"Error reading from file: {e}") from e
+
+        if chunk and self._cache_rewindable_reads:
+            self._compressed_cache.extend(chunk)
+        return chunk
 
     async def flush(self) -> None:
         """
