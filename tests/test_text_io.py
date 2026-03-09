@@ -198,7 +198,8 @@ class TestAsyncGzipTextFile:
             cookie = await f.tell()
             remaining = await f.read()
             assert remaining == text[5:]
-            await f.seek(cookie)
+            assert await f.seek(cookie) == cookie
+            assert await f.tell() == cookie
             replay = await f.read()
             assert replay == remaining
 
@@ -212,9 +213,26 @@ class TestAsyncGzipTextFile:
             await f.read(1)
             cookie = await f.tell()
             rest = await f.read()
-            await f.seek(cookie)
+            assert await f.seek(cookie) == cookie
+            assert await f.tell() == cookie
             replay = await f.read()
             assert replay == rest
+
+    @pytest.mark.asyncio
+    async def test_text_seek_cookie_replays_split_multibyte_sequences(self, temp_file):
+        text = "éå漢字"
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write(text)
+
+        async with AsyncGzipTextFile(temp_file, "rt", newline="", chunk_size=4) as f:
+            assert await f.read(1) == "é"
+            cookie = await f.tell()
+            assert cookie < 0
+            remainder = await f.read()
+
+            assert await f.seek(cookie) == cookie
+            assert await f.tell() == cookie
+            assert await f.read() == remainder
 
     @pytest.mark.asyncio
     async def test_text_tell_cookies_are_unique_for_nearby_positions(self, temp_file):
@@ -250,6 +268,30 @@ class TestAsyncGzipTextFile:
             end = await f.seek(0, os.SEEK_END)
             assert end == len(text)
             assert await f.tell() == len(text)
+            assert await f.read() == ""
+
+    @pytest.mark.asyncio
+    async def test_text_tell_plain_positions_match_multibyte_and_newline_parity(
+        self, temp_file
+    ):
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write("é")
+
+        async with AsyncGzipTextFile(temp_file, "rt", newline="") as f:
+            assert await f.read() == "é"
+            assert await f.tell() == 2
+            assert await f.seek(2) == 2
+            assert await f.tell() == 2
+            assert await f.read() == ""
+
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write("a\r\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt", newline=None) as f:
+            assert await f.read() == "a\n"
+            assert await f.tell() == 3
+            assert await f.seek(3) == 3
+            assert await f.tell() == 3
             assert await f.read() == ""
 
     @pytest.mark.asyncio
