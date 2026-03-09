@@ -295,6 +295,20 @@ class TestAsyncGzipBinaryFile:
             read = await f.readinto1(buf)
             assert read == 5
 
+    @pytest.mark.asyncio
+    async def test_binary_read1_negative_size_leaves_remaining_data(self, temp_file):
+        payload = os.urandom(200000)
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(payload)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb", chunk_size=128) as f:
+            first = await f.read1(-1)
+            rest = await f.read()
+
+        assert first != b""
+        assert rest != b""
+        assert first + rest == payload
+
     def test_binary_seekable_and_writable_flags(self, temp_file):
         f = AsyncGzipBinaryFile(temp_file, "wb")
         assert f.seekable()

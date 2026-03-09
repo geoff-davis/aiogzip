@@ -362,11 +362,50 @@ class AsyncGzipBinaryFile:
 
     async def read1(self, size: int = -1) -> bytes:
         """Read up to size bytes from the buffer without looping."""
-        return await self.read(size)
+        if self._mode_op != "r":
+            raise OSError("File not open for reading")
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
+        if self._file is None:
+            raise ValueError("File not opened. Use async context manager.")
+
+        if size is None:
+            size = -1
+
+        available = len(self._buffer) - self._buffer_offset
+        if available <= 0 and not self._eof:
+            await self._fill_buffer()
+            available = len(self._buffer) - self._buffer_offset
+
+        if size is None or size < 0:
+            actual_read_size = available
+        else:
+            actual_read_size = min(size, available)
+
+        data_to_return = bytes(
+            self._buffer[self._buffer_offset : self._buffer_offset + actual_read_size]
+        )
+        self._buffer_offset += actual_read_size
+        self._position += actual_read_size
+
+        if self._buffer_offset >= len(self._buffer):
+            del self._buffer[:]
+            self._buffer_offset = 0
+
+        return data_to_return
 
     async def readinto1(self, b: Union[bytearray, memoryview]) -> int:
         """Read directly into the buffer without looping."""
-        return await self.readinto(b)
+        if self._mode_op != "r":
+            raise OSError("File not open for reading")
+        if self._file is None:
+            raise ValueError("File not opened. Use async context manager.")
+        view = memoryview(b)
+        if view.readonly:
+            raise TypeError("readinto() argument must be writable")
+        data = await self.read1(len(view))
+        view[: len(data)] = data
+        return len(data)
 
     async def readline(self, limit: int = -1) -> bytes:
         """Read and return one line from the binary stream."""
