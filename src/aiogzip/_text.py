@@ -481,6 +481,9 @@ class AsyncGzipTextFile:
             if decoded_chunk:
                 self._apply_newline_decoding(decoded_chunk)
 
+        if remaining == 0 and not self._binary_file._eof:
+            await self._binary_file.peek(1)
+
         if remaining == 0 and self._binary_file._eof:
             final_decoded = self._decoder.decode(b"", final=True)
             if final_decoded:

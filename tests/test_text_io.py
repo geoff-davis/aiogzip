@@ -327,6 +327,17 @@ class TestAsyncGzipTextFile:
             assert await f.read() == ""
 
     @pytest.mark.asyncio
+    async def test_text_seek_plain_eof_finalizes_trailing_cr(self, temp_file):
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write("a\r")
+
+        async with AsyncGzipTextFile(temp_file, "rt", newline=None) as f:
+            assert await f.seek(2) == 2
+            assert await f.tell() == 2
+            assert f.newlines == "\r"
+            assert await f.read() == ""
+
+    @pytest.mark.asyncio
     async def test_text_seek_nonzero_cur_end_raises(self, temp_file):
         """Text seek should reject nonzero relative seeks."""
         async with AsyncGzipTextFile(temp_file, "wt") as f:
