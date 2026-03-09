@@ -468,6 +468,28 @@ class TestTextNewlineBehavior:
             data = await f.read()
         assert data.decode("utf-8") == text
 
+    @pytest.mark.asyncio
+    async def test_newlines_reports_observed_universal_newlines(self, temp_file):
+        raw_text = "line1\r\nline2\nline3\r"
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write(raw_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            assert f.newlines is None
+            assert await f.read() == "line1\nline2\nline3\n"
+            assert f.newlines == ("\r", "\n", "\r\n")
+
+    @pytest.mark.asyncio
+    async def test_newlines_reports_observed_types_without_translation(self, temp_file):
+        raw_text = "line1\r\nline2\n"
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write(raw_text)
+
+        async with AsyncGzipTextFile(temp_file, "rt", newline="") as f:
+            assert f.newlines is None
+            assert await f.readline() == "line1\r\n"
+            assert f.newlines == ("\n", "\r\n")
+
 
 class TestNewlineHandlingBugs:
     """Tests for newline handling bugs identified in code review."""

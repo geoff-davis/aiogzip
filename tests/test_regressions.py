@@ -319,7 +319,7 @@ class TestHighPriorityEdgeCases:
         )
         assert text.encoding == "latin-1"
         assert text.errors == "ignore"
-        assert text.newlines == ""
+        assert text.newlines is None
 
         default_text = AsyncGzipTextFile(temp_file, "rt")
         assert default_text.encoding == "utf-8"

@@ -69,6 +69,7 @@ class AsyncGzipTextFile:
         "_decoder",
         "_text_buffer",
         "_trailing_cr",
+        "_seen_newline_types",
         "_cookie_cache",
         "_cookie_lookup",
         "_next_cookie",
@@ -76,6 +77,9 @@ class AsyncGzipTextFile:
 
     # Maximum number of entries to keep in the cookie cache for tell()/seek()
     MAX_COOKIE_CACHE_SIZE = 1000
+    _SEEN_CR = 1
+    _SEEN_LF = 2
+    _SEEN_CRLF = 4
 
     def __init__(
         self,
@@ -142,6 +146,7 @@ class AsyncGzipTextFile:
         )
         self._text_buffer: str = ""  # Central buffer for decoded text
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
+        self._seen_newline_types: int = 0
         self._cookie_cache: Dict[int, _TextCookieState] = {}
         self._cookie_lookup: Dict[_TextCookieState, int] = {}
         self._next_cookie: int = 1
@@ -242,6 +247,7 @@ class AsyncGzipTextFile:
         self._decoder.reset()
         self._text_buffer = ""
         self._trailing_cr = False
+        self._seen_newline_types = 0
         return offset
 
     def fileno(self) -> int:
@@ -283,9 +289,22 @@ class AsyncGzipTextFile:
         return self._errors
 
     @property
-    def newlines(self) -> Optional[str]:
-        """Return newline handling configuration."""
-        return self._newline
+    def newlines(self) -> Optional[Union[str, Tuple[str, ...]]]:
+        """Return newline types observed while reading, like TextIOWrapper."""
+        if self._seen_newline_types == 0:
+            return None
+
+        seen = []
+        if self._seen_newline_types & self._SEEN_CR:
+            seen.append("\r")
+        if self._seen_newline_types & self._SEEN_LF:
+            seen.append("\n")
+        if self._seen_newline_types & self._SEEN_CRLF:
+            seen.append("\r\n")
+
+        if len(seen) == 1:
+            return seen[0]
+        return tuple(seen)
 
     @property
     def buffer(self) -> AsyncGzipBinaryFile:
@@ -350,6 +369,7 @@ class AsyncGzipTextFile:
             return False
 
         if self._binary_file._eof:
+            self._finalize_pending_newline_state()
             return False
 
         raw_chunk = await self._binary_file.read(self._chunk_size)
@@ -358,6 +378,8 @@ class AsyncGzipTextFile:
             final_decoded = self._decoder.decode(b"", final=True)
             if final_decoded:
                 self._text_buffer += self._apply_newline_decoding(final_decoded)
+            self._finalize_pending_newline_state()
+            if final_decoded:
                 return True
             return False
 
@@ -497,29 +519,56 @@ class AsyncGzipTextFile:
         """
         if not text:
             return text
-        if self._newline is None:
-            # Universal newline translation
-            # Handle trailing \r from previous chunk
-            if self._trailing_cr and text and text[0] == "\n":
-                # Previous chunk ended with \r, this starts with \n - it's a CRLF
-                # Remove the \n since the \r was already converted to \n in previous chunk
+        if self._newline in {None, ""}:
+            if self._trailing_cr:
+                if text[0] == "\n":
+                    self._seen_newline_types |= self._SEEN_CRLF
+                else:
+                    self._seen_newline_types |= self._SEEN_CR
+
+            pending_trailing_cr = False
+            scan_limit = len(text)
+            if text.endswith("\r"):
+                pending_trailing_cr = True
+                scan_limit -= 1
+
+            index = 0
+            while index < scan_limit:
+                char = text[index]
+                if char == "\r":
+                    if index + 1 < scan_limit and text[index + 1] == "\n":
+                        self._seen_newline_types |= self._SEEN_CRLF
+                        index += 2
+                        continue
+                    self._seen_newline_types |= self._SEEN_CR
+                elif char == "\n":
+                    self._seen_newline_types |= self._SEEN_LF
+                index += 1
+
+            if self._newline == "":
+                self._trailing_cr = pending_trailing_cr
+                return text
+
+            if self._trailing_cr and text[0] == "\n":
+                # Previous chunk ended with \r, this starts with \n - it's a CRLF.
+                # Drop the \n because the previous chunk already emitted the normalized \n.
                 text = text[1:]
 
-            # Reset trailing CR flag
-            self._trailing_cr = False
-
-            # Check if this chunk ends with \r (before we do replacements)
-            # This \r might be followed by \n in the next chunk
-            if text and text[-1] == "\r":
-                self._trailing_cr = True
-
-            # Convert CRLF to LF, then remaining CR to LF
+            self._trailing_cr = pending_trailing_cr
             text = text.replace("\r\n", "\n")
             text = text.replace("\r", "\n")
-
             return text
         # newline '' or explicit newline: do not translate on input
         return text
+
+    def _finalize_pending_newline_state(self) -> None:
+        """Record a trailing standalone CR when EOF resolves the ambiguity."""
+        if self._newline not in {None, ""}:
+            return
+        if not self._trailing_cr:
+            return
+        self._seen_newline_types |= self._SEEN_CR
+        self._trailing_cr = False
 
     def __aiter__(self) -> "AsyncGzipTextFile":
         """Make AsyncGzipTextFile iterable for line-by-line reading."""
