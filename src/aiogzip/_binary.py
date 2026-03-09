@@ -222,7 +222,19 @@ class AsyncGzipBinaryFile:
         elif whence == os.SEEK_CUR:
             target = self._position + offset
         elif whence == os.SEEK_END:
-            raise ValueError("Seek from end not supported in read mode")
+            while not self._eof:
+                await self._fill_buffer()
+                buffered = len(self._buffer) - self._buffer_offset
+                if buffered > 0:
+                    self._buffer_offset = len(self._buffer)
+                    self._position += buffered
+                    del self._buffer[:]
+                    self._buffer_offset = 0
+            target = self._position + offset
+            if target < 0:
+                target = 0
+            elif target > self._position:
+                target = self._position
         else:
             raise ValueError("Invalid whence value")
 

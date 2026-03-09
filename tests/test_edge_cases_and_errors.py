@@ -347,7 +347,7 @@ class TestAdditionalCoverage:
 
     @pytest.mark.asyncio
     async def test_seek_end_in_read_mode(self, tmp_path):
-        """Test seek(SEEK_END) in read mode raises error."""
+        """Test seek(SEEK_END) in read mode matches gzip.GzipFile semantics."""
         import os
 
         p = tmp_path / "test.gz"
@@ -355,8 +355,8 @@ class TestAdditionalCoverage:
             await f.write(b"test data")
 
         async with AsyncGzipBinaryFile(p, "rb") as f:
-            with pytest.raises(ValueError, match="Seek from end not supported"):
-                await f.seek(0, os.SEEK_END)
+            assert await f.seek(-4, os.SEEK_END) == 5
+            assert await f.read() == b"data"
 
     @pytest.mark.asyncio
     async def test_fileno_no_fileno_method(self, tmp_path):

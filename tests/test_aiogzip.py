@@ -584,6 +584,28 @@ class TestAsyncGzipBinaryFile:
             assert await f.tell() == 7
 
     @pytest.mark.asyncio
+    async def test_binary_seek_from_end_clamps_to_stream_bounds(self, temp_file):
+        payload = b"abcdef"
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(payload)
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.seek(0, os.SEEK_END) == len(payload)
+            assert await f.read() == b""
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.seek(-1, os.SEEK_END) == len(payload) - 1
+            assert await f.read() == payload[-1:]
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.seek(-100, os.SEEK_END) == 0
+            assert await f.read() == payload
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.seek(100, os.SEEK_END) == len(payload)
+            assert await f.read() == b""
+
+    @pytest.mark.asyncio
     async def test_binary_readinto(self, temp_file, sample_data):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(sample_data)
