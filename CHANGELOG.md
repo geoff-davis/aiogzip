@@ -7,10 +7,14 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - Make `AsyncGzipTextFile.tell()` cookies unique per call to avoid collisions that could restore the wrong text position when using `seek(cookie)`.
+- Align binary `read1()` and `readinto1()` with `gzip.GzipFile`, including zero-length requests that must not trigger underlying reads.
 - Add read-mode binary `seek(..., SEEK_END)` support to match `gzip.GzipFile`.
 - Support backward seeks on non-seekable binary `fileobj` inputs by replaying cached compressed input when a rewind is needed.
 - Clean up internally opened resources when `AsyncGzipBinaryFile.__aenter__()` or `AsyncGzipTextFile.__aenter__()` fails partway through setup.
 - Validate that gzip header `mtime` values fit in the 32-bit field before opening the stream.
+- Make text-mode newline tracking match stdlib behavior by reporting observed newline types and preserving that state across `seek(tell())` round trips.
+- Rework text `seek()` / `tell()` handling to use self-contained cookies plus stdlib-compatible plain positions, fixing multibyte, translated-newline, and exact-EOF edge cases without retaining per-cookie cache state indefinitely.
+- Fall back to `fileobj.name` for `.name` when no explicit filename was provided, matching `gzip.GzipFile`.
 
 ### Documentation
 
@@ -19,10 +23,12 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Narrow GitHub Actions write permissions so only the coverage-comment job gets elevated access.
+- Ignore local `mise.toml` tool configuration files in git status.
 
 ### Refactor
 
 - Split the test suite into focused modules for factory, binary, text, file-object, lifecycle, interop, regression, and performance coverage.
+- Add contributor guidance to run `uv run pre-commit run --all-files` before committing so formatting and type-check issues are caught locally.
 
 ## [1.2.2] - 2026-02-11
 
