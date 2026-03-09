@@ -1,4 +1,6 @@
+import gzip
 import io
+import os
 
 import pytest
 
@@ -598,3 +600,384 @@ class TestAdditionalCoverage:
             line2 = await f.readline()
             assert line1 == "line1\r\n"
             assert line2 == "line2\r\n"
+
+
+class TestEdgeCases:
+    """Test edge cases and error conditions."""
+
+    @pytest.mark.asyncio
+    async def test_tricky_unicode_split(self, temp_file):
+        """
+        Tests that multi-byte characters are decoded correctly even when
+        split across internal read-chunk boundaries.
+        """
+        # 1. SETUP: Define a chunk size and create a string that will
+        # force a multi-byte character to be split by a read operation.
+        chunk_size = 1024
+
+        # The character "世界" is 6 bytes in UTF-8: b'\xe4\xb8\x96\xe7\x95\x8c'.
+        # We construct the string so the first binary read of `chunk_size`
+        # bytes will end mid-character, capturing only the first few bytes.
+        # This creates the adversarial condition we want to test.
+        test_text = "a" * (chunk_size - 2) + "世界"
+
+        # 2. ACTION: Write the test string to a compressed file.
+        async with AsyncGzipTextFile(temp_file, "wt", encoding="utf-8") as f_write:
+            await f_write.write(test_text)
+
+        # 3. VERIFICATION: Read the file back using a controlled chunk size
+        #    to ensure our multi-byte character is split.
+        async with AsyncGzipTextFile(temp_file, "rt", encoding="utf-8") as f_read:
+            # This is a testing-specific modification to force the desired
+            # read behavior by manipulating an internal attribute.
+            f_read._binary_file._chunk_size = chunk_size
+
+            # Read the entire file. The library's internal logic will have
+            # to handle the broken character across reads.
+            read_content = await f_read.read()
+
+        # 4. ASSERT: The final decoded content must exactly match the original.
+        assert read_content == test_text
+
+    def test_invalid_filename(self):
+        """Test invalid filename inputs."""
+        with pytest.raises(ValueError, match="Filename cannot be empty"):
+            AsyncGzipBinaryFile("")
+
+        with pytest.raises(ValueError, match="Filename cannot be empty"):
+            AsyncGzipTextFile("")
+
+        with pytest.raises(
+            ValueError, match="Either filename or fileobj must be provided"
+        ):
+            AsyncGzipBinaryFile(None)
+
+        with pytest.raises(
+            ValueError, match="Either filename or fileobj must be provided"
+        ):
+            AsyncGzipTextFile(None)
+
+        with pytest.raises(TypeError, match="Filename must be a string"):
+            AsyncGzipBinaryFile(123)  # pyrefly: ignore
+
+        with pytest.raises(TypeError, match="Filename must be a string"):
+            AsyncGzipTextFile(123)  # pyrefly: ignore
+
+    def test_invalid_chunk_size(self):
+        """Test invalid chunk size inputs."""
+        with pytest.raises(ValueError, match="Chunk size must be positive"):
+            AsyncGzipBinaryFile("test.gz", chunk_size=0)
+
+        with pytest.raises(ValueError, match="Chunk size must be positive"):
+            AsyncGzipBinaryFile("test.gz", chunk_size=-1)
+
+    def test_invalid_compression_level(self):
+        """Test invalid compression level inputs."""
+        AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=-1)
+        AsyncGzipTextFile("test.gz", mode="wt", compresslevel=-1)
+
+        with pytest.raises(
+            ValueError, match="Compression level must be between -1 and 9"
+        ):
+            AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=-2)
+
+        with pytest.raises(
+            ValueError, match="Compression level must be between -1 and 9"
+        ):
+            AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=10)
+
+        with pytest.raises(
+            ValueError, match="Compression level must be between -1 and 9"
+        ):
+            AsyncGzipTextFile("test.gz", mode="wt", compresslevel=-2)
+
+    def test_invalid_mode(self):
+        """Test invalid mode inputs."""
+        with pytest.raises(ValueError, match="Invalid mode"):
+            AsyncGzipBinaryFile("test.gz", mode="invalid")
+
+        with pytest.raises(ValueError, match="Invalid mode"):
+            AsyncGzipTextFile("test.gz", mode="invalid")
+
+        # Test that binary file rejects text modes
+        with pytest.raises(ValueError, match="text \\('t'\\)"):
+            AsyncGzipBinaryFile("test.gz", mode="rt")
+
+        with pytest.raises(ValueError, match="text \\('t'\\)"):
+            AsyncGzipBinaryFile("test.gz", mode="wt")
+
+        with pytest.raises(ValueError, match="text \\('t'\\)"):
+            AsyncGzipBinaryFile("test.gz", mode="at")
+
+        # Test that text file rejects binary modes
+        with pytest.raises(ValueError, match="binary \\('b'\\)"):
+            AsyncGzipTextFile("test.gz", mode="rb")
+
+        with pytest.raises(ValueError, match="binary \\('b'\\)"):
+            AsyncGzipTextFile("test.gz", mode="wb")
+
+        with pytest.raises(ValueError, match="binary \\('b'\\)"):
+            AsyncGzipTextFile("test.gz", mode="ab")
+
+    def test_invalid_encoding(self):
+        """Test invalid encoding inputs."""
+        with pytest.raises(ValueError, match="Encoding cannot be empty"):
+            AsyncGzipTextFile("test.gz", encoding="")
+
+    def test_invalid_errors(self):
+        """Test invalid errors inputs."""
+        # Arbitrary error handlers should now be accepted
+        AsyncGzipTextFile("test.gz", errors="invalid")
+        f = AsyncGzipTextFile("test.gz", errors=None)
+        assert f._errors == "strict"
+
+    def test_valid_errors_values(self):
+        """Test that all valid errors values are accepted."""
+        valid_errors = [
+            "strict",
+            "ignore",
+            "replace",
+            "backslashreplace",
+            "surrogateescape",
+            "xmlcharrefreplace",
+            "namereplace",
+        ]
+        for error_val in valid_errors:
+            # Should not raise an exception
+            f = AsyncGzipTextFile("test.gz", errors=error_val)
+            assert f._errors == error_val
+
+    @pytest.mark.asyncio
+    async def test_empty_file_operations(self, temp_file):
+        """Test operations on empty files."""
+        # Write empty file
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            pass  # Write nothing
+
+        # Read empty file
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read()
+            assert data == b""
+
+        # Test partial read on empty file
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            data = await f.read(100)
+            assert data == b""
+
+    @pytest.mark.asyncio
+    async def test_empty_text_file_operations(self, temp_file):
+        """Test operations on empty text files."""
+        # Write empty text file
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            pass  # Write nothing
+
+        # Read empty text file
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            data = await f.read()
+            assert data == ""
+
+        # Test line iteration on empty file
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            lines = []
+            async for line in f:
+                lines.append(line)
+            assert lines == []
+
+    @pytest.mark.asyncio
+    async def test_corrupted_file_handling(self, temp_file):
+        """Test handling of corrupted gzip files."""
+        # Create a file with invalid gzip data
+        with open(temp_file, "wb") as f:
+            f.write(b"This is not gzip data")
+
+        # Try to read it
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            with pytest.raises(gzip.BadGzipFile, match="Error decompressing gzip data"):
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_operations_on_closed_file(self, temp_file):
+        """Test operations on closed files."""
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        async with f:
+            await f.write(b"test")
+
+        # File is now closed
+        with pytest.raises(ValueError, match="I/O operation on closed file"):
+            await f.write(b"more data")
+
+    @pytest.mark.asyncio
+    async def test_operations_without_context_manager(self, temp_file):
+        """Test operations without using context manager."""
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+
+        with pytest.raises(ValueError, match="File not opened"):
+            await f.write(b"test")
+
+    @pytest.mark.asyncio
+    async def test_compression_levels(self, temp_file):
+        """Test different compression levels."""
+        test_data = b"Hello, World! " * 1000  # Repeating data compresses well
+
+        sizes = {}
+        for level in [0, 1, 6, 9]:  # Test min, low, default, max compression
+            temp_file_level = f"{temp_file}_{level}"
+            async with AsyncGzipBinaryFile(
+                temp_file_level, "wb", compresslevel=level
+            ) as f:
+                await f.write(test_data)
+
+            # Check file size
+            sizes[level] = os.path.getsize(temp_file_level)
+
+            # Verify we can read it back
+            async with AsyncGzipBinaryFile(temp_file_level, "rb") as f:
+                read_data = await f.read()
+                assert read_data == test_data
+
+            # Clean up
+            os.unlink(temp_file_level)
+
+        # Level 0 (no compression) should be largest
+        # Level 9 (max compression) should be smallest for this data
+        assert sizes[0] > sizes[9]
+
+    @pytest.mark.asyncio
+    async def test_unicode_edge_cases(self, temp_file):
+        """Test Unicode edge cases in text mode."""
+        # Test various Unicode characters
+        test_strings = [
+            "Hello, 世界!",  # Mixed ASCII and Chinese
+            "🚀🌟💫",  # Emojis
+            "Ñoño niño",  # Spanish characters
+            "Здравствуй мир",  # Cyrillic
+            "مرحبا بالعالم",  # Arabic
+            "\n\r\t",  # Control characters
+            "",  # Empty string
+        ]
+
+        for test_str in test_strings:
+            async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+                await f.write(test_str)
+
+            async with AsyncGzipTextFile(temp_file, "rt", newline="") as f:
+                read_str = await f.read()
+                assert read_str == test_str
+
+    @pytest.mark.asyncio
+    async def test_multiple_writes_and_reads(self, temp_file):
+        """Test multiple write operations followed by reads."""
+        chunks = [b"chunk1", b"chunk2", b"chunk3", b"chunk4"]
+
+        # Write multiple chunks
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            for chunk in chunks:
+                await f.write(chunk)
+
+        # Read back all at once
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            all_data = await f.read()
+            assert all_data == b"".join(chunks)
+
+        # Read back in parts
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            read_chunks = []
+            for expected_chunk in chunks:
+                chunk = await f.read(len(expected_chunk))
+                read_chunks.append(chunk)
+            assert read_chunks == chunks
+
+
+
+
+class TestErrorHandlingConsistency:
+    """Test consistent error handling across the module."""
+
+    @pytest.mark.asyncio
+    async def test_zlib_errors_wrapped_as_oserror(self, temp_file):
+        """Test that zlib errors are consistently wrapped in OSError."""
+        # Create corrupted gzip file
+        with open(temp_file, "wb") as f:
+            f.write(b"Not a valid gzip file")
+
+        # Reading should raise OSError (not zlib.error)
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            with pytest.raises(OSError, match="Error decompressing gzip data"):
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_all_operation_errors_are_oserror(self, temp_file):
+        """Test that all operation failures raise OSError consistently."""
+        # Write valid data first
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"test data")
+
+        # Try to write when file is read-only
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            with pytest.raises(IOError, match="File not open for writing"):
+                await f.write(b"more data")
+
+        # Try to read when file is write-only
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            with pytest.raises(IOError, match="File not open for reading"):
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_exception_chaining_preserved(self, temp_file):
+        """Test that exception chaining is used (from e) for debugging."""
+        # Create corrupted file
+        with open(temp_file, "wb") as f:
+            f.write(b"\x1f\x8b\x08\x00corrupted")
+
+        try:
+            async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+                await f.read()
+        except OSError as e:
+            # Should have a __cause__ from the original zlib.error
+            assert e.__cause__ is not None
+            assert (
+                "zlib" in str(type(e.__cause__)).lower()
+                or "error" in str(type(e.__cause__)).lower()
+            )
+
+    @pytest.mark.asyncio
+    async def test_clear_error_messages(self, temp_file):
+        """Test that error messages clearly indicate which operation failed."""
+        # Test compression error message
+        with open(temp_file, "wb") as f:
+            f.write(b"\x1f\x8b\x08\x00corrupted")
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            try:
+                await f.read()
+            except OSError as e:
+                # Error message should indicate it's a decompression error
+                assert "decompress" in str(e).lower()
+
+    @pytest.mark.asyncio
+    async def test_io_errors_not_wrapped(self, tmp_path):
+        """Test that I/O errors are re-raised as-is, not wrapped."""
+        # Create a file that we'll delete while reading
+        test_file = tmp_path / "test.gz"
+
+        async with AsyncGzipBinaryFile(test_file, "wb") as f:
+            await f.write(b"test data")
+
+        # Open file for reading but don't read yet
+        f = AsyncGzipBinaryFile(test_file, "rb")
+        await f.__aenter__()
+
+        # Close the underlying file to simulate I/O error
+        if f._file is not None:
+            await f._file.close()
+
+        # Try to read - should get an I/O error (not wrapped in our custom OSError)
+        with pytest.raises(
+            (OSError, ValueError)
+        ):  # aiofiles may raise ValueError for closed file
+            await f.read()
+
+        # Clean up
+        await f.__aexit__(None, None, None)
+
+
