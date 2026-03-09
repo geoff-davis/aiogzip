@@ -229,6 +229,63 @@ class TestEdgeCasesAndErrors:
                 await f.flush()
 
     @pytest.mark.asyncio
+    async def test_binary_enter_failure_closes_owned_file(self, monkeypatch, tmp_path):
+        """Failed binary __aenter__ should close internally opened file handles."""
+        import aiogzip._binary as binary_module
+
+        class FailingFile:
+            def __init__(self):
+                self.close_called = False
+
+            async def write(self, data):
+                raise OSError("header write failed")
+
+            async def close(self):
+                self.close_called = True
+
+        opened_file = FailingFile()
+
+        async def fake_open(*args, **kwargs):
+            return opened_file
+
+        monkeypatch.setattr(binary_module.aiofiles, "open", fake_open)
+
+        f = AsyncGzipBinaryFile(tmp_path / "broken.gz", "wb")
+        with pytest.raises(OSError, match="header write failed"):
+            await f.__aenter__()
+
+        assert opened_file.close_called is True
+        assert f._file is None
+
+    @pytest.mark.asyncio
+    async def test_text_enter_failure_closes_nested_binary_file(self, monkeypatch, tmp_path):
+        """Failed text __aenter__ should clean up the nested binary layer."""
+        import aiogzip._text as text_module
+
+        class FailingBinaryFile:
+            last_instance = None
+
+            def __init__(self, *args, **kwargs):
+                self.close_called = False
+                self.__class__.last_instance = self
+
+            async def __aenter__(self):
+                raise OSError("binary setup failed")
+
+            async def close(self):
+                self.close_called = True
+
+        monkeypatch.setattr(text_module, "AsyncGzipBinaryFile", FailingBinaryFile)
+
+        f = AsyncGzipTextFile(tmp_path / "broken.gz", "wt")
+        with pytest.raises(OSError, match="binary setup failed"):
+            await f.__aenter__()
+
+        assert FailingBinaryFile.last_instance is not None
+        assert FailingBinaryFile.last_instance.close_called is True
+        assert f._binary_file is None
+
+    @pytest.mark.asyncio
     async def test_text_write_type_error(self, tmp_path):
         """Test write raises TypeError for non-string input."""
         p = tmp_path / "text_type_err.gz"

@@ -150,41 +150,47 @@ class AsyncGzipBinaryFile:
 
     async def __aenter__(self) -> "AsyncGzipBinaryFile":
         """Enter the async context manager and initialize resources."""
-        if self._external_file is not None:
-            self._file = self._external_file
-            self._owns_file = False
-        else:
-            if self._filename is None:
-                raise ValueError("Filename must be provided when fileobj is not given")
-            self._file = await aiofiles.open(  # type: ignore
-                self._filename, self._file_mode
-            )
-            self._owns_file = True
+        try:
+            if self._external_file is not None:
+                self._file = self._external_file
+                self._owns_file = False
+            else:
+                if self._filename is None:
+                    raise ValueError("Filename must be provided when fileobj is not given")
+                self._file = await aiofiles.open(  # type: ignore
+                    self._filename, self._file_mode
+                )
+                self._owns_file = True
 
-        # Initialize compression/decompression engine based on mode
-        if self._writing_mode:
-            self._engine = zlib.compressobj(
-                level=self._compresslevel, wbits=-zlib.MAX_WBITS
-            )
-            header = _build_gzip_header(
-                _derive_header_filename(self._header_filename_override, self._filename),
-                self._header_mtime,
-                self._compresslevel,
-            )
-            await self._file.write(header)
-            self._crc = 0
-            self._input_size = 0
-        else:  # read mode
-            self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
-            self._position = 0
-            self._mtime = None
-            self._header_probe_buffer.clear()
-            self._compressed_cache.clear()
-            self._replay_offset = None
-            seek_method = getattr(self._file, "seek", None)
-            self._cache_rewindable_reads = not callable(seek_method)
+            # Initialize compression/decompression engine based on mode
+            if self._writing_mode:
+                self._engine = zlib.compressobj(
+                    level=self._compresslevel, wbits=-zlib.MAX_WBITS
+                )
+                header = _build_gzip_header(
+                    _derive_header_filename(
+                        self._header_filename_override, self._filename
+                    ),
+                    self._header_mtime,
+                    self._compresslevel,
+                )
+                await self._file.write(header)
+                self._crc = 0
+                self._input_size = 0
+            else:  # read mode
+                self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
+                self._position = 0
+                self._mtime = None
+                self._header_probe_buffer.clear()
+                self._compressed_cache.clear()
+                self._replay_offset = None
+                seek_method = getattr(self._file, "seek", None)
+                self._cache_rewindable_reads = not callable(seek_method)
 
-        return self
+            return self
+        except Exception:
+            await self._cleanup_failed_enter()
+            raise
 
     async def __aexit__(
         self,
@@ -722,6 +728,19 @@ class AsyncGzipBinaryFile:
         if chunk and self._cache_rewindable_reads:
             self._compressed_cache.extend(chunk)
         return chunk
+
+    async def _cleanup_failed_enter(self) -> None:
+        """Close internally opened resources after __aenter__ setup failures."""
+        if self._file is None or not self._owns_file:
+            return
+
+        close_method = getattr(self._file, "close", None)
+        if callable(close_method):
+            result = close_method()
+            if hasattr(result, "__await__"):
+                await result
+        self._file = None
+        self._owns_file = False
 
     async def flush(self) -> None:
         """

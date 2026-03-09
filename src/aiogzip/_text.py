@@ -159,7 +159,15 @@ class AsyncGzipTextFile:
             fileobj=self._external_file,
             closefd=self._closefd,
         )
-        await self._binary_file.__aenter__()
+        try:
+            await self._binary_file.__aenter__()
+        except Exception:
+            try:
+                await self._binary_file.close()
+            except Exception:
+                pass
+            self._binary_file = None
+            raise
         return self
 
     async def __aexit__(
