@@ -252,13 +252,19 @@ class AsyncGzipTextFile:
         """Return the name of the file.
 
         This property provides compatibility with the standard file API.
-        Returns the filename passed to the constructor, or None if the file
-        was opened with a file object instead of a filename.
+        Returns the filename passed to the constructor, or falls back to the
+        underlying file object's ``name`` attribute when available.
 
         Returns:
-            The filename as str, bytes, or Path, or None if opened via fileobj.
+            The filename as str, bytes, or Path, or None if no name is available.
         """
-        return self._filename
+        if self._filename is not None:
+            return self._filename
+        if self._external_file is not None:
+            return getattr(self._external_file, "name", None)
+        if self._binary_file is None:
+            return None
+        return self._binary_file.name
 
     @property
     def closed(self) -> bool:

@@ -141,7 +141,7 @@ class TestNameProperty:
             async with AsyncGzipBinaryFile(
                 None, "wb", fileobj=file_handle, closefd=False
             ) as f:
-                assert f.name is None
+                assert f.name == file_handle.name
                 await f.write(b"test")
         finally:
             await file_handle.close()
@@ -170,7 +170,7 @@ class TestNameProperty:
             async with AsyncGzipTextFile(
                 None, "wt", fileobj=file_handle, closefd=False
             ) as f:
-                assert f.name is None
+                assert f.name == file_handle.name
                 await f.write("test")
         finally:
             await file_handle.close()
