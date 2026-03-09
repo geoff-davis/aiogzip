@@ -75,8 +75,6 @@ class AsyncGzipTextFile:
         "_next_cookie",
     )
 
-    # Maximum number of entries to keep in the cookie cache for tell()/seek()
-    MAX_COOKIE_CACHE_SIZE = 1000
     _SEEN_CR = 1
     _SEEN_LF = 2
     _SEEN_CRLF = 4
@@ -202,15 +200,6 @@ class AsyncGzipTextFile:
 
         cookie = self._next_cookie
         self._next_cookie += 1
-        # Bound the cache size to prevent unbounded memory growth
-        if len(self._cookie_cache) >= self.MAX_COOKIE_CACHE_SIZE:
-            # Remove oldest entries (first half of the cache)
-            keys_to_remove = list(self._cookie_cache.keys())[
-                : self.MAX_COOKIE_CACHE_SIZE // 2
-            ]
-            for key in keys_to_remove:
-                removed_state = self._cookie_cache.pop(key)
-                self._cookie_lookup.pop(removed_state, None)
         self._cookie_cache[cookie] = state
         self._cookie_lookup[state] = cookie
         return cookie
@@ -239,9 +228,7 @@ class AsyncGzipTextFile:
             return offset
 
         if offset != 0:
-            raise OSError(
-                "Cannot seek to uncached text cookie; call tell() near the target position"
-            )
+            raise OSError("Cannot seek to invalid text cookie for this stream")
 
         await self._binary_file.seek(0)
         self._decoder.reset()

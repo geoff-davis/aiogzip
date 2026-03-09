@@ -461,58 +461,37 @@ class TestAdditionalCoverage:
             await f.__aexit__(None, None, None)
 
     @pytest.mark.asyncio
-    async def test_cookie_cache_eviction(self, tmp_path):
-        """Test that cookie cache evicts old entries when full."""
-        p = tmp_path / "test.gz"
-
-        # Create a file with enough content
-        async with AsyncGzipTextFile(p, "wt") as f:
-            for i in range(100):
-                await f.write(f"Line {i}\n")
-
-        async with AsyncGzipTextFile(p, "rt") as f:
-            # Temporarily reduce cache size for testing
-            original_max = f.MAX_COOKIE_CACHE_SIZE
-            f.__class__.MAX_COOKIE_CACHE_SIZE = 10
-
-            try:
-                # Call tell() many times to fill the cache
-                for _ in range(20):
-                    await f.tell()
-                    await f.read(5)
-
-                # Cache should have been trimmed
-                assert len(f._cookie_cache) <= 10
-            finally:
-                f.__class__.MAX_COOKIE_CACHE_SIZE = original_max
-
-    @pytest.mark.asyncio
-    async def test_text_seek_evicted_cookie_raises(self, tmp_path):
-        """Seeking an evicted cookie should fail instead of returning wrong data."""
-        p = tmp_path / "evicted_cookie.gz"
+    async def test_text_seek_cookie_remains_valid_after_many_tells(self, tmp_path):
+        """tell() cookies should remain valid for the full stream lifetime."""
+        p = tmp_path / "long_lived_cookie.gz"
         async with AsyncGzipTextFile(p, "wt", newline="") as f:
             await f.write("aé🙂b" * 600)
 
         async with AsyncGzipTextFile(p, "rt", newline="", chunk_size=1) as f:
-            original_max = f.MAX_COOKIE_CACHE_SIZE
-            f.__class__.MAX_COOKIE_CACHE_SIZE = 10
-            try:
-                await f.read(5)
-                cookie = await f.tell()
+            await f.read(5)
+            cookie = await f.tell()
+            expected = await f.read(10)
 
-                for _ in range(300):
-                    if cookie not in f._cookie_cache:
-                        break
-                    await f.read(5)
-                    await f.tell()
+            for _ in range(300):
+                if not await f.read(5):
+                    break
+                await f.tell()
 
-                assert cookie not in f._cookie_cache
-                with pytest.raises(
-                    OSError, match="Cannot seek to uncached text cookie"
-                ):
-                    await f.seek(cookie)
-            finally:
-                f.__class__.MAX_COOKIE_CACHE_SIZE = original_max
+            await f.seek(cookie)
+            assert await f.read(10) == expected
+
+    @pytest.mark.asyncio
+    async def test_text_seek_invalid_cookie_raises(self, tmp_path):
+        """Seeking an arbitrary cookie should fail cleanly."""
+        p = tmp_path / "invalid_cookie.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("hello world")
+
+        async with AsyncGzipTextFile(p, "rt") as f:
+            with pytest.raises(
+                OSError, match="Cannot seek to invalid text cookie for this stream"
+            ):
+                await f.seek(999999)
 
     @pytest.mark.asyncio
     async def test_text_seek_non_seek_set(self, tmp_path):
