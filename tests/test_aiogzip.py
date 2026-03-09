@@ -3,12 +3,9 @@
 import gzip
 import io
 import os
-import struct
 import tarfile
-import tempfile
 import time
-from pathlib import Path
-from typing import Dict, Union
+from typing import Union
 
 import aiocsv
 import pytest
@@ -21,44 +18,11 @@ from aiogzip import (
     WithAsyncReadWrite,
     WithAsyncWrite,
 )
-
-
-def _parse_gzip_header_bytes(
-    path: Union[str, os.PathLike],
-) -> Dict[str, Union[int, bytes]]:
-    raw = Path(path).read_bytes()
-    assert len(raw) >= 10
-    flags = raw[3]
-    mtime = struct.unpack("<I", raw[4:8])[0]
-    filename = b""
-    if flags & 0x08:
-        terminator = raw.find(b"\x00", 10)
-        assert terminator != -1
-        filename = raw[10:terminator]
-    return {"flags": flags, "mtime": mtime, "filename": filename}
+from conftest import parse_gzip_header_bytes
 
 
 class TestAsyncGzipFile:
     """Test the AsyncGzipFile factory function."""
-
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
-    @pytest.fixture
-    def sample_data(self):
-        """Sample data for testing."""
-        return b"Hello, World! This is a test string for gzip compression."
-
-    @pytest.fixture
-    def large_data(self):
-        """Large data for testing chunked operations."""
-        return b"Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 1000
 
     def test_init_valid_modes(self):
         """Test initialization with valid modes."""
@@ -376,25 +340,6 @@ class TestAsyncGzipFile:
 class TestAsyncGzipBinaryFile:
     """Test the AsyncGzipBinaryFile class."""
 
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
-    @pytest.fixture
-    def sample_data(self):
-        """Sample data for testing."""
-        return b"Hello, World! This is a test string for gzip compression."
-
-    @pytest.fixture
-    def large_data(self):
-        """Large data for testing chunked operations."""
-        return b"Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 1000
-
     @pytest.mark.asyncio
     async def test_binary_write_read_roundtrip(self, temp_file, sample_data):
         """Test basic write/read roundtrip in binary mode."""
@@ -526,7 +471,7 @@ class TestAsyncGzipBinaryFile:
         ) as f:
             await f.write(b"payload")
 
-        header = _parse_gzip_header_bytes(target)
+        header = parse_gzip_header_bytes(target)
         assert header["mtime"] == 0
         assert header["filename"] == b"report.csv"
         assert header["flags"] & 0x08
@@ -541,7 +486,7 @@ class TestAsyncGzipBinaryFile:
         async with AsyncGzipBinaryFile(target, "wb") as f:
             await f.write(b"x")
 
-        header = _parse_gzip_header_bytes(target)
+        header = parse_gzip_header_bytes(target)
         assert header["filename"] == b"dataset"
         # Allow slight timing differences
         assert abs(header["mtime"] - int(time.time())) < 10
@@ -555,7 +500,7 @@ class TestAsyncGzipBinaryFile:
         ) as f:
             await f.write("hello")
 
-        header = _parse_gzip_header_bytes(target)
+        header = parse_gzip_header_bytes(target)
         assert header["mtime"] == 12345
         assert header["filename"] == b"notes.txt"
 
@@ -755,25 +700,6 @@ class TestAsyncGzipBinaryFile:
 
 class TestAsyncGzipTextFile:
     """Test the AsyncGzipTextFile class."""
-
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
-    @pytest.fixture
-    def sample_text(self):
-        """Sample text for testing."""
-        return "Hello, World! This is a test string for gzip compression."
-
-    @pytest.fixture
-    def large_text(self):
-        """Large text for testing chunked operations."""
-        return "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 1000
 
     @pytest.mark.asyncio
     async def test_text_write_read_roundtrip(self, temp_file, sample_text):
@@ -1136,15 +1062,6 @@ class TestAsyncGzipTextFile:
 class TestTextErrorsBehavior:
     """Tests for errors= behavior matching gzip semantics."""
 
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
     @pytest.mark.asyncio
     async def test_read_errors_strict_raises_on_invalid_bytes(self, temp_file):
         """Reading invalid UTF-8 with errors=strict should raise UnicodeDecodeError."""
@@ -1213,14 +1130,6 @@ class TestTextErrorsBehavior:
 
 class TestTextNewlineBehavior:
     """Tests for newline handling similar to TextIOWrapper semantics."""
-
-    @pytest.fixture
-    def temp_file(self):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
 
     @pytest.mark.asyncio
     async def test_read_universal_newlines_default(self, temp_file):
@@ -1321,15 +1230,6 @@ class TestFileobjSupport:
 class TestAiocsvIntegration:
     """Test integration with aiocsv."""
 
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
     @pytest.mark.asyncio
     async def test_csv_read_write_roundtrip(self, temp_file):
         """Test CSV read/write roundtrip with aiocsv."""
@@ -1397,15 +1297,6 @@ class TestAiocsvIntegration:
 
 class TestEdgeCases:
     """Test edge cases and error conditions."""
-
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
 
     @pytest.mark.asyncio
     async def test_tricky_unicode_split(self, temp_file):
@@ -1693,15 +1584,6 @@ class TestEdgeCases:
 class TestPerformanceAndMemory:
     """Test performance and memory efficiency."""
 
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
     @pytest.mark.asyncio
     async def test_memory_efficiency_large_file(self, temp_file):
         """Test that large files don't consume excessive memory."""
@@ -1937,15 +1819,6 @@ class TestProtocols:
 class TestPathlibSupport:
     """Test support for pathlib.Path objects."""
 
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
     @pytest.mark.asyncio
     async def test_binary_file_with_path_object(self, temp_file):
         """Test AsyncGzipBinaryFile with pathlib.Path object."""
@@ -2019,15 +1892,6 @@ class TestPathlibSupport:
 
 class TestNameProperty:
     """Test the name property for file API compatibility."""
-
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
 
     @pytest.mark.asyncio
     async def test_binary_file_name_with_string(self, temp_file):
@@ -2234,15 +2098,6 @@ class TestClosefdParameter:
 class TestAppendMode:
     """Test append mode operations and limitations."""
 
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
     @pytest.mark.asyncio
     async def test_append_mode_binary(self, temp_file):
         """Test append mode with binary data.
@@ -2363,15 +2218,6 @@ class TestAppendMode:
 class TestResourceCleanup:
     """Test proper resource cleanup and concurrent close handling."""
 
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
     @pytest.mark.asyncio
     async def test_double_close_binary(self, temp_file):
         """Test that calling close() twice doesn't cause errors."""
@@ -2466,15 +2312,6 @@ class TestResourceCleanup:
 
 class TestErrorHandlingConsistency:
     """Test consistent error handling across the module."""
-
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
 
     @pytest.mark.asyncio
     async def test_zlib_errors_wrapped_as_oserror(self, temp_file):
@@ -2594,15 +2431,6 @@ class TestModeParsingErrors:
 
 class TestNewAPIMethods:
     """Test new API methods: flush() and readline()."""
-
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
 
     @pytest.mark.asyncio
     async def test_binary_flush_method(self, temp_file):
@@ -3024,15 +2852,6 @@ class TestNewAPIMethods:
 
 class TestHighPriorityEdgeCases:
     """Test high priority edge cases for improved coverage."""
-
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
 
     @pytest.mark.asyncio
     async def test_unexpected_compression_error(self, temp_file):
@@ -3498,15 +3317,6 @@ class TestHighPriorityEdgeCases:
 class TestMediumPriorityEdgeCases:
     """Test medium priority edge cases for improved coverage."""
 
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-
     @pytest.mark.asyncio
     async def test_async_flush_on_underlying_file(self, temp_file):
         """Test that async flush method on underlying file object is awaited."""
@@ -3704,15 +3514,6 @@ class TestMediumPriorityEdgeCases:
 
 class TestLowPriorityEdgeCases:
     """Test low priority edge cases for improved coverage."""
-
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
 
     @pytest.mark.asyncio
     async def test_binary_read_on_closed_file(self, temp_file):
@@ -3931,15 +3732,6 @@ class TestLowPriorityEdgeCases:
 
 class TestNewlineHandlingBugs:
     """Tests for newline handling bugs identified in code review."""
-
-    @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".gz") as f:
-            temp_path = f.name
-        yield temp_path
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
 
     @pytest.mark.asyncio
     async def test_crlf_split_across_chunk_boundary(self, temp_file):
