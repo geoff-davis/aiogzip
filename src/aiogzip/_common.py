@@ -28,6 +28,7 @@ GZIP_METHOD_DEFLATE = 8
 GZIP_OS_UNKNOWN = 255
 _COMPRESS_LEVEL_FAST = 1
 _COMPRESS_LEVEL_BEST = 9
+_MAX_GZIP_MTIME = 0xFFFFFFFF
 
 # Type alias for zlib compression/decompression objects
 # These are the return types of zlib.compressobj() and zlib.decompressobj()
@@ -91,7 +92,10 @@ def _normalize_mtime(mtime: Optional[Union[int, float]]) -> Optional[int]:
         raise TypeError("mtime must be an int or float if provided")
     if mtime < 0:
         raise ValueError("mtime must be non-negative")
-    return int(mtime)
+    normalized = int(mtime)
+    if normalized > _MAX_GZIP_MTIME:
+        raise ValueError(f"mtime must be <= {_MAX_GZIP_MTIME}")
+    return normalized
 
 
 def _validate_original_filename(

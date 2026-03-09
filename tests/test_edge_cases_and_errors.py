@@ -25,6 +25,18 @@ class TestEdgeCasesAndErrors:
             AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=10)
 
     @pytest.mark.asyncio
+    async def test_mtime_validation(self):
+        """Test validation of mtime values."""
+        AsyncGzipBinaryFile("test.gz", mode="wb", mtime=0xFFFFFFFF)
+        AsyncGzipTextFile("test.gz", mode="wt", mtime=0xFFFFFFFF)
+
+        with pytest.raises(ValueError, match=r"mtime must be <= 4294967295"):
+            AsyncGzipBinaryFile("test.gz", mode="wb", mtime=0x100000000)
+
+        with pytest.raises(ValueError, match=r"mtime must be <= 4294967295"):
+            AsyncGzipTextFile("test.gz", mode="wt", mtime=0x100000000)
+
+    @pytest.mark.asyncio
     async def test_binary_file_init_errors(self):
         """Test initialization errors for AsyncGzipBinaryFile."""
         # Binary mode cannot include text
