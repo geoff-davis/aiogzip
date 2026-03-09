@@ -68,6 +68,7 @@ class AsyncGzipTextFile:
         "_is_closed",
         "_decoder",
         "_text_buffer",
+        "_text_buffer_offset",
         "_trailing_cr",
         "_seen_newline_types",
         "_cookie_cache",
@@ -142,7 +143,8 @@ class AsyncGzipTextFile:
         self._decoder = codecs.getincrementaldecoder(self._encoding)(
             errors=self._errors
         )
-        self._text_buffer: str = ""  # Central buffer for decoded text
+        self._text_buffer: str = ""  # Backing store for buffered decoded text
+        self._text_buffer_offset: int = 0  # Start of unread text within _text_buffer
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
         self._seen_newline_types: int = 0
         self._cookie_cache: Dict[int, _TextCookieState] = {}
@@ -192,6 +194,7 @@ class AsyncGzipTextFile:
             byte_offset=bytes_offset,
             decoder_state=decoder_state,
             text_buffer=self._text_buffer,
+            text_buffer_offset=self._text_buffer_offset,
             trailing_cr=self._trailing_cr,
         )
         cookie = self._cookie_lookup.get(state)
@@ -224,6 +227,7 @@ class AsyncGzipTextFile:
             await self._binary_file.seek(cached_state.byte_offset)
             self._decoder.setstate(cached_state.decoder_state)
             self._text_buffer = cached_state.text_buffer
+            self._text_buffer_offset = cached_state.text_buffer_offset
             self._trailing_cr = cached_state.trailing_cr
             return offset
 
@@ -233,6 +237,7 @@ class AsyncGzipTextFile:
         await self._binary_file.seek(0)
         self._decoder.reset()
         self._text_buffer = ""
+        self._text_buffer_offset = 0
         self._trailing_cr = False
         self._seen_newline_types = 0
         return offset
@@ -352,6 +357,47 @@ class AsyncGzipTextFile:
         await self._binary_file.write(encoded_data)
         return len(data)
 
+    def _buffered_text(self) -> str:
+        """Return the unread slice of the current decoded text buffer."""
+        return self._text_buffer[self._text_buffer_offset :]
+
+    def _buffered_text_len(self) -> int:
+        """Return the number of unread characters in the decoded text buffer."""
+        return len(self._text_buffer) - self._text_buffer_offset
+
+    def _set_buffer(self, text: str) -> None:
+        """Replace the unread decoded text buffer."""
+        self._text_buffer = text
+        self._text_buffer_offset = 0
+
+    def _append_buffer(self, text: str) -> None:
+        """Append decoded text while dropping already-consumed prefixes."""
+        if not text:
+            return
+        if self._text_buffer_offset:
+            self._text_buffer = self._buffered_text() + text
+            self._text_buffer_offset = 0
+            return
+        self._text_buffer += text
+
+    def _prepend_buffer(self, text: str) -> None:
+        """Prepend text ahead of unread buffered data."""
+        if not text:
+            return
+        self._text_buffer = text + self._buffered_text()
+        self._text_buffer_offset = 0
+
+    def _consume_buffer(self, size: int) -> str:
+        """Consume and return up to ``size`` characters from the decoded buffer."""
+        start = self._text_buffer_offset
+        end = start + size
+        result = self._text_buffer[start:end]
+        self._text_buffer_offset = end
+        if self._text_buffer_offset >= len(self._text_buffer):
+            self._text_buffer = ""
+            self._text_buffer_offset = 0
+        return result
+
     async def _read_chunk_and_decode(self) -> bool:
         """Read a chunk of binary data, decode it, and append to text buffer.
 
@@ -370,7 +416,7 @@ class AsyncGzipTextFile:
             # EOF: flush the decoder
             final_decoded = self._decoder.decode(b"", final=True)
             if final_decoded:
-                self._text_buffer += self._apply_newline_decoding(final_decoded)
+                self._append_buffer(self._apply_newline_decoding(final_decoded))
             self._finalize_pending_newline_state()
             if final_decoded:
                 return True
@@ -380,7 +426,7 @@ class AsyncGzipTextFile:
         decoded_chunk = self._decoder.decode(raw_chunk, final=False)
 
         if decoded_chunk:
-            self._text_buffer += self._apply_newline_decoding(decoded_chunk)
+            self._append_buffer(self._apply_newline_decoding(decoded_chunk))
             return True
 
         return True  # We read bytes but produced no text (incomplete multibyte char), still not EOF
@@ -419,29 +465,27 @@ class AsyncGzipTextFile:
         if size == -1:
             # Read all remaining data
             # We use a list to accumulate chunks for performance
-            chunks = [self._text_buffer]
-            self._text_buffer = ""
+            chunks = [self._buffered_text()]
+            self._set_buffer("")
 
             while True:
                 has_more = await self._read_chunk_and_decode()
                 if not has_more:
                     break
-                if self._text_buffer:
-                    chunks.append(self._text_buffer)
-                    self._text_buffer = ""
+                if self._buffered_text_len() > 0:
+                    chunks.append(self._buffered_text())
+                    self._set_buffer("")
 
             return "".join(chunks)
         else:
             # Check if we have enough data in our text buffer
-            while len(self._text_buffer) < size:
+            while self._buffered_text_len() < size:
                 has_more = await self._read_chunk_and_decode()
                 if not has_more:
                     break
 
             # Return the requested number of characters
-            result = self._text_buffer[:size]
-            self._text_buffer = self._text_buffer[size:]
-            return result
+            return self._consume_buffer(size)
 
     def _at_stream_eof(self) -> bool:
         """Return True if the underlying binary file has reached EOF."""
@@ -575,20 +619,20 @@ class AsyncGzipTextFile:
         # Read until we get a complete line
         while True:
             # Try to get a line from our buffer using newline-aware search
-            pos, length = self._get_line_terminator_pos(self._text_buffer)
+            buffered = self._buffered_text()
+            pos, length = self._get_line_terminator_pos(buffered)
             if pos != -1:
                 # Found a line terminator
-                line = self._text_buffer[: pos + length]
-                self._text_buffer = self._text_buffer[pos + length :]
+                line = self._consume_buffer(pos + length)
                 return line
 
             # Read more data
             has_more = await self._read_chunk_and_decode()
             if not has_more:
                 # EOF
-                if self._text_buffer:
-                    result = self._text_buffer
-                    self._text_buffer = ""  # Clear buffer
+                if self._buffered_text_len() > 0:
+                    result = self._buffered_text()
+                    self._set_buffer("")
                     return result  # Last line without newline
                 else:
                     raise StopAsyncIteration
@@ -627,36 +671,35 @@ class AsyncGzipTextFile:
 
         # Try to get a line from our buffer using newline-aware search
         while True:
-            pos, length = self._get_line_terminator_pos(self._text_buffer)
+            buffered = self._buffered_text()
+            pos, length = self._get_line_terminator_pos(buffered)
 
             if pos != -1:
                 # Found a line terminator - extract the line
                 end = pos + length
-                line = self._text_buffer[:end]
-                self._text_buffer = self._text_buffer[end:]
+                line = self._consume_buffer(end)
                 # Apply limit if specified
                 if limit != -1 and len(line) > limit:
-                    self._text_buffer = line[limit:] + self._text_buffer
+                    self._prepend_buffer(line[limit:])
                     line = line[:limit]
                 return line
 
             # No terminator found - check if we have enough data for limit
-            if limit != -1 and len(self._text_buffer) >= limit:
-                line = self._text_buffer[:limit]
-                self._text_buffer = self._text_buffer[limit:]
+            if limit != -1 and self._buffered_text_len() >= limit:
+                line = self._consume_buffer(limit)
                 return line
 
             # Need more data - try to read
             has_more = await self._read_chunk_and_decode()
             if not has_more:
                 # EOF reached - return whatever is in the buffer
-                if not self._text_buffer:
+                if self._buffered_text_len() == 0:
                     return ""
-                line = self._text_buffer
-                self._text_buffer = ""
+                line = self._buffered_text()
+                self._set_buffer("")
                 # Apply limit if specified
                 if limit != -1 and len(line) > limit:
-                    self._text_buffer = line[limit:] + self._text_buffer
+                    self._prepend_buffer(line[limit:])
                     line = line[:limit]
                 return line
             # Loop continues to search for terminator in newly read data

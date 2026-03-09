@@ -286,6 +286,7 @@ class _TextCookieState:
     byte_offset: int
     decoder_state: Tuple[Any, int]
     text_buffer: str
+    text_buffer_offset: int
     trailing_cr: bool
 
 

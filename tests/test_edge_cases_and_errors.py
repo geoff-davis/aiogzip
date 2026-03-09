@@ -481,6 +481,27 @@ class TestAdditionalCoverage:
             assert await f.read(10) == expected
 
     @pytest.mark.asyncio
+    async def test_text_tell_reuses_backing_buffer_across_nearby_cookies(
+        self, tmp_path
+    ):
+        """Nearby cookies should share one backing buffer plus different offsets."""
+        p = tmp_path / "shared_cookie_buffer.gz"
+        async with AsyncGzipTextFile(p, "wt", newline="") as f:
+            await f.write("abcdefghij" * 1000)
+
+        async with AsyncGzipTextFile(p, "rt", newline="", chunk_size=4096) as f:
+            cookies = []
+            for _ in range(6):
+                await f.read(1)
+                cookies.append(await f.tell())
+
+            states = [f._cookie_cache[cookie] for cookie in cookies]
+            assert len({id(state.text_buffer) for state in states}) == 1
+            offsets = [state.text_buffer_offset for state in states]
+            assert offsets == sorted(offsets)
+            assert len(set(offsets)) == len(offsets)
+
+    @pytest.mark.asyncio
     async def test_text_seek_invalid_cookie_raises(self, tmp_path):
         """Seeking an arbitrary cookie should fail cleanly."""
         p = tmp_path / "invalid_cookie.gz"
