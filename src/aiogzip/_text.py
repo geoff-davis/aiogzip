@@ -238,17 +238,7 @@ class AsyncGzipTextFile:
 
         if offset != 0:
             if offset >= 0:
-                await self._binary_file.seek(offset)
-                self._decoder.reset()
-                self._set_buffer("")
-                self._trailing_cr = False
-                self._seen_newline_types = 0
-                self._set_buffer_origin(
-                    origin_offset=offset,
-                    decoder_state=self._decoder.getstate(),
-                    trailing_cr=False,
-                    seen_newlines=0,
-                )
+                await self._seek_to_plain_position(offset)
                 return offset
 
             (
@@ -432,7 +422,6 @@ class AsyncGzipTextFile:
             and decoder_bytes == b""
             and decoder_flag == 0
             and not self._trailing_cr
-            and (self._seen_newline_types == 0 or self._at_stream_eof())
         )
 
     async def _reset_to_start(self) -> None:
@@ -471,6 +460,36 @@ class AsyncGzipTextFile:
             raise ValueError("File not opened. Use async context manager.")
         self._set_buffer_origin(
             origin_offset=await self._binary_file.tell(),
+            decoder_state=self._decoder.getstate(),
+            trailing_cr=self._trailing_cr,
+            seen_newlines=self._seen_newline_types,
+        )
+
+    async def _seek_to_plain_position(self, offset: int) -> None:
+        """Restore a plain text position by replaying bytes from the stream start."""
+        if self._binary_file is None:
+            raise ValueError("File not opened. Use async context manager.")
+
+        await self._reset_to_start()
+        remaining = offset
+        while remaining > 0:
+            raw_chunk = await self._binary_file.read(min(self._chunk_size, remaining))
+            if not raw_chunk:
+                break
+            remaining -= len(raw_chunk)
+            decoded_chunk = self._decoder.decode(raw_chunk, final=False)
+            if decoded_chunk:
+                self._apply_newline_decoding(decoded_chunk)
+
+        if remaining == 0 and self._binary_file._eof:
+            final_decoded = self._decoder.decode(b"", final=True)
+            if final_decoded:
+                self._apply_newline_decoding(final_decoded)
+            self._finalize_pending_newline_state()
+
+        self._set_buffer("")
+        self._set_buffer_origin(
+            origin_offset=offset,
             decoder_state=self._decoder.getstate(),
             trailing_cr=self._trailing_cr,
             seen_newlines=self._seen_newline_types,
