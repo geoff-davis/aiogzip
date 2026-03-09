@@ -481,25 +481,35 @@ class TestAdditionalCoverage:
             assert await f.read(10) == expected
 
     @pytest.mark.asyncio
-    async def test_text_tell_reuses_backing_buffer_across_nearby_cookies(
-        self, tmp_path
-    ):
-        """Nearby cookies should share one backing buffer plus different offsets."""
-        p = tmp_path / "shared_cookie_buffer.gz"
+    async def test_text_tell_cookies_are_self_contained(self, tmp_path):
+        """Text cookies should not rely on per-position cache state in the stream."""
+        p = tmp_path / "self_contained_cookie.gz"
         async with AsyncGzipTextFile(p, "wt", newline="") as f:
             await f.write("abcdefghij" * 1000)
 
         async with AsyncGzipTextFile(p, "rt", newline="", chunk_size=4096) as f:
-            cookies = []
-            for _ in range(6):
-                await f.read(1)
-                cookies.append(await f.tell())
+            assert not hasattr(f, "_cookie_cache")
+            assert not hasattr(f, "_cookie_lookup")
+            cookie = await f.tell()
+            assert isinstance(cookie, int)
+            assert cookie > 0
 
-            states = [f._cookie_cache[cookie] for cookie in cookies]
-            assert len({id(state.text_buffer) for state in states}) == 1
-            offsets = [state.text_buffer_offset for state in states]
-            assert offsets == sorted(offsets)
-            assert len(set(offsets)) == len(offsets)
+    @pytest.mark.asyncio
+    async def test_text_seek_cookie_from_other_stream_raises(self, tmp_path):
+        """Cookies should remain scoped to the open handle that created them."""
+        p = tmp_path / "cross_stream_cookie.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("hello world")
+
+        async with AsyncGzipTextFile(p, "rt") as first:
+            await first.read(5)
+            cookie = await first.tell()
+
+        async with AsyncGzipTextFile(p, "rt") as second:
+            with pytest.raises(
+                OSError, match="Cannot seek to invalid text cookie for this stream"
+            ):
+                await second.seek(cookie)
 
     @pytest.mark.asyncio
     async def test_text_seek_invalid_cookie_raises(self, tmp_path):

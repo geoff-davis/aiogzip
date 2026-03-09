@@ -3,7 +3,6 @@
 import os
 import struct
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Any,
@@ -279,17 +278,6 @@ class WithAsyncReadWrite(Protocol):
     async def close(self) -> None: ...
 
 
-@dataclass(frozen=True)
-class _TextCookieState:
-    """Internal snapshot of decoder/buffer state for tell()/seek() cookies."""
-
-    byte_offset: int
-    decoder_state: Tuple[Any, int]
-    text_buffer: str
-    text_buffer_offset: int
-    trailing_cr: bool
-
-
 __all__ = [
     "GZIP_WBITS",
     "GZIP_FLAG_FNAME",
@@ -312,5 +300,4 @@ __all__ = [
     "WithAsyncRead",
     "WithAsyncWrite",
     "WithAsyncReadWrite",
-    "_TextCookieState",
 ]
