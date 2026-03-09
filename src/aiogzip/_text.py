@@ -432,6 +432,7 @@ class AsyncGzipTextFile:
             and decoder_bytes == b""
             and decoder_flag == 0
             and not self._trailing_cr
+            and (self._seen_newline_types == 0 or self._at_stream_eof())
         )
 
     async def _reset_to_start(self) -> None:
