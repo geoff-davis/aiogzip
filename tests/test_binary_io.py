@@ -309,6 +309,31 @@ class TestAsyncGzipBinaryFile:
         assert rest != b""
         assert first + rest == payload
 
+    @pytest.mark.asyncio
+    async def test_binary_read1_zero_length_does_not_touch_underlying_reader(self):
+        payload = gzip.compress(b"abcdef")
+
+        class CountingAsyncReader:
+            def __init__(self, data):
+                self._buffer = io.BytesIO(data)
+                self.read_calls = 0
+
+            async def read(self, size=-1):
+                self.read_calls += 1
+                return self._buffer.read(size)
+
+            async def close(self):
+                pass
+
+        reader = CountingAsyncReader(payload)
+        async with AsyncGzipBinaryFile(None, "rb", fileobj=reader, closefd=False) as f:
+            assert await f.read1(0) == b""
+            assert reader.read_calls == 0
+
+            buf = bytearray(0)
+            assert await f.readinto1(buf) == 0
+            assert reader.read_calls == 0
+
     def test_binary_seekable_and_writable_flags(self, temp_file):
         f = AsyncGzipBinaryFile(temp_file, "wb")
         assert f.seekable()

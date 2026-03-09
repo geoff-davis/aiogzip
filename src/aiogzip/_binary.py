@@ -376,6 +376,8 @@ class AsyncGzipBinaryFile:
 
         if size is None:
             size = -1
+        if size == 0:
+            return b""
 
         available = len(self._buffer) - self._buffer_offset
         if available <= 0 and not self._eof:
