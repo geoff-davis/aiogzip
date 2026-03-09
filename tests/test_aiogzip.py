@@ -926,7 +926,7 @@ class TestAsyncGzipTextFile:
             head = await f.read(4)
             assert head == sample_text[:4]
             pos = await f.tell()
-            assert pos % 2 == 0
+            assert isinstance(pos, int)
             await f.seek(0)
             entire = await f.read()
             assert entire == sample_text
@@ -969,6 +969,23 @@ class TestAsyncGzipTextFile:
             await f.seek(cookie)
             replay = await f.read()
             assert replay == rest
+
+    @pytest.mark.asyncio
+    async def test_text_tell_cookies_are_unique_for_nearby_positions(self, temp_file):
+        text = "abcdefghij" * 1000
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
+            await f.write(text)
+
+        async with AsyncGzipTextFile(temp_file, "rt", newline="", chunk_size=1024) as f:
+            assert await f.read(1) == "a"
+            cookie1 = await f.tell()
+            assert await f.read(1) == "b"
+            cookie2 = await f.tell()
+
+            assert cookie1 != cookie2
+
+            await f.seek(cookie1)
+            assert await f.read(2) == "bc"
 
     @pytest.mark.asyncio
     async def test_text_seek_cur_and_end_zero(self, temp_file):

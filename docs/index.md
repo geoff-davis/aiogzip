@@ -84,4 +84,6 @@ asyncio.run(main())
 - ✅ Full compatibility with `tarfile` for reading `.tar.gz` archives
 - ✅ Seamless integration with `aiocsv` for CSV processing
 
+For `AsyncGzipTextFile`, `tell()` returns an opaque cookie value for the current open stream. Use it only with `seek(cookie)` on the same open handle.
+
 **Note:** `aiogzip` focuses on file-based operations and does not currently support in-memory compression/decompression (e.g., `gzip.compress`/`gzip.decompress`).

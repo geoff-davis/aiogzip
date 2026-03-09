@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Make `AsyncGzipTextFile.tell()` cookies unique per call to avoid collisions that could restore the wrong text position when using `seek(cookie)`.
+
+### Documentation
+
+- Clarify that text `tell()` values are opaque cookies intended only for `seek(cookie)` on the same open stream.
+
 ## [1.2.2] - 2026-02-11
 
 ### Added

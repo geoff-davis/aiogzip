@@ -70,6 +70,8 @@ class AsyncGzipTextFile:
         "_text_buffer",
         "_trailing_cr",
         "_cookie_cache",
+        "_cookie_lookup",
+        "_next_cookie",
     )
 
     # Maximum number of entries to keep in the cookie cache for tell()/seek()
@@ -141,6 +143,8 @@ class AsyncGzipTextFile:
         self._text_buffer: str = ""  # Central buffer for decoded text
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
         self._cookie_cache: Dict[int, _TextCookieState] = {}
+        self._cookie_lookup: Dict[_TextCookieState, int] = {}
+        self._next_cookie: int = 1
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
@@ -173,9 +177,18 @@ class AsyncGzipTextFile:
             raise ValueError("File not opened. Use async context manager.")
         bytes_offset = await self._binary_file.tell()
         decoder_state = self._decoder.getstate()
-        pending_bytes, _ = decoder_state
-        flag = 1 if pending_bytes else 0
-        cookie = (bytes_offset << 1) | flag
+        state = _TextCookieState(
+            byte_offset=bytes_offset,
+            decoder_state=decoder_state,
+            text_buffer=self._text_buffer,
+            trailing_cr=self._trailing_cr,
+        )
+        cookie = self._cookie_lookup.get(state)
+        if cookie is not None:
+            return cookie
+
+        cookie = self._next_cookie
+        self._next_cookie += 1
         # Bound the cache size to prevent unbounded memory growth
         if len(self._cookie_cache) >= self.MAX_COOKIE_CACHE_SIZE:
             # Remove oldest entries (first half of the cache)
@@ -183,13 +196,10 @@ class AsyncGzipTextFile:
                 : self.MAX_COOKIE_CACHE_SIZE // 2
             ]
             for key in keys_to_remove:
-                del self._cookie_cache[key]
-        self._cookie_cache[cookie] = _TextCookieState(
-            byte_offset=bytes_offset,
-            decoder_state=decoder_state,
-            text_buffer=self._text_buffer,
-            trailing_cr=self._trailing_cr,
-        )
+                removed_state = self._cookie_cache.pop(key)
+                self._cookie_lookup.pop(removed_state, None)
+        self._cookie_cache[cookie] = state
+        self._cookie_lookup[state] = cookie
         return cookie
 
     async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
@@ -220,8 +230,7 @@ class AsyncGzipTextFile:
                 "Cannot seek to uncached text cookie; call tell() near the target position"
             )
 
-        byte_offset = offset >> 1
-        await self._binary_file.seek(byte_offset)
+        await self._binary_file.seek(0)
         self._decoder.reset()
         self._text_buffer = ""
         self._trailing_cr = False
@@ -700,6 +709,7 @@ class AsyncGzipTextFile:
         # Mark as closed immediately to prevent concurrent close attempts
         self._is_closed = True
         self._cookie_cache.clear()
+        self._cookie_lookup.clear()
 
         try:
             if not self._writing_mode:
