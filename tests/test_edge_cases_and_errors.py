@@ -272,7 +272,9 @@ class TestEdgeCasesAndErrors:
         assert f._file is None
 
     @pytest.mark.asyncio
-    async def test_text_enter_failure_closes_nested_binary_file(self, monkeypatch, tmp_path):
+    async def test_text_enter_failure_closes_nested_binary_file(
+        self, monkeypatch, tmp_path
+    ):
         """Failed text __aenter__ should clean up the nested binary layer."""
         import aiogzip._text as text_module
 
@@ -888,8 +890,6 @@ class TestEdgeCases:
             assert read_chunks == chunks
 
 
-
-
 class TestErrorHandlingConsistency:
     """Test consistent error handling across the module."""
 
@@ -979,5 +979,3 @@ class TestErrorHandlingConsistency:
 
         # Clean up
         await f.__aexit__(None, None, None)
-
-

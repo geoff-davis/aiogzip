@@ -5,7 +5,7 @@ import io
 import os
 import zlib
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Union
+from typing import Any, Iterable, List, Optional, Union, cast
 
 import aiofiles
 
@@ -156,7 +156,9 @@ class AsyncGzipBinaryFile:
                 self._owns_file = False
             else:
                 if self._filename is None:
-                    raise ValueError("Filename must be provided when fileobj is not given")
+                    raise ValueError(
+                        "Filename must be provided when fileobj is not given"
+                    )
                 self._file = await aiofiles.open(  # type: ignore
                     self._filename, self._file_mode
                 )
@@ -710,7 +712,9 @@ class AsyncGzipBinaryFile:
             return b""
 
         if self._replay_offset is not None:
-            end = min(self._replay_offset + self._chunk_size, len(self._compressed_cache))
+            end = min(
+                self._replay_offset + self._chunk_size, len(self._compressed_cache)
+            )
             chunk = bytes(self._compressed_cache[self._replay_offset : end])
             self._replay_offset = end
             if self._replay_offset >= len(self._compressed_cache):
@@ -718,7 +722,7 @@ class AsyncGzipBinaryFile:
             return chunk
 
         try:
-            chunk = await self._file.read(self._chunk_size)
+            chunk = cast(bytes, await self._file.read(self._chunk_size))
         except OSError:
             # Re-raise I/O errors as-is
             raise

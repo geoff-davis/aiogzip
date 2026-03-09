@@ -206,4 +206,3 @@ class TestPerformanceAndMemory:
         # Level 9 should have maximum compression for this data
         assert compression_ratios[0] < compression_ratios[9]
         print(f"Compression ratios: {compression_ratios}")
-

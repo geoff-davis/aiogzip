@@ -7,10 +7,22 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - Make `AsyncGzipTextFile.tell()` cookies unique per call to avoid collisions that could restore the wrong text position when using `seek(cookie)`.
+- Add read-mode binary `seek(..., SEEK_END)` support to match `gzip.GzipFile`.
+- Support backward seeks on non-seekable binary `fileobj` inputs by replaying cached compressed input when a rewind is needed.
+- Clean up internally opened resources when `AsyncGzipBinaryFile.__aenter__()` or `AsyncGzipTextFile.__aenter__()` fails partway through setup.
+- Validate that gzip header `mtime` values fit in the 32-bit field before opening the stream.
 
 ### Documentation
 
 - Clarify that text `tell()` values are opaque cookies intended only for `seek(cookie)` on the same open stream.
+
+### Changed
+
+- Narrow GitHub Actions write permissions so only the coverage-comment job gets elevated access.
+
+### Refactor
+
+- Split the test suite into focused modules for factory, binary, text, file-object, lifecycle, interop, regression, and performance coverage.
 
 ## [1.2.2] - 2026-02-11
 
