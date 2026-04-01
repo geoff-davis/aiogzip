@@ -28,7 +28,8 @@ repos:
       - id: ty
         name: ty
         entry: ty check src
-        language: system
+        language: python
+        additional_dependencies: ["ty>=0.0.1a16", "aiofiles>=23.0.0", "types-aiofiles"]
         pass_filenames: false
 
   # General code quality checks
