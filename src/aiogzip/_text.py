@@ -77,6 +77,7 @@ class AsyncGzipTextFile:
         "_buffer_origin_decoder_state",
         "_buffer_origin_trailing_cr",
         "_buffer_origin_seen_newline_types",
+        "_universal_newlines",
     )
 
     _SEEN_CR = 1
@@ -159,6 +160,7 @@ class AsyncGzipTextFile:
         self._buffer_origin_decoder_state: Tuple[Any, int] = initial_decoder_state
         self._buffer_origin_trailing_cr: bool = False
         self._buffer_origin_seen_newline_types: int = 0
+        self._universal_newlines: bool = newline in {None, ""}
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
@@ -402,13 +404,16 @@ class AsyncGzipTextFile:
 
     def _consume_buffer(self, size: int) -> str:
         """Consume and return up to ``size`` characters from the decoded buffer."""
+        buf = self._text_buffer
         start = self._text_buffer_offset
         end = start + size
-        result = self._text_buffer[start:end]
-        self._text_buffer_offset = end
-        if self._text_buffer_offset >= len(self._text_buffer):
+        if end >= len(buf):
+            # Consuming everything — return without slice when possible
             self._text_buffer = ""
             self._text_buffer_offset = 0
+            return buf if start == 0 else buf[start:]
+        result = buf[start:end]
+        self._text_buffer_offset = end
         return result
 
     def _can_use_plain_position(self, decoder_state: Tuple[Any, int]) -> bool:
@@ -581,35 +586,40 @@ class AsyncGzipTextFile:
         Returns:
             bool: True if data was added to the buffer, False if EOF was reached.
         """
-        if self._binary_file is None:
+        bf = self._binary_file
+        if bf is None:
             return False
 
-        if self._binary_file._eof:
-            self._finalize_pending_newline_state()
+        if bf._eof:
+            # Inline _finalize_pending_newline_state
+            if self._universal_newlines and self._trailing_cr:
+                self._seen_newline_types |= self._SEEN_CR
+                self._trailing_cr = False
             return False
 
-        if self._buffered_text_len() == 0:
-            self._capture_buffer_origin()
+        # Inline _capture_buffer_origin when buffer is empty
+        if len(self._text_buffer) == self._text_buffer_offset:
+            self._buffer_origin_offset = bf._position
+            self._buffer_origin_decoder_state = self._decoder.getstate()
+            self._buffer_origin_trailing_cr = self._trailing_cr
+            self._buffer_origin_seen_newline_types = self._seen_newline_types
 
-        raw_chunk = await self._binary_file.read(self._chunk_size)
+        raw_chunk = await bf.read(self._chunk_size)
         if not raw_chunk:
-            # EOF: flush the decoder
             final_decoded = self._decoder.decode(b"", final=True)
             if final_decoded:
                 self._append_buffer(self._apply_newline_decoding(final_decoded))
-            self._finalize_pending_newline_state()
-            if final_decoded:
-                return True
-            return False
+            if self._universal_newlines and self._trailing_cr:
+                self._seen_newline_types |= self._SEEN_CR
+                self._trailing_cr = False
+            return bool(final_decoded)
 
-        # Decode incrementally (buffering incomplete bytes internally)
         decoded_chunk = self._decoder.decode(raw_chunk, final=False)
 
         if decoded_chunk:
             self._append_buffer(self._apply_newline_decoding(decoded_chunk))
-            return True
 
-        return True  # We read bytes but produced no text (incomplete multibyte char), still not EOF
+        return True
 
     async def read(self, size: int = -1) -> str:
         """
@@ -643,18 +653,30 @@ class AsyncGzipTextFile:
             return ""
 
         if size == -1:
-            # Read all remaining data
-            # We use a list to accumulate chunks for performance
+            # Fast path: drain buffer, then read all remaining binary data
+            # in one shot to avoid per-chunk buffer append/consume overhead
             chunks = []
-            if self._buffered_text_len() > 0:
-                chunks.append(self._consume_buffer(self._buffered_text_len()))
+            buf = self._text_buffer
+            off = self._text_buffer_offset
+            if off < len(buf):
+                chunks.append(buf[off:] if off else buf)
+                self._text_buffer = ""
+                self._text_buffer_offset = 0
 
-            while True:
-                has_more = await self._read_chunk_and_decode()
-                if not has_more:
-                    break
-                if self._buffered_text_len() > 0:
-                    chunks.append(self._consume_buffer(self._buffered_text_len()))
+            bf = self._binary_file
+            decoder = self._decoder
+            apply_nl = self._apply_newline_decoding
+
+            raw_all = await bf.read(-1)
+            if raw_all:
+                decoded = decoder.decode(raw_all, final=False)
+                if decoded:
+                    chunks.append(apply_nl(decoded))
+
+            final = decoder.decode(b"", final=True)
+            if final:
+                chunks.append(apply_nl(final))
+            self._finalize_pending_newline_state()
 
             return "".join(chunks)
         else:
@@ -667,39 +689,38 @@ class AsyncGzipTextFile:
             # Return the requested number of characters
             return self._consume_buffer(size)
 
-    def _at_stream_eof(self) -> bool:
-        """Return True if the underlying binary file has reached EOF."""
-        if self._binary_file is None:
-            return True
-        return bool(self._binary_file._eof)
-
-    def _find_line_terminator(self) -> Tuple[int, int]:
+    def _find_line_terminator(self, search_from: int = 0) -> Tuple[int, int]:
         """Find position of next line terminator in the buffered text.
 
-        Searches directly in ``_text_buffer`` starting from ``_text_buffer_offset``
-        to avoid creating a slice copy of the buffer.
+        Searches directly in ``_text_buffer`` starting from
+        ``_text_buffer_offset + search_from`` to avoid both slice copies and
+        redundant re-scanning of already-searched regions.
+
+        Args:
+            search_from: Number of characters past the buffer offset to begin
+                searching.  Callers use this after appending new data so that
+                only the freshly added portion is scanned.
 
         Returns:
             Tuple of (position, length) where position is relative to the current
             buffer offset and length is the terminator length (1 or 2).
             Returns (-1, 0) if no terminator found.
         """
-        offset = self._text_buffer_offset
         buf = self._text_buffer
         buf_end = len(buf)
+        search_start = self._text_buffer_offset + search_from
+        base = self._text_buffer_offset
 
         if self._newline is None or self._newline == "":
-            # Universal newlines: accept \n, \r, or \r\n
-            pos_n = buf.find("\n", offset)
-            pos_r = buf.find("\r", offset)
+            pos_n = buf.find("\n", search_start)
+            pos_r = buf.find("\r", search_start)
 
             if pos_n == -1 and pos_r == -1:
                 return (-1, 0)
 
             if pos_r == -1:
-                return (pos_n - offset, 1)
+                return (pos_n - base, 1)
 
-            # pos_r is valid here (pos_r == -1 was handled above)
             cr_length = (
                 2 if pos_r + 1 < buf_end and buf[pos_r + 1] == "\n" else 1
             )
@@ -708,28 +729,26 @@ class AsyncGzipTextFile:
                 self._newline == ""
                 and cr_length == 1
                 and cr_is_trailing
-                and not self._at_stream_eof()
+                and not self._binary_file._eof
             )
-            rel_pos = pos_r - offset
+            rel_pos = pos_r - base
             if should_wait_for_lf:
-                # Can't use the \r yet — might be start of \r\n across chunks
-                return (pos_n - offset, 1) if pos_n != -1 else (-1, 0)
-            if pos_n == -1 or rel_pos <= pos_n - offset:
+                return (pos_n - base, 1) if pos_n != -1 else (-1, 0)
+            if pos_n == -1 or rel_pos <= pos_n - base:
                 return (rel_pos, cr_length)
-            return (pos_n - offset, 1)
+            return (pos_n - base, 1)
         elif self._newline == "\n":
-            pos = buf.find("\n", offset)
-            return (pos - offset, 1) if pos != -1 else (-1, 0)
+            pos = buf.find("\n", search_start)
+            return (pos - base, 1) if pos != -1 else (-1, 0)
         elif self._newline == "\r":
-            pos = buf.find("\r", offset)
-            return (pos - offset, 1) if pos != -1 else (-1, 0)
+            pos = buf.find("\r", search_start)
+            return (pos - base, 1) if pos != -1 else (-1, 0)
         elif self._newline == "\r\n":
-            pos = buf.find("\r\n", offset)
-            return (pos - offset, 2) if pos != -1 else (-1, 0)
+            pos = buf.find("\r\n", search_start)
+            return (pos - base, 2) if pos != -1 else (-1, 0)
         else:
-            # Fallback to \n
-            pos = buf.find("\n", offset)
-            return (pos - offset, 1) if pos != -1 else (-1, 0)
+            pos = buf.find("\n", search_start)
+            return (pos - base, 1) if pos != -1 else (-1, 0)
 
     def _apply_newline_decoding(self, text: str) -> str:
         """Apply newline decoding/translation semantics similar to TextIOWrapper.
@@ -742,61 +761,50 @@ class AsyncGzipTextFile:
         """
         if not text:
             return text
-        if self._newline not in {None, ""}:
-            # Explicit newline: no translation on input
+        if not self._universal_newlines:
             return text
 
+        trailing_cr = self._trailing_cr
+        seen = self._seen_newline_types
+
         # Handle trailing CR from previous chunk
-        if self._trailing_cr:
+        if trailing_cr:
             if text[0] == "\n":
-                self._seen_newline_types |= self._SEEN_CRLF
+                seen |= self._SEEN_CRLF
             else:
-                self._seen_newline_types |= self._SEEN_CR
+                seen |= self._SEEN_CR
 
         pending_trailing_cr = text[-1] == "\r"
 
-        # Track newline types using C-speed string operations instead of
-        # a character-by-character Python loop.
-        need = (self._SEEN_CR | self._SEEN_LF | self._SEEN_CRLF) & ~self._seen_newline_types
+        # Track newline types using C-speed string operations
+        need = 7 & ~seen  # 7 == _SEEN_CR | _SEEN_LF | _SEEN_CRLF
         if need:
-            # Determine the region to scan (exclude trailing \r which is ambiguous)
             scan = text[:-1] if pending_trailing_cr else text
 
-            has_crlf = "\r\n" in scan if need & self._SEEN_CRLF else False
+            has_crlf = "\r\n" in scan if need & 4 else False
             if has_crlf:
-                self._seen_newline_types |= self._SEEN_CRLF
+                seen |= self._SEEN_CRLF
 
-            if need & self._SEEN_LF:
-                if "\n" in scan:
-                    if has_crlf:
-                        # Only set LF if there are standalone \n (not part of \r\n)
-                        if "\n" in scan.replace("\r\n", "\r\r"):
-                            self._seen_newline_types |= self._SEEN_LF
-                    else:
-                        self._seen_newline_types |= self._SEEN_LF
+            if need & 2 and "\n" in scan:
+                if not has_crlf or "\n" in scan.replace("\r\n", "\r\r"):
+                    seen |= self._SEEN_LF
 
-            if need & self._SEEN_CR:
-                if "\r" in scan:
-                    if has_crlf:
-                        # Only set CR if there are standalone \r (not part of \r\n)
-                        if "\r" in scan.replace("\r\n", "\n\n"):
-                            self._seen_newline_types |= self._SEEN_CR
-                    else:
-                        self._seen_newline_types |= self._SEEN_CR
+            if need & 1 and "\r" in scan:
+                if not has_crlf or "\r" in scan.replace("\r\n", "\n\n"):
+                    seen |= self._SEEN_CR
+
+        self._seen_newline_types = seen
 
         if self._newline == "":
             self._trailing_cr = pending_trailing_cr
             return text
 
         # Universal newline translation (newline is None)
-        if self._trailing_cr and text[0] == "\n":
-            # Previous chunk ended with \r, this starts with \n - it's a CRLF.
-            # Drop the \n because the previous chunk already emitted the normalized \n.
+        if trailing_cr and text[0] == "\n":
             text = text[1:]
 
         self._trailing_cr = pending_trailing_cr
 
-        # Fast path: no \r means no translation needed
         if "\r" not in text:
             return text
 
@@ -806,12 +814,9 @@ class AsyncGzipTextFile:
 
     def _finalize_pending_newline_state(self) -> None:
         """Record a trailing standalone CR when EOF resolves the ambiguity."""
-        if self._newline not in {None, ""}:
-            return
-        if not self._trailing_cr:
-            return
-        self._seen_newline_types |= self._SEEN_CR
-        self._trailing_cr = False
+        if self._universal_newlines and self._trailing_cr:
+            self._seen_newline_types |= self._SEEN_CR
+            self._trailing_cr = False
 
     def __aiter__(self) -> "AsyncGzipTextFile":
         """Make AsyncGzipTextFile iterable for line-by-line reading."""
@@ -822,22 +827,22 @@ class AsyncGzipTextFile:
         if self._is_closed:
             raise StopAsyncIteration
 
-        # Read until we get a complete line
+        search_from = 0
         while True:
-            # Try to get a line from our buffer using newline-aware search
-            pos, length = self._find_line_terminator()
+            pos, length = self._find_line_terminator(search_from)
             if pos != -1:
-                # Found a line terminator
                 return self._consume_buffer(pos + length)
 
-            # Read more data
+            # Track how far we've scanned before reading more data.
+            # Back up 1 char in case a \r at the boundary pairs with a new \n.
+            buf_len = len(self._text_buffer) - self._text_buffer_offset
             has_more = await self._read_chunk_and_decode()
             if not has_more:
-                # EOF
-                if self._buffered_text_len() > 0:
-                    return self._consume_buffer(self._buffered_text_len())
-                else:
-                    raise StopAsyncIteration
+                remaining = len(self._text_buffer) - self._text_buffer_offset
+                if remaining > 0:
+                    return self._consume_buffer(remaining)
+                raise StopAsyncIteration
+            search_from = max(0, buf_len - 1)
 
     async def readline(self, limit: int = -1) -> str:
         """
@@ -872,30 +877,29 @@ class AsyncGzipTextFile:
             return ""
 
         # Try to get a line from our buffer using newline-aware search
+        search_from = 0
         while True:
-            pos, length = self._find_line_terminator()
+            pos, length = self._find_line_terminator(search_from)
 
             if pos != -1:
-                # Found a line terminator - extract the line
                 end = pos + length
                 if limit != -1 and end > limit:
                     return self._consume_buffer(limit)
                 return self._consume_buffer(end)
 
-            # No terminator found - check if we have enough data for limit
-            if limit != -1 and self._buffered_text_len() >= limit:
+            buf_len = len(self._text_buffer) - self._text_buffer_offset
+            if limit != -1 and buf_len >= limit:
                 return self._consume_buffer(limit)
 
-            # Need more data - try to read
             has_more = await self._read_chunk_and_decode()
             if not has_more:
-                # EOF reached - return whatever is in the buffer
-                if self._buffered_text_len() == 0:
+                if buf_len == 0:
                     return ""
-                if limit != -1 and self._buffered_text_len() > limit:
+                remaining = len(self._text_buffer) - self._text_buffer_offset
+                if limit != -1 and remaining > limit:
                     return self._consume_buffer(limit)
-                return self._consume_buffer(self._buffered_text_len())
-            # Loop continues to search for terminator in newly read data
+                return self._consume_buffer(remaining)
+            search_from = max(0, buf_len - 1)
 
     async def readlines(self, hint: int = -1) -> List[str]:
         """

@@ -390,7 +390,9 @@ class AsyncGzipBinaryFile:
             actual_read_size = min(size, available)
 
         data_to_return = bytes(
-            self._buffer[self._buffer_offset : self._buffer_offset + actual_read_size]
+            memoryview(self._buffer)[
+                self._buffer_offset : self._buffer_offset + actual_read_size
+            ]
         )
         self._buffer_offset += actual_read_size
         self._position += actual_read_size
@@ -427,6 +429,26 @@ class AsyncGzipBinaryFile:
         if limit == 0:
             return b""
 
+        # Fast path: line fits in current buffer (common case)
+        buf = self._buffer
+        start = self._buffer_offset
+        buf_len = len(buf)
+        if start < buf_len:
+            newline_index = buf.find(b"\n", start)
+            if newline_index != -1:
+                end = newline_index + 1
+                if limit != -1:
+                    end = min(end, start + limit)
+                result = bytes(memoryview(buf)[start:end])
+                consumed = end - start
+                self._buffer_offset = end
+                self._position += consumed
+                if end >= buf_len:
+                    del buf[:]
+                    self._buffer_offset = 0
+                return result
+
+        # Slow path: need more data or no newline in buffer
         chunks: List[bytes] = []
         total = 0
         while True:
@@ -453,7 +475,7 @@ class AsyncGzipBinaryFile:
             if end <= start:
                 break
 
-            chunk = bytes(self._buffer[start:end])
+            chunk = bytes(memoryview(self._buffer)[start:end])
             chunks.append(chunk)
             consumed = end - start
             self._buffer_offset = end
@@ -532,9 +554,13 @@ class AsyncGzipBinaryFile:
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
 
-        buffer = self._coerce_byteslike(data)
+        if isinstance(data, (bytes, bytearray)):
+            buffer = data
+        else:
+            buffer = self._coerce_byteslike(data)
+        length = len(buffer)
         self._crc = zlib.crc32(buffer, self._crc)
-        self._input_size += len(buffer)
+        self._input_size += length
         self._position = self._input_size
 
         try:
@@ -604,50 +630,63 @@ class AsyncGzipBinaryFile:
         # If size is -1, read all data in chunks to avoid memory issues
         if size == -1:
             # Return buffered data + read remaining (no recursion)
+            # Use list + b"".join() — it pre-computes total size and does
+            # one allocation, which beats bytearray.extend() reallocation.
             chunks = []
             total_read = 0
-            if self._buffer_offset < len(self._buffer):
-                chunk = bytes(self._buffer[self._buffer_offset :])
+            buf = self._buffer
+            offset = self._buffer_offset
+            if offset < len(buf):
+                chunk = bytes(memoryview(buf)[offset:])
                 chunks.append(chunk)
                 total_read += len(chunk)
 
-            del self._buffer[:]  # Clear while retaining capacity
+            del buf[:]
             self._buffer_offset = 0
 
             while not self._eof:
                 await self._fill_buffer()
                 if self._buffer:
-                    chunk = bytes(self._buffer)
-                    chunks.append(chunk)
-                    total_read += len(chunk)
-                    del self._buffer[:]  # Clear while retaining capacity
+                    chunks.append(bytes(self._buffer))
+                    total_read += len(self._buffer)
+                    del self._buffer[:]
 
-            data = b"".join(chunks)
             self._position += total_read
-            return data
+            return b"".join(chunks)
         else:
-            # Otherwise, read until the buffer has enough data to satisfy the request.
-            while (len(self._buffer) - self._buffer_offset) < size and not self._eof:
-                # If buffer has too much garbage at the front, compact it
-                if self._buffer_offset > self.BUFFER_COMPACTION_THRESHOLD:
+            buf = self._buffer
+            offset = self._buffer_offset
+            available = len(buf) - offset
+
+            # Fast path: buffer already has enough data
+            if available >= size:
+                end = offset + size
+                data_to_return = bytes(memoryview(buf)[offset:end])
+                self._buffer_offset = end
+                self._position += size
+                if end >= len(buf):
+                    del buf[:]
+                    self._buffer_offset = 0
+                return data_to_return
+
+            # Fill until we have enough
+            threshold = self.BUFFER_COMPACTION_THRESHOLD
+            while available < size and not self._eof:
+                if self._buffer_offset > threshold:
                     del self._buffer[: self._buffer_offset]
                     self._buffer_offset = 0
-
                 await self._fill_buffer()
+                available = len(self._buffer) - self._buffer_offset
 
-            # Determine how much we can actually read
-            available = len(self._buffer) - self._buffer_offset
+            # Return what we have
             actual_read_size = min(size, available)
-
+            offset = self._buffer_offset
             data_to_return = bytes(
-                self._buffer[
-                    self._buffer_offset : self._buffer_offset + actual_read_size
-                ]
+                memoryview(self._buffer)[offset : offset + actual_read_size]
             )
             self._buffer_offset += actual_read_size
             self._position += actual_read_size
 
-            # If we consumed everything, reset to keep buffer clean
             if self._buffer_offset >= len(self._buffer):
                 del self._buffer[:]
                 self._buffer_offset = 0
