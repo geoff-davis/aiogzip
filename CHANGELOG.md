@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-04-01
+
+### Performance
+
+- Replace character-by-character Python loop in text newline decoding with C-speed string operations (`str.find`, `in`, `str.replace`), with a fast path that skips translation entirely when no `\r` is present.
+- Eliminate per-line string slice copies in `readline()` and `async for` iteration by searching directly in the text buffer with an offset instead of creating a slice copy.
+- Track already-scanned buffer positions in `readline()` / `__anext__()` to avoid O(n²) re-scanning when lines span multiple chunks.
+- Dedicated `read(-1)` fast path that bypasses per-chunk buffer append/consume overhead, performing a single binary read and decode instead.
+- Use `memoryview` for zero-copy buffer slicing in binary `read()`, `read1()`, and `readline()`, eliminating an intermediate `bytearray` allocation per call.
+- Add binary `readline()` fast path for the common case where the line fits in the current buffer, avoiding list allocation and `b"".join()`.
+- Add binary `read(size)` early exit when the buffer already satisfies the request.
+- Make text `_capture_buffer_origin()` synchronous by accessing binary position directly, eliminating coroutine creation overhead per chunk.
+- Inline small helper methods (`_buffered_text_len`, `_capture_buffer_origin`, `_finalize_pending_newline_state`, `_at_stream_eof`) in hot paths to eliminate method call overhead.
+- Pre-compute `_universal_newlines` flag at init to replace per-chunk set membership tests.
+- Defer text buffer compaction until dead space exceeds a threshold, matching the binary layer's strategy.
+- Inline `isinstance` check in binary `write()` for the common `bytes` input case, skipping static method dispatch.
+- Cache class-attribute and instance-attribute lookups as locals in tight loops.
+
 ## [1.3.0] - 2026-03-09
 
 ### Fixed
