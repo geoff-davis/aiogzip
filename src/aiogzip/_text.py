@@ -721,9 +721,7 @@ class AsyncGzipTextFile:
             if pos_r == -1:
                 return (pos_n - base, 1)
 
-            cr_length = (
-                2 if pos_r + 1 < buf_end and buf[pos_r + 1] == "\n" else 1
-            )
+            cr_length = 2 if pos_r + 1 < buf_end and buf[pos_r + 1] == "\n" else 1
             cr_is_trailing = pos_r + 1 == buf_end
             should_wait_for_lf = (
                 self._newline == ""
