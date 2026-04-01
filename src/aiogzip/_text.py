@@ -458,8 +458,10 @@ class AsyncGzipTextFile:
 
     def _capture_buffer_origin(self) -> None:
         """Snapshot the current decoder state before decoding fresh unread text."""
+        bf = self._binary_file
+        assert bf is not None
         self._set_buffer_origin(
-            origin_offset=self._binary_file._position,  # type: ignore[union-attr]
+            origin_offset=bf._position,
             decoder_state=self._decoder.getstate(),
             trailing_cr=self._trailing_cr,
             seen_newlines=self._seen_newline_types,
@@ -710,6 +712,8 @@ class AsyncGzipTextFile:
         buf_end = len(buf)
         search_start = self._text_buffer_offset + search_from
         base = self._text_buffer_offset
+        bf = self._binary_file
+        assert bf is not None
 
         if self._newline is None or self._newline == "":
             pos_n = buf.find("\n", search_start)
@@ -727,7 +731,7 @@ class AsyncGzipTextFile:
                 self._newline == ""
                 and cr_length == 1
                 and cr_is_trailing
-                and not self._binary_file._eof  # type: ignore[union-attr]
+                and not bf._eof
             )
             rel_pos = pos_r - base
             if should_wait_for_lf:
