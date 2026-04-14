@@ -8,10 +8,15 @@ Prepare a new release of aiogzip. This skill handles changelog generation, versi
 
 ## Steps
 
+### 0. Pre-flight checks
+
+- Run `git fetch origin main` to ensure we have the latest remote state.
+- Check for uncommitted changes. If there are any, stop and tell the user to commit or stash them first (branch switching may lose work).
+
 ### 1. Generate changelog entries
 
-- Run `git describe --tags --abbrev=0` to find the latest tag.
-- Run `git log <latest-tag>..HEAD --oneline` to get commits since that tag.
+- Run `git describe --tags --abbrev=0 origin/main` to find the latest tag.
+- Run `git log <latest-tag>..origin/main --oneline` to get commits since that tag.
 - Read `CHANGELOG.md` and check the `[Unreleased]` section.
 - If `[Unreleased]` is empty, auto-generate entries from the commit log, grouped by category:
   - **Added** — new features or capabilities
@@ -42,7 +47,7 @@ Prepare a new release of aiogzip. This skill handles changelog generation, versi
 
 ### 5. Create release branch and PR
 
-- Create branch `release/v<version>` from current HEAD.
+- Create branch `release/v<version>` from `origin/main`.
 - Stage `CHANGELOG.md` and `src/aiogzip/__init__.py`.
 - Commit with message: `Prepare release v<version>`
 - Push the branch.
