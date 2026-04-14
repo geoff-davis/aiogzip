@@ -61,7 +61,36 @@ However, for multi-gigabyte files, always prefer **streaming** (line-by-line or 
 - If you need text, use `AsyncGzipTextFile` (or `mode="rt"/"wt"`). It handles decoding more efficiently than you can typically do manually in Python loop.
 - If you just need to move bytes (e.g., upload to S3), use `AsyncGzipBinaryFile`.
 
-### 4. Buffer Management
+### 4. Tune JSONL Reads Explicitly
+
+For gzipped JSONL, prefer text mode and tell the reader exactly what newline
+format to expect:
+
+```python
+import json
+from aiogzip import AsyncGzipTextFile
+
+async with AsyncGzipTextFile(
+    "events.jsonl.gz",
+    "rt",
+    newline="\n",
+    chunk_size=512 * 1024,
+) as f:
+    async for line in f:
+        record = json.loads(line)
+```
+
+Why this is faster:
+
+- `newline="\n"` avoids universal-newline detection and translation overhead.
+- Larger `chunk_size` values reduce the number of async reads and line-scanning passes.
+- For JSONL workloads, `AsyncGzipTextFile` is typically faster than iterating
+  bytes from `AsyncGzipBinaryFile` and calling `json.loads()` on each line.
+
+In local measurements on gzipped JSONL reads, `newline="\n"` plus a larger
+chunk size was materially faster than the default text-mode configuration.
+
+### 5. Buffer Management
 
 `aiogzip` maintains an internal buffer.
 
