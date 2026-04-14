@@ -57,6 +57,7 @@ async with AsyncGzipFile(
 - **Binary I/O**: Typically near parity for bulk reads/writes, and can be slower for very small chunk sizes.
 - **Concurrency**: Non-blocking I/O can improve throughput in latency-bound multi-file workloads.
 - **Memory**: Optimized buffer management for stable memory usage.
+- **JSONL**: For large gzipped JSONL files, prefer `AsyncGzipTextFile(..., newline="\n", chunk_size=512 * 1024)` to reduce line-iteration overhead.
 
 See the [Performance Guide](https://geoff-davis.github.io/aiogzip/performance/) for detailed benchmarks.
 

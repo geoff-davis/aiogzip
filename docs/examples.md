@@ -68,6 +68,38 @@ async def process_jsonl():
 asyncio.run(process_jsonl())
 ```
 
+### Reading JSONL Efficiently
+
+If your data is standard UTF-8 JSONL with `\n` line endings, configure the text
+reader explicitly:
+
+```python
+import asyncio
+import json
+from aiogzip import AsyncGzipTextFile
+
+async def process_jsonl_fast():
+    async with AsyncGzipTextFile(
+        "logs.jsonl.gz",
+        "rt",
+        newline="\n",
+        chunk_size=512 * 1024,
+    ) as f:
+        async for line in f:
+            record = json.loads(line)
+            # Process record...
+
+asyncio.run(process_jsonl_fast())
+```
+
+Why this helps:
+
+- `newline="\n"` skips universal-newline handling that JSONL does not need.
+- A larger `chunk_size` reduces async read overhead during line iteration.
+
+This is a good default for large gzipped JSONL files. If memory pressure matters
+more than throughput, lower the chunk size.
+
 ## Concurrent File Processing
 
 One of the biggest advantages of `aiogzip` is the ability to process multiple files concurrently without blocking the event loop.
