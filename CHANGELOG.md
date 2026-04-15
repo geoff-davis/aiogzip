@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-04-14
+
+### Documentation
+
+- Add JSONL performance tips to README, examples guide, and performance guide.
+- Recommend `newline="\n"` and larger `chunk_size` for efficient gzipped JSONL reads.
+
 ## [1.3.1] - 2026-04-01
 
 ### Performance
