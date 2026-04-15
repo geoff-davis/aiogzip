@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-04-14
+
 ### Added
 
 - Add `/release-prep` and `/release-tag` Claude Code skills to streamline the release process.
