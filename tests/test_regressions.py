@@ -662,6 +662,76 @@ class TestMediumPriorityEdgeCases:
                 await f.read()
 
     @pytest.mark.asyncio
+    async def test_large_compress_offloaded_to_executor(self, temp_file):
+        """compress() of a payload above the offload threshold must run in
+        an executor so the event loop is not blocked during the CPU work."""
+        import os as _os
+        from unittest.mock import patch
+
+        from aiogzip import _binary
+
+        calls = []
+        original = _binary._run_zlib_in_thread
+
+        async def tracking(method, data):
+            calls.append(len(data))
+            return await original(method, data)
+
+        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+            payload = _os.urandom(2 * 1024 * 1024)  # Above threshold.
+            async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+                await f.write(payload)
+            assert calls, "large write should have been offloaded"
+            assert max(calls) >= _binary._ZLIB_OFFLOAD_THRESHOLD
+
+    @pytest.mark.asyncio
+    async def test_small_compress_stays_inline(self, temp_file):
+        """Tiny writes should not pay the executor round-trip cost."""
+        from unittest.mock import patch
+
+        from aiogzip import _binary
+
+        calls = []
+
+        async def tracking(method, data):
+            calls.append(len(data))
+            return method(data)
+
+        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+            async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+                await f.write(b"small payload")
+        # Small payloads must stay inline to avoid executor overhead.
+        assert calls == []
+
+    @pytest.mark.asyncio
+    async def test_large_decompress_offloaded_to_executor(self, temp_file):
+        """decompress() of a large member should also run in the executor."""
+        import gzip as _gzip
+        import os as _os
+        from unittest.mock import patch
+
+        from aiogzip import _binary
+
+        payload = _os.urandom(2 * 1024 * 1024)  # Incompressible → large chunks.
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(payload)
+
+        calls = []
+        original = _binary._run_zlib_in_thread
+
+        async def tracking(method, data):
+            calls.append(len(data))
+            return await original(method, data)
+
+        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+            async with AsyncGzipBinaryFile(
+                temp_file, "rb", chunk_size=_binary._ZLIB_OFFLOAD_THRESHOLD * 2
+            ) as f:
+                got = await f.read()
+        assert got == payload
+        assert calls, "large decompress should have been offloaded"
+
+    @pytest.mark.asyncio
     async def test_crc_is_masked_to_32_bits(self, temp_file):
         """The accumulated CRC must stay within the 32-bit range so that
         the trailer bytes match what zlib would have produced."""

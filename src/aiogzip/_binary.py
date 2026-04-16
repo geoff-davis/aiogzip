@@ -1,11 +1,12 @@
 """Binary gzip stream implementation."""
 
+import asyncio
 import gzip
 import io
 import os
 import zlib
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Union, cast
+from typing import Any, Callable, Iterable, List, Optional, Union, cast
 
 import aiofiles
 
@@ -25,6 +26,24 @@ from ._common import (
     _validate_filename,
     _validate_original_filename,
 )
+
+# Inputs smaller than this run zlib inline — the executor round-trip
+# (context switch + thread wake-up) costs more than the CPU work below
+# this size. The threshold matches the default chunk_size so a single
+# full chunk is exactly on the boundary.
+_ZLIB_OFFLOAD_THRESHOLD = 64 * 1024
+
+
+async def _run_zlib_in_thread(method: Callable[[bytes], bytes], data: bytes) -> bytes:
+    """Run a zlib compress/decompress call in the default executor.
+
+    Kept as a module-level coroutine so tests can substitute it and so the
+    compress and decompress sites share one dispatch point. zlib releases
+    the GIL internally, so offloading large chunks keeps the event loop
+    responsive during CPU-bound work.
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, method, data)
 
 
 class AsyncGzipBinaryFile:
@@ -586,7 +605,14 @@ class AsyncGzipBinaryFile:
         # the compressor *has* advanced past these bytes, so the gzip
         # member is no longer recoverable — mark the stream broken.
         try:
-            compressed = self._engine.compress(buffer)
+            if length >= _ZLIB_OFFLOAD_THRESHOLD:
+                # Pass bytes into the thread — bytearray/memoryview are
+                # not guaranteed safe across thread boundaries while we
+                # may still mutate the caller's bytearray.
+                payload = bytes(buffer) if not isinstance(buffer, bytes) else buffer
+                compressed = await _run_zlib_in_thread(self._engine.compress, payload)
+            else:
+                compressed = self._engine.compress(buffer)
         except zlib.error as e:
             raise OSError(f"Error compressing data: {e}") from e
         except Exception as e:
@@ -762,7 +788,12 @@ class AsyncGzipBinaryFile:
 
         # Decompress the chunk
         try:
-            decompressed = self._engine.decompress(compressed_chunk)
+            if len(compressed_chunk) >= _ZLIB_OFFLOAD_THRESHOLD:
+                decompressed = await _run_zlib_in_thread(
+                    self._engine.decompress, compressed_chunk
+                )
+            else:
+                decompressed = self._engine.decompress(compressed_chunk)
             self._buffer.extend(decompressed)
             self._account_decompressed(len(decompressed))
 
@@ -776,7 +807,12 @@ class AsyncGzipBinaryFile:
                     break
 
                 self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
-                decompressed = self._engine.decompress(unused)
+                if len(unused) >= _ZLIB_OFFLOAD_THRESHOLD:
+                    decompressed = await _run_zlib_in_thread(
+                        self._engine.decompress, unused
+                    )
+                else:
+                    decompressed = self._engine.decompress(unused)
                 self._buffer.extend(decompressed)
                 self._account_decompressed(len(decompressed))
                 unused = self._engine.unused_data
