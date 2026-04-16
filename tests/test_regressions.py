@@ -756,6 +756,44 @@ class TestMediumPriorityEdgeCases:
             assert f._input_size == 0xFFFFFFFF
 
     @pytest.mark.asyncio
+    async def test_failed_enter_with_raising_close_leaves_null_file(self, tmp_path):
+        """If __aenter__ fails on an internally-opened file and the
+        subsequent close() also raises, _cleanup_failed_enter must still
+        null _file so the half-closed handle is not reachable."""
+        from unittest.mock import AsyncMock, patch
+
+        from aiogzip import _binary
+
+        class BadFile:
+            def __init__(self):
+                self.closed_called = False
+
+            async def write(self, data):
+                raise OSError("write boom")
+
+            async def close(self):
+                self.closed_called = True
+                raise OSError("close boom")
+
+        bad = BadFile()
+
+        # Make aiofiles.open return our BadFile so the file is treated as
+        # internally owned; __aenter__ then writes the gzip header via
+        # BadFile.write which raises, triggering cleanup — whose close()
+        # also raises.
+        async def fake_open(*args, **kwargs):
+            return bad
+
+        target = tmp_path / "out.gz"
+        f = AsyncGzipBinaryFile(str(target), "wb")
+        with patch.object(_binary.aiofiles, "open", AsyncMock(side_effect=fake_open)):
+            with pytest.raises(OSError):
+                await f.__aenter__()
+        assert bad.closed_called, "cleanup must still attempt close()"
+        assert f._file is None, "cleanup must null _file even if close raises"
+        assert f._owns_file is False
+
+    @pytest.mark.asyncio
     async def test_strict_size_defaults_off(self, temp_file):
         """Default behaviour (strict_size=False) still silently wraps to
         match gzip.open() so we do not break existing callers."""

@@ -932,17 +932,25 @@ class AsyncGzipBinaryFile:
         return chunk
 
     async def _cleanup_failed_enter(self) -> None:
-        """Close internally opened resources after __aenter__ setup failures."""
+        """Close internally opened resources after __aenter__ setup failures.
+
+        If the underlying close() raises (e.g., because the half-open
+        file is already in a bad state), the instance still has to end
+        up with _file cleared — otherwise the next caller can reach a
+        handle we no longer own.
+        """
         if self._file is None or not self._owns_file:
             return
 
         close_method = getattr(self._file, "close", None)
-        if callable(close_method):
-            result = close_method()
-            if hasattr(result, "__await__"):
-                await result
-        self._file = None
-        self._owns_file = False
+        try:
+            if callable(close_method):
+                result = close_method()
+                if hasattr(result, "__await__"):
+                    await result
+        finally:
+            self._file = None
+            self._owns_file = False
 
     async def flush(self) -> None:
         """
