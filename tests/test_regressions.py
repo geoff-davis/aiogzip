@@ -756,6 +756,24 @@ class TestMediumPriorityEdgeCases:
             assert f._input_size == 0xFFFFFFFF
 
     @pytest.mark.asyncio
+    async def test_text_cookie_rejected_by_different_instance(self, temp_file):
+        """A tell() cookie from one AsyncGzipTextFile must not be accepted
+        by a different instance, even if both point at the same file.
+        The per-instance cookie nonce is what guarantees this."""
+        import gzip as _gzip
+
+        with _gzip.open(temp_file, "wt") as fh:
+            fh.write("alpha\nbeta\ngamma\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f1:
+            await f1.readline()
+            cookie = await f1.tell()
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f2:
+            with pytest.raises(OSError, match="invalid text cookie"):
+                await f2.seek(cookie)
+
+    @pytest.mark.asyncio
     async def test_failed_enter_with_raising_close_leaves_null_file(self, tmp_path):
         """If __aenter__ fails on an internally-opened file and the
         subsequent close() also raises, _cleanup_failed_enter must still
