@@ -10,6 +10,7 @@ from typing import Any, Iterable, List, Optional, Union, cast
 import aiofiles
 
 from ._common import (
+    _MAX_CHUNK_SIZE,
     GZIP_WBITS,
     WithAsyncReadWrite,
     ZlibEngine,
@@ -340,6 +341,11 @@ class AsyncGzipBinaryFile:
             raise OSError("File not open for reading")
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
+        if size is not None and size > _MAX_CHUNK_SIZE:
+            raise ValueError(
+                f"peek size must be <= {_MAX_CHUNK_SIZE} bytes "
+                f"({_MAX_CHUNK_SIZE // (1024 * 1024)} MiB)"
+            )
         available = len(self._buffer) - self._buffer_offset
         target = size
         if target is None or target <= 0:

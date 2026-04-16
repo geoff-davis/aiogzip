@@ -29,6 +29,11 @@ _COMPRESS_LEVEL_FAST = 1
 _COMPRESS_LEVEL_BEST = 9
 _MAX_GZIP_MTIME = 0xFFFFFFFF
 
+# Safety cap for chunk_size/peek/readinto arguments (128 MiB). Prevents a
+# caller from accidentally allocating gigabytes when passing an unsanitized
+# integer from user input.
+_MAX_CHUNK_SIZE = 128 * 1024 * 1024
+
 # Type alias for zlib compression/decompression objects
 # These are the return types of zlib.compressobj() and zlib.decompressobj()
 # The actual types (zlib.Compress/zlib.Decompress) are C extension types that
@@ -68,6 +73,11 @@ def _validate_chunk_size(chunk_size: int) -> None:
     """
     if chunk_size <= 0:
         raise ValueError("Chunk size must be positive")
+    if chunk_size > _MAX_CHUNK_SIZE:
+        raise ValueError(
+            f"Chunk size must be <= {_MAX_CHUNK_SIZE} bytes "
+            f"({_MAX_CHUNK_SIZE // (1024 * 1024)} MiB)"
+        )
 
 
 def _validate_compresslevel(compresslevel: int) -> None:
