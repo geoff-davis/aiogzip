@@ -605,6 +605,63 @@ class TestMediumPriorityEdgeCases:
         await f.__aexit__(None, None, None)
 
     @pytest.mark.asyncio
+    async def test_max_decompressed_size_trips_on_bomb(self, temp_file):
+        """A highly compressible gzip should not expand past the caller's
+        max_decompressed_size cap."""
+        import gzip as _gzip
+
+        # 10 MiB of zeros — compresses to a few KB. Untrusted input could
+        # easily hide a payload like this.
+        bomb_uncompressed = b"\x00" * (10 * 1024 * 1024)
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(bomb_uncompressed)
+
+        # Cap the decompressed output at 1 MiB and expect a clear failure.
+        with pytest.raises(OSError, match="max_decompressed_size"):
+            async with AsyncGzipBinaryFile(
+                temp_file, "rb", max_decompressed_size=1 * 1024 * 1024
+            ) as f:
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_max_decompressed_size_allows_under_cap(self, temp_file):
+        """Reads comfortably under the cap should succeed."""
+        import gzip as _gzip
+
+        payload = b"ok " * 100
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(payload)
+
+        async with AsyncGzipBinaryFile(
+            temp_file, "rb", max_decompressed_size=10 * 1024
+        ) as f:
+            assert await f.read() == payload
+
+    @pytest.mark.asyncio
+    async def test_max_decompressed_size_validated(self):
+        """Zero and negative caps should be rejected at construction time."""
+        with pytest.raises(ValueError, match="max_decompressed_size"):
+            AsyncGzipBinaryFile("test.gz", "rb", max_decompressed_size=0)
+        with pytest.raises(ValueError, match="max_decompressed_size"):
+            AsyncGzipBinaryFile("test.gz", "rb", max_decompressed_size=-1)
+        with pytest.raises(ValueError, match="max_decompressed_size"):
+            AsyncGzipTextFile("test.gz", "rt", max_decompressed_size=0)
+
+    @pytest.mark.asyncio
+    async def test_max_decompressed_size_text_mode_trips(self, temp_file):
+        """The cap should also apply when reading through AsyncGzipTextFile."""
+        import gzip as _gzip
+
+        with _gzip.open(temp_file, "wt") as fh:
+            fh.write("a" * (2 * 1024 * 1024))
+
+        with pytest.raises(OSError, match="max_decompressed_size"):
+            async with AsyncGzipTextFile(
+                temp_file, "rt", max_decompressed_size=256 * 1024
+            ) as f:
+                await f.read()
+
+    @pytest.mark.asyncio
     async def test_crc_is_masked_to_32_bits(self, temp_file):
         """The accumulated CRC must stay within the 32-bit range so that
         the trailer bytes match what zlib would have produced."""

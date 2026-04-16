@@ -87,6 +87,8 @@ class AsyncGzipBinaryFile:
         "_replay_offset",
         "_cache_rewindable_reads",
         "_write_broken",
+        "_max_decompressed_size",
+        "_decompressed_total",
     )
 
     DEFAULT_CHUNK_SIZE = 64 * 1024  # 64 KB
@@ -102,10 +104,13 @@ class AsyncGzipBinaryFile:
         original_filename: Optional[Union[str, bytes]] = None,
         fileobj: Optional[WithAsyncReadWrite] = None,
         closefd: Optional[bool] = None,
+        max_decompressed_size: Optional[int] = None,
     ) -> None:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
         _validate_chunk_size(chunk_size)
+        if max_decompressed_size is not None and max_decompressed_size <= 0:
+            raise ValueError("max_decompressed_size must be a positive integer")
 
         # Validate mode and derive file characteristics
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
@@ -150,6 +155,8 @@ class AsyncGzipBinaryFile:
         self._replay_offset: Optional[int] = None
         self._cache_rewindable_reads: bool = False
         self._write_broken: bool = False
+        self._max_decompressed_size: Optional[int] = max_decompressed_size
+        self._decompressed_total: int = 0
 
     async def __aenter__(self) -> "AsyncGzipBinaryFile":
         """Enter the async context manager and initialize resources."""
@@ -746,6 +753,7 @@ class AsyncGzipBinaryFile:
                 remaining = self._engine.flush()
                 if remaining:
                     self._buffer.extend(remaining)
+                    self._account_decompressed(len(remaining))
             except zlib.error as e:
                 raise gzip.BadGzipFile(
                     f"Error finalizing gzip decompression: {e}"
@@ -756,6 +764,7 @@ class AsyncGzipBinaryFile:
         try:
             decompressed = self._engine.decompress(compressed_chunk)
             self._buffer.extend(decompressed)
+            self._account_decompressed(len(decompressed))
 
             # Handle multi-member gzip archives (created by append mode).
             # CPython's gzip reader ignores zero padding between/after members,
@@ -769,11 +778,32 @@ class AsyncGzipBinaryFile:
                 self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
                 decompressed = self._engine.decompress(unused)
                 self._buffer.extend(decompressed)
+                self._account_decompressed(len(decompressed))
                 unused = self._engine.unused_data
         except zlib.error as e:
             raise gzip.BadGzipFile(f"Error decompressing gzip data: {e}") from e
+        except OSError:
+            # Preserve OSErrors raised deliberately by helpers (e.g., the
+            # max_decompressed_size guard) instead of re-wrapping them.
+            raise
         except Exception as e:
             raise OSError(f"Unexpected error during decompression: {e}") from e
+
+    def _account_decompressed(self, n: int) -> None:
+        """Track total decompressed output and enforce max_decompressed_size.
+
+        Raises OSError once the cap is exceeded so a decompression bomb can
+        be aborted before consuming unbounded memory.
+        """
+        if not n:
+            return
+        self._decompressed_total += n
+        cap = self._max_decompressed_size
+        if cap is not None and self._decompressed_total > cap:
+            raise OSError(
+                f"decompressed output exceeded max_decompressed_size "
+                f"({self._decompressed_total} > {cap} bytes)"
+            )
 
     async def _consume_bytes(self, amount: int) -> None:
         """Advance the read position by consuming bytes without returning them."""
