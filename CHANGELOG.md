@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-04-16
+
 ### Added
 
 - New `max_decompressed_size` keyword on `AsyncGzipBinaryFile` and `AsyncGzipTextFile`: when set, reads abort with `OSError` once the cumulative decompressed output exceeds the cap. Intended as a decompression-bomb guard for untrusted input.
@@ -27,6 +29,7 @@ All notable changes to this project will be documented in this file.
 ### Tooling
 
 - Add a `scripts/check_py38_compat.py` pre-commit hook that rejects PEP 585 generic subscripts (`tuple[...]`, `list[...]`, `PathLike[...]`, ...) and PEP 604 union operators in `src/`. `mypy` ≥ 1.15 no longer accepts `python_version = "3.8"`, so this grep-based check guards the library's declared Python 3.8+ support.
+- `/release-prep` skill now refuses to run when the current branch has commits ahead of `origin/main` that are not yet merged, preventing silent exclusion of feature work from the release.
 
 ## [1.3.3] - 2026-04-14
 

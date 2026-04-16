@@ -29,7 +29,7 @@ from ._common import (
 )
 from ._text import AsyncGzipTextFile
 
-__version__ = "1.3.3"
+__version__ = "1.4.0"
 
 
 def AsyncGzipFile(
