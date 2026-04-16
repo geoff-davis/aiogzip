@@ -152,7 +152,9 @@ class AsyncGzipTextFile:
         self._binary_file: Optional[AsyncGzipBinaryFile] = None
         self._is_closed: bool = False
 
-        # Decoder and buffer state
+        # Decoder and buffer state. Constructed eagerly so an invalid
+        # `encoding` raises LookupError at call site, matching stdlib
+        # io.TextIOWrapper and codecs.getincrementaldecoder semantics.
         self._decoder = codecs.getincrementaldecoder(self._encoding)(
             errors=self._errors
         )
