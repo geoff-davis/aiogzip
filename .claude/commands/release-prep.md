@@ -12,6 +12,10 @@ Prepare a new release of aiogzip. This skill handles changelog generation, versi
 
 - Run `git fetch origin main` to ensure we have the latest remote state.
 - Check for uncommitted changes. If there are any, stop and tell the user to commit or stash them first (branch switching may lose work).
+- Check that the current branch is not ahead of `origin/main` with commits that are not yet merged. Run `git log origin/main..HEAD --oneline` — if the output is non-empty, **stop** and tell the user:
+  - This skill cuts `release/v<version>` from `origin/main`, so any local commits ahead of `origin/main` would be silently excluded from the release.
+  - Ask them to open and merge a feature PR for those commits first, then re-run `/release-prep`.
+  - Do not offer to work around this by branching from the current HEAD — that mixes feature work into the release PR and breaks the one-PR-per-concern model that `/release-tag` expects.
 
 ### 1. Generate changelog entries
 

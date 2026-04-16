@@ -78,14 +78,24 @@ class AsyncGzipTextFile:
         "_buffer_origin_trailing_cr",
         "_buffer_origin_seen_newline_types",
         "_universal_newlines",
+        "_max_decompressed_size",
+        "_strict_size",
     )
 
+    # Bit flags tracking which newline *styles* the stream has emitted so
+    # far, mirroring the tuple reported by TextIOWrapper.newlines.
+    # Combined with `7 & ~seen` to ask "which styles are still missing?"
+    # when deciding whether a pending \r can be treated as standalone.
     _SEEN_CR = 1
     _SEEN_LF = 2
     _SEEN_CRLF = 4
     _COOKIE_VERSION = 1
     _COOKIE_HEADER = struct.Struct(">BQQQiBBI")
-    _TEXT_COMPACTION_THRESHOLD = 16384  # Compact text buffer when offset exceeds 16KB
+    # When the decoded-text head offset crosses this, drop the consumed
+    # prefix so the Python str buffer does not grow unbounded. Smaller
+    # than the binary buffer because each char can cost 1-4 bytes of
+    # internal storage.
+    _TEXT_COMPACTION_THRESHOLD = 16384
 
     def __init__(
         self,
@@ -100,10 +110,14 @@ class AsyncGzipTextFile:
         original_filename: Optional[Union[str, bytes]] = None,
         fileobj: Optional[WithAsyncReadWrite] = None,
         closefd: Optional[bool] = None,
+        max_decompressed_size: Optional[int] = None,
+        strict_size: bool = False,
     ) -> None:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
         _validate_chunk_size(chunk_size)
+        if max_decompressed_size is not None and max_decompressed_size <= 0:
+            raise ValueError("max_decompressed_size must be a positive integer")
 
         # Validate text-specific parameters
         if encoding is None:
@@ -146,7 +160,9 @@ class AsyncGzipTextFile:
         self._binary_file: Optional[AsyncGzipBinaryFile] = None
         self._is_closed: bool = False
 
-        # Decoder and buffer state
+        # Decoder and buffer state. Constructed eagerly so an invalid
+        # `encoding` raises LookupError at call site, matching stdlib
+        # io.TextIOWrapper and codecs.getincrementaldecoder semantics.
         self._decoder = codecs.getincrementaldecoder(self._encoding)(
             errors=self._errors
         )
@@ -161,6 +177,8 @@ class AsyncGzipTextFile:
         self._buffer_origin_trailing_cr: bool = False
         self._buffer_origin_seen_newline_types: int = 0
         self._universal_newlines: bool = newline in {None, ""}
+        self._max_decompressed_size: Optional[int] = max_decompressed_size
+        self._strict_size: bool = bool(strict_size)
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
@@ -174,6 +192,8 @@ class AsyncGzipTextFile:
             original_filename=self._header_filename_override,
             fileobj=self._external_file,
             closefd=self._closefd,
+            max_decompressed_size=self._max_decompressed_size,
+            strict_size=self._strict_size,
         )
         try:
             await self._binary_file.__aenter__()

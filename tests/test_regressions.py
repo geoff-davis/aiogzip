@@ -1,6 +1,7 @@
 # pyrefly: ignore
 # pyrefly: disable=all
 import io
+import os
 
 import pytest
 
@@ -552,6 +553,320 @@ class TestMediumPriorityEdgeCases:
         async with AsyncGzipTextFile(temp_file, "rt", encoding="cp1252") as f:
             data = await f.read()
             assert data == test_text
+
+    @pytest.mark.asyncio
+    async def test_write_failure_does_not_advance_accounting(self):
+        """If the underlying file.write fails, CRC/size/position must not
+        reflect bytes that never reached the file, and subsequent writes
+        must not silently produce a corrupted stream."""
+
+        class FailOnNthWrite:
+            """Fileobj that records writes and fails on a chosen one."""
+
+            def __init__(self, fail_on_call: int):
+                self.calls = 0
+                self.fail_on_call = fail_on_call
+                self.buf = bytearray()
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls == self.fail_on_call:
+                    raise OSError("simulated disk full")
+                self.buf.extend(data)
+                return len(data)
+
+            async def close(self):
+                pass
+
+        # Call 1 is the gzip header emitted by __aenter__; fail call 2,
+        # which is the first data write. Use incompressible random bytes
+        # so the compressor has to flush output.
+        import os as _os
+
+        payload = _os.urandom(256 * 1024)
+        mock = FailOnNthWrite(fail_on_call=2)
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=mock, closefd=False)
+        await f.__aenter__()
+
+        with pytest.raises(OSError, match="simulated disk full"):
+            await f.write(payload)
+
+        # Accounting must still be at zero: nothing reached the file.
+        assert f._crc == 0
+        assert f._input_size == 0
+        assert await f.tell() == 0
+
+        # The stream should be marked broken so a follow-up write does
+        # not silently emit bytes on top of a torn compressor state.
+        with pytest.raises(OSError, match="broken|unusable|failed"):
+            await f.write(b"more")
+
+        # Closing a broken writer should not raise and should not append
+        # a trailer that claims data never written.
+        await f.__aexit__(None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_max_decompressed_size_trips_on_bomb(self, temp_file):
+        """A highly compressible gzip should not expand past the caller's
+        max_decompressed_size cap."""
+        import gzip as _gzip
+
+        # 10 MiB of zeros — compresses to a few KB. Untrusted input could
+        # easily hide a payload like this.
+        bomb_uncompressed = b"\x00" * (10 * 1024 * 1024)
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(bomb_uncompressed)
+
+        # Cap the decompressed output at 1 MiB and expect a clear failure.
+        with pytest.raises(OSError, match="max_decompressed_size"):
+            async with AsyncGzipBinaryFile(
+                temp_file, "rb", max_decompressed_size=1 * 1024 * 1024
+            ) as f:
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_max_decompressed_size_allows_under_cap(self, temp_file):
+        """Reads comfortably under the cap should succeed."""
+        import gzip as _gzip
+
+        payload = b"ok " * 100
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(payload)
+
+        async with AsyncGzipBinaryFile(
+            temp_file, "rb", max_decompressed_size=10 * 1024
+        ) as f:
+            assert await f.read() == payload
+
+    @pytest.mark.asyncio
+    async def test_max_decompressed_size_validated(self):
+        """Zero and negative caps should be rejected at construction time."""
+        with pytest.raises(ValueError, match="max_decompressed_size"):
+            AsyncGzipBinaryFile("test.gz", "rb", max_decompressed_size=0)
+        with pytest.raises(ValueError, match="max_decompressed_size"):
+            AsyncGzipBinaryFile("test.gz", "rb", max_decompressed_size=-1)
+        with pytest.raises(ValueError, match="max_decompressed_size"):
+            AsyncGzipTextFile("test.gz", "rt", max_decompressed_size=0)
+
+    @pytest.mark.asyncio
+    async def test_max_decompressed_size_text_mode_trips(self, temp_file):
+        """The cap should also apply when reading through AsyncGzipTextFile."""
+        import gzip as _gzip
+
+        with _gzip.open(temp_file, "wt") as fh:
+            fh.write("a" * (2 * 1024 * 1024))
+
+        with pytest.raises(OSError, match="max_decompressed_size"):
+            async with AsyncGzipTextFile(
+                temp_file, "rt", max_decompressed_size=256 * 1024
+            ) as f:
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_large_compress_offloaded_to_executor(self, temp_file):
+        """compress() of a payload above the offload threshold must run in
+        an executor so the event loop is not blocked during the CPU work."""
+        import os as _os
+        from unittest.mock import patch
+
+        from aiogzip import _binary
+
+        calls = []
+        original = _binary._run_zlib_in_thread
+
+        async def tracking(method, data):
+            calls.append(len(data))
+            return await original(method, data)
+
+        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+            payload = _os.urandom(2 * 1024 * 1024)  # Above threshold.
+            async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+                await f.write(payload)
+            assert calls, "large write should have been offloaded"
+            assert max(calls) >= _binary._ZLIB_OFFLOAD_THRESHOLD
+
+    @pytest.mark.asyncio
+    async def test_small_compress_stays_inline(self, temp_file):
+        """Tiny writes should not pay the executor round-trip cost."""
+        from unittest.mock import patch
+
+        from aiogzip import _binary
+
+        calls = []
+
+        async def tracking(method, data):
+            calls.append(len(data))
+            return method(data)
+
+        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+            async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+                await f.write(b"small payload")
+        # Small payloads must stay inline to avoid executor overhead.
+        assert calls == []
+
+    @pytest.mark.asyncio
+    async def test_large_decompress_offloaded_to_executor(self, temp_file):
+        """decompress() of a large member should also run in the executor."""
+        import gzip as _gzip
+        import os as _os
+        from unittest.mock import patch
+
+        from aiogzip import _binary
+
+        payload = _os.urandom(2 * 1024 * 1024)  # Incompressible → large chunks.
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(payload)
+
+        calls = []
+        original = _binary._run_zlib_in_thread
+
+        async def tracking(method, data):
+            calls.append(len(data))
+            return await original(method, data)
+
+        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+            async with AsyncGzipBinaryFile(
+                temp_file, "rb", chunk_size=_binary._ZLIB_OFFLOAD_THRESHOLD * 2
+            ) as f:
+                got = await f.read()
+        assert got == payload
+        assert calls, "large decompress should have been offloaded"
+
+    @pytest.mark.asyncio
+    async def test_strict_size_rejects_write_past_4gib(self, temp_file):
+        """With strict_size=True, a write that would push _input_size past
+        the gzip ISIZE field's 4 GiB cap must raise rather than silently
+        emit a truncated-looking trailer."""
+        async with AsyncGzipBinaryFile(temp_file, "wb", strict_size=True) as f:
+            # Pre-seed the accumulator just below the ISIZE limit. A real
+            # caller would have reached this via actual writes; simulating
+            # it keeps the test cheap.
+            f._input_size = 0xFFFFFFFF - 2
+            with pytest.raises(OSError, match="4 GiB"):
+                await f.write(b"abcdef")
+
+    @pytest.mark.asyncio
+    async def test_strict_size_at_limit_ok(self, temp_file):
+        """A write that lands exactly on the 4 GiB boundary is allowed."""
+        async with AsyncGzipBinaryFile(temp_file, "wb", strict_size=True) as f:
+            f._input_size = 0xFFFFFFFF - 3
+            # Exactly three bytes leaves _input_size == 0xFFFFFFFF, which
+            # still fits the ISIZE field.
+            await f.write(b"abc")
+            assert f._input_size == 0xFFFFFFFF
+
+    @pytest.mark.asyncio
+    async def test_text_cookie_rejected_by_different_instance(self, temp_file):
+        """A tell() cookie from one AsyncGzipTextFile must not be accepted
+        by a different instance, even if both point at the same file.
+        The per-instance cookie nonce is what guarantees this."""
+        import gzip as _gzip
+
+        with _gzip.open(temp_file, "wt") as fh:
+            fh.write("alpha\nbeta\ngamma\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f1:
+            await f1.readline()
+            cookie = await f1.tell()
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f2:
+            with pytest.raises(OSError, match="invalid text cookie"):
+                await f2.seek(cookie)
+
+    @pytest.mark.asyncio
+    async def test_failed_enter_with_raising_close_leaves_null_file(self, tmp_path):
+        """If __aenter__ fails on an internally-opened file and the
+        subsequent close() also raises, _cleanup_failed_enter must still
+        null _file so the half-closed handle is not reachable."""
+        from unittest.mock import AsyncMock, patch
+
+        from aiogzip import _binary
+
+        class BadFile:
+            def __init__(self):
+                self.closed_called = False
+
+            async def write(self, data):
+                raise OSError("write boom")
+
+            async def close(self):
+                self.closed_called = True
+                raise OSError("close boom")
+
+        bad = BadFile()
+
+        # Make aiofiles.open return our BadFile so the file is treated as
+        # internally owned; __aenter__ then writes the gzip header via
+        # BadFile.write which raises, triggering cleanup — whose close()
+        # also raises.
+        async def fake_open(*args, **kwargs):
+            return bad
+
+        target = tmp_path / "out.gz"
+        f = AsyncGzipBinaryFile(str(target), "wb")
+        with patch.object(_binary.aiofiles, "open", AsyncMock(side_effect=fake_open)):
+            with pytest.raises(OSError):
+                await f.__aenter__()
+        assert bad.closed_called, "cleanup must still attempt close()"
+        assert f._file is None, "cleanup must null _file even if close raises"
+        assert f._owns_file is False
+
+    @pytest.mark.asyncio
+    async def test_strict_size_defaults_off(self, temp_file):
+        """Default behaviour (strict_size=False) still silently wraps to
+        match gzip.open() so we do not break existing callers."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            f._input_size = 0xFFFFFFFE
+            # Should not raise.
+            await f.write(b"abcdef")
+
+    @pytest.mark.asyncio
+    async def test_truncated_gzip_seek_end_raises(self, temp_file):
+        """SEEK_END on a mid-stream truncated gzip must not silently report
+        a partial position; the reader should detect the missing trailer."""
+        import gzip as _gzip
+
+        # Create a valid gzip then drop the last 200 bytes so the deflate
+        # stream is cut mid-block (no trailing CRC/ISIZE).
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(b"x" * (256 * 1024))
+        size = os.path.getsize(temp_file)
+        with open(temp_file, "r+b") as fh:
+            fh.truncate(size - 200)
+
+        with pytest.raises(_gzip.BadGzipFile):
+            async with AsyncGzipBinaryFile(temp_file, "rb") as gz:
+                await gz.seek(0, 2)  # SEEK_END
+
+    @pytest.mark.asyncio
+    async def test_truncated_gzip_read_raises(self, temp_file):
+        """Reading to EOF on a truncated gzip must also raise."""
+        import gzip as _gzip
+
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(b"y" * (128 * 1024))
+        size = os.path.getsize(temp_file)
+        with open(temp_file, "r+b") as fh:
+            fh.truncate(size - 50)
+
+        with pytest.raises(_gzip.BadGzipFile):
+            async with AsyncGzipBinaryFile(temp_file, "rb") as gz:
+                await gz.read()
+
+    @pytest.mark.asyncio
+    async def test_crc_is_masked_to_32_bits(self, temp_file):
+        """The accumulated CRC must stay within the 32-bit range so that
+        the trailer bytes match what zlib would have produced."""
+        import zlib
+
+        payload = b"x" * 1024
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(payload)
+            # Pre-close: internal _crc must be the same uint32 value
+            # that zlib.crc32 returns for the same bytes.
+            expected = zlib.crc32(payload) & 0xFFFFFFFF
+            assert f._crc == expected
+            assert 0 <= f._crc <= 0xFFFFFFFF
 
 
 class TestLowPriorityEdgeCases:

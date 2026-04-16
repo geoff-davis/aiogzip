@@ -684,6 +684,26 @@ class TestEdgeCases:
         with pytest.raises(ValueError, match="Chunk size must be positive"):
             AsyncGzipBinaryFile("test.gz", chunk_size=-1)
 
+    def test_chunk_size_upper_bound(self):
+        """chunk_size must be rejected if it exceeds the safety cap."""
+        # 128 MiB is the cap; just over should raise.
+        too_big = 128 * 1024 * 1024 + 1
+        with pytest.raises(ValueError, match="Chunk size must be <="):
+            AsyncGzipBinaryFile("test.gz", chunk_size=too_big)
+        with pytest.raises(ValueError, match="Chunk size must be <="):
+            AsyncGzipTextFile("test.gz", chunk_size=too_big)
+        # Exactly at the cap is allowed.
+        AsyncGzipBinaryFile("test.gz", chunk_size=128 * 1024 * 1024)
+
+    @pytest.mark.asyncio
+    async def test_peek_size_upper_bound(self, temp_file, sample_data):
+        """peek(size) must reject absurd sizes rather than try to buffer them."""
+        async with AsyncGzipBinaryFile(temp_file, mode="wb") as f:
+            await f.write(sample_data)
+        async with AsyncGzipBinaryFile(temp_file, mode="rb") as f:
+            with pytest.raises(ValueError, match="peek size"):
+                await f.peek(128 * 1024 * 1024 + 1)
+
     def test_invalid_compression_level(self):
         """Test invalid compression level inputs."""
         AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=-1)
@@ -935,10 +955,21 @@ class TestErrorHandlingConsistency:
 
     @pytest.mark.asyncio
     async def test_exception_chaining_preserved(self, temp_file):
-        """Test that exception chaining is used (from e) for debugging."""
-        # Create corrupted file
-        with open(temp_file, "wb") as f:
-            f.write(b"\x1f\x8b\x08\x00corrupted")
+        """Test that exception chaining is used (from e) for debugging.
+
+        Start from a valid gzip and corrupt a byte inside the deflate
+        payload so the error surfaces through zlib rather than through
+        the truncation check.
+        """
+        import gzip as _gzip
+
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(b"payload data " * 4096)
+        data = bytearray(open(temp_file, "rb").read())
+        # Flip a byte well inside the deflate body to force a zlib.error.
+        data[100] ^= 0xFF
+        with open(temp_file, "wb") as fh:
+            fh.write(data)
 
         try:
             async with AsyncGzipBinaryFile(temp_file, "rb") as f:
