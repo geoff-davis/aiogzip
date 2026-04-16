@@ -28,10 +28,12 @@ from ._common import (
 )
 
 # Inputs smaller than this run zlib inline — the executor round-trip
-# (context switch + thread wake-up) costs more than the CPU work below
-# this size. The threshold matches the default chunk_size so a single
-# full chunk is exactly on the boundary.
-_ZLIB_OFFLOAD_THRESHOLD = 64 * 1024
+# (~50-100µs thread hop + wake-up) otherwise costs more than the CPU
+# work it offloads. Calibrated against incompressible data: below 256
+# KiB, decompressing a single chunk is faster than the hop, so the
+# event-loop benefit does not pay for itself. Above it, the CPU work
+# dominates and the hop is amortised.
+_ZLIB_OFFLOAD_THRESHOLD = 256 * 1024
 
 
 async def _run_zlib_in_thread(method: Callable[[bytes], bytes], data: bytes) -> bytes:
