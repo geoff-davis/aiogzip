@@ -112,7 +112,12 @@ class AsyncGzipBinaryFile:
     )
 
     DEFAULT_CHUNK_SIZE = 64 * 1024  # 64 KB
-    BUFFER_COMPACTION_THRESHOLD = 64 * 1024  # Compact buffer when offset exceeds this
+    # When the read buffer's head offset crosses this, drop the consumed
+    # prefix so the bytearray does not grow unbounded while reads march
+    # forward. Matches DEFAULT_CHUNK_SIZE so a full typical chunk fits.
+    BUFFER_COMPACTION_THRESHOLD = 64 * 1024
+    # Reusable zero-chunk size for write-mode forward seek() filler.
+    _SEEK_ZERO_CHUNK_SIZE = 1024
 
     def __init__(
         self,
@@ -255,7 +260,7 @@ class AsyncGzipBinaryFile:
                 raise OSError("Negative seek in write mode")
             count = target - self._position
             if count > 0:
-                zero_chunk = b"\x00" * min(1024, count)
+                zero_chunk = b"\x00" * min(self._SEEK_ZERO_CHUNK_SIZE, count)
                 remaining = count
                 while remaining > 0:
                     chunk = (

@@ -82,12 +82,20 @@ class AsyncGzipTextFile:
         "_strict_size",
     )
 
+    # Bit flags tracking which newline *styles* the stream has emitted so
+    # far, mirroring the tuple reported by TextIOWrapper.newlines.
+    # Combined with `7 & ~seen` to ask "which styles are still missing?"
+    # when deciding whether a pending \r can be treated as standalone.
     _SEEN_CR = 1
     _SEEN_LF = 2
     _SEEN_CRLF = 4
     _COOKIE_VERSION = 1
     _COOKIE_HEADER = struct.Struct(">BQQQiBBI")
-    _TEXT_COMPACTION_THRESHOLD = 16384  # Compact text buffer when offset exceeds 16KB
+    # When the decoded-text head offset crosses this, drop the consumed
+    # prefix so the Python str buffer does not grow unbounded. Smaller
+    # than the binary buffer because each char can cost 1-4 bytes of
+    # internal storage.
+    _TEXT_COMPACTION_THRESHOLD = 16384
 
     def __init__(
         self,
