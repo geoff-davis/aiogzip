@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- New `max_decompressed_size` keyword on `AsyncGzipBinaryFile` and `AsyncGzipTextFile`: when set, reads abort with `OSError` once the cumulative decompressed output exceeds the cap. Intended as a decompression-bomb guard for untrusted input.
+- New `strict_size` keyword on `AsyncGzipBinaryFile` and `AsyncGzipTextFile`: when true, writes that would push the uncompressed member size past the gzip `ISIZE` field's 4 GiB limit raise `OSError` instead of producing a trailer with a silently-truncated size. Default remains false so spec-compliant wrapping (matching `gzip.open()`) is preserved.
+
+### Fixed
+
+- Detect truncated gzip streams. A member that ended before the decompressor consumed its trailer previously caused `read()` and `seek(0, SEEK_END)` to silently return the partial bytes already emitted. Both paths now raise `gzip.BadGzipFile`. **Behavior change:** callers that were (often unknowingly) relying on silent truncation will now see an exception — this is a data-integrity fix.
+- Keep write accounting consistent after a failed underlying `write()`. `_crc`, `_input_size`, and `_position` now update only after the compressed bytes are durably handed to the file object, and the CRC accumulator is explicitly masked to 32 bits. A mid-write `OSError` marks the stream broken so follow-up writes refuse rather than silently producing a torn gzip member, and `close()` skips emitting a trailer that would lie about bytes never written.
+- `_cleanup_failed_enter` now nulls `_file` in a `finally` block, so a raising close during setup-failure cleanup no longer leaves a reachable handle on the instance.
+- Add an upper bound (128 MiB) to `_validate_chunk_size` and to `AsyncGzipBinaryFile.peek(size=…)`, so a caller passing an unsanitized integer cannot accidentally allocate gigabytes of buffer.
+
+### Performance
+
+- Offload `zlib` compress/decompress calls to the default executor when the input is ≥ 256 KiB. `zlib` releases the GIL internally, so multiple gzip streams on the same event loop now run their CPU work in parallel. The repo's concurrent-I/O benchmark improves ~4x; single-stream latency is unchanged within noise.
+
+### Documentation
+
+- README now describes append-mode multi-member semantics, backward-seek cost, the 4 GiB `ISIZE` caveat (and `strict_size`), and `max_decompressed_size` as a decompression-bomb guard.
+
+### Tooling
+
+- Add a `scripts/check_py38_compat.py` pre-commit hook that rejects PEP 585 generic subscripts (`tuple[...]`, `list[...]`, `PathLike[...]`, ...) and PEP 604 union operators in `src/`. `mypy` ≥ 1.15 no longer accepts `python_version = "3.8"`, so this grep-based check guards the library's declared Python 3.8+ support.
+
 ## [1.3.3] - 2026-04-14
 
 ### Added

@@ -62,7 +62,7 @@ async with AsyncGzipFile(
 
 - **Text I/O**: Often ~2-3x faster than standard `gzip` in bulk text workflows.
 - **Binary I/O**: Typically near parity for bulk reads/writes, and can be slower for very small chunk sizes.
-- **Concurrency**: Non-blocking I/O can improve throughput in latency-bound multi-file workloads.
+- **Concurrency**: CPU-heavy `zlib` compress/decompress calls run in the default executor above a 256 KiB threshold, so multiple gzip streams on the same event loop compress and decompress in parallel instead of serializing on the loop thread. The repo's concurrent-I/O benchmark runs ~4x faster on 1.4.0 than on 1.3.x as a result; single-stream throughput stays at parity.
 - **Memory**: Optimized buffer management for stable memory usage.
 - **JSONL**: For large gzipped JSONL files, prefer `AsyncGzipTextFile(..., newline="\n", chunk_size=512 * 1024)` to reduce line-iteration overhead.
 
