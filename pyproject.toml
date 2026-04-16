@@ -86,6 +86,8 @@ ignore = ["E501"]  # Line too long (handled by formatter usually, but good to ig
 "src/aiogzip/__init__.py" = ["E402"]
 
 [tool.mypy]
+# mypy >= 1.15 no longer accepts python_version = "3.8"; the
+# pre-commit `python38-compat` hook guards the PEP 585/604 syntax.
 python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true

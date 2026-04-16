@@ -32,6 +32,17 @@ repos:
         additional_dependencies: ["ty>=0.0.1a16", "aiofiles>=23.0.0", "types-aiofiles"]
         pass_filenames: false
 
+  # Python 3.8 compatibility guard - mypy >=1.15 can't target 3.8, so we
+  # grep for PEP 585 generics and PEP 604 union operators in src/.
+  - repo: local
+    hooks:
+      - id: python38-compat
+        name: python38-compat
+        entry: scripts/check_py38_compat.py
+        language: system
+        files: ^src/.*\.py$
+        pass_filenames: true
+
   # General code quality checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
