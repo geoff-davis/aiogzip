@@ -86,6 +86,7 @@ class AsyncGzipBinaryFile:
         "_compressed_cache",
         "_replay_offset",
         "_cache_rewindable_reads",
+        "_write_broken",
     )
 
     DEFAULT_CHUNK_SIZE = 64 * 1024  # 64 KB
@@ -148,6 +149,7 @@ class AsyncGzipBinaryFile:
         self._compressed_cache = bytearray()
         self._replay_offset: Optional[int] = None
         self._cache_rewindable_reads: bool = False
+        self._write_broken: bool = False
 
     async def __aenter__(self) -> "AsyncGzipBinaryFile":
         """Enter the async context manager and initialize resources."""
@@ -559,29 +561,47 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
+        if self._write_broken:
+            raise OSError(
+                "write stream is broken after a prior write failure; "
+                "the gzip member is unusable"
+            )
 
         if isinstance(data, (bytes, bytearray)):
             buffer = data
         else:
             buffer = self._coerce_byteslike(data)
         length = len(buffer)
-        self._crc = zlib.crc32(buffer, self._crc)
-        self._input_size += length
-        self._position = self._input_size
 
+        # Compress first. If compress() raises, the compressor's state is
+        # intact (no output was emitted) and we can leave our accounting
+        # untouched. If it succeeds but the downstream file write fails,
+        # the compressor *has* advanced past these bytes, so the gzip
+        # member is no longer recoverable — mark the stream broken.
         try:
             compressed = self._engine.compress(buffer)
-            if compressed:
-                await self._file.write(compressed)
         except zlib.error as e:
             raise OSError(f"Error compressing data: {e}") from e
-        except OSError:
-            # Re-raise I/O errors as-is
-            raise
         except Exception as e:
             raise OSError(f"Unexpected error during compression: {e}") from e
 
-        return len(buffer)
+        if compressed:
+            try:
+                await self._file.write(compressed)
+            except BaseException:
+                # File write failed after compressor already consumed input;
+                # further writes would produce a torn member.
+                self._write_broken = True
+                raise
+
+        # Only credit the input once both stages succeed, and mask the CRC
+        # to 32 bits so tell()/the trailer always see the same uint32 zlib
+        # would have produced.
+        self._crc = zlib.crc32(buffer, self._crc) & 0xFFFFFFFF
+        self._input_size += length
+        self._position = self._input_size
+
+        return length
 
     @staticmethod
     def _coerce_byteslike(data: Any) -> Union[bytes, bytearray, memoryview]:
@@ -856,7 +876,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
 
-        if self._writing_mode and self._file is not None:
+        if self._writing_mode and self._file is not None and not self._write_broken:
             # Flush any buffered compressed data (but not the final trailer)
             # Using Z_SYNC_FLUSH allows us to flush without ending the stream
             try:
@@ -886,8 +906,10 @@ class AsyncGzipBinaryFile:
         self._is_closed = True
 
         try:
-            if self._writing_mode and self._file is not None:
-                # Flush the compressor to write the gzip trailer
+            if self._writing_mode and self._file is not None and not self._write_broken:
+                # Flush the compressor to write the gzip trailer. Skipped on
+                # a broken writer because the member is already torn and a
+                # trailer would lie about the bytes actually on disk.
                 remaining_data = self._engine.flush()
                 if remaining_data:
                     await self._file.write(remaining_data)

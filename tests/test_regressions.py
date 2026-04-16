@@ -553,6 +553,72 @@ class TestMediumPriorityEdgeCases:
             data = await f.read()
             assert data == test_text
 
+    @pytest.mark.asyncio
+    async def test_write_failure_does_not_advance_accounting(self):
+        """If the underlying file.write fails, CRC/size/position must not
+        reflect bytes that never reached the file, and subsequent writes
+        must not silently produce a corrupted stream."""
+
+        class FailOnNthWrite:
+            """Fileobj that records writes and fails on a chosen one."""
+
+            def __init__(self, fail_on_call: int):
+                self.calls = 0
+                self.fail_on_call = fail_on_call
+                self.buf = bytearray()
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls == self.fail_on_call:
+                    raise OSError("simulated disk full")
+                self.buf.extend(data)
+                return len(data)
+
+            async def close(self):
+                pass
+
+        # Call 1 is the gzip header emitted by __aenter__; fail call 2,
+        # which is the first data write. Use incompressible random bytes
+        # so the compressor has to flush output.
+        import os as _os
+
+        payload = _os.urandom(256 * 1024)
+        mock = FailOnNthWrite(fail_on_call=2)
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=mock, closefd=False)
+        await f.__aenter__()
+
+        with pytest.raises(OSError, match="simulated disk full"):
+            await f.write(payload)
+
+        # Accounting must still be at zero: nothing reached the file.
+        assert f._crc == 0
+        assert f._input_size == 0
+        assert await f.tell() == 0
+
+        # The stream should be marked broken so a follow-up write does
+        # not silently emit bytes on top of a torn compressor state.
+        with pytest.raises(OSError, match="broken|unusable|failed"):
+            await f.write(b"more")
+
+        # Closing a broken writer should not raise and should not append
+        # a trailer that claims data never written.
+        await f.__aexit__(None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_crc_is_masked_to_32_bits(self, temp_file):
+        """The accumulated CRC must stay within the 32-bit range so that
+        the trailer bytes match what zlib would have produced."""
+        import zlib
+
+        payload = b"x" * 1024
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(payload)
+            # Pre-close: internal _crc must be the same uint32 value
+            # that zlib.crc32 returns for the same bytes.
+            expected = zlib.crc32(payload) & 0xFFFFFFFF
+            assert f._crc == expected
+            assert 0 <= f._crc <= 0xFFFFFFFF
+
 
 class TestLowPriorityEdgeCases:
     """Test low priority edge cases for improved coverage."""
