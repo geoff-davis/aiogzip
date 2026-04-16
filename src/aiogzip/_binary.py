@@ -108,6 +108,7 @@ class AsyncGzipBinaryFile:
         "_write_broken",
         "_max_decompressed_size",
         "_decompressed_total",
+        "_strict_size",
     )
 
     DEFAULT_CHUNK_SIZE = 64 * 1024  # 64 KB
@@ -124,6 +125,7 @@ class AsyncGzipBinaryFile:
         fileobj: Optional[WithAsyncReadWrite] = None,
         closefd: Optional[bool] = None,
         max_decompressed_size: Optional[int] = None,
+        strict_size: bool = False,
     ) -> None:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
@@ -176,6 +178,7 @@ class AsyncGzipBinaryFile:
         self._write_broken: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._decompressed_total: int = 0
+        self._strict_size: bool = bool(strict_size)
 
     async def __aenter__(self) -> "AsyncGzipBinaryFile":
         """Enter the async context manager and initialize resources."""
@@ -598,6 +601,14 @@ class AsyncGzipBinaryFile:
         else:
             buffer = self._coerce_byteslike(data)
         length = len(buffer)
+
+        if self._strict_size and self._input_size + length > 0xFFFFFFFF:
+            raise OSError(
+                f"uncompressed member size would exceed the gzip ISIZE "
+                f"field's 4 GiB limit ({self._input_size} + {length} > "
+                f"{0xFFFFFFFF}); drop strict_size to allow ISIZE "
+                f"truncation or split the payload into multiple members"
+            )
 
         # Compress first. If compress() raises, the compressor's state is
         # intact (no output was emitted) and we can leave our accounting

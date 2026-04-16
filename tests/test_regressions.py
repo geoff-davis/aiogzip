@@ -733,6 +733,38 @@ class TestMediumPriorityEdgeCases:
         assert calls, "large decompress should have been offloaded"
 
     @pytest.mark.asyncio
+    async def test_strict_size_rejects_write_past_4gib(self, temp_file):
+        """With strict_size=True, a write that would push _input_size past
+        the gzip ISIZE field's 4 GiB cap must raise rather than silently
+        emit a truncated-looking trailer."""
+        async with AsyncGzipBinaryFile(temp_file, "wb", strict_size=True) as f:
+            # Pre-seed the accumulator just below the ISIZE limit. A real
+            # caller would have reached this via actual writes; simulating
+            # it keeps the test cheap.
+            f._input_size = 0xFFFFFFFF - 2
+            with pytest.raises(OSError, match="4 GiB"):
+                await f.write(b"abcdef")
+
+    @pytest.mark.asyncio
+    async def test_strict_size_at_limit_ok(self, temp_file):
+        """A write that lands exactly on the 4 GiB boundary is allowed."""
+        async with AsyncGzipBinaryFile(temp_file, "wb", strict_size=True) as f:
+            f._input_size = 0xFFFFFFFF - 3
+            # Exactly three bytes leaves _input_size == 0xFFFFFFFF, which
+            # still fits the ISIZE field.
+            await f.write(b"abc")
+            assert f._input_size == 0xFFFFFFFF
+
+    @pytest.mark.asyncio
+    async def test_strict_size_defaults_off(self, temp_file):
+        """Default behaviour (strict_size=False) still silently wraps to
+        match gzip.open() so we do not break existing callers."""
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            f._input_size = 0xFFFFFFFE
+            # Should not raise.
+            await f.write(b"abcdef")
+
+    @pytest.mark.asyncio
     async def test_truncated_gzip_seek_end_raises(self, temp_file):
         """SEEK_END on a mid-stream truncated gzip must not silently report
         a partial position; the reader should detect the missing trailer."""

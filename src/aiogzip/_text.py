@@ -79,6 +79,7 @@ class AsyncGzipTextFile:
         "_buffer_origin_seen_newline_types",
         "_universal_newlines",
         "_max_decompressed_size",
+        "_strict_size",
     )
 
     _SEEN_CR = 1
@@ -102,6 +103,7 @@ class AsyncGzipTextFile:
         fileobj: Optional[WithAsyncReadWrite] = None,
         closefd: Optional[bool] = None,
         max_decompressed_size: Optional[int] = None,
+        strict_size: bool = False,
     ) -> None:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
@@ -166,6 +168,7 @@ class AsyncGzipTextFile:
         self._buffer_origin_seen_newline_types: int = 0
         self._universal_newlines: bool = newline in {None, ""}
         self._max_decompressed_size: Optional[int] = max_decompressed_size
+        self._strict_size: bool = bool(strict_size)
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
@@ -180,6 +183,7 @@ class AsyncGzipTextFile:
             fileobj=self._external_file,
             closefd=self._closefd,
             max_decompressed_size=self._max_decompressed_size,
+            strict_size=self._strict_size,
         )
         try:
             await self._binary_file.__aenter__()
