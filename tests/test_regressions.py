@@ -1,6 +1,7 @@
 # pyrefly: ignore
 # pyrefly: disable=all
 import io
+import os
 
 import pytest
 
@@ -730,6 +731,39 @@ class TestMediumPriorityEdgeCases:
                 got = await f.read()
         assert got == payload
         assert calls, "large decompress should have been offloaded"
+
+    @pytest.mark.asyncio
+    async def test_truncated_gzip_seek_end_raises(self, temp_file):
+        """SEEK_END on a mid-stream truncated gzip must not silently report
+        a partial position; the reader should detect the missing trailer."""
+        import gzip as _gzip
+
+        # Create a valid gzip then drop the last 200 bytes so the deflate
+        # stream is cut mid-block (no trailing CRC/ISIZE).
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(b"x" * (256 * 1024))
+        size = os.path.getsize(temp_file)
+        with open(temp_file, "r+b") as fh:
+            fh.truncate(size - 200)
+
+        with pytest.raises(_gzip.BadGzipFile):
+            async with AsyncGzipBinaryFile(temp_file, "rb") as gz:
+                await gz.seek(0, 2)  # SEEK_END
+
+    @pytest.mark.asyncio
+    async def test_truncated_gzip_read_raises(self, temp_file):
+        """Reading to EOF on a truncated gzip must also raise."""
+        import gzip as _gzip
+
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(b"y" * (128 * 1024))
+        size = os.path.getsize(temp_file)
+        with open(temp_file, "r+b") as fh:
+            fh.truncate(size - 50)
+
+        with pytest.raises(_gzip.BadGzipFile):
+            async with AsyncGzipBinaryFile(temp_file, "rb") as gz:
+                await gz.read()
 
     @pytest.mark.asyncio
     async def test_crc_is_masked_to_32_bits(self, temp_file):

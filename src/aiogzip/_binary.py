@@ -784,6 +784,16 @@ class AsyncGzipBinaryFile:
                 raise gzip.BadGzipFile(
                     f"Error finalizing gzip decompression: {e}"
                 ) from e
+            # After the underlying file is drained, the decompressor must
+            # have consumed a complete gzip member — otherwise the file
+            # was truncated mid-stream and silently ignoring that would
+            # hand the caller a partial read with no indication.
+            if not getattr(self._engine, "eof", True):
+                raise gzip.BadGzipFile(
+                    "Error decompressing gzip data: stream ended before "
+                    "the member trailer was read; the file is truncated "
+                    "or incomplete"
+                )
             return
 
         # Decompress the chunk

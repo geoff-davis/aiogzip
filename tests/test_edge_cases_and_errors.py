@@ -955,10 +955,21 @@ class TestErrorHandlingConsistency:
 
     @pytest.mark.asyncio
     async def test_exception_chaining_preserved(self, temp_file):
-        """Test that exception chaining is used (from e) for debugging."""
-        # Create corrupted file
-        with open(temp_file, "wb") as f:
-            f.write(b"\x1f\x8b\x08\x00corrupted")
+        """Test that exception chaining is used (from e) for debugging.
+
+        Start from a valid gzip and corrupt a byte inside the deflate
+        payload so the error surfaces through zlib rather than through
+        the truncation check.
+        """
+        import gzip as _gzip
+
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(b"payload data " * 4096)
+        data = bytearray(open(temp_file, "rb").read())
+        # Flip a byte well inside the deflate body to force a zlib.error.
+        data[100] ^= 0xFF
+        with open(temp_file, "wb") as fh:
+            fh.write(data)
 
         try:
             async with AsyncGzipBinaryFile(temp_file, "rb") as f:
