@@ -62,7 +62,12 @@ jobs:
         run: |
           ty check src
 
-      # Step 8: Run tests with pytest and coverage
+      # Step 8: Check Python 3.8 source syntax compatibility
+      - name: Check Python 3.8 compatibility
+        run: |
+          python scripts/check_py38_compat.py src/aiogzip/*.py
+
+      # Step 9: Run tests with pytest and coverage
       - name: Run tests with pytest and coverage
         run: |
           pytest --cov --cov-report=term-missing --cov-report=xml
