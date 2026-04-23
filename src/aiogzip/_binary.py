@@ -910,6 +910,7 @@ class AsyncGzipBinaryFile:
         self._buffer_offset = 0
         self._eof = False
         self._position = 0
+        self._decompressed_total = 0
 
     async def _read_compressed_chunk(self) -> bytes:
         """Read the next compressed chunk from cache replay or the underlying file."""
