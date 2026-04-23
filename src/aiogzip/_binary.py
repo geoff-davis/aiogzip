@@ -46,7 +46,7 @@ async def _run_zlib_in_thread(method: Callable[[bytes], bytes], data: bytes) -> 
     the GIL internally, so offloading large chunks keeps the event loop
     responsive during CPU-bound work.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, method, data)
 
 
