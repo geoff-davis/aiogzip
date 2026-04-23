@@ -27,6 +27,7 @@
 
 - **Append mode (`"ab"`, `"at"`) writes a new gzip member**. The file ends up as two (or more) concatenated gzip members. Every standards-compliant reader — including `aiogzip`, `gzip.open()`, and command-line `gunzip` — transparently concatenates the output, but each additional open writes a new member rather than extending the existing deflate stream.
 - **Backward seeks restart decompression** from the beginning of the file, so forward-only access is much faster than mixed-direction access.
+- **Non-seekable input streams use a bounded rewind cache**. By default, up to 128 MiB of compressed input is retained so backward seeks can replay the stream; pass `max_rewind_cache_size=<bytes>` to tune this, or `None` to allow an unbounded cache.
 - **Writes past 4 GiB of uncompressed data** produce a gzip trailer whose `ISIZE` field wraps to `size & 0xFFFFFFFF` (this matches the gzip format spec and `gzip.open()`). Pass `strict_size=True` to refuse writes that would exceed the limit instead.
 - **Guard against decompression bombs** by passing `max_decompressed_size=<bytes>` when reading untrusted files; the decompressor aborts with `OSError` once the cap is exceeded.
 

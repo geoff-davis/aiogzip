@@ -108,6 +108,7 @@ class AsyncGzipBinaryFile:
         "_replay_offset",
         "_cache_rewindable_reads",
         "_underlying_seekable",
+        "_max_rewind_cache_size",
         "_write_broken",
         "_max_decompressed_size",
         "_decompressed_total",
@@ -133,6 +134,7 @@ class AsyncGzipBinaryFile:
         fileobj: Optional[WithAsyncReadWrite] = None,
         closefd: Optional[bool] = None,
         max_decompressed_size: Optional[int] = None,
+        max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
         strict_size: bool = False,
     ) -> None:
         # Validate inputs using shared validation functions
@@ -140,6 +142,8 @@ class AsyncGzipBinaryFile:
         _validate_chunk_size(chunk_size)
         if max_decompressed_size is not None and max_decompressed_size <= 0:
             raise ValueError("max_decompressed_size must be a positive integer")
+        if max_rewind_cache_size is not None and max_rewind_cache_size <= 0:
+            raise ValueError("max_rewind_cache_size must be a positive integer")
 
         # Validate mode and derive file characteristics
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
@@ -184,6 +188,7 @@ class AsyncGzipBinaryFile:
         self._replay_offset: Optional[int] = None
         self._cache_rewindable_reads: bool = False
         self._underlying_seekable: bool = True
+        self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._write_broken: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._decompressed_total: int = 0
@@ -961,7 +966,12 @@ class AsyncGzipBinaryFile:
             raise OSError(f"Error reading from file: {e}") from e
 
         if chunk and self._cache_rewindable_reads:
-            self._compressed_cache.extend(chunk)
+            cap = self._max_rewind_cache_size
+            if cap is not None and len(self._compressed_cache) + len(chunk) > cap:
+                self._compressed_cache.clear()
+                self._cache_rewindable_reads = False
+            else:
+                self._compressed_cache.extend(chunk)
         return chunk
 
     async def _cleanup_failed_enter(self) -> None:
