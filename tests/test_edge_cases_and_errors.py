@@ -355,7 +355,7 @@ class TestAdditionalCoverage:
     @pytest.mark.asyncio
     async def test_derive_header_filename_type_error(self, tmp_path):
         """Test _derive_header_filename raises TypeError for invalid type."""
-        from aiogzip import _derive_header_filename
+        from aiogzip._common import _derive_header_filename
 
         # Pass an invalid type (not str, bytes, or Path)
         with pytest.raises(TypeError, match="original_filename must be"):
@@ -364,7 +364,7 @@ class TestAdditionalCoverage:
     @pytest.mark.asyncio
     async def test_derive_header_filename_unicode_error(self, tmp_path):
         """Test _derive_header_filename handles UnicodeEncodeError gracefully."""
-        from aiogzip import _derive_header_filename
+        from aiogzip._common import _derive_header_filename
 
         # Characters that can't be encoded to latin-1
         result = _derive_header_filename("日本語.gz", None)
