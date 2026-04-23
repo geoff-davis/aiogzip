@@ -1021,15 +1021,5 @@ class AsyncGzipTextFile:
         # Mark as closed immediately to prevent concurrent close attempts
         self._is_closed = True
 
-        try:
-            if not self._writing_mode:
-                # Flush the decoder to ensure all buffered bytes are processed
-                # This is important for handling incomplete multi-byte characters at EOF
-                self._decoder.decode(b"", final=True)
-
-            if self._binary_file is not None:
-                await self._binary_file.close()
-        except Exception:
-            # If an error occurs during close, we're still closed
-            # but we need to propagate the exception
-            raise
+        if self._binary_file is not None:
+            await self._binary_file.close()

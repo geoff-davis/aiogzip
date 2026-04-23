@@ -114,6 +114,45 @@ class TestResourceCleanup:
         await f.close()
 
     @pytest.mark.asyncio
+    async def test_text_close_after_partial_multibyte_read_closes_fileobj(
+        self, tmp_path
+    ):
+        import aiofiles
+
+        p = tmp_path / "partial_multibyte.gz"
+        async with AsyncGzipTextFile(p, "wt", encoding="utf-8") as f:
+            await f.write("a🚀")
+
+        class CloseTrackingReader:
+            def __init__(self, real_file):
+                self.real_file = real_file
+                self.close_called = False
+
+            async def read(self, size=-1):
+                return await self.real_file.read(size)
+
+            async def close(self):
+                self.close_called = True
+                await self.real_file.close()
+
+        real_file = await aiofiles.open(p, "rb")
+        reader = CloseTrackingReader(real_file)
+        f = AsyncGzipTextFile(
+            None,
+            "rt",
+            encoding="utf-8",
+            chunk_size=2,
+            fileobj=reader,
+            closefd=True,
+        )
+
+        await f.__aenter__()
+        assert await f.read(1) == "a"
+        await f.close()
+
+        assert reader.close_called is True
+
+    @pytest.mark.asyncio
     async def test_concurrent_close_binary(self, temp_file):
         import asyncio
 
