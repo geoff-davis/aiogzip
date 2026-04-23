@@ -38,7 +38,8 @@ When processing multiple files, especially where I/O latency (disk/network) is i
 
 ### 1. Choose the Right Chunk Size
 
-The default `chunk_size` is 64KB, and there is intentionally **no upper bound**.
+The default `chunk_size` is 64KB. Values must be positive and no larger than
+128 MiB, which prevents accidental huge allocations from unsanitized input.
 
 - **Increase it** (e.g., `128*1024` or `1024*1024`) for large file throughput if you have memory to spare.
 - **Decrease it** if you are memory constrained and processing massive files.
@@ -96,3 +97,4 @@ chunk size was materially faster than the default text-mode configuration.
 
 - **Binary Mode**: Uses an efficient offset-pointer strategy to avoid expensive memory copies (`del buffer[:n]`) when reading small chunks.
 - **Text Mode**: Buffers decoded text to handle split multi-byte characters and split newlines correctly.
+- **Non-seekable `fileobj` Inputs**: Retains a bounded compressed-input rewind cache so backward seeks can replay the stream. The default cap is 128 MiB; lower `max_rewind_cache_size` for memory-sensitive streaming, or set it to `None` only when unbounded rewind support is acceptable.

@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Add `max_rewind_cache_size` to `AsyncGzipBinaryFile` and `AsyncGzipTextFile`. Non-seekable read streams now retain at most 128 MiB of compressed input by default for backward-seek replay; pass a byte limit to tune the cap or `None` to preserve the previous unbounded cache behavior.
+
+### Fixed
+
+- Ensure `AsyncGzipTextFile.close()` does not finalize partially read decoder state. Closing after a partial multibyte read no longer raises `UnicodeDecodeError` or skips closing the underlying binary stream.
+- Ensure `AsyncGzipBinaryFile.close()` still closes owned or `closefd=True` file objects when final compressor flush or trailer writes fail.
+- Reject embedded NUL bytes in `original_filename`, which previously produced malformed gzip headers and unreadable archives.
+- Reset `max_decompressed_size` accounting when a reader rewinds, so re-reading an otherwise under-cap archive after `seek(0)` no longer trips the cap.
+- Treat file objects that report `seekable() == False` as non-seekable even if they expose a `seek()` method, using replay caching instead of calling a failing seek.
+
+### Changed
+
+- Keep underscore-prefixed implementation helpers out of the top-level `aiogzip.__all__`; import internals from `aiogzip._common`, `aiogzip._binary`, or `aiogzip._text` only for unsupported internal testing/debugging.
+- Broaden `fileobj` constructor type annotations to accept read-only objects in read mode and write-only objects in write mode.
+- Use `asyncio.get_running_loop()` for executor dispatch in zlib offload paths.
+
+### Documentation
+
+- Document bounded rewind-cache behavior for non-seekable streams and clarify the 128 MiB `chunk_size` cap.
+
+### Tooling
+
+- Run the Python 3.8 syntax-compatibility guard in CI, not just pre-commit.
+- Run `twine check dist/*` in the publish workflow before uploading artifacts.
+
 ## [1.4.0] - 2026-04-16
 
 ### Added
