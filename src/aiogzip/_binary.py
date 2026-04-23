@@ -107,6 +107,7 @@ class AsyncGzipBinaryFile:
         "_compressed_cache",
         "_replay_offset",
         "_cache_rewindable_reads",
+        "_underlying_seekable",
         "_write_broken",
         "_max_decompressed_size",
         "_decompressed_total",
@@ -182,6 +183,7 @@ class AsyncGzipBinaryFile:
         self._compressed_cache = bytearray()
         self._replay_offset: Optional[int] = None
         self._cache_rewindable_reads: bool = False
+        self._underlying_seekable: bool = True
         self._write_broken: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._decompressed_total: int = 0
@@ -225,8 +227,8 @@ class AsyncGzipBinaryFile:
                 self._header_probe_buffer.clear()
                 self._compressed_cache.clear()
                 self._replay_offset = None
-                seek_method = getattr(self._file, "seek", None)
-                self._cache_rewindable_reads = not callable(seek_method)
+                self._underlying_seekable = await self._probe_underlying_seekable()
+                self._cache_rewindable_reads = not self._underlying_seekable
 
             return self
         except Exception:
@@ -573,7 +575,9 @@ class AsyncGzipBinaryFile:
         return self._writing_mode
 
     def seekable(self) -> bool:
-        return True
+        if self._file is None or self._writing_mode:
+            return True
+        return self._underlying_seekable or self._cache_rewindable_reads
 
     async def rewind(self) -> None:
         if self._mode_op != "r":
@@ -894,7 +898,7 @@ class AsyncGzipBinaryFile:
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
         seek_method = getattr(self._file, "seek", None)
-        if callable(seek_method):
+        if self._underlying_seekable and callable(seek_method):
             result = seek_method(0, os.SEEK_SET)
             if hasattr(result, "__await__"):
                 await result
@@ -911,6 +915,27 @@ class AsyncGzipBinaryFile:
         self._eof = False
         self._position = 0
         self._decompressed_total = 0
+
+    async def _probe_underlying_seekable(self) -> bool:
+        """Return whether the underlying file should be rewound with seek()."""
+        if self._file is None:
+            return False
+
+        seek_method = getattr(self._file, "seek", None)
+        if not callable(seek_method):
+            return False
+
+        seekable_method = getattr(self._file, "seekable", None)
+        if not callable(seekable_method):
+            return True
+
+        try:
+            result = seekable_method()
+            if hasattr(result, "__await__"):
+                result = await result
+        except Exception:
+            return False
+        return bool(result)
 
     async def _read_compressed_chunk(self) -> bytes:
         """Read the next compressed chunk from cache replay or the underlying file."""
