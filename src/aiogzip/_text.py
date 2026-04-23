@@ -11,7 +11,9 @@ from typing import Any, Iterable, List, Optional, Tuple, Union
 from ._binary import AsyncGzipBinaryFile
 from ._common import (
     _MAX_CHUNK_SIZE,
+    WithAsyncRead,
     WithAsyncReadWrite,
+    WithAsyncWrite,
     _normalize_mtime,
     _parse_mode_tokens,
     _validate_chunk_size,
@@ -110,7 +112,9 @@ class AsyncGzipTextFile:
         compresslevel: int = 6,
         mtime: Optional[Union[int, float]] = None,
         original_filename: Optional[Union[str, bytes]] = None,
-        fileobj: Optional[WithAsyncReadWrite] = None,
+        fileobj: Optional[
+            Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]
+        ] = None,
         closefd: Optional[bool] = None,
         max_decompressed_size: Optional[int] = None,
         max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,

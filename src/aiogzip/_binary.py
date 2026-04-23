@@ -13,7 +13,9 @@ import aiofiles
 from ._common import (
     _MAX_CHUNK_SIZE,
     GZIP_WBITS,
+    WithAsyncRead,
     WithAsyncReadWrite,
+    WithAsyncWrite,
     ZlibEngine,
     _build_gzip_header,
     _build_gzip_trailer,
@@ -131,7 +133,9 @@ class AsyncGzipBinaryFile:
         compresslevel: int = 6,
         mtime: Optional[Union[int, float]] = None,
         original_filename: Optional[Union[str, bytes]] = None,
-        fileobj: Optional[WithAsyncReadWrite] = None,
+        fileobj: Optional[
+            Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]
+        ] = None,
         closefd: Optional[bool] = None,
         max_decompressed_size: Optional[int] = None,
         max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
@@ -198,7 +202,7 @@ class AsyncGzipBinaryFile:
         """Enter the async context manager and initialize resources."""
         try:
             if self._external_file is not None:
-                self._file = self._external_file
+                self._file = cast(Any, self._external_file)
                 self._owns_file = False
             else:
                 if self._filename is None:
