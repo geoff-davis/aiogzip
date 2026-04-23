@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-04-23
+
 ### Added
 
 - Add `max_rewind_cache_size` to `AsyncGzipBinaryFile` and `AsyncGzipTextFile`. Non-seekable read streams now retain at most 128 MiB of compressed input by default for backward-seek replay; pass a byte limit to tune the cap or `None` to preserve the previous unbounded cache behavior.
