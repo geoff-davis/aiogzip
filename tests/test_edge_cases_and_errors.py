@@ -370,6 +370,14 @@ class TestAdditionalCoverage:
         result = _derive_header_filename("日本語.gz", None)
         assert result == b""
 
+    def test_original_filename_rejects_nul_bytes(self):
+        """NUL bytes would terminate FNAME early and corrupt the gzip stream."""
+        with pytest.raises(ValueError, match="original_filename cannot contain NUL"):
+            AsyncGzipBinaryFile("test.gz", "wb", original_filename=b"a\x00b")
+
+        with pytest.raises(ValueError, match="original_filename cannot contain NUL"):
+            AsyncGzipTextFile("test.gz", "wt", original_filename="a\x00b")
+
     @pytest.mark.asyncio
     async def test_rewind_in_write_mode_raises(self, tmp_path):
         """Test rewind() raises error in write mode."""
