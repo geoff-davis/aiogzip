@@ -204,3 +204,28 @@ class TestResourceCleanup:
         assert f._is_closed is True
         await f.close()
         await f.close()
+
+    @pytest.mark.asyncio
+    async def test_binary_close_failure_still_closes_fileobj(self):
+        class FailingCloseTrackingWriter:
+            def __init__(self):
+                self.write_calls = 0
+                self.close_called = False
+
+            async def write(self, data):
+                self.write_calls += 1
+                if self.write_calls == 2:
+                    raise OSError("close write failed")
+                return len(data)
+
+            async def close(self):
+                self.close_called = True
+
+        writer = FailingCloseTrackingWriter()
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=True)
+        await f.__aenter__()
+
+        with pytest.raises(OSError, match="close write failed"):
+            await f.close()
+
+        assert writer.close_called is True

@@ -1007,6 +1007,12 @@ class AsyncGzipBinaryFile:
         # Mark as closed immediately to prevent concurrent close attempts
         self._is_closed = True
 
+        close_file = (
+            self._file
+            if self._file is not None and (self._owns_file or self._closefd)
+            else None
+        )
+        write_failed = False
         try:
             if self._writing_mode and self._file is not None and not self._write_broken:
                 # Flush the compressor to write the gzip trailer. Skipped on
@@ -1017,18 +1023,22 @@ class AsyncGzipBinaryFile:
                     await self._file.write(remaining_data)
                 trailer = _build_gzip_trailer(self._crc, self._input_size)
                 await self._file.write(trailer)
-
-            if self._file is not None and (self._owns_file or self._closefd):
-                # Close only if we own it or closefd=True
-                close_method = getattr(self._file, "close", None)
-                if callable(close_method):
-                    result = close_method()
-                    if hasattr(result, "__await__"):
-                        await result
-        except Exception:
-            # If an error occurs during close, we're still closed
-            # but we need to propagate the exception
+        except BaseException:
+            write_failed = True
             raise
+        finally:
+            if close_file is not None:
+                # Close only if we own it or closefd=True. Preserve a prior
+                # final-write exception if close() also fails.
+                close_method = getattr(close_file, "close", None)
+                if callable(close_method):
+                    try:
+                        result = close_method()
+                        if hasattr(result, "__await__"):
+                            await result
+                    except BaseException:
+                        if not write_failed:
+                            raise
 
     def __aiter__(self) -> "AsyncGzipBinaryFile":
         """Make AsyncGzipBinaryFile iterable over newline-delimited chunks."""
