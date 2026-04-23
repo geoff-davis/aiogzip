@@ -114,6 +114,45 @@ class TestResourceCleanup:
         await f.close()
 
     @pytest.mark.asyncio
+    async def test_text_close_after_partial_multibyte_read_closes_fileobj(
+        self, tmp_path
+    ):
+        import aiofiles
+
+        p = tmp_path / "partial_multibyte.gz"
+        async with AsyncGzipTextFile(p, "wt", encoding="utf-8") as f:
+            await f.write("a🚀")
+
+        class CloseTrackingReader:
+            def __init__(self, real_file):
+                self.real_file = real_file
+                self.close_called = False
+
+            async def read(self, size=-1):
+                return await self.real_file.read(size)
+
+            async def close(self):
+                self.close_called = True
+                await self.real_file.close()
+
+        real_file = await aiofiles.open(p, "rb")
+        reader = CloseTrackingReader(real_file)
+        f = AsyncGzipTextFile(
+            None,
+            "rt",
+            encoding="utf-8",
+            chunk_size=2,
+            fileobj=reader,
+            closefd=True,
+        )
+
+        await f.__aenter__()
+        assert await f.read(1) == "a"
+        await f.close()
+
+        assert reader.close_called is True
+
+    @pytest.mark.asyncio
     async def test_concurrent_close_binary(self, temp_file):
         import asyncio
 
@@ -165,3 +204,66 @@ class TestResourceCleanup:
         assert f._is_closed is True
         await f.close()
         await f.close()
+
+    @pytest.mark.asyncio
+    async def test_binary_close_failure_still_closes_fileobj(self):
+        class FailingCloseTrackingWriter:
+            def __init__(self):
+                self.write_calls = 0
+                self.close_called = False
+
+            async def write(self, data):
+                self.write_calls += 1
+                if self.write_calls == 2:
+                    raise OSError("close write failed")
+                return len(data)
+
+            async def close(self):
+                self.close_called = True
+
+        writer = FailingCloseTrackingWriter()
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=True)
+        await f.__aenter__()
+
+        with pytest.raises(OSError, match="close write failed"):
+            await f.close()
+
+        assert writer.close_called is True
+
+    @pytest.mark.asyncio
+    async def test_binary_write_error_wins_over_close_error(self):
+        """When both final write and close fail, the write error propagates."""
+
+        class DoublyFailingWriter:
+            def __init__(self):
+                self.write_calls = 0
+
+            async def write(self, data):
+                self.write_calls += 1
+                if self.write_calls == 2:
+                    raise OSError("final write failed")
+                return len(data)
+
+            async def close(self):
+                raise RuntimeError("close failed too")
+
+        writer = DoublyFailingWriter()
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=True)
+        await f.__aenter__()
+
+        with pytest.raises(OSError, match="final write failed"):
+            await f.close()
+
+    @pytest.mark.asyncio
+    async def test_text_close_does_not_raise_on_partial_multibyte(self, tmp_path):
+        """Regression: close() used to call decoder.decode(b'', final=True),
+        which raised UnicodeDecodeError if the decoder held partial multibyte
+        state from a read that stopped mid-character."""
+        p = tmp_path / "partial_close.gz"
+        async with AsyncGzipTextFile(p, "wt", encoding="utf-8") as f:
+            await f.write("a🚀b🚀c")
+
+        f = AsyncGzipTextFile(p, "rt", encoding="utf-8", chunk_size=1)
+        async with f:
+            assert await f.read(1) == "a"
+        assert f._is_closed is True

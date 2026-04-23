@@ -13,7 +13,9 @@ import aiofiles
 from ._common import (
     _MAX_CHUNK_SIZE,
     GZIP_WBITS,
+    WithAsyncRead,
     WithAsyncReadWrite,
+    WithAsyncWrite,
     ZlibEngine,
     _build_gzip_header,
     _build_gzip_trailer,
@@ -44,7 +46,7 @@ async def _run_zlib_in_thread(method: Callable[[bytes], bytes], data: bytes) -> 
     the GIL internally, so offloading large chunks keeps the event loop
     responsive during CPU-bound work.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, method, data)
 
 
@@ -107,6 +109,8 @@ class AsyncGzipBinaryFile:
         "_compressed_cache",
         "_replay_offset",
         "_cache_rewindable_reads",
+        "_underlying_seekable",
+        "_max_rewind_cache_size",
         "_write_broken",
         "_max_decompressed_size",
         "_decompressed_total",
@@ -129,9 +133,12 @@ class AsyncGzipBinaryFile:
         compresslevel: int = 6,
         mtime: Optional[Union[int, float]] = None,
         original_filename: Optional[Union[str, bytes]] = None,
-        fileobj: Optional[WithAsyncReadWrite] = None,
+        fileobj: Optional[
+            Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]
+        ] = None,
         closefd: Optional[bool] = None,
         max_decompressed_size: Optional[int] = None,
+        max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
         strict_size: bool = False,
     ) -> None:
         # Validate inputs using shared validation functions
@@ -139,6 +146,8 @@ class AsyncGzipBinaryFile:
         _validate_chunk_size(chunk_size)
         if max_decompressed_size is not None and max_decompressed_size <= 0:
             raise ValueError("max_decompressed_size must be a positive integer")
+        if max_rewind_cache_size is not None and max_rewind_cache_size <= 0:
+            raise ValueError("max_rewind_cache_size must be a positive integer")
 
         # Validate mode and derive file characteristics
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
@@ -182,6 +191,8 @@ class AsyncGzipBinaryFile:
         self._compressed_cache = bytearray()
         self._replay_offset: Optional[int] = None
         self._cache_rewindable_reads: bool = False
+        self._underlying_seekable: bool = True
+        self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._write_broken: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._decompressed_total: int = 0
@@ -191,7 +202,7 @@ class AsyncGzipBinaryFile:
         """Enter the async context manager and initialize resources."""
         try:
             if self._external_file is not None:
-                self._file = self._external_file
+                self._file = cast(Any, self._external_file)
                 self._owns_file = False
             else:
                 if self._filename is None:
@@ -225,8 +236,8 @@ class AsyncGzipBinaryFile:
                 self._header_probe_buffer.clear()
                 self._compressed_cache.clear()
                 self._replay_offset = None
-                seek_method = getattr(self._file, "seek", None)
-                self._cache_rewindable_reads = not callable(seek_method)
+                self._underlying_seekable = await self._probe_underlying_seekable()
+                self._cache_rewindable_reads = not self._underlying_seekable
 
             return self
         except Exception:
@@ -573,7 +584,9 @@ class AsyncGzipBinaryFile:
         return self._writing_mode
 
     def seekable(self) -> bool:
-        return True
+        if self._file is None or self._writing_mode:
+            return True
+        return self._underlying_seekable or self._cache_rewindable_reads
 
     async def rewind(self) -> None:
         if self._mode_op != "r":
@@ -894,7 +907,7 @@ class AsyncGzipBinaryFile:
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
         seek_method = getattr(self._file, "seek", None)
-        if callable(seek_method):
+        if self._underlying_seekable and callable(seek_method):
             result = seek_method(0, os.SEEK_SET)
             if hasattr(result, "__await__"):
                 await result
@@ -910,6 +923,28 @@ class AsyncGzipBinaryFile:
         self._buffer_offset = 0
         self._eof = False
         self._position = 0
+        self._decompressed_total = 0
+
+    async def _probe_underlying_seekable(self) -> bool:
+        """Return whether the underlying file should be rewound with seek()."""
+        if self._file is None:
+            return False
+
+        seek_method = getattr(self._file, "seek", None)
+        if not callable(seek_method):
+            return False
+
+        seekable_method = getattr(self._file, "seekable", None)
+        if not callable(seekable_method):
+            return True
+
+        try:
+            result = seekable_method()
+            if hasattr(result, "__await__"):
+                result = await result
+        except Exception:
+            return False
+        return bool(result)
 
     async def _read_compressed_chunk(self) -> bytes:
         """Read the next compressed chunk from cache replay or the underlying file."""
@@ -935,7 +970,12 @@ class AsyncGzipBinaryFile:
             raise OSError(f"Error reading from file: {e}") from e
 
         if chunk and self._cache_rewindable_reads:
-            self._compressed_cache.extend(chunk)
+            cap = self._max_rewind_cache_size
+            if cap is not None and len(self._compressed_cache) + len(chunk) > cap:
+                self._compressed_cache.clear()
+                self._cache_rewindable_reads = False
+            else:
+                self._compressed_cache.extend(chunk)
         return chunk
 
     async def _cleanup_failed_enter(self) -> None:
@@ -1007,6 +1047,12 @@ class AsyncGzipBinaryFile:
         # Mark as closed immediately to prevent concurrent close attempts
         self._is_closed = True
 
+        close_file = (
+            self._file
+            if self._file is not None and (self._owns_file or self._closefd)
+            else None
+        )
+        write_failed = False
         try:
             if self._writing_mode and self._file is not None and not self._write_broken:
                 # Flush the compressor to write the gzip trailer. Skipped on
@@ -1017,18 +1063,22 @@ class AsyncGzipBinaryFile:
                     await self._file.write(remaining_data)
                 trailer = _build_gzip_trailer(self._crc, self._input_size)
                 await self._file.write(trailer)
-
-            if self._file is not None and (self._owns_file or self._closefd):
-                # Close only if we own it or closefd=True
-                close_method = getattr(self._file, "close", None)
-                if callable(close_method):
-                    result = close_method()
-                    if hasattr(result, "__await__"):
-                        await result
-        except Exception:
-            # If an error occurs during close, we're still closed
-            # but we need to propagate the exception
+        except BaseException:
+            write_failed = True
             raise
+        finally:
+            if close_file is not None:
+                # Close only if we own it or closefd=True. Preserve a prior
+                # final-write exception if close() also fails.
+                close_method = getattr(close_file, "close", None)
+                if callable(close_method):
+                    try:
+                        result = close_method()
+                        if hasattr(result, "__await__"):
+                            await result
+                    except BaseException:
+                        if not write_failed:
+                            raise
 
     def __aiter__(self) -> "AsyncGzipBinaryFile":
         """Make AsyncGzipBinaryFile iterable over newline-delimited chunks."""

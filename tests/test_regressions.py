@@ -639,6 +639,22 @@ class TestMediumPriorityEdgeCases:
             assert await f.read() == payload
 
     @pytest.mark.asyncio
+    async def test_max_decompressed_size_resets_after_rewind(self, temp_file):
+        """Re-reading an under-cap archive after seek(0) should remain under cap."""
+        import gzip as _gzip
+
+        payload = b"abc" * 100
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(payload)
+
+        async with AsyncGzipBinaryFile(
+            temp_file, "rb", max_decompressed_size=len(payload)
+        ) as f:
+            assert await f.read() == payload
+            assert await f.seek(0) == 0
+            assert await f.read() == payload
+
+    @pytest.mark.asyncio
     async def test_max_decompressed_size_validated(self):
         """Zero and negative caps should be rejected at construction time."""
         with pytest.raises(ValueError, match="max_decompressed_size"):

@@ -355,7 +355,7 @@ class TestAdditionalCoverage:
     @pytest.mark.asyncio
     async def test_derive_header_filename_type_error(self, tmp_path):
         """Test _derive_header_filename raises TypeError for invalid type."""
-        from aiogzip import _derive_header_filename
+        from aiogzip._common import _derive_header_filename
 
         # Pass an invalid type (not str, bytes, or Path)
         with pytest.raises(TypeError, match="original_filename must be"):
@@ -364,11 +364,19 @@ class TestAdditionalCoverage:
     @pytest.mark.asyncio
     async def test_derive_header_filename_unicode_error(self, tmp_path):
         """Test _derive_header_filename handles UnicodeEncodeError gracefully."""
-        from aiogzip import _derive_header_filename
+        from aiogzip._common import _derive_header_filename
 
         # Characters that can't be encoded to latin-1
         result = _derive_header_filename("日本語.gz", None)
         assert result == b""
+
+    def test_original_filename_rejects_nul_bytes(self):
+        """NUL bytes would terminate FNAME early and corrupt the gzip stream."""
+        with pytest.raises(ValueError, match="original_filename cannot contain NUL"):
+            AsyncGzipBinaryFile("test.gz", "wb", original_filename=b"a\x00b")
+
+        with pytest.raises(ValueError, match="original_filename cannot contain NUL"):
+            AsyncGzipTextFile("test.gz", "wt", original_filename="a\x00b")
 
     @pytest.mark.asyncio
     async def test_rewind_in_write_mode_raises(self, tmp_path):

@@ -10,7 +10,10 @@ from typing import Any, Iterable, List, Optional, Tuple, Union
 
 from ._binary import AsyncGzipBinaryFile
 from ._common import (
+    _MAX_CHUNK_SIZE,
+    WithAsyncRead,
     WithAsyncReadWrite,
+    WithAsyncWrite,
     _normalize_mtime,
     _parse_mode_tokens,
     _validate_chunk_size,
@@ -79,6 +82,7 @@ class AsyncGzipTextFile:
         "_buffer_origin_seen_newline_types",
         "_universal_newlines",
         "_max_decompressed_size",
+        "_max_rewind_cache_size",
         "_strict_size",
     )
 
@@ -108,9 +112,12 @@ class AsyncGzipTextFile:
         compresslevel: int = 6,
         mtime: Optional[Union[int, float]] = None,
         original_filename: Optional[Union[str, bytes]] = None,
-        fileobj: Optional[WithAsyncReadWrite] = None,
+        fileobj: Optional[
+            Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]
+        ] = None,
         closefd: Optional[bool] = None,
         max_decompressed_size: Optional[int] = None,
+        max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
         strict_size: bool = False,
     ) -> None:
         # Validate inputs using shared validation functions
@@ -118,6 +125,8 @@ class AsyncGzipTextFile:
         _validate_chunk_size(chunk_size)
         if max_decompressed_size is not None and max_decompressed_size <= 0:
             raise ValueError("max_decompressed_size must be a positive integer")
+        if max_rewind_cache_size is not None and max_rewind_cache_size <= 0:
+            raise ValueError("max_rewind_cache_size must be a positive integer")
 
         # Validate text-specific parameters
         if encoding is None:
@@ -178,6 +187,7 @@ class AsyncGzipTextFile:
         self._buffer_origin_seen_newline_types: int = 0
         self._universal_newlines: bool = newline in {None, ""}
         self._max_decompressed_size: Optional[int] = max_decompressed_size
+        self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._strict_size: bool = bool(strict_size)
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
@@ -193,6 +203,7 @@ class AsyncGzipTextFile:
             fileobj=self._external_file,
             closefd=self._closefd,
             max_decompressed_size=self._max_decompressed_size,
+            max_rewind_cache_size=self._max_rewind_cache_size,
             strict_size=self._strict_size,
         )
         try:
@@ -1021,15 +1032,5 @@ class AsyncGzipTextFile:
         # Mark as closed immediately to prevent concurrent close attempts
         self._is_closed = True
 
-        try:
-            if not self._writing_mode:
-                # Flush the decoder to ensure all buffered bytes are processed
-                # This is important for handling incomplete multi-byte characters at EOF
-                self._decoder.decode(b"", final=True)
-
-            if self._binary_file is not None:
-                await self._binary_file.close()
-        except Exception:
-            # If an error occurs during close, we're still closed
-            # but we need to propagate the exception
-            raise
+        if self._binary_file is not None:
+            await self._binary_file.close()

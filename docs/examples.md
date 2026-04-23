@@ -151,3 +151,24 @@ async def safe_read():
 
 asyncio.run(safe_read())
 ```
+
+## Reading Untrusted Files Safely
+
+When reading gzip data from untrusted sources, cap decompressed output to avoid
+expanding a small compressed file into unbounded memory usage:
+
+```python
+import asyncio
+from aiogzip import AsyncGzipFile
+
+async def read_untrusted(path):
+    async with AsyncGzipFile(path, "rb", max_decompressed_size=100 * 1024 * 1024) as f:
+        return await f.read()
+
+asyncio.run(read_untrusted("upload.gz"))
+```
+
+If the input is a non-seekable stream, `aiogzip` may keep compressed bytes so
+backward seeks can replay the stream. The cache defaults to 128 MiB; reduce
+`max_rewind_cache_size` for memory-sensitive pipelines, or use forward-only
+reads and leave backward seeking disabled once the cap is exceeded.

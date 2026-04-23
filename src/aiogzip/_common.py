@@ -111,7 +111,15 @@ def _validate_original_filename(
     filename: Optional[Union[str, bytes]],
 ) -> Optional[Union[str, bytes]]:
     """Validate optional original filename parameter."""
-    if filename is None or isinstance(filename, (str, bytes)):
+    if filename is None:
+        return filename
+    if isinstance(filename, bytes):
+        if b"\x00" in filename:
+            raise ValueError("original_filename cannot contain NUL bytes")
+        return filename
+    if isinstance(filename, str):
+        if "\x00" in filename:
+            raise ValueError("original_filename cannot contain NUL bytes")
         return filename
     raise TypeError("original_filename must be a string or bytes if provided")
 
