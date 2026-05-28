@@ -262,7 +262,7 @@ class TestAsyncGzipFile:
     @pytest.mark.asyncio
     async def test_default_chunk_size(self):
         """Test default chunk size."""
-        assert AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE == 64 * 1024
+        assert AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE == 256 * 1024
 
     @pytest.mark.asyncio
     async def test_interoperability_with_gzip_binary(self, temp_file, sample_data):
