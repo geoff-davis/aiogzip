@@ -915,6 +915,56 @@ class AsyncGzipTextFile:
             self._seen_newline_types |= self._SEEN_CR
             self._trailing_cr = False
 
+    # Newline modes whose line terminator is a single character that cannot
+    # span a chunk boundary, so each decoded chunk can be searched on its own:
+    #   - None: CR/CRLF were already folded to '\n' at decode time;
+    #   - '\n' / '\r': single-character terminators with no translation.
+    # '\r\n' (two chars) and '' (trailing-CR look-ahead) can straddle chunk
+    # boundaries and stay on the buffer-accumulating path.
+    _FAST_READLINE_NEWLINES = frozenset({None, "\n", "\r"})
+
+    async def _readline_fast(self) -> str:
+        """O(n) single-line read for the cross-boundary-safe newline modes.
+
+        Accumulates the line in a local list and joins once, instead of
+        repeatedly growing the str buffer via ``_append_buffer`` (which is
+        O(n^2) for a very long line because CPython cannot extend a slotted
+        str attribute in place). Returns "" at end of input.
+
+        Only valid when ``self._newline in _FAST_READLINE_NEWLINES``.
+        """
+        term = "\r" if self._newline == "\r" else "\n"
+
+        # 1. Satisfy from already-buffered text when it holds a terminator.
+        buf = self._text_buffer
+        start = self._text_buffer_offset
+        idx = buf.find(term, start)
+        if idx != -1:
+            return self._consume_buffer(idx + 1 - start)
+
+        # 2. The buffered remainder (if any) is part of this line. Pull it out
+        #    and accumulate freshly decoded chunks locally.
+        parts: List[str] = []
+        if start < len(buf):
+            parts.append(buf[start:] if start else buf)
+        self._set_buffer("")
+
+        while True:
+            text, more = await self._decode_next_chunk()
+            if text:
+                i = text.find(term)
+                if i != -1:
+                    parts.append(text[: i + 1])
+                    # Keep the whole chunk buffered so the residual's replay
+                    # origin (captured by _decode_next_chunk before decoding
+                    # it) stays valid for tell()/seek().
+                    self._set_buffer(text)
+                    self._text_buffer_offset = i + 1
+                    return "".join(parts)
+                parts.append(text)
+            if not more:
+                return "".join(parts)
+
     def __aiter__(self) -> "AsyncGzipTextFile":
         """Make AsyncGzipTextFile iterable for line-by-line reading."""
         return self
@@ -923,6 +973,12 @@ class AsyncGzipTextFile:
         """Return the next line from the file."""
         if self._is_closed:
             raise StopAsyncIteration
+
+        if self._newline in self._FAST_READLINE_NEWLINES:
+            line = await self._readline_fast()
+            if line == "":
+                raise StopAsyncIteration
+            return line
 
         search_from = 0
         while True:
@@ -972,6 +1028,12 @@ class AsyncGzipTextFile:
             limit = -1
         if limit == 0:
             return ""
+
+        # Unbounded reads in a cross-boundary-safe newline mode use the O(n)
+        # local-accumulation path. Bounded reads (limit != -1) cap the work at
+        # `limit` characters anyway, so they stay on the buffer path below.
+        if limit == -1 and self._newline in self._FAST_READLINE_NEWLINES:
+            return await self._readline_fast()
 
         # Try to get a line from our buffer using newline-aware search
         search_from = 0
