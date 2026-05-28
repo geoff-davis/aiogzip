@@ -335,6 +335,101 @@ class IoBenchmarks(BenchmarkBase):
             lines_per_sec=f"{len(lines) / duration:.0f}",
         )
 
+    async def benchmark_read_all_isolated(self):
+        """Full-read throughput with the write excluded from the timed region.
+
+        Isolates ``read(-1)`` so the cost of copying decompressed output shows
+        up directly (the bulk benchmark folds write+compression into its
+        totals). Uses highly compressible data, where decompression is cheap
+        and the output copy is the dominant cost; larger ``--size`` makes the
+        signal cleaner.
+        """
+        payload = self.data_gen.generate_compressible(self.data_size_mb)
+        aiogzip_file = self.temp_mgr.get_path("readall_isolated.gz")
+        gzip_file = self.temp_mgr.get_path("readall_isolated_gzip.gz")
+
+        # Write outside the timed region.
+        async with AsyncGzipBinaryFile(aiogzip_file, "wb") as f:
+            await f.write(payload)
+        with gzip.open(gzip_file, "wb") as f:
+            f.write(payload)
+
+        chunk_size = 512 * 1024
+        aiogzip_times = []
+        for _ in range(5):
+            start = time.perf_counter()
+            async with AsyncGzipBinaryFile(
+                aiogzip_file, "rb", chunk_size=chunk_size
+            ) as f:
+                await f.read()
+            aiogzip_times.append(time.perf_counter() - start)
+        aiogzip_best = min(aiogzip_times)
+
+        gzip_times = []
+        for _ in range(5):
+            start = time.perf_counter()
+            with gzip.open(gzip_file, "rb") as f:
+                f.read()
+            gzip_times.append(time.perf_counter() - start)
+        gzip_best = min(gzip_times)
+
+        mb = len(payload) / (1024 * 1024)
+        self.add_result(
+            "Read-all isolated (compressible, read-only timing)",
+            "io",
+            aiogzip_best,
+            aiogzip_read_best=f"{aiogzip_best * 1000:.2f}ms",
+            gzip_read_best=f"{gzip_best * 1000:.2f}ms",
+            aiogzip_throughput=f"{mb / aiogzip_best:.1f} MB/s"
+            if aiogzip_best > 0
+            else "N/A",
+            speedup=format_speedup(aiogzip_best, gzip_best),
+        )
+
+    async def benchmark_text_large_reads(self):
+        """Large single ``read(size)`` and a single very long line.
+
+        Both paths previously accumulated text via repeated ``str +=`` (O(n^2));
+        this records their throughput so a regression to quadratic scaling is
+        visible. Uses a no-newline blob so ``read(size)`` and ``readline()``
+        must accumulate across many chunks.
+        """
+        n = self.data_size_mb * 1024 * 1024
+        blob = "x" * n
+        path = self.temp_mgr.get_path("text_large_reads.gz")
+        async with AsyncGzipTextFile(path, "wt") as f:
+            await f.write(blob)
+
+        chunk_size = 64 * 1024
+
+        sized_times = []
+        for _ in range(5):
+            start = time.perf_counter()
+            async with AsyncGzipTextFile(path, "rt", chunk_size=chunk_size) as f:
+                _ = await f.read(n)
+            sized_times.append(time.perf_counter() - start)
+        sized_best = min(sized_times)
+
+        line_times = []
+        for _ in range(5):
+            start = time.perf_counter()
+            async with AsyncGzipTextFile(path, "rt", chunk_size=chunk_size) as f:
+                _ = await f.readline()
+            line_times.append(time.perf_counter() - start)
+        line_best = min(line_times)
+
+        mchars = n / (1024 * 1024)
+        self.add_result(
+            "Text large reads (sized read + long line, O(n) accumulation)",
+            "io",
+            sized_best,
+            read_size_best=f"{sized_best * 1000:.2f}ms",
+            readline_long_best=f"{line_best * 1000:.2f}ms",
+            read_size_throughput=f"{mchars / sized_best:.1f} Mchar/s"
+            if sized_best > 0
+            else "N/A",
+        )
+
     async def run_all(self):
         """Run all I/O benchmarks."""
         await self.benchmark_binary_small_chunks()
@@ -344,3 +439,5 @@ class IoBenchmarks(BenchmarkBase):
         await self.benchmark_line_iteration()
         await self.benchmark_flush_operations()
         await self.benchmark_readline()
+        await self.benchmark_read_all_isolated()
+        await self.benchmark_text_large_reads()
