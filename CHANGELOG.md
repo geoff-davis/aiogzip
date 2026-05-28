@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-05-28
+
+### Changed
+
+- The default `chunk_size` for `AsyncGzipBinaryFile` and `AsyncGzipTextFile` is now **256 KiB** (was 64 KiB). This improves bulk-read throughput (~1.3–1.6x) and lets CPU-bound `zlib` work offload to a thread by default, at the cost of more buffer memory per open file. Pass `chunk_size=64*1024` to restore the previous footprint.
+- CI now runs on Windows and macOS in addition to Linux, and enforces a coverage floor. Fixed the mypy configuration for newer mypy releases.
+
+### Performance
+
+- Bulk `read(-1)` no longer copies decompressed output through an intermediate buffer, speeding up full-file reads (notably for compressible data).
+- Text `read(size)` and long-line `readline()`/iteration are now O(n) instead of O(n^2) for large reads.
+
+### Documentation
+
+- Documented that an open file is not safe for concurrent use by multiple tasks (use one file object per task).
+- Refreshed the performance guide for the new 256 KiB default and current benchmark numbers.
+
 ## [1.5.0] - 2026-04-23
 
 ### Added
