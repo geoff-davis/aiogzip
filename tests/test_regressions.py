@@ -749,6 +749,43 @@ class TestMediumPriorityEdgeCases:
         assert calls, "large decompress should have been offloaded"
 
     @pytest.mark.asyncio
+    async def test_large_subsequent_member_offloaded_to_executor(self, temp_file):
+        """A large second member, surfaced as unused_data after the first
+        member ends, must also be offloaded to the executor rather than
+        decompressed inline on the event loop."""
+        import gzip as _gzip
+        import os as _os
+        from unittest.mock import patch
+
+        from aiogzip import _binary
+
+        small = b"first member"
+        large = _os.urandom(2 * 1024 * 1024)  # incompressible second member
+        # Two concatenated gzip members.
+        with open(temp_file, "wb") as fh:
+            fh.write(_gzip.compress(small))
+            fh.write(_gzip.compress(large))
+
+        calls = []
+        original = _binary._run_zlib_in_thread
+
+        async def tracking(method, data):
+            calls.append(len(data))
+            return await original(method, data)
+
+        # A chunk_size large enough to read both members in one read, so the
+        # second member arrives as unused_data on the first decompressor.
+        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+            async with AsyncGzipBinaryFile(
+                temp_file, "rb", chunk_size=8 * 1024 * 1024
+            ) as f:
+                got = await f.read()
+        assert got == small + large
+        assert any(n >= _binary._ZLIB_OFFLOAD_THRESHOLD for n in calls), (
+            "large subsequent member should have been offloaded"
+        )
+
+    @pytest.mark.asyncio
     async def test_strict_size_rejects_write_past_4gib(self, temp_file):
         """With strict_size=True, a write that would push _input_size past
         the gzip ISIZE field's 4 GiB cap must raise rather than silently

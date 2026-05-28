@@ -18,11 +18,21 @@ permissions:
 jobs:
   build:
     # The type of runner that the job will run on
-    runs-on: ubuntu-latest
-    # Defines a build matrix for your tests
+    runs-on: ${{ matrix.os }}
+    # Defines a build matrix for your tests. Linux runs the full Python
+    # version sweep; Windows and macOS run a single version each to guard
+    # platform-specific paths (e.g. os.linesep newline translation in text
+    # mode, path handling) without multiplying CI cost across the matrix.
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.12"
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -68,9 +78,12 @@ jobs:
           python scripts/check_py38_compat.py src/aiogzip/*.py
 
       # Step 9: Run tests with pytest and coverage
+      # --cov-fail-under gates against silent coverage regressions. The
+      # threshold sits a couple points below the current ~87% to absorb
+      # benign per-platform branch differences without nuisance failures.
       - name: Run tests with pytest and coverage
         run: |
-          pytest --cov --cov-report=term-missing --cov-report=xml
+          pytest --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=85
 
   coverage-comment:
     runs-on: ubuntu-latest
