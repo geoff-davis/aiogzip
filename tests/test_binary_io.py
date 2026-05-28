@@ -115,6 +115,41 @@ class TestAsyncGzipBinaryFile:
             assert await f.read() == b"abcdef"
 
     @pytest.mark.asyncio
+    async def test_binary_accepts_noncontiguous_and_multibyte_buffers(self, temp_file):
+        """write() must coerce buffer-protocol inputs that are not already a
+        flat, single-byte, contiguous view.
+
+        Exercises the _coerce_byteslike branches for:
+        - a memoryview with itemsize != 1 (cast to bytes),
+        - a non-contiguous memoryview (copied via tobytes()),
+        - a generic buffer object that is not a memoryview (array).
+        """
+        from array import array
+
+        int_view = memoryview(array("i", [1, 2, 3]))  # itemsize 4 memoryview
+        noncontiguous = memoryview(bytearray(b"abcdef"))[::2]  # -> b"ace"
+        int_array = array("i", [4, 5, 6])  # generic buffer, itemsize 4
+        byte_array = array("b", [104, 105])  # generic itemsize-1 buffer -> b"hi"
+
+        assert not noncontiguous.contiguous  # guard the branch we mean to hit
+
+        expected = (
+            array("i", [1, 2, 3]).tobytes()
+            + b"ace"
+            + array("i", [4, 5, 6]).tobytes()
+            + b"hi"
+        )
+
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            assert await f.write(int_view) == len(array("i", [1, 2, 3]).tobytes())
+            assert await f.write(noncontiguous) == 3
+            assert await f.write(int_array) == len(array("i", [4, 5, 6]).tobytes())
+            assert await f.write(byte_array) == 2
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.read() == expected
+
+    @pytest.mark.asyncio
     async def test_binary_interoperability_with_gzip(self, temp_file, sample_data):
         """Test interoperability with gzip.open for binary data."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
