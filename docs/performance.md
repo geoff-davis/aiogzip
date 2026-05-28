@@ -12,9 +12,9 @@ All benchmarks were conducted on standard hardware using Python 3.12+.
 
 | Operation | aiogzip | gzip (sync) | Speedup |
 |-----------|---------|-------------|---------|
-| **Bulk Text Read/Write** | ~35 MB/s | ~14 MB/s | **2.5x Faster** |
-| **JSONL Processing** | - | - | **1.8x Faster** |
-| **Line Iteration** | 1.2M lines/sec | - | - |
+| **Bulk Text Read/Write** | ~37 MB/s | ~13 MB/s | **~2.9x Faster** |
+| **JSONL Processing** | - | - | **~1.8x Faster** |
+| **Line Iteration** | ~1.35M lines/sec | - | - |
 
 **Why?** `aiogzip` uses optimized UTF-8 decoding strategies (using `codecs.getincrementaldecoder`) and manages buffers efficiently to minimize encoding/decoding overhead.
 
@@ -22,27 +22,32 @@ All benchmarks were conducted on standard hardware using Python 3.12+.
 
 For bulk binary I/O, `aiogzip` matches the throughput of standard `gzip`.
 
-| Operation | aiogzip | gzip (sync) | Speedup |
-|-----------|---------|-------------|---------|
-| **Bulk Binary I/O** | ~52 MB/s | ~53 MB/s | **Equivalent** |
-| **Small Chunks** | 1.7M ops/sec | 1.3M ops/sec | **1.3x Faster** |
+| Operation | aiogzip | gzip (sync) | Result |
+|-----------|---------|-------------|--------|
+| **Bulk Binary I/O** | ~61 MB/s | ~62 MB/s | **Equivalent** |
+| **Tiny (10-byte) chunk writes** | ~1.6M ops/sec | ~3.3M ops/sec | **Slower** |
+
+The async write path adds a small per-call cost, so writing in *very* small pieces is slower than synchronous `gzip` — batch writes (or use a larger working buffer) when throughput matters. Bulk reads are fast: a full `read(-1)` of compressible data runs at several hundred MB/s.
 
 ### Concurrency (Winner: `aiogzip`)
 
 When processing multiple files, especially where I/O latency (disk/network) is involved, `aiogzip` shines by not blocking the event loop.
 
-- **Concurrent Processing**: **1.5x Faster** (simulated I/O latency).
+- **Concurrent I/O (latency-bound)**: up to **~6x faster** than sequential synchronous processing when each file incurs I/O latency.
+- **Mixed read/write workload**: **~1.5x faster**.
+- CPU-bound `zlib` work above a 256 KiB chunk is offloaded to a thread, so multiple streams compress/decompress in parallel instead of serializing on the loop.
 - Allows the main thread to remain responsive (e.g., for a web server) while processing heavy compression tasks.
 
 ## Optimization Tips
 
 ### 1. Choose the Right Chunk Size
 
-The default `chunk_size` is 64KB. Values must be positive and no larger than
+The default `chunk_size` is 256 KiB. Values must be positive and no larger than
 128 MiB, which prevents accidental huge allocations from unsanitized input.
 
-- **Increase it** (e.g., `128*1024` or `1024*1024`) for large file throughput if you have memory to spare.
-- **Decrease it** if you are memory constrained and processing massive files.
+- **Increase it** (e.g., `512*1024` or `1024*1024`) for large-file throughput if you have memory to spare.
+- **Decrease it** (e.g., `64*1024`) if you are memory constrained and keeping many files open at once.
+- The default also sits at the threshold above which CPU-bound `zlib` work is offloaded to a thread, so the default already benefits from decompression offload.
 - If you push chunk sizes into the multi-megabyte range, budget the extra memory per open file to avoid accidental OOMs.
 
 ```python
