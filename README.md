@@ -30,6 +30,7 @@
 - **Non-seekable input streams use a bounded rewind cache**. By default, up to 128 MiB of compressed input is retained so backward seeks can replay the stream; pass `max_rewind_cache_size=<bytes>` to tune this, or `None` to allow an unbounded cache.
 - **Writes past 4 GiB of uncompressed data** produce a gzip trailer whose `ISIZE` field wraps to `size & 0xFFFFFFFF` (this matches the gzip format spec and `gzip.open()`). Pass `strict_size=True` to refuse writes that would exceed the limit instead.
 - **Guard against decompression bombs** by passing `max_decompressed_size=<bytes>` when reading untrusted files; the decompressor aborts with `OSError` once the cap is exceeded.
+- **Use one file object per task.** An open `aiogzip` file is not safe for concurrent use by multiple `asyncio` tasks — its internal buffers and decoder/compressor state are mutated without locking, the same contract as standard-library file objects. Give each task its own file object, or serialize access behind your own lock.
 
 ## Quickstart
 

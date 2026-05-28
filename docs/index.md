@@ -88,4 +88,6 @@ For `AsyncGzipTextFile`, `tell()` returns an opaque cookie value for the current
 
 Backward seeks restart decompression from the beginning of the gzip stream. For non-seekable `fileobj` inputs, `aiogzip` keeps a bounded compressed-input replay cache so rewind can work without loading unbounded data; tune it with `max_rewind_cache_size` or set it to `None` for the previous unbounded behavior.
 
+**Concurrency:** An open `aiogzip` file is not safe for concurrent use by multiple `asyncio` tasks. Its internal buffers and decoder/compressor state are mutated without locking — the same contract as standard-library file objects. Give each task its own file object, or serialize access behind your own lock.
+
 **Note:** `aiogzip` focuses on file-based operations and does not currently support in-memory compression/decompression (e.g., `gzip.compress`/`gzip.decompress`).
