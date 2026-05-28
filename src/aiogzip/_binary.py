@@ -739,12 +739,14 @@ class AsyncGzipBinaryFile:
             del buf[:]
             self._buffer_offset = 0
 
+            # Append decompressor output directly to the join list. Each piece
+            # is already a distinct bytes object, so this avoids copying every
+            # byte through self._buffer (extend + bytes()) only to copy again
+            # in the final join — the dominant cost for large read-all calls.
             while not self._eof:
-                await self._fill_buffer()
-                if self._buffer:
-                    chunks.append(bytes(self._buffer))
-                    total_read += len(self._buffer)
-                    del self._buffer[:]
+                for piece in await self._decompress_next():
+                    chunks.append(piece)
+                    total_read += len(piece)
 
             self._position += total_read
             return b"".join(chunks)
@@ -788,14 +790,22 @@ class AsyncGzipBinaryFile:
 
             return data_to_return
 
-    async def _fill_buffer(self) -> None:
-        """Internal helper to read a compressed chunk and decompress it.
+    async def _decompress_next(self) -> List[bytes]:
+        """Read the next compressed chunk and return its decompressed pieces.
 
-        Handles multi-member gzip archives (created by append mode) by detecting
-        when one member ends and starting a new decompressor for the next member.
+        This is the shared decompression core. It advances EOF state, parses
+        the gzip header mtime, walks multi-member archives (created by append
+        mode), performs end-of-stream finalization/validation, and enforces
+        ``max_decompressed_size``.
+
+        Each decompressor call already returns a fresh ``bytes`` object, so the
+        pieces are handed back as-is: ``read(-1)`` appends them straight to its
+        join list (avoiding a round-trip through ``self._buffer``), while
+        ``_fill_buffer`` extends the buffer with them for the partial-read
+        paths. Returns an empty list at or after EOF.
         """
         if self._eof or self._file is None:
-            return
+            return []
 
         compressed_chunk = await self._read_compressed_chunk()
 
@@ -813,13 +823,14 @@ class AsyncGzipBinaryFile:
             self._eof = True
             try:
                 remaining = self._engine.flush()
-                if remaining:
-                    self._buffer.extend(remaining)
-                    self._account_decompressed(len(remaining))
             except zlib.error as e:
                 raise gzip.BadGzipFile(
                     f"Error finalizing gzip decompression: {e}"
                 ) from e
+            pieces: List[bytes] = []
+            if remaining:
+                self._account_decompressed(len(remaining))
+                pieces.append(remaining)
             # After the underlying file is drained, the decompressor must
             # have consumed a complete gzip member — otherwise the file
             # was truncated mid-stream and silently ignoring that would
@@ -830,9 +841,10 @@ class AsyncGzipBinaryFile:
                     "the member trailer was read; the file is truncated "
                     "or incomplete"
                 )
-            return
+            return pieces
 
         # Decompress the chunk
+        pieces = []
         try:
             if len(compressed_chunk) >= _ZLIB_OFFLOAD_THRESHOLD:
                 decompressed = await _run_zlib_in_thread(
@@ -840,8 +852,9 @@ class AsyncGzipBinaryFile:
                 )
             else:
                 decompressed = self._engine.decompress(compressed_chunk)
-            self._buffer.extend(decompressed)
-            self._account_decompressed(len(decompressed))
+            if decompressed:
+                self._account_decompressed(len(decompressed))
+                pieces.append(decompressed)
 
             # Handle multi-member gzip archives (created by append mode).
             # CPython's gzip reader ignores zero padding between/after members,
@@ -859,8 +872,9 @@ class AsyncGzipBinaryFile:
                     )
                 else:
                     decompressed = self._engine.decompress(unused)
-                self._buffer.extend(decompressed)
-                self._account_decompressed(len(decompressed))
+                if decompressed:
+                    self._account_decompressed(len(decompressed))
+                    pieces.append(decompressed)
                 unused = self._engine.unused_data
         except zlib.error as e:
             raise gzip.BadGzipFile(f"Error decompressing gzip data: {e}") from e
@@ -870,6 +884,17 @@ class AsyncGzipBinaryFile:
             raise
         except Exception as e:
             raise OSError(f"Unexpected error during decompression: {e}") from e
+        return pieces
+
+    async def _fill_buffer(self) -> None:
+        """Decompress the next compressed chunk into the read buffer.
+
+        Thin wrapper over :meth:`_decompress_next` used by the partial-read
+        paths (``read(size)``, ``readline``, ``peek``, ``seek``) that need the
+        decoded bytes accumulated in ``self._buffer``.
+        """
+        for piece in await self._decompress_next():
+            self._buffer.extend(piece)
 
     def _account_decompressed(self, n: int) -> None:
         """Track total decompressed output and enforce max_decompressed_size.
