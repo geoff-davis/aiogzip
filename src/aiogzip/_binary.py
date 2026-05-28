@@ -616,6 +616,11 @@ class AsyncGzipBinaryFile:
                 "the gzip member is unusable"
             )
 
+        # Declared explicitly so the two assignments share one type: the
+        # bytes/bytearray fast path and the coerced memoryview path would
+        # otherwise infer incompatible types under newer mypy (which treats
+        # memoryview as generic, memoryview[int]).
+        buffer: Union[bytes, bytearray, memoryview]
         if isinstance(data, (bytes, bytearray)):
             buffer = data
         else:
