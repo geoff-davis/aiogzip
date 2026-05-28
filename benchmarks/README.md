@@ -28,6 +28,8 @@ Core read/write performance:
 - Text I/O operations
 - Flush operations (100 flushes)
 - Line-by-line reading with `readline()` (1000 lines)
+- Read-all isolated: `read(-1)` timed on its own (write excluded) on compressible data
+- Text large reads: a single large `read(size)` and a single long-line `readline()` (guards against O(n^2) accumulation regressions)
 
 ### 2. 💾 Memory Benchmarks (`bench_memory.py`)
 
