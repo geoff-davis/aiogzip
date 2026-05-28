@@ -61,7 +61,7 @@ Before committing code changes, verify:
    pytest --cov --cov-report=term-missing
    ```
 
-   Ensure all 209+ tests pass with good coverage.
+   Ensure all 329+ tests pass with good coverage.
 
 3. **Check imports:**
 
@@ -88,8 +88,9 @@ Before committing code changes, verify:
 
 ## Test Coverage Best Practices
 
-- **Current coverage:** 86.74% (173 tests)
-- **Target:** Maintain or improve coverage
+- **Current coverage:** 87.27% (329 tests)
+- **Target:** Maintain or improve coverage. CI enforces a floor via
+  `--cov-fail-under=85`.
 - Always add tests for new features
 - Document edge cases with descriptive test names
 
@@ -108,12 +109,13 @@ Tests are organized by priority:
 
 - CRLF sequences can split across chunk boundaries
 - Must track `_trailing_cr` state to prevent `\r\n` → `\n\n`
-- Use `_get_line_terminator_pos()` helper for newline-aware searching
+- Use `_find_line_terminator()` helper for newline-aware searching
 
 ### Unicode Handling
 
 - Multibyte characters can split across buffers
-- Use `_safe_decode_with_remainder()` to handle incomplete sequences
+- Decoding uses an incremental codec (`codecs.getincrementaldecoder`) that
+  retains incomplete trailing bytes between chunks
 - Different encodings have different max incomplete byte counts
 
 ### Error Handling
@@ -124,7 +126,9 @@ Tests are organized by priority:
 
 ## CI/CD Notes
 
-The project uses GitHub Actions which tests against Python 3.8, 3.9, 3.10, 3.11, 3.12, and 3.13.
+The project uses GitHub Actions which tests against Python 3.8 through 3.14.
+Linux runs the full version sweep; Windows and macOS each run one version to
+guard platform-specific paths (e.g. `os.linesep` newline translation).
 
 **Any Python 3.9+ only syntax will fail CI!**
 
@@ -173,9 +177,11 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **Current (Unreleased)** - Bug fixes, test improvements, Python 3.8 compatibility
+- **1.5.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
+  work includes the rewind cache for non-seekable streams, decompression-bomb
+  guards (`max_decompressed_size`), `strict_size`, and zlib executor offload.
 
 ---
 
-**Last Updated:** 2024-11-14
+**Last Updated:** 2026-05-28
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
