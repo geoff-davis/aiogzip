@@ -255,7 +255,10 @@ class TestAsyncGzipTextFile:
     async def test_text_seek_cur_and_end_zero(self, temp_file):
         """Text seek should support zero-offset SEEK_CUR and SEEK_END."""
         text = "abc\ndef"
-        async with AsyncGzipTextFile(temp_file, "wt") as f:
+        # newline="" avoids translating "\n" to os.linesep on write (which is
+        # "\r\n" on Windows), so the byte position from SEEK_END matches
+        # len(text) on every platform.
+        async with AsyncGzipTextFile(temp_file, "wt", newline="") as f:
             await f.write(text)
 
         async with AsyncGzipTextFile(temp_file, "rt") as f:

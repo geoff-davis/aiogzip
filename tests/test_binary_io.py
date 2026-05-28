@@ -407,8 +407,11 @@ class TestAsyncGzipBinaryFile:
             "inner1.txt": "alpha\nbeta",
             "inner2.txt": "gamma",
         }
-        file1.write_text(contents["inner1.txt"], encoding="utf-8")
-        file2.write_text(contents["inner2.txt"], encoding="utf-8")
+        # newline="" prevents Path.write_text from translating "\n" to
+        # os.linesep on Windows, so the on-disk bytes (and info.size) match
+        # the literal contents on every platform.
+        file1.write_text(contents["inner1.txt"], encoding="utf-8", newline="")
+        file2.write_text(contents["inner2.txt"], encoding="utf-8", newline="")
         with tarfile.open(tar_path, "w:gz") as tar:
             tar.add(file1, arcname="inner1.txt")
             tar.add(file2, arcname="inner2.txt")
