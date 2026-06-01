@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Optional `aiogzip[fast]` extra that installs [`zlib-ng`](https://pypi.org/project/zlib-ng/). When present, **decompression** automatically uses zlib-ng, which is faster (~1.6–2x on typical data) and produces byte-identical output to stdlib `zlib`. Set the environment variable `AIOGZIP_ENGINE=stdlib` to force stdlib regardless of what is installed. When the extra is not installed, aiogzip remains pure-Python and behaves exactly as before.
+
 ## [1.6.0] - 2026-05-28
 
 ### Changed

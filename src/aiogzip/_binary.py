@@ -4,12 +4,12 @@ import asyncio
 import gzip
 import io
 import os
-import zlib
 from pathlib import Path
 from typing import Any, Callable, Iterable, List, Optional, Union, cast
 
 import aiofiles
 
+from . import _engine
 from ._common import (
     _MAX_CHUNK_SIZE,
     GZIP_WBITS,
@@ -222,8 +222,8 @@ class AsyncGzipBinaryFile:
 
             # Initialize compression/decompression engine based on mode
             if self._writing_mode:
-                self._engine = zlib.compressobj(
-                    level=self._compresslevel, wbits=-zlib.MAX_WBITS
+                self._engine = _engine.compressobj(
+                    self._compresslevel, -_engine.MAX_WBITS
                 )
                 header = _build_gzip_header(
                     _derive_header_filename(
@@ -236,7 +236,7 @@ class AsyncGzipBinaryFile:
                 self._crc = 0
                 self._input_size = 0
             else:  # read mode
-                self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
+                self._engine = _engine.decompressobj(GZIP_WBITS)
                 self._position = 0
                 self._mtime = None
                 self._header_probe_buffer.clear()
@@ -655,7 +655,7 @@ class AsyncGzipBinaryFile:
                 compressed = await _run_zlib_in_thread(self._engine.compress, payload)
             else:
                 compressed = self._engine.compress(buffer)
-        except zlib.error as e:
+        except _engine.ZLIB_ERRORS as e:
             raise OSError(f"Error compressing data: {e}") from e
         except Exception as e:
             raise OSError(f"Unexpected error during compression: {e}") from e
@@ -672,7 +672,7 @@ class AsyncGzipBinaryFile:
         # Only credit the input once both stages succeed, and mask the CRC
         # to 32 bits so tell()/the trailer always see the same uint32 zlib
         # would have produced.
-        self._crc = zlib.crc32(buffer, self._crc) & 0xFFFFFFFF
+        self._crc = _engine.crc32(buffer, self._crc) & 0xFFFFFFFF
         self._input_size += length
         self._position = self._input_size
 
@@ -829,7 +829,7 @@ class AsyncGzipBinaryFile:
             self._eof = True
             try:
                 remaining = self._engine.flush()
-            except zlib.error as e:
+            except _engine.ZLIB_ERRORS as e:
                 raise gzip.BadGzipFile(
                     f"Error finalizing gzip decompression: {e}"
                 ) from e
@@ -871,7 +871,7 @@ class AsyncGzipBinaryFile:
                 if not unused:
                     break
 
-                self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
+                self._engine = _engine.decompressobj(GZIP_WBITS)
                 if len(unused) >= _ZLIB_OFFLOAD_THRESHOLD:
                     decompressed = await _run_zlib_in_thread(
                         self._engine.decompress, unused
@@ -882,7 +882,7 @@ class AsyncGzipBinaryFile:
                     self._account_decompressed(len(decompressed))
                     pieces.append(decompressed)
                 unused = self._engine.unused_data
-        except zlib.error as e:
+        except _engine.ZLIB_ERRORS as e:
             raise gzip.BadGzipFile(f"Error decompressing gzip data: {e}") from e
         except OSError:
             # Preserve OSErrors raised deliberately by helpers (e.g., the
@@ -954,7 +954,7 @@ class AsyncGzipBinaryFile:
             self._replay_offset = 0
         else:
             raise OSError("Underlying file is not seekable")
-        self._engine = zlib.decompressobj(wbits=GZIP_WBITS)
+        self._engine = _engine.decompressobj(GZIP_WBITS)
         del self._buffer[:]
         self._buffer_offset = 0
         self._eof = False
@@ -1058,7 +1058,7 @@ class AsyncGzipBinaryFile:
             # Flush any buffered compressed data (but not the final trailer)
             # Using Z_SYNC_FLUSH allows us to flush without ending the stream
             try:
-                flushed_data = self._engine.flush(zlib.Z_SYNC_FLUSH)
+                flushed_data = self._engine.flush(_engine.Z_SYNC_FLUSH)
                 if flushed_data:
                     await self._file.write(flushed_data)
 
@@ -1068,7 +1068,7 @@ class AsyncGzipBinaryFile:
                     result = flush_method()
                     if hasattr(result, "__await__"):
                         await result
-            except zlib.error as e:
+            except _engine.ZLIB_ERRORS as e:
                 raise OSError(f"Error flushing compressed data: {e}") from e
             except OSError:
                 raise
