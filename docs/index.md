@@ -19,6 +19,7 @@ It is designed for high-performance I/O operations, especially for text-based da
 - **Separate Binary and Text Modes**: `AsyncGzipBinaryFile` and `AsyncGzipTextFile` provide clear, type-safe handling of data.
 - **Excellent Compression Quality**: Achieves compression ratios nearly identical to the standard `gzip` module.
 - **`aiocsv` Integration**: Read and write compressed CSV files effortlessly.
+- **Optional Faster Codec**: Install `aiogzip[fast]` to use [`zlib-ng`](https://pypi.org/project/zlib-ng/) for faster decompression automatically (byte-identical output) and, with `fast_compress=True`, for compression. See the [Performance Guide](performance.md).
 
 ---
 

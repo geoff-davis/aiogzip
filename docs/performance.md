@@ -14,9 +14,9 @@ All benchmarks were conducted on standard hardware using Python 3.12+.
 |-----------|---------|-------------|---------|
 | **Bulk Text Read/Write** | ~37 MB/s | ~13 MB/s | **~2.9x Faster** |
 | **JSONL Processing** | - | - | **~1.8x Faster** |
-| **Line Iteration** | ~1.35M lines/sec | - | - |
+| **Line Iteration** | ~4.2M lines/sec | - | - |
 
-**Why?** `aiogzip` uses optimized UTF-8 decoding strategies (using `codecs.getincrementaldecoder`) and manages buffers efficiently to minimize encoding/decoding overhead.
+**Why?** `aiogzip` uses optimized UTF-8 decoding strategies (using `codecs.getincrementaldecoder`) and manages buffers efficiently to minimize encoding/decoding overhead. For the single-character newline modes (`None`, `"\n"`, `"\r"`), each decoded chunk's lines are bulk-split in one pass and served from a batch, which makes `async for` line iteration roughly **1.3x** faster than per-line scanning.
 
 ### Binary Operations (Tie)
 
@@ -37,6 +37,34 @@ When processing multiple files, especially where I/O latency (disk/network) is i
 - **Mixed read/write workload**: **~1.5x faster**.
 - CPU-bound `zlib` work above a 256 KiB chunk is offloaded to a thread, so multiple streams compress/decompress in parallel instead of serializing on the loop.
 - Allows the main thread to remain responsive (e.g., for a web server) while processing heavy compression tasks.
+
+### Optional Faster Codec (`aiogzip[fast]` / zlib-ng)
+
+Installing the optional extra pulls in [`zlib-ng`](https://pypi.org/project/zlib-ng/),
+a drop-in deflate implementation that is faster than stdlib `zlib`:
+
+```bash
+pip install "aiogzip[fast]"
+```
+
+- **Decompression** uses zlib-ng automatically whenever it is installed. Its
+  output is **byte-identical** to stdlib `zlib`, so this is transparent. Measured
+  read-throughput gains range from ~**1.2x** on typical data to **~7-10x** on
+  highly compressible data and bulk `read(-1)`.
+- **Compression** stays on stdlib `zlib` by default, because zlib-ng's compressed
+  *bytes* are not identical to stdlib's — installing the extra alone must not
+  change produced `.gz` output. Opt in per file with `fast_compress=True` for a
+  ~**1.5x** compression speedup; the output is valid gzip readable by any
+  decompressor, just not byte-for-byte identical to stdlib.
+
+  ```python
+  async with AsyncGzipBinaryFile("out.gz", "wb", fast_compress=True) as f:
+      await f.write(payload)
+  ```
+
+- Set `AIOGZIP_ENGINE=stdlib` to force stdlib everywhere (e.g. for reproducible
+  output or debugging). When the extra is not installed, `aiogzip` remains
+  pure-Python and behaves exactly as before.
 
 ## Optimization Tips
 
