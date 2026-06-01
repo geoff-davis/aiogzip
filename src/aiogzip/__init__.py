@@ -19,7 +19,7 @@ from ._common import (
 )
 from ._text import AsyncGzipTextFile
 
-__version__ = "1.6.0"
+__version__ = "1.7.0"
 
 
 def AsyncGzipFile(
