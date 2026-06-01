@@ -115,6 +115,12 @@ class AsyncGzipTextFile:
     # than the binary buffer because each char can cost 1-4 bytes of
     # internal storage.
     _TEXT_COMPACTION_THRESHOLD = 16384
+    # Upper bound on how many characters of complete lines are bulk-split into
+    # _pending_lines per refill. Without it, a large chunk_size (up to the
+    # 128 MiB max) full of tiny lines would materialize millions of line
+    # strings at once. 256 KiB matches the default chunk_size, so the common
+    # case still splits a whole chunk in a single pass.
+    _LINE_BATCH_CHARS = 256 * 1024
 
     def __init__(
         self,
@@ -978,6 +984,10 @@ class AsyncGzipTextFile:
         Advancing ``_text_buffer_offset`` exactly as ``_consume_buffer`` would
         keeps tell()/seek() bookkeeping identical to consuming one line at a
         time. Returns None when ``_pending_lines`` is exhausted.
+
+        This is the canonical implementation; ``__anext__`` and
+        ``_readline_fast`` inline the same logic in their hot paths (a per-line
+        method call costs ~7% throughput). Keep all three in sync.
         """
         idx = self._pending_idx
         pending = self._pending_lines
@@ -1007,10 +1017,19 @@ class AsyncGzipTextFile:
         # only reached in those modes.
         assert term is not None and split_re is not None
 
-        # Bulk-split every complete line in the buffered remainder at once.
+        # Bulk-split the complete lines in the buffered remainder, but only up
+        # to a bounded window so a huge chunk_size full of tiny lines does not
+        # materialize the whole chunk's lines at once.
         buf = self._text_buffer
         start = self._text_buffer_offset
-        last = buf.rfind(term)
+        window_end = min(len(buf), start + self._LINE_BATCH_CHARS)
+        last = buf.rfind(term, start, window_end)
+        if last < start:
+            # No terminator within the window: either the first line is longer
+            # than the window or there is no complete line at all. find()
+            # returns the first terminator (or -1), so an over-long first line
+            # still yields exactly one line and stays bounded.
+            last = buf.find(term, start)
         if last >= start:
             region = buf[start : last + 1]
             self._pending_lines = split_re.findall(region)
@@ -1036,16 +1055,12 @@ class AsyncGzipTextFile:
                         first_line = "".join(prefix) + text[: i + 1]
                     else:
                         first_line = text[: i + 1]
+                    # Keep the whole chunk buffered (its replay origin stays
+                    # valid) with the offset past this line; the next call
+                    # bulk-splits the rest of the chunk via the windowed path
+                    # above.
                     self._set_buffer(text)
                     self._text_buffer_offset = i + 1
-                    # Pre-split any further complete lines in this chunk so the
-                    # next calls serve them without re-scanning.
-                    rest_last = text.rfind(term)
-                    if rest_last > i:
-                        self._pending_lines = split_re.findall(
-                            text[i + 1 : rest_last + 1]
-                        )
-                        self._pending_idx = 0
                     return first_line
                 prefix.append(text)
             if not more:
@@ -1058,9 +1073,9 @@ class AsyncGzipTextFile:
         Returns "" at end of input. Only valid when
         ``self._line_term is not None``.
         """
-        # Serve a pre-split line inline (mirroring __anext__) so repeated
-        # readline() calls do not pay an extra coroutine hop per line; only
-        # refill through the coroutine when the batch is drained.
+        # Inlined pending-line pop (canonical copy: _take_pending_line). Kept
+        # inline in the two hot read paths because a per-line method call
+        # measurably (~7%) lowers iteration throughput; keep the copies in sync.
         idx = self._pending_idx
         pending = self._pending_lines
         if idx < len(pending):
@@ -1081,8 +1096,8 @@ class AsyncGzipTextFile:
             raise StopAsyncIteration
 
         if self._line_term is not None:
-            # Serve a pre-split line inline to avoid a coroutine hop per line;
-            # only fall back to the refill coroutine when the batch is drained.
+            # Inlined pending-line pop (canonical copy: _take_pending_line);
+            # kept inline in this hot path for throughput. Keep copies in sync.
             idx = self._pending_idx
             pending = self._pending_lines
             if idx < len(pending):

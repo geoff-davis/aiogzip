@@ -153,6 +153,54 @@ class TestTellSeekDuringIteration:
             assert await f.__anext__() == "row10\n"
 
 
+class TestBatchWindowing:
+    """The pending batch is capped at _LINE_BATCH_CHARS per refill so a large
+    chunk_size full of tiny lines does not materialize the whole chunk at once.
+    A tiny cap forces many windowed refills within one buffered chunk."""
+
+    @pytest.mark.asyncio
+    async def test_many_small_lines_across_windows(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(AsyncGzipTextFile, "_LINE_BATCH_CHARS", 16)
+        text = "".join(f"{i}\n" for i in range(5000))
+        path = tmp_path / "win.gz"
+        path.write_bytes(gzip.compress(text.encode("utf-8")))
+        # chunk_size far larger than the cap so one buffer holds many windows.
+        async with AsyncGzipTextFile(path, "rt", newline="\n", chunk_size=1 << 20) as f:
+            lines = [line async for line in f]
+        assert lines == oracle_lines(path, "\n")
+
+    @pytest.mark.asyncio
+    async def test_line_longer_than_window(self, tmp_path, monkeypatch):
+        # A line longer than the batch window must still be emitted whole
+        # (exercises the find()-fallback when the window holds no terminator).
+        monkeypatch.setattr(AsyncGzipTextFile, "_LINE_BATCH_CHARS", 8)
+        text = ("x" * 500) + "\n" + "short\n" + ("y" * 300) + "\n"
+        path = tmp_path / "longwin.gz"
+        path.write_bytes(gzip.compress(text.encode("utf-8")))
+        async with AsyncGzipTextFile(path, "rt", newline="\n", chunk_size=1 << 20) as f:
+            lines = [line async for line in f]
+        assert lines == ["x" * 500 + "\n", "short\n", "y" * 300 + "\n"]
+
+
+class TestBoundedReadlineInterleaving:
+    @pytest.mark.asyncio
+    async def test_bounded_readline_clears_pending_batch(self, tmp_path):
+        """A bounded readline(limit) after iteration has populated the batch
+        must not let stale pre-split lines be served on the next iteration."""
+        text = "abcdefgh\nij\nklmno\npqr\n"
+        path = tmp_path / "bnd.gz"
+        path.write_bytes(gzip.compress(text.encode("utf-8")))
+        async with AsyncGzipTextFile(path, "rt", newline="\n") as f:
+            first = await f.__anext__()  # populates the pending batch
+            mid = await f.readline(3)  # bounded -> must drop the batch
+            nxt = await f.__anext__()  # must be the real next line, not stale
+            tail = await f.read()
+        assert first == "abcdefgh\n"
+        assert mid == "ij\n"
+        assert nxt == "klmno\n"
+        assert tail == "pqr\n"
+
+
 class TestLongLineSpanningChunks:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("newline", [None, "\n", "\r"])
