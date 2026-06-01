@@ -43,16 +43,17 @@ class MicroBenchmarks(BenchmarkBase):
         )
 
     async def benchmark_line_iteration(self):
-        """Benchmark line-by-line iteration."""
+        """Benchmark line-by-line iteration (async for)."""
         text_file = self.temp_mgr.get_path("micro_text.gz")
 
-        # Write text data with 10,000 lines
-        lines = [f"This is line number {i}\n" for i in range(10000)]
+        # 100K lines (~2.4 MB) so the per-line cost dominates per-file overhead
+        # and the measurement is stable rather than sub-millisecond noise.
+        n_lines = 100_000
+        lines = [f"This is line number {i}\n" for i in range(n_lines)]
         async with AsyncGzipTextFile(text_file, "wt") as f:
             await f.write("".join(lines))
 
-        # Benchmark line iteration - 100 iterations
-        iterations = 100
+        iterations = 30
         total_time = 0
         for _ in range(iterations):
             start = time.perf_counter()
@@ -65,24 +66,24 @@ class MicroBenchmarks(BenchmarkBase):
         avg_time = total_time / iterations
 
         self.add_result(
-            "Line iteration - 10K lines",
+            "Line iteration - 100K lines",
             "micro",
             avg_time,
             iterations=iterations,
             avg_time_ms=f"{avg_time * 1000:.3f}ms",
+            lines_per_sec=f"{n_lines / avg_time:.0f}",
         )
 
     async def benchmark_readline_loop(self):
         """Benchmark readline() in a loop."""
         text_file = self.temp_mgr.get_path("micro_readline.gz")
 
-        # Write text data with 10,000 lines
-        lines = [f"This is line number {i}\n" for i in range(10000)]
+        n_lines = 100_000
+        lines = [f"This is line number {i}\n" for i in range(n_lines)]
         async with AsyncGzipTextFile(text_file, "wt") as f:
             await f.write("".join(lines))
 
-        # Benchmark readline loop - 100 iterations
-        iterations = 100
+        iterations = 30
         total_time = 0
         for _ in range(iterations):
             start = time.perf_counter()
@@ -98,11 +99,12 @@ class MicroBenchmarks(BenchmarkBase):
         avg_time = total_time / iterations
 
         self.add_result(
-            "readline() loop - 10K lines",
+            "readline() loop - 100K lines",
             "micro",
             avg_time,
             iterations=iterations,
             avg_time_ms=f"{avg_time * 1000:.3f}ms",
+            lines_per_sec=f"{n_lines / avg_time:.0f}",
         )
 
     async def benchmark_small_writes(self):

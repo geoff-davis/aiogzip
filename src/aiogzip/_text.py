@@ -3,6 +3,7 @@
 import codecs
 import io
 import os
+import re
 import secrets
 import struct
 from pathlib import Path
@@ -21,6 +22,15 @@ from ._common import (
     _validate_filename,
     _validate_original_filename,
 )
+
+# Keepends line splitters for the single-character terminator modes. Each match
+# consumes a run of non-terminator characters up to and including one terminator,
+# so ``"".join(pattern.findall(region)) == region`` whenever ``region`` ends on a
+# terminator. NOTE: this deliberately does NOT use ``str.splitlines()``, which
+# also breaks on \v, \f, \x1c-\x1e, \x85, U+2028, and U+2029 -- characters a
+# text-file readline must treat as ordinary content, not line breaks.
+_LINE_RE_LF = re.compile(r"[^\n]*\n")
+_LINE_RE_CR = re.compile(r"[^\r]*\r")
 
 
 class AsyncGzipTextFile:
@@ -84,6 +94,11 @@ class AsyncGzipTextFile:
         "_max_decompressed_size",
         "_max_rewind_cache_size",
         "_strict_size",
+        "_fast_compress",
+        "_line_term",
+        "_line_split_re",
+        "_pending_lines",
+        "_pending_idx",
     )
 
     # Bit flags tracking which newline *styles* the stream has emitted so
@@ -100,6 +115,12 @@ class AsyncGzipTextFile:
     # than the binary buffer because each char can cost 1-4 bytes of
     # internal storage.
     _TEXT_COMPACTION_THRESHOLD = 16384
+    # Upper bound on how many characters of complete lines are bulk-split into
+    # _pending_lines per refill. Without it, a large chunk_size (up to the
+    # 128 MiB max) full of tiny lines would materialize millions of line
+    # strings at once. 256 KiB matches the default chunk_size, so the common
+    # case still splits a whole chunk in a single pass.
+    _LINE_BATCH_CHARS = 256 * 1024
 
     def __init__(
         self,
@@ -119,6 +140,7 @@ class AsyncGzipTextFile:
         max_decompressed_size: Optional[int] = None,
         max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
         strict_size: bool = False,
+        fast_compress: bool = False,
     ) -> None:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
@@ -189,6 +211,26 @@ class AsyncGzipTextFile:
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._strict_size: bool = bool(strict_size)
+        self._fast_compress: bool = bool(fast_compress)
+
+        # Batched line iteration: for the single-character terminator modes we
+        # bulk-split a decoded chunk into whole lines once (C-speed) and serve
+        # them from _pending_lines, advancing _text_buffer_offset per line so
+        # tell()/seek() bookkeeping stays identical to consuming one at a time.
+        # `_line_term` is None for the modes that need cross-boundary handling
+        # ('' look-ahead, '\r\n'), which keep the per-line buffer-scan path.
+        if newline in self._FAST_READLINE_NEWLINES:
+            self._line_term: Optional[str] = "\r" if newline == "\r" else "\n"
+            # Unsubscripted re.Pattern: re.Pattern[str] is not subscriptable at
+            # runtime on Python 3.8, and an attribute annotation is evaluated.
+            self._line_split_re: Optional[re.Pattern] = (
+                _LINE_RE_CR if newline == "\r" else _LINE_RE_LF
+            )
+        else:
+            self._line_term = None
+            self._line_split_re = None
+        self._pending_lines: List[str] = []
+        self._pending_idx: int = 0
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
@@ -205,6 +247,7 @@ class AsyncGzipTextFile:
             max_decompressed_size=self._max_decompressed_size,
             max_rewind_cache_size=self._max_rewind_cache_size,
             strict_size=self._strict_size,
+            fast_compress=self._fast_compress,
         )
         try:
             await self._binary_file.__aenter__()
@@ -422,6 +465,11 @@ class AsyncGzipTextFile:
         """Replace the unread decoded text buffer."""
         self._text_buffer = text
         self._text_buffer_offset = 0
+        # Any pre-split lines were views into the old buffer/offset; drop them
+        # so a later iteration step re-splits from the new buffer state.
+        if self._pending_lines:
+            self._pending_lines = []
+            self._pending_idx = 0
 
     def _append_buffer(self, text: str) -> None:
         """Append decoded text, compacting consumed prefix when it grows large."""
@@ -725,6 +773,13 @@ class AsyncGzipTextFile:
         if size == 0:
             return ""
 
+        # read() consumes the buffer by character count; drop any batched
+        # pending lines so they cannot serve stale content afterwards. The
+        # synced offset means the buffer remainder is read correctly regardless.
+        if self._pending_lines:
+            self._pending_lines = []
+            self._pending_idx = 0
+
         if size == -1:
             # Fast path: drain buffer, then read all remaining binary data
             # in one shot to avoid per-chunk buffer append/consume overhead
@@ -923,30 +978,72 @@ class AsyncGzipTextFile:
     # boundaries and stay on the buffer-accumulating path.
     _FAST_READLINE_NEWLINES = frozenset({None, "\n", "\r"})
 
-    async def _readline_fast(self) -> str:
-        """O(n) single-line read for the cross-boundary-safe newline modes.
+    def _take_pending_line(self) -> Optional[str]:
+        """Pop the next pre-split line, advancing the buffer offset by its length.
 
-        Accumulates the line in a local list and joins once, instead of
-        repeatedly growing the str buffer via ``_append_buffer`` (which is
-        O(n^2) for a very long line because CPython cannot extend a slotted
-        str attribute in place). Returns "" at end of input.
+        Advancing ``_text_buffer_offset`` exactly as ``_consume_buffer`` would
+        keeps tell()/seek() bookkeeping identical to consuming one line at a
+        time. Returns None when ``_pending_lines`` is exhausted.
 
-        Only valid when ``self._newline in _FAST_READLINE_NEWLINES``.
+        This is the canonical implementation; ``__anext__`` and
+        ``_readline_fast`` inline the same logic in their hot paths (a per-line
+        method call costs ~7% throughput). Keep all three in sync.
         """
-        term = "\r" if self._newline == "\r" else "\n"
+        idx = self._pending_idx
+        pending = self._pending_lines
+        if idx < len(pending):
+            line = pending[idx]
+            self._pending_idx = idx + 1
+            self._text_buffer_offset += len(line)
+            return line
+        return None
 
-        # 1. Satisfy from already-buffered text when it holds a terminator.
+    async def _next_fast_line(self) -> Optional[str]:
+        """Return the next line for a single-character terminator mode.
+
+        Serves from ``_pending_lines`` first; when those run out it bulk-splits
+        the complete lines in the buffered remainder in one C-level pass, or
+        (for a line spanning the chunk boundary or the final unterminated line)
+        accumulates across chunks exactly as the original per-line path did.
+        Returns None at end of input.
+        """
+        line = self._take_pending_line()
+        if line is not None:
+            return line
+
+        term = self._line_term
+        split_re = self._line_split_re
+        # Both are set together for single-char terminator modes; this method is
+        # only reached in those modes.
+        assert term is not None and split_re is not None
+
+        # Bulk-split the complete lines in the buffered remainder, but only up
+        # to a bounded window so a huge chunk_size full of tiny lines does not
+        # materialize the whole chunk's lines at once.
         buf = self._text_buffer
         start = self._text_buffer_offset
-        idx = buf.find(term, start)
-        if idx != -1:
-            return self._consume_buffer(idx + 1 - start)
+        window_end = min(len(buf), start + self._LINE_BATCH_CHARS)
+        last = buf.rfind(term, start, window_end)
+        if last < start:
+            # No terminator within the window: either the first line is longer
+            # than the window or there is no complete line at all. find()
+            # returns the first terminator (or -1), so an over-long first line
+            # still yields exactly one line and stays bounded.
+            last = buf.find(term, start)
+        if last >= start:
+            region = buf[start : last + 1]
+            self._pending_lines = split_re.findall(region)
+            self._pending_idx = 0
+            return self._take_pending_line()
 
-        # 2. The buffered remainder (if any) is part of this line. Pull it out
-        #    and accumulate freshly decoded chunks locally.
-        parts: List[str] = []
+        # The remainder has no terminator: it is the head of a line that
+        # continues into later chunks (or the final unterminated line). Pull it
+        # out and gather decoded chunks until a terminator or EOF, keeping the
+        # whole terminating chunk buffered so its replay origin (captured by
+        # _decode_next_chunk before decoding) stays valid for tell()/seek().
+        prefix: List[str] = []
         if start < len(buf):
-            parts.append(buf[start:] if start else buf)
+            prefix.append(buf[start:] if start else buf)
         self._set_buffer("")
 
         while True:
@@ -954,16 +1051,40 @@ class AsyncGzipTextFile:
             if text:
                 i = text.find(term)
                 if i != -1:
-                    parts.append(text[: i + 1])
-                    # Keep the whole chunk buffered so the residual's replay
-                    # origin (captured by _decode_next_chunk before decoding
-                    # it) stays valid for tell()/seek().
+                    if prefix:
+                        first_line = "".join(prefix) + text[: i + 1]
+                    else:
+                        first_line = text[: i + 1]
+                    # Keep the whole chunk buffered (its replay origin stays
+                    # valid) with the offset past this line; the next call
+                    # bulk-splits the rest of the chunk via the windowed path
+                    # above.
                     self._set_buffer(text)
                     self._text_buffer_offset = i + 1
-                    return "".join(parts)
-                parts.append(text)
+                    return first_line
+                prefix.append(text)
             if not more:
-                return "".join(parts)
+                tail = "".join(prefix)
+                return tail if tail else None
+
+    async def _readline_fast(self) -> str:
+        """Single-line read for the single-character terminator modes.
+
+        Returns "" at end of input. Only valid when
+        ``self._line_term is not None``.
+        """
+        # Inlined pending-line pop (canonical copy: _take_pending_line). Kept
+        # inline in the two hot read paths because a per-line method call
+        # measurably (~7%) lowers iteration throughput; keep the copies in sync.
+        idx = self._pending_idx
+        pending = self._pending_lines
+        if idx < len(pending):
+            line = pending[idx]
+            self._pending_idx = idx + 1
+            self._text_buffer_offset += len(line)
+            return line
+        refilled = await self._next_fast_line()
+        return refilled if refilled is not None else ""
 
     def __aiter__(self) -> "AsyncGzipTextFile":
         """Make AsyncGzipTextFile iterable for line-by-line reading."""
@@ -974,11 +1095,20 @@ class AsyncGzipTextFile:
         if self._is_closed:
             raise StopAsyncIteration
 
-        if self._newline in self._FAST_READLINE_NEWLINES:
-            line = await self._readline_fast()
-            if line == "":
+        if self._line_term is not None:
+            # Inlined pending-line pop (canonical copy: _take_pending_line);
+            # kept inline in this hot path for throughput. Keep copies in sync.
+            idx = self._pending_idx
+            pending = self._pending_lines
+            if idx < len(pending):
+                line = pending[idx]
+                self._pending_idx = idx + 1
+                self._text_buffer_offset += len(line)
+                return line
+            refilled = await self._next_fast_line()
+            if refilled is None:
                 raise StopAsyncIteration
-            return line
+            return refilled
 
         search_from = 0
         while True:
@@ -1029,11 +1159,17 @@ class AsyncGzipTextFile:
         if limit == 0:
             return ""
 
-        # Unbounded reads in a cross-boundary-safe newline mode use the O(n)
-        # local-accumulation path. Bounded reads (limit != -1) cap the work at
-        # `limit` characters anyway, so they stay on the buffer path below.
-        if limit == -1 and self._newline in self._FAST_READLINE_NEWLINES:
+        # Unbounded reads in a single-character terminator mode use the batched
+        # pending-line path. Bounded reads (limit != -1) cap the work at `limit`
+        # characters anyway, so they stay on the buffer path below.
+        if limit == -1 and self._line_term is not None:
             return await self._readline_fast()
+
+        # Bounded reads consume the buffer by character count, which would leave
+        # any batched pending lines pointing at stale offsets; drop them first.
+        if self._pending_lines:
+            self._pending_lines = []
+            self._pending_idx = 0
 
         # Try to get a line from our buffer using newline-aware search
         search_from = 0

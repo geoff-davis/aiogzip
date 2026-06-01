@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Optional `aiogzip[fast]` extra that installs [`zlib-ng`](https://pypi.org/project/zlib-ng/). When present, **decompression** automatically uses zlib-ng, which is faster (~1.6–2x on typical data) and produces byte-identical output to stdlib `zlib`. Set the environment variable `AIOGZIP_ENGINE=stdlib` to force stdlib regardless of what is installed. When the extra is not installed, aiogzip remains pure-Python and behaves exactly as before.
+- `fast_compress=True` option on `AsyncGzipBinaryFile`, `AsyncGzipTextFile`, and the `AsyncGzipFile` factory to opt into zlib-ng for **compression** (~1.2–1.4x). Compression stays on stdlib `zlib` by default because zlib-ng's compressed output is not byte-identical — installing the extra alone does not change produced `.gz` bytes. If `fast_compress=True` is requested without zlib-ng installed, it warns once and falls back to stdlib. zlib-ng output remains valid gzip readable by any decompressor.
+
 ## [1.6.0] - 2026-05-28
 
 ### Changed
