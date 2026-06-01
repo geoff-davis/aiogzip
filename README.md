@@ -21,6 +21,7 @@
 - **Reproducible Archives**: Control gzip `mtime` and embedded filenames.
 - **Type-Safe**: Distinct `AsyncGzipBinaryFile` and `AsyncGzipTextFile`.
 - **`aiocsv` Ready**: Seamless integration for CSV pipelines.
+- **Optional faster codec**: Install `aiogzip[fast]` to use [`zlib-ng`](https://pypi.org/project/zlib-ng/) for decompression automatically (byte-identical output) and, with `fast_compress=True`, for compression.
 - **Predictable Performance**: Backward seeks rewind the stream and re-decompress data (same as `gzip.GzipFile`), so treat random access as O(n) and prefer forward-only patterns when possible.
 
 ### Append mode and large files
@@ -36,7 +37,16 @@
 
 ```bash
 pip install aiogzip
+
+# Optional: faster compression/decompression via zlib-ng
+pip install "aiogzip[fast]"
 ```
+
+When `aiogzip[fast]` is installed, decompression transparently uses `zlib-ng`
+(its output is byte-identical to stdlib `zlib`). Compression stays on stdlib by
+default so produced `.gz` bytes are unchanged; opt in per file with
+`fast_compress=True`. Set `AIOGZIP_ENGINE=stdlib` to force stdlib regardless of
+what is installed.
 
 ```python
 import asyncio

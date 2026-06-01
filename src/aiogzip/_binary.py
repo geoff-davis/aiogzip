@@ -4,6 +4,7 @@ import asyncio
 import gzip
 import io
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Callable, Iterable, List, Optional, Union, cast
 
@@ -115,6 +116,7 @@ class AsyncGzipBinaryFile:
         "_max_decompressed_size",
         "_decompressed_total",
         "_strict_size",
+        "_fast_compress",
     )
 
     # 256 KiB balances bulk-read throughput against per-file memory. Below it
@@ -146,6 +148,7 @@ class AsyncGzipBinaryFile:
         max_decompressed_size: Optional[int] = None,
         max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
         strict_size: bool = False,
+        fast_compress: bool = False,
     ) -> None:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
@@ -169,6 +172,18 @@ class AsyncGzipBinaryFile:
         self._writing_mode = mode_op in {"w", "a", "x"}
         if self._writing_mode:
             _validate_compresslevel(compresslevel)
+        self._fast_compress = bool(fast_compress)
+        if (
+            self._writing_mode
+            and self._fast_compress
+            and not _engine.have_fast_engine()
+        ):
+            warnings.warn(
+                "fast_compress=True requested but zlib-ng is not available; "
+                "falling back to stdlib zlib. Install the extra with "
+                "'pip install aiogzip[fast]' to enable faster compression.",
+                stacklevel=2,
+            )
         self._chunk_size = chunk_size
         self._compresslevel = compresslevel
         self._header_mtime = _normalize_mtime(mtime)
@@ -223,7 +238,9 @@ class AsyncGzipBinaryFile:
             # Initialize compression/decompression engine based on mode
             if self._writing_mode:
                 self._engine = _engine.compressobj(
-                    self._compresslevel, -_engine.MAX_WBITS
+                    self._compresslevel,
+                    -_engine.MAX_WBITS,
+                    fast=self._fast_compress,
                 )
                 header = _build_gzip_header(
                     _derive_header_filename(

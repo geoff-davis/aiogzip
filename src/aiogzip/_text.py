@@ -84,6 +84,7 @@ class AsyncGzipTextFile:
         "_max_decompressed_size",
         "_max_rewind_cache_size",
         "_strict_size",
+        "_fast_compress",
     )
 
     # Bit flags tracking which newline *styles* the stream has emitted so
@@ -119,6 +120,7 @@ class AsyncGzipTextFile:
         max_decompressed_size: Optional[int] = None,
         max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
         strict_size: bool = False,
+        fast_compress: bool = False,
     ) -> None:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
@@ -189,6 +191,7 @@ class AsyncGzipTextFile:
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._strict_size: bool = bool(strict_size)
+        self._fast_compress: bool = bool(fast_compress)
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
@@ -205,6 +208,7 @@ class AsyncGzipTextFile:
             max_decompressed_size=self._max_decompressed_size,
             max_rewind_cache_size=self._max_rewind_cache_size,
             strict_size=self._strict_size,
+            fast_compress=self._fast_compress,
         )
         try:
             await self._binary_file.__aenter__()
