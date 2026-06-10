@@ -430,18 +430,86 @@ class AsyncGzipBinaryFile:
         end = self._buffer_offset + min(target, available)
         return bytes(self._buffer[self._buffer_offset : end])
 
+    def _copy_into_view(self, view: memoryview, written: int) -> int:
+        """Copy as much of the current buffer span as fits into ``view[written:]``.
+
+        Returns the number of bytes copied (0 when the buffer is empty). Applies
+        the same advance/clear-when-drained bookkeeping as the ``read()`` path,
+        but writes straight into the caller's view instead of allocating a
+        ``bytes`` object.
+        """
+        buf = self._buffer
+        offset = self._buffer_offset
+        available = len(buf) - offset
+        if available <= 0:
+            return 0
+        n = len(view) - written
+        if n > available:
+            n = available
+        view[written : written + n] = memoryview(buf)[offset : offset + n]
+        new_offset = offset + n
+        self._position += n
+        if new_offset >= len(buf):
+            del buf[:]
+            self._buffer_offset = 0
+        else:
+            self._buffer_offset = new_offset
+        return n
+
     async def readinto(self, b: Union[bytearray, memoryview]) -> int:
-        """Read bytes directly into a pre-allocated, writable buffer."""
+        """Read bytes directly into a pre-allocated, writable buffer.
+
+        Fills the caller's buffer straight from the decompression buffer,
+        avoiding the intermediate ``bytes`` object that delegating to ``read()``
+        would allocate. Returns the number of bytes written (0 at EOF).
+        """
         if self._mode_op != "r":
             raise OSError("File not open for reading")
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto() argument must be writable")
-        data = await self.read(len(view))
-        view[: len(data)] = data
-        return len(data)
+
+        total = len(view)
+        if total == 0:
+            return 0
+
+        # Fast path: the current buffer already satisfies the whole request, so
+        # fill the view with a single copy and no per-span loop overhead (this
+        # is the common case while a chunk's worth of decoded data lasts).
+        buf = self._buffer
+        offset = self._buffer_offset
+        if len(buf) - offset >= total:
+            end = offset + total
+            view[:] = memoryview(buf)[offset:end]
+            self._position += total
+            if end >= len(buf):
+                del buf[:]
+                self._buffer_offset = 0
+            else:
+                self._buffer_offset = end
+            return total
+
+        # Slow path: span the request across refills.
+        written = 0
+        threshold = self.BUFFER_COMPACTION_THRESHOLD
+        while written < total:
+            n = self._copy_into_view(view, written)
+            if n:
+                written += n
+                continue
+            # Buffer is drained; stop at EOF, otherwise refill (compacting a
+            # large consumed prefix first, exactly as read() does).
+            if self._eof:
+                break
+            if self._buffer_offset > threshold:
+                del self._buffer[: self._buffer_offset]
+                self._buffer_offset = 0
+            await self._fill_buffer()
+        return written
 
     async def read1(self, size: int = -1) -> bytes:
         """Read up to size bytes from the buffer without looping."""
@@ -482,17 +550,30 @@ class AsyncGzipBinaryFile:
         return data_to_return
 
     async def readinto1(self, b: Union[bytearray, memoryview]) -> int:
-        """Read directly into the buffer without looping."""
+        """Read directly into the buffer with at most one underlying fill.
+
+        Like ``read1()`` but writes straight into the caller's buffer, avoiding
+        the intermediate ``bytes`` object. Returns the number of bytes written
+        (0 at EOF).
+        """
         if self._mode_op != "r":
             raise OSError("File not open for reading")
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto() argument must be writable")
-        data = await self.read1(len(view))
-        view[: len(data)] = data
-        return len(data)
+
+        total = len(view)
+        if total == 0:
+            return 0
+
+        available = len(self._buffer) - self._buffer_offset
+        if available <= 0 and not self._eof:
+            await self._fill_buffer()
+        return self._copy_into_view(view, 0)
 
     async def readline(self, limit: int = -1) -> bytes:
         """Read and return one line from the binary stream."""
