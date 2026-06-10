@@ -74,6 +74,28 @@ async def main():
 asyncio.run(main())
 ```
 
+### Manual lifecycle (`open()` / `close()`)
+
+`async with` is the recommended way to use a file, but when a `with` block is
+impractical you can manage the lifecycle imperatively with `open()` and
+`close()`. Always pair them with `try`/`finally` so the file is closed even if
+an error occurs:
+
+```python
+f = AsyncGzipFile("file.txt.gz", "rt")
+await f.open()        # initializes the stream and returns the file; __aenter__ calls this
+try:
+    async for line in f:
+        print(line.strip())
+finally:
+    await f.close()
+```
+
+`open()` returns the file object. Calling it on an already-open file raises
+`ValueError`, and a closed instance cannot be reopened (it raises `ValueError`,
+matching standard `io` objects) — create a new instance instead. Operations
+before `open()` raise `ValueError("File not opened.")`.
+
 ## Compatibility
 
 `aiogzip` provides comprehensive compatibility with the standard `gzip` module's `GzipFile` API, including:
@@ -84,6 +106,16 @@ asyncio.run(main())
 - ✅ Text and binary mode operations with proper encoding/decoding
 - ✅ Full compatibility with `tarfile` for reading `.tar.gz` archives
 - ✅ Seamless integration with `aiocsv` for CSV processing
+
+> **Default compression level.** `aiogzip` defaults to `compresslevel=6` (the
+> zlib default — a better speed/ratio tradeoff), whereas `gzip.open()` defaults
+> to `9`. The two therefore produce different `.gz` sizes by default. For
+> byte-size parity with stdlib defaults, pass `compresslevel=9`:
+>
+> ```python
+> async with AsyncGzipFile("file.gz", "wb", compresslevel=9) as f:
+>     await f.write(b"...")
+> ```
 
 For `AsyncGzipTextFile`, `tell()` returns an opaque cookie value (a negative integer encoding the decoder state) for the current open stream. Use it only with `seek(cookie)` on the **same open handle**.
 
