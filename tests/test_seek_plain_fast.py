@@ -220,3 +220,30 @@ async def test_fast_path_still_used_after_pure_text_seeks(temp_file):
             await f.seek(12)
         # Offset 12 is two bytes into "row2\n".
         assert await f.read(6) == "w2\nrow"
+
+
+@pytest.mark.asyncio
+async def test_forward_seek_with_text_readahead_uses_fast_path(temp_file):
+    """Buffered read-ahead does not disqualify the fast path.
+
+    A text readline() leaves decoded read-ahead, but the live decoder and
+    newline state still correspond to the binary frontier (every byte the
+    binary layer advanced past was fed to the decoder), and the seek discards
+    the buffer either way — so only the forward delta is replayed, and the
+    result matches a replay-from-zero.
+    """
+    lines = [b"row%d\n" % i for i in range(200)]
+    raw = b"".join(lines)
+    _write_raw(temp_file, raw)
+    target = _line_offsets(lines)[120]
+
+    ref_ret, ref_nl, ref_rest = await _replay_from_zero(temp_file, target)
+
+    async with AsyncGzipTextFile(temp_file, "rt", chunk_size=64) as f:
+        assert await f.readline() == "row0\n"  # leaves read-ahead buffered
+        with patch.object(
+            AsyncGzipTextFile, "_reset_to_start", side_effect=AssertionError
+        ):
+            assert await f.seek(target) == ref_ret == target
+        assert await f.read() == ref_rest
+        assert f.newlines == ref_nl

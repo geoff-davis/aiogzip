@@ -243,7 +243,7 @@ async def test_readinto_on_closed_file_raises(temp_file):
     """readinto()/readinto1() on a closed file raise the same error as read()."""
     _write(temp_file, b"abc")
     f = AsyncGzipBinaryFile(temp_file, "rb")
-    await f.__aenter__()
+    await f.open()
     await f.close()
     with pytest.raises(ValueError, match="closed"):
         await f.readinto(bytearray(4))

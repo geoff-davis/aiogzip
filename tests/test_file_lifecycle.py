@@ -497,3 +497,26 @@ class TestFailedOpenRecovery:
                 await f.write(b"hello")
         finally:
             await inner.close()
+
+
+class TestReprOnPartialObjects:
+    """repr() must not raise on partially-constructed instances.
+
+    The classes use __slots__ and __init__ validates mid-assignment, so a
+    constructor failure leaves an object missing some attributes; debuggers
+    and locals-capturing traceback formatters still call repr() on it.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    async def test_repr_after_failed_init(self, tmp_path, cls):
+        obj = cls.__new__(cls)
+        try:
+            # compresslevel=99 raises after _filename/_mode are assigned but
+            # before _is_closed, leaving the object half-built.
+            mode = "wb" if cls is AsyncGzipBinaryFile else "wt"
+            obj.__init__(tmp_path / "x.gz", mode, compresslevel=99)
+        except ValueError:
+            pass
+        r = repr(obj)  # must not raise
+        assert cls.__name__ in r

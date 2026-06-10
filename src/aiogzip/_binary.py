@@ -20,7 +20,9 @@ from ._common import (
     ZlibEngine,
     _build_gzip_header,
     _build_gzip_trailer,
+    _check_can_open,
     _derive_header_filename,
+    _format_file_repr,
     _normalize_mtime,
     _parse_mode_tokens,
     _try_parse_gzip_header_mtime,
@@ -245,10 +247,7 @@ class AsyncGzipBinaryFile:
             ValueError: if the file is already open, or has already been closed
                 (a closed instance cannot be reopened, matching io objects).
         """
-        if self._is_closed:
-            raise ValueError("Cannot reopen a closed file")
-        if self._file is not None:
-            raise ValueError("File is already open")
+        _check_can_open(self._is_closed, self._file is not None)
         try:
             if self._external_file is not None:
                 self._file = cast(Any, self._external_file)
@@ -309,10 +308,7 @@ class AsyncGzipBinaryFile:
         await self.close()
 
     def __repr__(self) -> str:
-        return (
-            f"<aiogzip.AsyncGzipBinaryFile name={self.name!r} "
-            f"mode={self._mode!r} closed={self.closed}>"
-        )
+        return _format_file_repr(self)
 
     # File API compatibility helpers
     async def tell(self) -> int:
@@ -496,6 +492,24 @@ class AsyncGzipBinaryFile:
             self._buffer_offset = new_offset
         return n
 
+    async def _fill_until(self, size: int) -> int:
+        """Refill until ``size`` unread bytes are buffered (or EOF).
+
+        Compacts a large consumed prefix before each refill so a long run of
+        partial reads cannot grow the buffer unbounded. Shared by the sized
+        ``read()`` path and ``readinto()``. Returns the unread byte count,
+        which may be short of ``size`` only at EOF.
+        """
+        available = len(self._buffer) - self._buffer_offset
+        threshold = self.BUFFER_COMPACTION_THRESHOLD
+        while available < size and not self._eof:
+            if self._buffer_offset > threshold:
+                del self._buffer[: self._buffer_offset]
+                self._buffer_offset = 0
+            await self._fill_buffer()
+            available = len(self._buffer) - self._buffer_offset
+        return available
+
     async def readinto(self, b: Union[bytearray, memoryview]) -> int:
         """Read bytes directly into a pre-allocated, writable buffer.
 
@@ -521,18 +535,10 @@ class AsyncGzipBinaryFile:
             return 0
 
         # Fill the internal buffer until it can satisfy the whole request (or
-        # EOF), compacting a large consumed prefix first exactly as read()
-        # does, then copy once. Filling before consuming preserves read()'s
+        # EOF), then copy once. Filling before consuming preserves read()'s
         # error semantics: if a refill raises mid-request, the stream position
         # and already-buffered data are left intact for the caller to salvage.
-        threshold = self.BUFFER_COMPACTION_THRESHOLD
-        available = len(self._buffer) - self._buffer_offset
-        while available < total and not self._eof:
-            if self._buffer_offset > threshold:
-                del self._buffer[: self._buffer_offset]
-                self._buffer_offset = 0
-            await self._fill_buffer()
-            available = len(self._buffer) - self._buffer_offset
+        await self._fill_until(total)
         return self._copy_into_view(view, 0)
 
     async def read1(self, size: int = -1) -> bytes:
@@ -905,13 +911,7 @@ class AsyncGzipBinaryFile:
                 return data_to_return
 
             # Fill until we have enough
-            threshold = self.BUFFER_COMPACTION_THRESHOLD
-            while available < size and not self._eof:
-                if self._buffer_offset > threshold:
-                    del self._buffer[: self._buffer_offset]
-                    self._buffer_offset = 0
-                await self._fill_buffer()
-                available = len(self._buffer) - self._buffer_offset
+            available = await self._fill_until(size)
 
             # Return what we have
             actual_read_size = min(size, available)
