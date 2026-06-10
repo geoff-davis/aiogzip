@@ -202,13 +202,20 @@ def test_read_patterns_match_stdlib(members, chunk_size, data):
 @settings(max_examples=MAX_EXAMPLES, deadline=None, suppress_health_check=_SUPPRESSED)
 @given(members=_members, data=st.data())
 def test_single_byte_corruption_parity(members, data):
-    """A flipped byte is detected (or ignored) identically by stdlib and aiogzip.
+    """A flipped byte never lets aiogzip silently accept what stdlib rejects.
 
     Most flips fall in the compressed body or trailer and make both raise
     (``gzip.BadGzipFile``/``OSError`` for aiogzip; stdlib may also surface
-    ``EOFError`` or ``zlib.error``). A few flips land in benign header metadata
-    (mtime/XFL/OS) and leave the stream readable; in that case both must still
-    decode to identical bytes.
+    ``EOFError`` or ``zlib.error``). The invariants asserted here:
+
+    - If stdlib detects corruption, aiogzip must too (it never decodes a stream
+      stdlib rejects).
+    - When both decode the stream, their output is byte-identical.
+
+    aiogzip is allowed to be *stricter* than stdlib: it decompresses via zlib,
+    which rejects reserved gzip header-flag bits that stdlib's hand-rolled
+    header parser silently ignores. So a flip that leaves stdlib reading cleanly
+    may still (legitimately) make aiogzip raise; that case is not a failure.
     """
     raw = bytearray(_build_raw(members))
     idx = data.draw(st.integers(min_value=0, max_value=len(raw) - 1))
@@ -241,11 +248,12 @@ def test_single_byte_corruption_parity(members, data):
         assert aio_raised, (
             f"stdlib detected corruption but aiogzip returned {aio_bytes!r}"
         )
+    if aio_raised:
         # aiogzip surfaces corruption as gzip.BadGzipFile, a subclass of OSError.
         assert isinstance(aio_exc, (gzip.BadGzipFile, OSError))
     else:
-        assert not aio_raised, f"aiogzip raised {aio_exc!r} but stdlib decoded cleanly"
-        assert aio_bytes == std_bytes
+        # aiogzip decoded; it must agree with stdlib whenever stdlib also decoded.
+        assert std_raised or aio_bytes == std_bytes
 
 
 if __name__ == "__main__":  # pragma: no cover
