@@ -70,6 +70,27 @@ async with AsyncGzipFile(
     await f.write(b"stable bytes")
 ```
 
+> **Default compression level.** As a drop-in replacement, `aiogzip` matches
+> `gzip.open()`'s API but **defaults to `compresslevel=6`** (the zlib default — a
+> better speed/ratio tradeoff), whereas `gzip.open()` defaults to `9`. Pass
+> `compresslevel=9` for byte-size parity with stdlib defaults:
+>
+> ```python
+> async with AsyncGzipFile("file.gz", "wb", compresslevel=9) as f:
+>     await f.write(b"...")  # same compression level as gzip.open() defaults
+> ```
+
+If you cannot use `async with`, open and close explicitly with try/finally:
+
+```python
+f = AsyncGzipFile("file.gz", "rb")
+await f.open()
+try:
+    data = await f.read()
+finally:
+    await f.close()
+```
+
 ## Performance
 
 - **Text I/O**: Often ~2-3x faster than standard `gzip` in bulk text workflows.

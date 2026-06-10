@@ -267,3 +267,161 @@ class TestResourceCleanup:
         async with f:
             assert await f.read(1) == "a"
         assert f._is_closed is True
+
+
+class TestOpenCloseLifecycle:
+    """Explicit open()/close() lifecycle (the imperative try/finally pattern)."""
+
+    @staticmethod
+    def _write(path, text=b"hello\nworld\n"):
+        import gzip
+
+        with gzip.open(path, "wb") as f:
+            f.write(text)
+
+    @pytest.mark.asyncio
+    async def test_binary_open_read_close(self, tmp_path):
+        p = tmp_path / "binary.gz"
+        self._write(p)
+        f = AsyncGzipBinaryFile(p, "rb")
+        assert f.closed is False
+        ret = await f.open()
+        assert ret is f  # open() returns self
+        try:
+            assert await f.read() == b"hello\nworld\n"
+        finally:
+            await f.close()
+        assert f.closed is True
+
+    @pytest.mark.asyncio
+    async def test_text_open_read_close(self, tmp_path):
+        p = tmp_path / "text.gz"
+        self._write(p)
+        f = AsyncGzipTextFile(p, "rt")
+        ret = await f.open()
+        assert ret is f
+        try:
+            assert await f.read() == "hello\nworld\n"
+        finally:
+            await f.close()
+        assert f.closed is True
+
+    @pytest.mark.asyncio
+    async def test_binary_open_write_round_trip(self, tmp_path):
+        p = tmp_path / "write.gz"
+        f = AsyncGzipBinaryFile(p, "wb")
+        await f.open()
+        try:
+            await f.write(b"payload data")
+        finally:
+            await f.close()
+
+        async with AsyncGzipBinaryFile(p, "rb") as r:
+            assert await r.read() == b"payload data"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    async def test_open_twice_raises(self, tmp_path, cls):
+        p = tmp_path / "twice.gz"
+        self._write(p)
+        mode = "rb" if cls is AsyncGzipBinaryFile else "rt"
+        f = cls(p, mode)
+        await f.open()
+        try:
+            with pytest.raises(ValueError, match="already open"):
+                await f.open()
+        finally:
+            await f.close()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    async def test_reopen_after_close_raises(self, tmp_path, cls):
+        p = tmp_path / "reopen.gz"
+        self._write(p)
+        mode = "rb" if cls is AsyncGzipBinaryFile else "rt"
+        f = cls(p, mode)
+        await f.open()
+        await f.close()
+        with pytest.raises(ValueError, match="closed"):
+            await f.open()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    async def test_operations_before_open_raise(self, tmp_path, cls):
+        p = tmp_path / "before.gz"
+        self._write(p)
+        mode = "rb" if cls is AsyncGzipBinaryFile else "rt"
+        f = cls(p, mode)
+        with pytest.raises(ValueError, match="File not opened"):
+            await f.read()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    async def test_aenter_matches_open(self, tmp_path, cls):
+        """__aenter__ is just open(): same result and same returned object."""
+        p = tmp_path / "aenter.gz"
+        self._write(p)
+        mode = "rb" if cls is AsyncGzipBinaryFile else "rt"
+        expected = b"hello\nworld\n" if cls is AsyncGzipBinaryFile else "hello\nworld\n"
+
+        async with cls(p, mode) as f:
+            assert f.closed is False
+            assert await f.read() == expected
+        assert f.closed is True
+
+
+class TestRepr:
+    """__repr__ shows name, mode, and closed state for both open and closed."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "cls,mode,classname",
+        [
+            (AsyncGzipBinaryFile, "rb", "AsyncGzipBinaryFile"),
+            (AsyncGzipTextFile, "rt", "AsyncGzipTextFile"),
+        ],
+    )
+    async def test_repr_open_and_closed(self, tmp_path, cls, mode, classname):
+        import gzip
+
+        p = tmp_path / "repr.gz"
+        with gzip.open(p, "wb") as fh:
+            fh.write(b"data")
+
+        name = str(p)
+        f = cls(name, mode)
+        await f.open()
+        assert repr(f) == (
+            f"<aiogzip.{classname} name={name!r} mode={mode!r} closed=False>"
+        )
+        await f.close()
+        assert repr(f) == (
+            f"<aiogzip.{classname} name={name!r} mode={mode!r} closed=True>"
+        )
+
+    @pytest.mark.asyncio
+    async def test_repr_fileobj_name_fallback(self, tmp_path):
+        """With filename=None, repr falls back to the fileobj's .name."""
+        import gzip
+        import io
+
+        raw = gzip.compress(b"xyz")
+
+        class NamedReader:
+            name = "in-memory.gz"
+
+            def __init__(self):
+                self._buf = io.BytesIO(raw)
+
+            async def read(self, size=-1):
+                return self._buf.read(size)
+
+            async def close(self):
+                pass
+
+        f = AsyncGzipBinaryFile(None, "rb", fileobj=NamedReader(), closefd=False)
+        await f.open()
+        try:
+            assert "name='in-memory.gz'" in repr(f)
+        finally:
+            await f.close()

@@ -285,7 +285,7 @@ class TestEdgeCasesAndErrors:
                 self.close_called = False
                 self.__class__.last_instance = self
 
-            async def __aenter__(self):
+            async def open(self):
                 raise OSError("binary setup failed")
 
             async def close(self):

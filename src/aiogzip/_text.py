@@ -60,6 +60,14 @@ class AsyncGzipTextFile:
         async with AsyncGzipTextFile("data.gz", "rt") as f:
             async for line in f:
                 print(line.strip())
+
+        # Imperative lifecycle when `async with` is impractical
+        f = AsyncGzipTextFile("data.gz", "rt")
+        await f.open()
+        try:
+            text = await f.read()
+        finally:
+            await f.close()
     """
 
     __slots__ = (
@@ -232,8 +240,28 @@ class AsyncGzipTextFile:
         self._pending_lines: List[str] = []
         self._pending_idx: int = 0
 
-    async def __aenter__(self) -> "AsyncGzipTextFile":
-        """Enter the async context manager and initialize resources."""
+    async def open(self) -> "AsyncGzipTextFile":
+        """Open the file for I/O and return ``self``.
+
+        This performs the same initialization as entering the async context
+        manager, for callers who prefer an explicit try/finally over ``async
+        with``::
+
+            f = AsyncGzipTextFile("data.txt.gz", "rt")
+            await f.open()
+            try:
+                text = await f.read()
+            finally:
+                await f.close()
+
+        Raises:
+            ValueError: if the file is already open, or has already been closed
+                (a closed instance cannot be reopened, matching io objects).
+        """
+        if self._is_closed:
+            raise ValueError("Cannot reopen a closed file")
+        if self._binary_file is not None:
+            raise ValueError("File is already open")
         filename = os.fspath(self._filename) if self._filename is not None else None
         self._binary_file = AsyncGzipBinaryFile(
             filename=filename,
@@ -250,7 +278,7 @@ class AsyncGzipTextFile:
             fast_compress=self._fast_compress,
         )
         try:
-            await self._binary_file.__aenter__()
+            await self._binary_file.open()
         except Exception:
             try:
                 await self._binary_file.close()
@@ -260,6 +288,10 @@ class AsyncGzipTextFile:
             raise
         return self
 
+    async def __aenter__(self) -> "AsyncGzipTextFile":
+        """Enter the async context manager and initialize resources."""
+        return await self.open()
+
     async def __aexit__(
         self,
         exc_type: Optional[type],
@@ -268,6 +300,12 @@ class AsyncGzipTextFile:
     ) -> None:
         """Exit the context manager, flushing and closing the file."""
         await self.close()
+
+    def __repr__(self) -> str:
+        return (
+            f"<aiogzip.AsyncGzipTextFile name={self.name!r} "
+            f"mode={self._mode!r} closed={self.closed}>"
+        )
 
     # File API compatibility helpers
     async def tell(self) -> int:
