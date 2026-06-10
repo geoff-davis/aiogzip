@@ -19,7 +19,7 @@ from ._common import (
 )
 from ._text import AsyncGzipTextFile
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 
 # Mode strings that select a text stream (they contain a 't'). The factory
 # parses modes character-by-character and is permutation-tolerant, so these
