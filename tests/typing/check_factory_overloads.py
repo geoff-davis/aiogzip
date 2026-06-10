@@ -1,0 +1,60 @@
+"""Static-typing assertions for the ``AsyncGzipFile`` factory overloads.
+
+This module is not run as a test (``assert_type`` is a no-op at runtime); it is
+type-checked with ``mypy --strict`` by ``tests/test_factory_typing.py``. Each
+``assert_type`` fails the type check if the factory does not narrow its return
+type by mode.
+"""
+
+from pathlib import Path
+from typing import Union
+
+from typing_extensions import assert_type
+
+from aiogzip import AsyncGzipBinaryFile, AsyncGzipFile, AsyncGzipTextFile
+
+p = Path("data.gz")
+
+# --- Text modes narrow to AsyncGzipTextFile ---------------------------------
+assert_type(AsyncGzipFile(p, "rt"), AsyncGzipTextFile)
+assert_type(AsyncGzipFile(p, "wt"), AsyncGzipTextFile)
+assert_type(AsyncGzipFile(p, "at"), AsyncGzipTextFile)
+assert_type(AsyncGzipFile(p, "xt"), AsyncGzipTextFile)
+assert_type(AsyncGzipFile(p, "tr"), AsyncGzipTextFile)
+assert_type(AsyncGzipFile(p, "rt+"), AsyncGzipTextFile)
+assert_type(AsyncGzipFile(p, "r+t"), AsyncGzipTextFile)
+# Text-only keyword arguments autocomplete and type-check.
+assert_type(
+    AsyncGzipFile(p, "wt", encoding="utf-8", errors="strict", newline="\n"),
+    AsyncGzipTextFile,
+)
+
+# --- Binary modes narrow to AsyncGzipBinaryFile -----------------------------
+assert_type(AsyncGzipFile(p), AsyncGzipBinaryFile)  # default mode "rb"
+assert_type(AsyncGzipFile(p, "rb"), AsyncGzipBinaryFile)
+assert_type(AsyncGzipFile(p, "wb"), AsyncGzipBinaryFile)
+assert_type(AsyncGzipFile(p, "ab"), AsyncGzipBinaryFile)
+assert_type(AsyncGzipFile(p, "xb"), AsyncGzipBinaryFile)
+assert_type(AsyncGzipFile(p, "r"), AsyncGzipBinaryFile)
+assert_type(AsyncGzipFile(p, "w"), AsyncGzipBinaryFile)
+assert_type(AsyncGzipFile(p, "a"), AsyncGzipBinaryFile)
+assert_type(AsyncGzipFile(p, "x"), AsyncGzipBinaryFile)
+assert_type(AsyncGzipFile(p, "rb+"), AsyncGzipBinaryFile)
+
+
+# --- read() return types follow the mode ------------------------------------
+async def _check_reads() -> None:
+    async with AsyncGzipFile(p, "rt") as text_file:
+        assert_type(text_file, AsyncGzipTextFile)
+        assert_type(await text_file.read(), str)
+    async with AsyncGzipFile(p, "rb") as binary_file:
+        assert_type(binary_file, AsyncGzipBinaryFile)
+        assert_type(await binary_file.read(), bytes)
+
+
+# --- A non-literal (dynamic) mode falls back to the union -------------------
+def _dynamic(mode: str) -> None:
+    assert_type(
+        AsyncGzipFile(p, mode),
+        Union[AsyncGzipBinaryFile, AsyncGzipTextFile],
+    )
