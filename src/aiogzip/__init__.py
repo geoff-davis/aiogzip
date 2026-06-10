@@ -1,7 +1,7 @@
 """Async gzip file reader/writer public API."""
 
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Literal, Optional, Union, overload
 
 from ._binary import AsyncGzipBinaryFile
 from ._common import (
@@ -21,9 +21,146 @@ from ._text import AsyncGzipTextFile
 
 __version__ = "1.7.0"
 
+# Mode strings that select a text stream (they contain a 't'). The factory
+# parses modes character-by-character and is permutation-tolerant, so these
+# enumerate the conventional spellings (mirroring typeshed's open/gzip.open
+# overloads); unusual permutations fall through to the str fallback overload.
+_TextMode = Literal[
+    "rt",
+    "wt",
+    "at",
+    "xt",
+    "tr",
+    "tw",
+    "ta",
+    "tx",
+    "rt+",
+    "wt+",
+    "at+",
+    "xt+",
+    "tr+",
+    "tw+",
+    "ta+",
+    "tx+",
+    "r+t",
+    "w+t",
+    "a+t",
+    "x+t",
+    "t+r",
+    "t+w",
+    "t+a",
+    "t+x",
+    "+rt",
+    "+wt",
+    "+at",
+    "+xt",
+    "+tr",
+    "+tw",
+    "+ta",
+    "+tx",
+]
+
+# Mode strings that select a binary stream (no 't'); the 'b' is optional.
+_BinaryMode = Literal[
+    "r",
+    "w",
+    "a",
+    "x",
+    "rb",
+    "wb",
+    "ab",
+    "xb",
+    "br",
+    "bw",
+    "ba",
+    "bx",
+    "r+",
+    "w+",
+    "a+",
+    "x+",
+    "+r",
+    "+w",
+    "+a",
+    "+x",
+    "rb+",
+    "wb+",
+    "ab+",
+    "xb+",
+    "br+",
+    "bw+",
+    "ba+",
+    "bx+",
+    "r+b",
+    "w+b",
+    "a+b",
+    "x+b",
+    "b+r",
+    "b+w",
+    "b+a",
+    "b+x",
+    "+rb",
+    "+wb",
+    "+ab",
+    "+xb",
+    "+br",
+    "+bw",
+    "+ba",
+    "+bx",
+]
+
+_Filename = Union[str, bytes, Path, None]
+_FileObj = Optional[Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]]
+
+
+@overload
+def AsyncGzipFile(
+    filename: _Filename,
+    mode: _TextMode,
+    *,
+    chunk_size: int = ...,
+    encoding: Optional[str] = ...,
+    errors: Optional[str] = ...,
+    newline: Optional[str] = ...,
+    compresslevel: int = ...,
+    mtime: Optional[Union[int, float]] = ...,
+    original_filename: Optional[Union[str, bytes]] = ...,
+    fileobj: _FileObj = ...,
+    closefd: Optional[bool] = ...,
+    max_decompressed_size: Optional[int] = ...,
+    max_rewind_cache_size: Optional[int] = ...,
+    strict_size: bool = ...,
+    fast_compress: bool = ...,
+) -> AsyncGzipTextFile: ...
+
+
+@overload
+def AsyncGzipFile(
+    filename: _Filename,
+    mode: _BinaryMode = ...,
+    *,
+    chunk_size: int = ...,
+    compresslevel: int = ...,
+    mtime: Optional[Union[int, float]] = ...,
+    original_filename: Optional[Union[str, bytes]] = ...,
+    fileobj: _FileObj = ...,
+    closefd: Optional[bool] = ...,
+    max_decompressed_size: Optional[int] = ...,
+    max_rewind_cache_size: Optional[int] = ...,
+    strict_size: bool = ...,
+    fast_compress: bool = ...,
+) -> AsyncGzipBinaryFile: ...
+
+
+@overload
+def AsyncGzipFile(
+    filename: _Filename,
+    mode: str,
+    **kwargs: Any,
+) -> Union[AsyncGzipBinaryFile, AsyncGzipTextFile]: ...
+
 
 def AsyncGzipFile(
-    filename: Union[str, bytes, Path, None], mode: str = "rb", **kwargs: Any
+    filename: _Filename, mode: str = "rb", **kwargs: Any
 ) -> Union[AsyncGzipBinaryFile, AsyncGzipTextFile]:
     """
     Factory function that returns the appropriate AsyncGzip class based on mode.

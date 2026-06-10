@@ -54,6 +54,7 @@ dev = [
     "mypy>=1.0.0",
     "ty>=0.0.1a16",
     "types-aiofiles",
+    "typing_extensions",
     "pre-commit",
 ]
 [project.urls]
