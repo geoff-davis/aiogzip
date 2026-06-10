@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-06-10
+
+### Added
+
+- Public `open()` method on `AsyncGzipBinaryFile` and `AsyncGzipTextFile` for the explicit try/finally lifecycle; `__aenter__` now delegates to it. Calling `open()` on an already-open file raises `ValueError`, and a closed instance cannot be reopened (matching io objects). A failed `open()` (e.g. a transient write error on an external `fileobj`) leaves the instance retryable instead of half-open.
+- `__repr__` on both file classes showing the name, mode, and closed state. The repr is safe even on partially-constructed instances, so debuggers and locals-capturing traceback formatters get a usable string instead of `AttributeError`.
+- Typing overloads on the `AsyncGzipFile` factory so the return type narrows to `AsyncGzipBinaryFile` or `AsyncGzipTextFile` from the mode literal.
+
+### Fixed
+
+- Text-mode forward `seek()` no longer corrupts decoder state when bytes were consumed directly from the public `buffer` accessor: the fast path now tracks the decoder's byte frontier and falls back to a full replay when the binary position has moved past it (previously `UnicodeDecodeError`, or silent corruption with error-tolerant encodings).
+- `readinto()`/`readinto1()` accept any writable buffer, including those with itemsize > 1 such as `array.array`, filling them and returning byte counts exactly like stdlib gzip.
+- `readinto()` fills its internal buffer before consuming, so a decompression error mid-request leaves the stream position and already-decoded data intact for salvage, matching `read()`.
+- `readinto1()` and `read1()` repeat fills until at least one byte decodes, so a `0`/`b""` result now means EOF (a single fill can consume compressed input, e.g. the gzip header, without producing output); `while await f.readinto1(buf): ...` loops are safe.
+- `peek()` on a closed file raises `ValueError("I/O operation on closed file.")` like the other read methods, and `readinto1()`'s writable-buffer `TypeError` names the right method.
+
+### Performance
+
+- `readinto()`/`readinto1()` write decompressed data straight into the caller's buffer instead of allocating an intermediate `bytes` object.
+- Forward plain-offset text seeks replay only the delta from the current position instead of restarting decompression from byte 0 — including when decoded read-ahead is buffered, since the buffer is discarded by the seek anyway.
+- Universal-newline detection counts terminators with windowed `str.count` instead of `replace()`-based scans, eliminating two chunk-sized string allocations per chunk on CRLF streams.
+
+### Documentation
+
+- Documented that text `tell()` cookies are bound to the handle that minted them, and added the resumable-processing recipe: checkpoint plain decompressed-byte offsets at line boundaries via the binary layer, then resume by seeking in text mode. `docs/api.md` summarizes and links to the canonical recipe in `docs/index.md`.
+
+### Testing
+
+- Hypothesis property-based parity suite against stdlib gzip: randomized multi-member archives are read through both libraries in lockstep across access patterns, and single-byte corruption must be detected identically — aiogzip may be stricter than stdlib only for reserved FLG-bit flips, which zlib rejects and stdlib's header parser ignores.
+
 ## [1.7.0] - 2026-06-01
 
 ### Added
