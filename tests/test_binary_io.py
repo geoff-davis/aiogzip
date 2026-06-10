@@ -281,6 +281,19 @@ class TestAsyncGzipBinaryFile:
             assert await f.read() == payload
 
     @pytest.mark.asyncio
+    async def test_binary_peek_on_closed_file_raises(self, temp_file):
+        """peek() on a closed file raises the same ValueError as read()."""
+        payload = b"abcdef"
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(payload)
+
+        f = AsyncGzipBinaryFile(temp_file, "rb")
+        await f.open()
+        await f.close()
+        with pytest.raises(ValueError, match="closed"):
+            await f.peek(1)
+
+    @pytest.mark.asyncio
     async def test_binary_peek_from_start_returns_data(self, temp_file):
         """peek() from a fresh reader should not return empty for valid gzip data."""
         payload = b"abcdefghijklmnopqrstuvwxyz"

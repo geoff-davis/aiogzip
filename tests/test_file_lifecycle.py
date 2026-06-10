@@ -425,3 +425,98 @@ class TestRepr:
             assert "name='in-memory.gz'" in repr(f)
         finally:
             await f.close()
+
+
+class TestFailedOpenRecovery:
+    """A failed open() must leave the instance retryable, not half-open.
+
+    Regression: with an external fileobj, _cleanup_failed_enter left _file
+    set after a failed open, so a retry raised "File is already open" and
+    write() would emit compressed data for a stream whose gzip header was
+    never written.
+    """
+
+    class _FlakyWriter:
+        """Fails the first write (the gzip header), then delegates."""
+
+        def __init__(self, target):
+            self._target = target
+            self.fail_next = True
+            self.closed = False
+
+        async def write(self, data):
+            if self.fail_next:
+                self.fail_next = False
+                raise OSError("transient write failure")
+            return await self._target.write(data)
+
+        async def close(self):
+            self.closed = True
+
+    @pytest.mark.asyncio
+    async def test_failed_open_with_external_fileobj_can_retry(self, tmp_path):
+        import gzip
+
+        import aiofiles
+
+        p = tmp_path / "flaky.gz"
+        inner = await aiofiles.open(p, "wb")
+        try:
+            writer = self._FlakyWriter(inner)
+            f = AsyncGzipBinaryFile(None, "wb", fileobj=writer)
+
+            with pytest.raises(OSError, match="transient write failure"):
+                await f.open()
+
+            # The failed open leaves no half-open state behind: the handle is
+            # cleared, the caller's fileobj is untouched, and a retry works.
+            assert f._file is None
+            assert writer.closed is False
+
+            async with f:
+                await f.write(b"recovered payload")
+        finally:
+            await inner.close()
+
+        with gzip.open(p, "rb") as check:
+            assert check.read() == b"recovered payload"
+
+    @pytest.mark.asyncio
+    async def test_failed_open_then_write_raises_not_opened(self, tmp_path):
+        """After a failed open, write() reports the file as not opened rather
+        than silently compressing into a headerless stream."""
+        import aiofiles
+
+        inner = await aiofiles.open(tmp_path / "wedge.gz", "wb")
+        try:
+            writer = self._FlakyWriter(inner)
+            f = AsyncGzipBinaryFile(None, "wb", fileobj=writer)
+            with pytest.raises(OSError, match="transient write failure"):
+                await f.open()
+            with pytest.raises(ValueError, match="File not opened"):
+                await f.write(b"hello")
+        finally:
+            await inner.close()
+
+
+class TestReprOnPartialObjects:
+    """repr() must not raise on partially-constructed instances.
+
+    The classes use __slots__ and __init__ validates mid-assignment, so a
+    constructor failure leaves an object missing some attributes; debuggers
+    and locals-capturing traceback formatters still call repr() on it.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    async def test_repr_after_failed_init(self, tmp_path, cls):
+        obj = cls.__new__(cls)
+        try:
+            # compresslevel=99 raises after _filename/_mode are assigned but
+            # before _is_closed, leaving the object half-built.
+            mode = "wb" if cls is AsyncGzipBinaryFile else "wt"
+            obj.__init__(tmp_path / "x.gz", mode, compresslevel=99)
+        except ValueError:
+            pass
+        r = repr(obj)  # must not raise
+        assert cls.__name__ in r

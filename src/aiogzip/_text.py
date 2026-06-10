@@ -15,6 +15,8 @@ from ._common import (
     WithAsyncRead,
     WithAsyncReadWrite,
     WithAsyncWrite,
+    _check_can_open,
+    _format_file_repr,
     _normalize_mtime,
     _parse_mode_tokens,
     _validate_chunk_size,
@@ -93,6 +95,7 @@ class AsyncGzipTextFile:
         "_text_buffer_offset",
         "_trailing_cr",
         "_seen_newline_types",
+        "_decoder_byte_position",
         "_cookie_nonce",
         "_buffer_origin_offset",
         "_buffer_origin_decoder_state",
@@ -209,6 +212,11 @@ class AsyncGzipTextFile:
         self._text_buffer_offset: int = 0  # Start of unread text within _text_buffer
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
         self._seen_newline_types: int = 0
+        # Binary-layer offset of the last byte fed to the incremental decoder.
+        # Reads made directly on the public `buffer` accessor advance the
+        # binary position without going through the decoder, so this frontier
+        # is what plain-position bookkeeping must compare against.
+        self._decoder_byte_position: int = 0
         self._cookie_nonce: int = secrets.randbits(64)
         initial_decoder_state = self._decoder.getstate()
         self._buffer_origin_offset: int = 0
@@ -258,10 +266,7 @@ class AsyncGzipTextFile:
             ValueError: if the file is already open, or has already been closed
                 (a closed instance cannot be reopened, matching io objects).
         """
-        if self._is_closed:
-            raise ValueError("Cannot reopen a closed file")
-        if self._binary_file is not None:
-            raise ValueError("File is already open")
+        _check_can_open(self._is_closed, self._binary_file is not None)
         filename = os.fspath(self._filename) if self._filename is not None else None
         self._binary_file = AsyncGzipBinaryFile(
             filename=filename,
@@ -302,10 +307,7 @@ class AsyncGzipTextFile:
         await self.close()
 
     def __repr__(self) -> str:
-        return (
-            f"<aiogzip.AsyncGzipTextFile name={self.name!r} "
-            f"mode={self._mode!r} closed={self.closed}>"
-        )
+        return _format_file_repr(self)
 
     # File API compatibility helpers
     async def tell(self) -> int:
@@ -365,6 +367,7 @@ class AsyncGzipTextFile:
             ) = self._decode_cookie(offset)
             await self._binary_file.seek(origin_offset)
             self._decoder.setstate(decoder_state)
+            self._decoder_byte_position = origin_offset
             self._trailing_cr = trailing_cr
             self._seen_newline_types = seen_newlines
             self._set_buffer("")
@@ -549,6 +552,7 @@ class AsyncGzipTextFile:
             raise ValueError("File not opened. Use async context manager.")
         await self._binary_file.seek(0)
         self._decoder.reset()
+        self._decoder_byte_position = 0
         self._set_buffer("")
         self._trailing_cr = False
         self._seen_newline_types = 0
@@ -587,20 +591,31 @@ class AsyncGzipTextFile:
     async def _seek_to_plain_position(self, offset: int) -> None:
         """Restore a plain text position by replaying decoded bytes forward.
 
-        Fast path: when the stream is already at a plain position at or behind
-        the target (and not at EOF), replay only the bytes between the current
-        binary position and ``offset`` instead of restarting from the beginning.
-        The incremental decoder and the newline tracker compose, so feeding the
-        delta onto the live state reaches the same decoder/newline state a full
-        replay-from-zero would. Otherwise reset and replay from the start.
+        Fast path: when the live decoder state corresponds to a clean byte
+        boundary at or behind the target (and not at EOF), replay only the
+        bytes between the current binary position and ``offset`` instead of
+        restarting from the beginning. The incremental decoder and the newline
+        tracker compose, so feeding the delta onto the live state reaches the
+        same decoder/newline state a full replay-from-zero would. Unlike
+        tell()'s plain-position check, buffered read-ahead text does not
+        disqualify the fast path: the buffer is discarded either way, and the
+        live state already reflects every byte up to the decoder frontier.
+        Otherwise reset and replay from the start.
         """
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
 
+        decoder_bytes, decoder_flag = self._decoder.getstate()
         if (
             not self._binary_file._eof
             and offset >= self._binary_file._position
-            and self._can_use_plain_position(self._decoder.getstate())
+            # Bytes consumed directly via the public `buffer` accessor bypass
+            # the decoder; the live state is only reusable when the decoder
+            # has seen everything up to the current binary position.
+            and self._binary_file._position == self._decoder_byte_position
+            and decoder_bytes == b""
+            and decoder_flag == 0
+            and not self._trailing_cr
         ):
             # Already a plain position at/behind the target: replay only the
             # forward delta, keeping the live decoder and newline state.
@@ -611,6 +626,7 @@ class AsyncGzipTextFile:
 
         while remaining > 0:
             raw_chunk = await self._binary_file.read(min(self._chunk_size, remaining))
+            self._decoder_byte_position = self._binary_file._position
             if not raw_chunk:
                 break
             remaining -= len(raw_chunk)
@@ -742,6 +758,7 @@ class AsyncGzipTextFile:
             self._buffer_origin_seen_newline_types = self._seen_newline_types
 
         raw_chunk = await bf.read(self._chunk_size)
+        self._decoder_byte_position = bf._position
         if not raw_chunk:
             final_decoded = self._decoder.decode(b"", final=True)
             if final_decoded:
@@ -785,6 +802,7 @@ class AsyncGzipTextFile:
             self._capture_buffer_origin()
 
         raw_chunk = await bf.read(self._chunk_size)
+        self._decoder_byte_position = bf._position
         if not raw_chunk:
             final_decoded = self._decoder.decode(b"", final=True)
             translated = (
@@ -972,45 +990,33 @@ class AsyncGzipTextFile:
         if not self._universal_newlines:
             return text
 
-        trailing_cr = self._trailing_cr
         seen = self._seen_newline_types
 
-        # Handle trailing CR from previous chunk
-        if trailing_cr:
-            if text[0] == "\n":
-                seen |= self._SEEN_CRLF
-            else:
-                seen |= self._SEEN_CR
+        # A leading '\n' completes a CRLF pair split across the chunk boundary.
+        crlf_completed = self._trailing_cr and text[0] == "\n"
+
+        # Resolve the trailing CR held over from the previous chunk.
+        if self._trailing_cr:
+            seen |= self._SEEN_CRLF if crlf_completed else self._SEEN_CR
 
         pending_trailing_cr = text[-1] == "\r"
 
-        # Track newline types using C-speed string operations
+        # Track newline types using C-speed counting. The scan window excludes
+        # a leading '\n' that completed a boundary-straddling CRLF (already
+        # recorded above) and a trailing '\r' held for the next chunk. Each
+        # CRLF pair contributes one '\r' and one '\n' to the raw counts, so a
+        # count exceeding the pair count means a bare occurrence exists.
         need = 7 & ~seen  # 7 == _SEEN_CR | _SEEN_LF | _SEEN_CRLF
         if need:
-            # A leading '\n' completing a CRLF split across the chunk boundary
-            # was already recorded above; drop it so the bare-LF scan does not
-            # double-count it. A trailing '\r' is likewise held for the next
-            # chunk rather than scanned here.
-            body = text[1:] if (trailing_cr and text[0] == "\n") else text
-            scan = body[:-1] if pending_trailing_cr else body
-
-            # Whether *this* chunk contains a CRLF pair. Computed unconditionally
-            # (not just when CRLF is still unseen) because the bare-CR / bare-LF
-            # disambiguation below must strip CRLF pairs regardless of which
-            # types earlier chunks already recorded. Skipping it once CRLF was
-            # seen would mis-count the \r and \n of a \r\n pair as a bare CR and
-            # a bare LF.
-            has_crlf = "\r\n" in scan
-            if need & 4 and has_crlf:
+            start = 1 if crlf_completed else 0
+            end = len(text) - 1 if pending_trailing_cr else len(text)
+            crlf = text.count("\r\n", start, end)
+            if crlf:
                 seen |= self._SEEN_CRLF
-
-            if need & 2 and "\n" in scan:
-                if not has_crlf or "\n" in scan.replace("\r\n", "\r\r"):
-                    seen |= self._SEEN_LF
-
-            if need & 1 and "\r" in scan:
-                if not has_crlf or "\r" in scan.replace("\r\n", "\n\n"):
-                    seen |= self._SEEN_CR
+            if need & self._SEEN_LF and text.count("\n", start, end) > crlf:
+                seen |= self._SEEN_LF
+            if need & self._SEEN_CR and text.count("\r", start, end) > crlf:
+                seen |= self._SEEN_CR
 
         self._seen_newline_types = seen
 
@@ -1018,8 +1024,10 @@ class AsyncGzipTextFile:
             self._trailing_cr = pending_trailing_cr
             return text
 
-        # Universal newline translation (newline is None)
-        if trailing_cr and text[0] == "\n":
+        # Universal newline translation (newline is None): the held CR was
+        # already emitted as '\n' at the end of the previous chunk, so drop
+        # the '\n' that completed the pair.
+        if crlf_completed:
             text = text[1:]
 
         self._trailing_cr = pending_trailing_cr

@@ -42,6 +42,36 @@ ZlibEngine = Any
 
 
 # Validation helper functions
+def _check_can_open(is_closed: bool, is_open: bool) -> None:
+    """Validate the open() precondition shared by the binary and text classes.
+
+    Raises:
+        ValueError: If the file is already open, or has been closed (a closed
+            instance cannot be reopened, matching io objects).
+    """
+    if is_closed:
+        raise ValueError("Cannot reopen a closed file")
+    if is_open:
+        raise ValueError("File is already open")
+
+
+def _format_file_repr(obj: Any) -> str:
+    """Shared __repr__ for the file classes: name, mode, and closed state.
+
+    Tolerates partially-constructed instances: the classes use __slots__ and
+    their __init__ can raise mid-validation, and debuggers / locals-capturing
+    traceback formatters call repr() on such half-built objects.
+    """
+    cls_name = type(obj).__name__
+    try:
+        return (
+            f"<aiogzip.{cls_name} name={obj.name!r} "
+            f"mode={obj._mode!r} closed={obj.closed}>"
+        )
+    except AttributeError:
+        return f"<aiogzip.{cls_name} [uninitialized]>"
+
+
 def _validate_filename(filename: Union[str, bytes, Path, None], fileobj: Any) -> None:
     """Validate filename parameter.
 

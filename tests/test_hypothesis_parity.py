@@ -72,16 +72,23 @@ _chunk_size = st.sampled_from(CHUNK_SIZES)
 
 
 def _build_raw(members):
-    """Encode the member spec into concatenated gzip members with NUL padding."""
+    """Encode the member spec into concatenated gzip members with NUL padding.
+
+    Returns ``(raw, flg_offsets)``: the stream bytes plus the offset of each
+    member's FLG header byte (byte 3 of the member), so the corruption test
+    can scope its only allowed strictness exemption to reserved-FLG-bit flips.
+    """
     out = bytearray()
+    flg_offsets = []
     for payload, level, pad in members:
         buf = io.BytesIO()
         # mtime=0 keeps the header deterministic.
         with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=level, mtime=0) as g:
             g.write(payload)
+        flg_offsets.append(len(out) + 3)
         out += buf.getvalue()
         out += b"\x00" * pad
-    return bytes(out)
+    return bytes(out), flg_offsets
 
 
 def _expected_len(members):
@@ -165,7 +172,7 @@ async def _check_pattern(path, chunk_size, pattern, params):
 @given(members=_members, chunk_size=_chunk_size, data=st.data())
 def test_read_patterns_match_stdlib(members, chunk_size, data):
     """aiogzip output and tell() match stdlib gzip across access patterns."""
-    raw = _build_raw(members)
+    raw, _ = _build_raw(members)
     total = _expected_len(members)
     pattern = data.draw(st.sampled_from(["all", "fixed", "line", "interleave"]))
 
@@ -220,13 +227,14 @@ def test_single_byte_corruption_parity(members, pos, mask):
     - If stdlib detects corruption, aiogzip must too (it never decodes a stream
       stdlib rejects).
     - When both decode the stream, their output is byte-identical.
-
-    aiogzip is allowed to be *stricter* than stdlib: it decompresses via zlib,
-    which rejects reserved gzip header-flag bits that stdlib's hand-rolled
-    header parser silently ignores. So a flip that leaves stdlib reading cleanly
-    may still (legitimately) make aiogzip raise; that case is not a failure.
+    - If aiogzip raises where stdlib decoded cleanly, the flip must have set a
+      reserved bit of a member's FLG header byte — the one place aiogzip is
+      legitimately *stricter*: it decompresses via zlib, which rejects reserved
+      flag bits that stdlib's hand-rolled header parser silently ignores. Any
+      other spurious rejection of a stream stdlib accepts is a failure.
     """
-    raw = bytearray(_build_raw(members))
+    built, flg_offsets = _build_raw(members)
+    raw = bytearray(built)
     idx = pos % len(raw)  # raw is always a full gzip member, so len(raw) > 0
     raw[idx] ^= mask
     corrupt = bytes(raw)
@@ -259,6 +267,14 @@ def test_single_byte_corruption_parity(members, pos, mask):
     if aio_raised:
         # aiogzip surfaces corruption as gzip.BadGzipFile, a subclass of OSError.
         assert isinstance(aio_exc, (gzip.BadGzipFile, OSError))
+        if not std_raised:
+            # Stricter-than-stdlib is allowed only for reserved FLG bits
+            # (0xE0); anything else is a spurious rejection of a valid stream.
+            assert idx in flg_offsets and mask & 0xE0, (
+                f"aiogzip raised {aio_exc!r} on a stream stdlib decoded "
+                f"cleanly (flip at byte {idx} with mask {mask:#04x} is not a "
+                f"reserved FLG-bit flip)"
+            )
     else:
         # aiogzip decoded; it must agree with stdlib whenever stdlib also decoded.
         assert std_raised or aio_bytes == std_bytes
