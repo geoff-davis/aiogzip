@@ -182,3 +182,41 @@ async def test_forward_plain_seek_skips_reset_backward_does_not(temp_file):
             await f.seek(p1)  # backward -> must reset and replay from zero
             assert mock_reset.call_count == calls_before + 1
             assert (await f.tell()) == p1
+
+
+@pytest.mark.asyncio
+async def test_forward_seek_after_direct_buffer_read_replays_from_zero(temp_file):
+    """Bytes consumed via the public binary `buffer` accessor bypass the text
+    decoder, so the live decoder state no longer matches the binary position.
+
+    Regression: the fast path spliced the decoder onto the advanced binary
+    position and resumed decoding mid-character (UnicodeDecodeError for
+    strict encodings, silent corruption for tolerant ones). It must fall
+    back to replay-from-zero instead.
+    """
+    raw = ("☃" * 100).encode("utf-8")  # 3 bytes per snowman
+    _write_raw(temp_file, raw)
+
+    async with AsyncGzipTextFile(temp_file, "rt", chunk_size=64) as f:
+        # Consume one byte behind the decoder's back, stopping mid-character.
+        assert await f.buffer.read(1) == raw[:1]
+        # Seek to a character boundary: must decode cleanly from there.
+        assert await f.seek(3) == 3
+        assert await f.read() == "☃" * 99
+
+
+@pytest.mark.asyncio
+async def test_fast_path_still_used_after_pure_text_seeks(temp_file):
+    """Sanity: the decoder-frontier gate does not disable the fast path for
+    the supported pattern (plain seeks/tells with no direct buffer reads)."""
+    raw = b"".join(b"row%d\n" % i for i in range(200))
+    _write_raw(temp_file, raw)
+
+    async with AsyncGzipTextFile(temp_file, "rt") as f:
+        await f.seek(6)
+        with patch.object(
+            AsyncGzipTextFile, "_reset_to_start", side_effect=AssertionError
+        ):
+            await f.seek(12)
+        # Offset 12 is two bytes into "row2\n".
+        assert await f.read(6) == "w2\nrow"

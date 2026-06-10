@@ -449,6 +449,8 @@ class AsyncGzipBinaryFile:
         """Return up to size bytes without advancing the read position."""
         if self._mode_op != "r":
             raise OSError("File not open for reading")
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
         if size is not None and size > _MAX_CHUNK_SIZE:
@@ -510,47 +512,36 @@ class AsyncGzipBinaryFile:
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto() argument must be writable")
+        # Accept any writable buffer (e.g. array.array with itemsize > 1) by
+        # viewing it as bytes, like the stdlib io machinery does.
+        view = view.cast("B")
 
         total = len(view)
         if total == 0:
             return 0
 
-        # Fast path: the current buffer already satisfies the whole request, so
-        # fill the view with a single copy and no per-span loop overhead (this
-        # is the common case while a chunk's worth of decoded data lasts).
-        buf = self._buffer
-        offset = self._buffer_offset
-        if len(buf) - offset >= total:
-            end = offset + total
-            view[:] = memoryview(buf)[offset:end]
-            self._position += total
-            if end >= len(buf):
-                del buf[:]
-                self._buffer_offset = 0
-            else:
-                self._buffer_offset = end
-            return total
-
-        # Slow path: span the request across refills.
-        written = 0
+        # Fill the internal buffer until it can satisfy the whole request (or
+        # EOF), compacting a large consumed prefix first exactly as read()
+        # does, then copy once. Filling before consuming preserves read()'s
+        # error semantics: if a refill raises mid-request, the stream position
+        # and already-buffered data are left intact for the caller to salvage.
         threshold = self.BUFFER_COMPACTION_THRESHOLD
-        while written < total:
-            n = self._copy_into_view(view, written)
-            if n:
-                written += n
-                continue
-            # Buffer is drained; stop at EOF, otherwise refill (compacting a
-            # large consumed prefix first, exactly as read() does).
-            if self._eof:
-                break
+        available = len(self._buffer) - self._buffer_offset
+        while available < total and not self._eof:
             if self._buffer_offset > threshold:
                 del self._buffer[: self._buffer_offset]
                 self._buffer_offset = 0
             await self._fill_buffer()
-        return written
+            available = len(self._buffer) - self._buffer_offset
+        return self._copy_into_view(view, 0)
 
     async def read1(self, size: int = -1) -> bytes:
-        """Read up to size bytes from the buffer without looping."""
+        """Read up to size bytes with at most one data-producing fill.
+
+        A single compressed chunk can decode to nothing (e.g. while consuming
+        the gzip header), so fills repeat until at least one byte is available;
+        like stdlib gzip's ``read1()``, an empty result means EOF.
+        """
         if self._mode_op != "r":
             raise OSError("File not open for reading")
         if self._is_closed:
@@ -564,7 +555,7 @@ class AsyncGzipBinaryFile:
             return b""
 
         available = len(self._buffer) - self._buffer_offset
-        if available <= 0 and not self._eof:
+        while available <= 0 and not self._eof:
             await self._fill_buffer()
             available = len(self._buffer) - self._buffer_offset
 
@@ -588,11 +579,14 @@ class AsyncGzipBinaryFile:
         return data_to_return
 
     async def readinto1(self, b: Union[bytearray, memoryview]) -> int:
-        """Read directly into the buffer with at most one underlying fill.
+        """Read directly into the buffer with at most one data-producing fill.
 
         Like ``read1()`` but writes straight into the caller's buffer, avoiding
-        the intermediate ``bytes`` object. Returns the number of bytes written
-        (0 at EOF).
+        the intermediate ``bytes`` object. A single compressed chunk can decode
+        to nothing (e.g. while consuming the gzip header), so fills repeat
+        until at least one byte is available; the result is still capped at one
+        buffer's worth of decoded data. Returns the number of bytes written
+        (0 only at EOF), so ``while await f.readinto1(buf): ...`` is safe.
         """
         if self._mode_op != "r":
             raise OSError("File not open for reading")
@@ -602,15 +596,17 @@ class AsyncGzipBinaryFile:
             raise ValueError("File not opened. Use async context manager.")
         view = memoryview(b)
         if view.readonly:
-            raise TypeError("readinto() argument must be writable")
+            raise TypeError("readinto1() argument must be writable")
+        view = view.cast("B")
 
         total = len(view)
         if total == 0:
             return 0
 
         available = len(self._buffer) - self._buffer_offset
-        if available <= 0 and not self._eof:
+        while available <= 0 and not self._eof:
             await self._fill_buffer()
+            available = len(self._buffer) - self._buffer_offset
         return self._copy_into_view(view, 0)
 
     async def readline(self, limit: int = -1) -> bytes:
@@ -1158,18 +1154,22 @@ class AsyncGzipBinaryFile:
         up with _file cleared — otherwise the next caller can reach a
         handle we no longer own.
         """
-        if self._file is None or not self._owns_file:
+        file = self._file
+        owns_file = self._owns_file
+        # Clear the handle up front (even for external fileobjs we must not
+        # close) so a failed open() never leaves the instance looking open —
+        # otherwise a retry would hit the "File is already open" guard and
+        # write() could emit compressed data for a stream with no header.
+        self._file = None
+        self._owns_file = False
+        if file is None or not owns_file:
             return
 
-        close_method = getattr(self._file, "close", None)
-        try:
-            if callable(close_method):
-                result = close_method()
-                if hasattr(result, "__await__"):
-                    await result
-        finally:
-            self._file = None
-            self._owns_file = False
+        close_method = getattr(file, "close", None)
+        if callable(close_method):
+            result = close_method()
+            if hasattr(result, "__await__"):
+                await result
 
     async def flush(self) -> None:
         """

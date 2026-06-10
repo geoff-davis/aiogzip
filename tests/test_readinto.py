@@ -6,6 +6,7 @@ with ``read()`` across chunk sizes (including ``chunk_size=1``), partial final
 fills at EOF, and both ``bytearray`` and ``memoryview`` (incl. slice) targets.
 """
 
+import array
 import gzip
 import os
 
@@ -132,13 +133,98 @@ async def test_readinto_memoryview_slice_target(temp_file, chunk_size):
 
 @pytest.mark.asyncio
 async def test_readinto_readonly_buffer_raises(temp_file):
-    """A read-only target is rejected with TypeError, before any read."""
+    """A read-only target is rejected with TypeError naming the right method."""
     _write(temp_file, b"abc")
     async with AsyncGzipBinaryFile(temp_file, "rb") as f:
-        with pytest.raises(TypeError, match="writable"):
+        with pytest.raises(TypeError, match=r"readinto\(\) argument must be writable"):
             await f.readinto(memoryview(b"immutable"))
-        with pytest.raises(TypeError, match="writable"):
+        with pytest.raises(TypeError, match=r"readinto1\(\) argument must be writable"):
             await f.readinto1(memoryview(b"immutable"))
+
+
+@pytest.mark.asyncio
+async def test_readinto_itemsize_gt_one_buffer_matches_stdlib(temp_file):
+    """Writable buffers with itemsize > 1 (array.array) fill like stdlib gzip.
+
+    The view must be cast to bytes: without the cast, the slice assignment
+    raises ValueError and the count would be in elements rather than bytes.
+    """
+    item = array.array("i", [0]).itemsize
+    payload = os.urandom(100 * item)
+    _write(temp_file, payload)
+
+    expected = array.array("i", bytes(100 * item))
+    with gzip.open(temp_file, "rb") as sf:
+        n_std = sf.readinto(expected)
+
+    arr = array.array("i", bytes(100 * item))
+    async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+        n = await f.readinto(arr)
+    assert n == n_std == 100 * item  # byte count, not element count
+    assert arr == expected
+
+    arr1 = array.array("i", bytes(100 * item))
+    async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+        n1 = await f.readinto1(arr1)
+    assert n1 > 0
+    assert arr1.tobytes()[:n1] == payload[:n1]
+
+
+@pytest.mark.asyncio
+async def test_readinto_error_leaves_position_and_buffer_intact(temp_file):
+    """A decompression error mid-request must not consume already-decoded data.
+
+    readinto() fills the internal buffer before copying anything into the
+    caller's view, so when a refill raises (truncated stream here) the
+    position is unchanged and the good prefix is still readable — the same
+    salvage semantics as read().
+    """
+    payload = b"payload data " * 4096
+    _write(temp_file, payload)
+    blob = open(temp_file, "rb").read()
+    with open(temp_file, "wb") as fh:
+        fh.write(blob[: len(blob) // 2])  # truncate mid-stream
+
+    async with AsyncGzipBinaryFile(temp_file, "rb", chunk_size=64) as f:
+        with pytest.raises(OSError):
+            await f.readinto(bytearray(len(payload)))
+        # Nothing was consumed by the failed call...
+        assert await f.tell() == 0
+        # ...and the decoded prefix is still available to salvage.
+        assert await f.read(10) == payload[:10]
+
+
+@pytest.mark.parametrize("chunk_size", [1, 2, 3])
+@pytest.mark.asyncio
+async def test_readinto1_and_read1_zero_only_at_eof(temp_file, chunk_size):
+    """readinto1()/read1() return 0/b'' only at EOF, like stdlib gzip.
+
+    With a tiny chunk_size a single fill can decode nothing (it is still
+    consuming the gzip header), so the fill must repeat until at least one
+    byte is available; otherwise the standard ``while n := readinto1(buf)``
+    consumer loop terminates before any data.
+    """
+    payload = b"hello world"
+    _write(temp_file, payload)
+
+    out = bytearray()
+    async with AsyncGzipBinaryFile(temp_file, "rb", chunk_size=chunk_size) as f:
+        buf = bytearray(4)
+        while True:
+            n = await f.readinto1(buf)
+            if n == 0:
+                break
+            out += buf[:n]
+    assert bytes(out) == payload
+
+    out1 = b""
+    async with AsyncGzipBinaryFile(temp_file, "rb", chunk_size=chunk_size) as f:
+        while True:
+            chunk = await f.read1(4)
+            if not chunk:
+                break
+            out1 += chunk
+    assert out1 == payload
 
 
 @pytest.mark.asyncio
@@ -181,10 +267,9 @@ async def test_readinto_in_write_mode_raises(temp_file):
 async def test_readinto1_matches_read1(temp_file, chunk_size, buf_size):
     """readinto1() returns the same bytes/length as read1(), one fill at a time.
 
-    read1()/readinto1() do at most one underlying fill, so with a small
-    chunk_size they can legitimately return 0 mid-stream (a fill that decoded
-    nothing yet) — that is not EOF, so the loop runs until the payload is fully
-    collected rather than stopping on a zero.
+    Both repeat fills until at least one byte decodes (a fill can consume
+    compressed input, e.g. the gzip header, without producing output), so a
+    zero/empty result means EOF for both and they stay in lockstep.
     """
     payload = os.urandom(3000)
     _write(temp_file, payload)

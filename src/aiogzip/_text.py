@@ -93,6 +93,7 @@ class AsyncGzipTextFile:
         "_text_buffer_offset",
         "_trailing_cr",
         "_seen_newline_types",
+        "_decoder_byte_position",
         "_cookie_nonce",
         "_buffer_origin_offset",
         "_buffer_origin_decoder_state",
@@ -209,6 +210,11 @@ class AsyncGzipTextFile:
         self._text_buffer_offset: int = 0  # Start of unread text within _text_buffer
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
         self._seen_newline_types: int = 0
+        # Binary-layer offset of the last byte fed to the incremental decoder.
+        # Reads made directly on the public `buffer` accessor advance the
+        # binary position without going through the decoder, so this frontier
+        # is what plain-position bookkeeping must compare against.
+        self._decoder_byte_position: int = 0
         self._cookie_nonce: int = secrets.randbits(64)
         initial_decoder_state = self._decoder.getstate()
         self._buffer_origin_offset: int = 0
@@ -365,6 +371,7 @@ class AsyncGzipTextFile:
             ) = self._decode_cookie(offset)
             await self._binary_file.seek(origin_offset)
             self._decoder.setstate(decoder_state)
+            self._decoder_byte_position = origin_offset
             self._trailing_cr = trailing_cr
             self._seen_newline_types = seen_newlines
             self._set_buffer("")
@@ -549,6 +556,7 @@ class AsyncGzipTextFile:
             raise ValueError("File not opened. Use async context manager.")
         await self._binary_file.seek(0)
         self._decoder.reset()
+        self._decoder_byte_position = 0
         self._set_buffer("")
         self._trailing_cr = False
         self._seen_newline_types = 0
@@ -600,6 +608,10 @@ class AsyncGzipTextFile:
         if (
             not self._binary_file._eof
             and offset >= self._binary_file._position
+            # Bytes consumed directly via the public `buffer` accessor bypass
+            # the decoder; the live state is only reusable when the decoder
+            # has seen everything up to the current binary position.
+            and self._binary_file._position == self._decoder_byte_position
             and self._can_use_plain_position(self._decoder.getstate())
         ):
             # Already a plain position at/behind the target: replay only the
@@ -611,6 +623,7 @@ class AsyncGzipTextFile:
 
         while remaining > 0:
             raw_chunk = await self._binary_file.read(min(self._chunk_size, remaining))
+            self._decoder_byte_position = self._binary_file._position
             if not raw_chunk:
                 break
             remaining -= len(raw_chunk)
@@ -742,6 +755,7 @@ class AsyncGzipTextFile:
             self._buffer_origin_seen_newline_types = self._seen_newline_types
 
         raw_chunk = await bf.read(self._chunk_size)
+        self._decoder_byte_position = bf._position
         if not raw_chunk:
             final_decoded = self._decoder.decode(b"", final=True)
             if final_decoded:
@@ -785,6 +799,7 @@ class AsyncGzipTextFile:
             self._capture_buffer_origin()
 
         raw_chunk = await bf.read(self._chunk_size)
+        self._decoder_byte_position = bf._position
         if not raw_chunk:
             final_decoded = self._decoder.decode(b"", final=True)
             translated = (
