@@ -547,12 +547,30 @@ class AsyncGzipTextFile:
         )
 
     async def _seek_to_plain_position(self, offset: int) -> None:
-        """Restore a plain text position by replaying bytes from the stream start."""
+        """Restore a plain text position by replaying decoded bytes forward.
+
+        Fast path: when the stream is already at a plain position at or behind
+        the target (and not at EOF), replay only the bytes between the current
+        binary position and ``offset`` instead of restarting from the beginning.
+        The incremental decoder and the newline tracker compose, so feeding the
+        delta onto the live state reaches the same decoder/newline state a full
+        replay-from-zero would. Otherwise reset and replay from the start.
+        """
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
 
-        await self._reset_to_start()
-        remaining = offset
+        if (
+            not self._binary_file._eof
+            and offset >= self._binary_file._position
+            and self._can_use_plain_position(self._decoder.getstate())
+        ):
+            # Already a plain position at/behind the target: replay only the
+            # forward delta, keeping the live decoder and newline state.
+            remaining = offset - self._binary_file._position
+        else:
+            await self._reset_to_start()
+            remaining = offset
+
         while remaining > 0:
             raw_chunk = await self._binary_file.read(min(self._chunk_size, remaining))
             if not raw_chunk:
@@ -931,10 +949,21 @@ class AsyncGzipTextFile:
         # Track newline types using C-speed string operations
         need = 7 & ~seen  # 7 == _SEEN_CR | _SEEN_LF | _SEEN_CRLF
         if need:
-            scan = text[:-1] if pending_trailing_cr else text
+            # A leading '\n' completing a CRLF split across the chunk boundary
+            # was already recorded above; drop it so the bare-LF scan does not
+            # double-count it. A trailing '\r' is likewise held for the next
+            # chunk rather than scanned here.
+            body = text[1:] if (trailing_cr and text[0] == "\n") else text
+            scan = body[:-1] if pending_trailing_cr else body
 
-            has_crlf = "\r\n" in scan if need & 4 else False
-            if has_crlf:
+            # Whether *this* chunk contains a CRLF pair. Computed unconditionally
+            # (not just when CRLF is still unseen) because the bare-CR / bare-LF
+            # disambiguation below must strip CRLF pairs regardless of which
+            # types earlier chunks already recorded. Skipping it once CRLF was
+            # seen would mis-count the \r and \n of a \r\n pair as a bare CR and
+            # a bare LF.
+            has_crlf = "\r\n" in scan
+            if need & 4 and has_crlf:
                 seen |= self._SEEN_CRLF
 
             if need & 2 and "\n" in scan:
