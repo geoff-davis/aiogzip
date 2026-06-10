@@ -200,8 +200,17 @@ def test_read_patterns_match_stdlib(members, chunk_size, data):
 
 
 @settings(max_examples=MAX_EXAMPLES, deadline=None, suppress_health_check=_SUPPRESSED)
-@given(members=_members, data=st.data())
-def test_single_byte_corruption_parity(members, data):
+@given(
+    members=_members,
+    # Drawn from fixed ranges, NOT via data.draw(..., max_value=len(raw)-1):
+    # the compressed length depends on os.urandom payloads and so varies
+    # between Hypothesis replays, which would make a len(raw)-bounded draw
+    # change structure and raise Flaky. ``pos`` is mapped onto a byte index at
+    # runtime instead.
+    pos=st.integers(min_value=0, max_value=2**31 - 1),
+    mask=st.integers(min_value=1, max_value=255),
+)
+def test_single_byte_corruption_parity(members, pos, mask):
     """A flipped byte never lets aiogzip silently accept what stdlib rejects.
 
     Most flips fall in the compressed body or trailer and make both raise
@@ -218,8 +227,7 @@ def test_single_byte_corruption_parity(members, data):
     may still (legitimately) make aiogzip raise; that case is not a failure.
     """
     raw = bytearray(_build_raw(members))
-    idx = data.draw(st.integers(min_value=0, max_value=len(raw) - 1))
-    mask = data.draw(st.integers(min_value=1, max_value=255))
+    idx = pos % len(raw)  # raw is always a full gzip member, so len(raw) > 0
     raw[idx] ^= mask
     corrupt = bytes(raw)
 
