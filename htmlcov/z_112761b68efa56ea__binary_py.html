@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/aiogzip/_binary.py: 90.09%</title>
+    <title>Coverage for src/aiogzip/_binary.py: 89.81%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_dd2e7eb5.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>aiogzip<span class="sep">/</span>_binary.py</b>:
-            <span class="pc_cov">90.09%</span>
+            <span class="pc_cov">89.81%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -56,10 +56,10 @@
         </aside>
         <h2>
             <span class="text">712 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">661<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">51<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">659<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">53<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
-            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">52<span class="text"> partial</span></button>
+            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">53<span class="text"> partial</span></button>
         </h2>
         <p class="text">
             <a id="prevFileLink" class="nav" href="z_112761b68efa56ea___init___py.html">&#xab; prev</a> &nbsp; &nbsp;
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_112761b68efa56ea__common_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.14.1">coverage.py v7.14.1</a>,
-            created at 2026-06-10 08:45 +0000
+            created at 2026-06-10 09:39 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -686,9 +686,9 @@
     <p class="run"><span class="n"><a id="t602" href="#t602">602</a></span><span class="t">                <span class="nam">consumed</span> <span class="op">=</span> <span class="nam">end</span> <span class="op">-</span> <span class="nam">start</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t603" href="#t603">603</a></span><span class="t">                <span class="nam">self</span><span class="op">.</span><span class="nam">_buffer_offset</span> <span class="op">=</span> <span class="nam">end</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t604" href="#t604">604</a></span><span class="t">                <span class="nam">self</span><span class="op">.</span><span class="nam">_position</span> <span class="op">+=</span> <span class="nam">consumed</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t605" href="#t605">605</a></span><span class="t">                <span class="key">if</span> <span class="nam">end</span> <span class="op">>=</span> <span class="nam">buf_len</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t606" href="#t606">606</a></span><span class="t">                    <span class="key">del</span> <span class="nam">buf</span><span class="op">[</span><span class="op">:</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t607" href="#t607">607</a></span><span class="t">                    <span class="nam">self</span><span class="op">.</span><span class="nam">_buffer_offset</span> <span class="op">=</span> <span class="num">0</span>&nbsp;</span><span class="r"></span></p>
+    <p class="par run show_par"><span class="n"><a id="t605" href="#t605">605</a></span><span class="t">                <span class="key">if</span> <span class="nam">end</span> <span class="op">>=</span> <span class="nam">buf_len</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">605&#x202F;&#x219B;&#x202F;606</span><span class="annotate long">line 605 didn't jump to line 606 because the condition on line 605 was never true</span></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t606" href="#t606">606</a></span><span class="t">                    <span class="key">del</span> <span class="nam">buf</span><span class="op">[</span><span class="op">:</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t607" href="#t607">607</a></span><span class="t">                    <span class="nam">self</span><span class="op">.</span><span class="nam">_buffer_offset</span> <span class="op">=</span> <span class="num">0</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t608" href="#t608">608</a></span><span class="t">                <span class="key">return</span> <span class="nam">result</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t609" href="#t609">609</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t610" href="#t610">610</a></span><span class="t">        <span class="com"># Slow path: need more data or no newline in buffer</span>&nbsp;</span><span class="r"></span></p>
@@ -1319,7 +1319,7 @@
             <a class="nav" href="z_112761b68efa56ea__common_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.14.1">coverage.py v7.14.1</a>,
-            created at 2026-06-10 08:45 +0000
+            created at 2026-06-10 09:39 +0000
         </p>
     </div>
 </footer>
