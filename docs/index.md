@@ -85,10 +85,54 @@ asyncio.run(main())
 - ✅ Full compatibility with `tarfile` for reading `.tar.gz` archives
 - ✅ Seamless integration with `aiocsv` for CSV processing
 
-For `AsyncGzipTextFile`, `tell()` returns an opaque cookie value for the current open stream. Use it only with `seek(cookie)` on the same open handle.
+For `AsyncGzipTextFile`, `tell()` returns an opaque cookie value (a negative integer encoding the decoder state) for the current open stream. Use it only with `seek(cookie)` on the **same open handle**.
+
+> **Warning — text cookies are not portable across handles.** This differs from `io.TextIOWrapper` and `gzip.open("rt")`, whose `tell()` cookies encode only decoder state and stay valid after re-opening the same file. An `aiogzip` text cookie embeds a random per-instance nonce, so a cookie minted by one handle is rejected with `OSError` by any other handle (and after the file is re-opened). This is deliberate: a stale cookie fails fast instead of silently restoring the wrong decoder state against an unrelated stream. To checkpoint progress for a later run or a different process, persist a *plain* offset (see [Resumable text processing](#resumable-text-processing)), never a cookie.
 
 Backward seeks restart decompression from the beginning of the gzip stream. For non-seekable `fileobj` inputs, `aiogzip` keeps a bounded compressed-input replay cache so rewind can work without loading unbounded data; tune it with `max_rewind_cache_size` or set it to `None` for the previous unbounded behavior.
 
 **Concurrency:** An open `aiogzip` file is not safe for concurrent use by multiple `asyncio` tasks. Its internal buffers and decoder/compressor state are mutated without locking — the same contract as standard-library file objects. Give each task its own file object, or serialize access behind your own lock.
 
 **Note:** `aiogzip` focuses on file-based operations and does not currently support in-memory compression/decompression (e.g., `gzip.compress`/`gzip.decompress`).
+
+## Resumable text processing
+
+To stop processing and resume later — especially in a **different process** — you cannot persist a `tell()` cookie, because it is bound to the handle that produced it (see the warning above). Instead, checkpoint a *plain* offset: a non-negative count of decompressed bytes that any handle can `seek()` to.
+
+A plain offset is only meaningful where the text stream is "plain" — no buffered text and a clean decoder, i.e. the offset does not fall in the middle of a multibyte character. Line boundaries delimited by `\n` are always such positions: `\n` (`0x0A`) can never be part of a UTF-8 (or any ASCII-compatible) multibyte sequence.
+
+The supported pattern is to drive the **binary layer** (`f.buffer`, or `AsyncGzipBinaryFile` directly), which splits lines without the text layer's read-ahead, so `await f.tell()` after each line is an exact decompressed byte offset. Decode each line yourself with the file's encoding, and persist that offset as your checkpoint:
+
+```python
+import asyncio
+import gzip
+from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
+
+async def main():
+    path = "events.jsonl.gz"
+    with gzip.open(path, "wt", encoding="utf-8") as fh:
+        for i in range(1000):
+            fh.write(f'{{"id": {i}}}\n')
+
+    # Pass 1: process lines via the binary layer, checkpointing a plain
+    # offset after each line, then "crash" partway through.
+    saved_offset = 0
+    async with AsyncGzipBinaryFile(path, "rb") as f:
+        async for raw_line in f:                  # exact line splits, no read-ahead
+            line = raw_line.decode("utf-8")
+            ...                                   # do your work with `line`
+            saved_offset = await f.tell()         # plain decompressed byte offset
+            if line.startswith('{"id": 499}'):
+                break                             # simulate interruption
+
+    # Pass 2: a brand-new handle (e.g. a fresh process) resumes by opening
+    # the file in text mode and seeking to the saved plain offset.
+    async with AsyncGzipTextFile(path, "rt", encoding="utf-8") as f:
+        await f.seek(saved_offset)                # non-negative plain offset, not a cookie
+        async for line in f:
+            ...                                   # continues at id 500
+
+asyncio.run(main())
+```
+
+`seek()` to a forward plain offset is **O(n)**: gzip cannot index into a compressed stream, so `aiogzip` restarts decompression from the beginning and replays `offset` bytes. If the replay cost matters, checkpoint at a coarse granularity (e.g. every N lines) rather than after every line.
