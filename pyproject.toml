@@ -47,6 +47,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio",
     "pytest-cov>=4.0.0",
+    "hypothesis>=6.0.0",
     "psutil",
     "tomli; python_version < \"3.11\"",
     "ruff==0.14.5",
