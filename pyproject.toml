@@ -50,7 +50,7 @@ dev = [
     "hypothesis>=6.0.0",
     "psutil",
     "tomli; python_version < \"3.11\"",
-    "ruff==0.14.5",
+    "ruff==0.15.17",
     "mypy>=1.0.0",
     "ty>=0.0.1a16",
     "types-aiofiles",
