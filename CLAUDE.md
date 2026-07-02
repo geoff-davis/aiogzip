@@ -23,6 +23,14 @@ two commits duplicated already-shipped work, the PR opened conflicting, and
 everything had to be rebased. The git status snapshot at session start only
 reflects the local clone; it says nothing about freshness relative to origin.
 
+A pre-push hook (`scripts/check_branch_fresh.sh`, wired up as the
+`check-branch-fresh` pre-commit hook) backstops this: it refuses a push when
+`origin/main` has commits missing from the branch's history, which also
+catches main moving *mid-session*. It requires the pre-push hook type to be
+installed — `pre-commit install` handles it via `default_install_hook_types`,
+but run it once on each machine/clone. Intentionally-behind pushes:
+`SKIP=check-branch-fresh git push`. The hook fails open when offline.
+
 ## Python 3.8 Compatibility Checklist
 
 **IMPORTANT:** This library supports Python 3.8+. Always check for PEP 585 compatibility before committing!
