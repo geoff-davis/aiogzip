@@ -38,7 +38,10 @@ def _scan(path: Path) -> list[tuple[int, str, str]]:
     with path.open("rb") as fh:
         try:
             tokens = list(tokenize.tokenize(fh.readline))
-        except tokenize.TokenizeError:
+        except (tokenize.TokenError, SyntaxError):
+            # SyntaxError covers bad encodings/indentation, which tokenize
+            # also raises. (tokenize.TokenizeError does not exist — using it
+            # turned any malformed file into an AttributeError.)
             return problems
 
     lines = path.read_text(encoding="utf-8").splitlines()
