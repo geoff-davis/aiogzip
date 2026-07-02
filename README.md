@@ -103,6 +103,13 @@ finally:
 
 See the [Performance Guide](https://geoff-davis.github.io/aiogzip/performance/) for detailed benchmarks.
 
+## Python version support
+
+`aiogzip` 1.x supports Python 3.8-3.14. **The 1.x line is the last to support
+Python 3.8 and 3.9** (both past end-of-life); `aiogzip` 2.0 will require
+Python 3.11+. Older interpreters will continue to resolve the latest 1.x
+release from PyPI automatically.
+
 ## Contributing
 
 See the [Contributing Guide](https://geoff-davis.github.io/aiogzip/contributing/) for development instructions.

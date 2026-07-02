@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Announced
+
+- The 1.x line is the last to support Python 3.8 and 3.9 (both past
+  end-of-life; together ~0.35% of downloads over the last 180 days).
+  aiogzip 2.0 will require Python 3.11+. Older interpreters keep resolving
+  the latest 1.x release via the `requires-python` metadata.
+
 ### Fixed
 
 - `readline(limit)` with a limit below -1 corrupted the read position: the binary fast path could move the buffer offset backwards and re-serve already-consumed bytes, and the text path drove the buffer offset negative so subsequent reads returned empty strings. Any negative limit now means "no limit", matching `io.IOBase`.
