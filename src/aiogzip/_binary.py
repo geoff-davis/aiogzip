@@ -173,8 +173,7 @@ class AsyncGzipBinaryFile:
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
         if saw_t:
             raise ValueError("Binary mode cannot include text ('t')")
-        if mode_op not in {"r", "w", "a", "x"}:
-            raise ValueError(f"Invalid mode '{mode}'.")
+        # _parse_mode_tokens guarantees mode_op is one of r/w/a/x here.
 
         self._filename = filename
         self._mode = mode
@@ -255,10 +254,9 @@ class AsyncGzipBinaryFile:
                 self._file = cast(Any, self._external_file)
                 self._owns_file = False
             else:
-                if self._filename is None:
-                    raise ValueError(
-                        "Filename must be provided when fileobj is not given"
-                    )
+                # __init__'s _validate_filename guarantees a filename exists
+                # whenever no fileobj was given; assert keeps the narrowing.
+                assert self._filename is not None
                 self._file = await aiofiles.open(  # type: ignore
                     self._filename, self._file_mode
                 )

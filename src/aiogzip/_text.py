@@ -174,8 +174,7 @@ class AsyncGzipTextFile:
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
         if saw_b:
             raise ValueError("Text mode cannot include binary ('b')")
-        if mode_op not in {"r", "w", "a", "x"}:
-            raise ValueError(f"Invalid mode '{mode}'.")
+        # _parse_mode_tokens guarantees mode_op is one of r/w/a/x here.
 
         self._filename = filename
         self._mode = mode
