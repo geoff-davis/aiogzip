@@ -13,6 +13,12 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- A task cancelled during `open()` (e.g. mid header write) left the instance
+  wedged — the handle leaked and every retry raised "File is already open".
+  The open-failure cleanup now runs for `BaseException`, so a cancelled open
+  is retryable exactly like a failed one, in both classes.
+- Operations before `open()` now say "File not opened. Call await open() or
+  use async with." — the old message only mentioned the context manager.
 - `readline(limit)` with a limit below -1 corrupted the read position: the binary fast path could move the buffer offset backwards and re-serve already-consumed bytes, and the text path drove the buffer offset negative so subsequent reads returned empty strings. Any negative limit now means "no limit", matching `io.IOBase`.
 - Reading a zero-byte file raised `BadGzipFile` ("truncated") where `gzip.open()` returns empty output. Truncation is now reported only when a gzip member actually started. Files that end mid-member still raise.
 - `seek()`, `tell()`, `rewind()`, `readinto()` and `readinto1()` on a closed file now raise `ValueError` like `read()`/`peek()`; previously `seek()` silently succeeded.
