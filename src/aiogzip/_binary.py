@@ -326,7 +326,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         if self._writing_mode:
             if whence == os.SEEK_CUR:
                 target = self._position + offset
@@ -415,7 +415,7 @@ class AsyncGzipBinaryFile:
     def fileno(self) -> int:
         """Return the underlying file descriptor number."""
         if self._file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         fileno_method = getattr(self._file, "fileno", None)
         if fileno_method is None:
             raise io.UnsupportedOperation("fileno() not supported by underlying file")
@@ -461,7 +461,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         if size is not None and size > _MAX_CHUNK_SIZE:
             raise ValueError(
                 f"peek size must be <= {_MAX_CHUNK_SIZE} bytes "
@@ -535,7 +535,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto() argument must be writable")
@@ -566,7 +566,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
 
         if size is None:
             size = -1
@@ -612,7 +612,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto1() argument must be writable")
@@ -635,7 +635,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         if limit is None or limit < 0:
             # Any negative limit means "no limit", matching io.IOBase. Values
             # below -1 must not reach the arithmetic below, where they would
@@ -769,7 +769,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         if self._write_broken:
             raise OSError(
                 "write stream is broken after a prior write failure; "
@@ -885,7 +885,7 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
 
         if size is None:
             size = -1
@@ -1104,7 +1104,7 @@ class AsyncGzipBinaryFile:
     async def _rewind_reader(self) -> None:
         """Rewind the underlying file and reset decompression state."""
         if self._file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         seek_method = getattr(self._file, "seek", None)
         if self._underlying_seekable and callable(seek_method):
             result = seek_method(0, os.SEEK_SET)

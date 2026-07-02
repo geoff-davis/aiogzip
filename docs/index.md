@@ -94,7 +94,8 @@ finally:
 `open()` returns the file object. Calling it on an already-open file raises
 `ValueError`, and a closed instance cannot be reopened (it raises `ValueError`,
 matching standard `io` objects) — create a new instance instead. Operations
-before `open()` raise `ValueError("File not opened.")`.
+before `open()` raise `ValueError` ("File not opened. Call await open() or
+use async with.").
 
 ## Compatibility
 
@@ -117,7 +118,7 @@ before `open()` raise `ValueError("File not opened.")`.
 >     await f.write(b"...")
 > ```
 
-For `AsyncGzipTextFile`, `tell()` returns an opaque cookie value (a negative integer encoding the decoder state) for the current open stream. Use it only with `seek(cookie)` on the **same open handle**.
+For `AsyncGzipTextFile`, `tell()` returns a plain non-negative byte offset when the stream is at a clean boundary, and an opaque cookie value (a negative integer encoding the decoder state) when it is mid-character, mid-line, or mid-`\r\n`. Use a cookie only with `seek(cookie)` on the **same open handle**.
 
 > **Warning — text cookies are not portable across handles.** This differs from `io.TextIOWrapper` and `gzip.open("rt")`, whose `tell()` cookies encode only decoder state and stay valid after re-opening the same file. An `aiogzip` text cookie embeds a random per-instance nonce, so a cookie minted by one handle is rejected with `OSError` by any other handle (and after the file is re-opened). This is deliberate: a stale cookie fails fast instead of silently restoring the wrong decoder state against an unrelated stream. To checkpoint progress for a later run or a different process, persist a *plain* offset (see [Resumable text processing](#resumable-text-processing)), never a cookie.
 
@@ -150,7 +151,7 @@ async def main():
     # offset after each line, then "crash" partway through.
     saved_offset = 0
     async with AsyncGzipBinaryFile(path, "rb") as f:
-        async for raw_line in f:                  # exact line splits, no read-ahead
+        async for raw_line in f:                  # tell() counts only consumed bytes
             line = raw_line.decode("utf-8")
             ...                                   # do your work with `line`
             saved_offset = await f.tell()         # plain decompressed byte offset

@@ -21,7 +21,7 @@ Implementation internals live in `aiogzip._common`, `aiogzip._binary`, and `aiog
 - A **plain** non-negative offset (decompressed bytes) when the stream is at a clean boundary — no buffered text, the decoder holds no partial multibyte sequence, and there is no pending `\r`. This is the same value the underlying binary layer reports (`await f.buffer.tell()`).
 - An **opaque cookie** (a negative integer) otherwise. The cookie encodes the decoder state needed to resume mid-character, mid-line, or mid-`\r\n`, so round-tripping `seek(await f.tell())` is exact.
 
-`seek()` accepts both: a non-negative argument is treated as a plain offset (decompression is replayed from the start up to that byte), and a negative argument is decoded as a cookie.
+`seek()` accepts both: a non-negative argument is treated as a plain offset (decompression is replayed forward to that byte — from the current position when the decoder is at a clean boundary at or behind the target, from the start of the stream otherwise), and a negative argument is decoded as a cookie.
 
 ### Cookies are bound to the handle that minted them
 
