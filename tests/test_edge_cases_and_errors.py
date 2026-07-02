@@ -1131,3 +1131,148 @@ class TestClosedFileGuards:
         with pytest.raises(OSError, match="broken"):
             await f.flush()
         await f.__aexit__(None, None, None)
+
+
+class TestExclusiveCreateMode:
+    """'x' modes must refuse to clobber an existing file."""
+
+    @pytest.mark.asyncio
+    async def test_binary_x_mode_raises_on_existing_file(self, tmp_path):
+        p = tmp_path / "exists.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"original")
+
+        with pytest.raises(FileExistsError):
+            async with AsyncGzipBinaryFile(p, "xb"):
+                pass
+
+        # The original file must be untouched.
+        async with AsyncGzipBinaryFile(p, "rb") as f:
+            assert await f.read() == b"original"
+
+    @pytest.mark.asyncio
+    async def test_text_x_mode_raises_on_existing_file(self, tmp_path):
+        p = tmp_path / "exists.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("original")
+
+        with pytest.raises(FileExistsError):
+            async with AsyncGzipTextFile(p, "xt"):
+                pass
+
+        async with AsyncGzipTextFile(p, "rt") as f:
+            assert await f.read() == "original"
+
+
+class TestTrailerCorruption:
+    """Corrupted trailer fields must raise BadGzipFile, matching stdlib."""
+
+    @staticmethod
+    def _flip_byte(path, offset_from_end):
+        with open(path, "rb") as fh:
+            data = bytearray(fh.read())
+        data[-offset_from_end] ^= 0xFF
+        with open(path, "wb") as fh:
+            fh.write(data)
+
+    @pytest.mark.asyncio
+    async def test_corrupted_crc_raises(self, tmp_path):
+        p = tmp_path / "bad_crc.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"hello world" * 100)
+        self._flip_byte(p, 8)  # trailer = CRC32 (4 bytes) + ISIZE (4 bytes)
+
+        async with AsyncGzipBinaryFile(p, "rb") as f:
+            with pytest.raises(gzip.BadGzipFile, match="data check"):
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_corrupted_isize_raises(self, tmp_path):
+        p = tmp_path / "bad_isize.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"hello world" * 100)
+        self._flip_byte(p, 1)  # last ISIZE byte
+
+        async with AsyncGzipBinaryFile(p, "rb") as f:
+            with pytest.raises(gzip.BadGzipFile, match="length check"):
+                await f.read()
+
+
+class TestTextModeGuardPlumbing:
+    """Safety kwargs must reach the binary layer through the text class."""
+
+    @pytest.mark.asyncio
+    async def test_max_decompressed_size_enforced_in_text_mode(self, tmp_path):
+        p = tmp_path / "bomb.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("0" * (1024 * 1024))
+
+        async with AsyncGzipTextFile(p, "rt", max_decompressed_size=1024) as f:
+            with pytest.raises(OSError, match="max_decompressed_size"):
+                await f.read()
+
+
+class TestReadlinesHintBoundary:
+    """The line crossing the hint must still be returned whole."""
+
+    @pytest.mark.asyncio
+    async def test_binary_hint_crossing_line_returned_whole(self, tmp_path):
+        p = tmp_path / "hint.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"aaaa\nbbbb\ncccc\n")
+
+        async with AsyncGzipBinaryFile(p, "rb") as f:
+            lines = await f.readlines(7)  # hint lands inside the second line
+        assert lines == [b"aaaa\n", b"bbbb\n"]
+
+    @pytest.mark.asyncio
+    async def test_text_hint_crossing_line_returned_whole(self, tmp_path):
+        p = tmp_path / "hint_t.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("aaaa\nbbbb\ncccc\n")
+
+        async with AsyncGzipTextFile(p, "rt") as f:
+            lines = await f.readlines(7)
+        assert lines == ["aaaa\n", "bbbb\n"]
+
+
+class TestRewindCacheOverflowTransition:
+    """A backward seek that was valid earlier fails once the cache overflows."""
+
+    class NonSeekableReader:
+        def __init__(self, path):
+            self._fh = open(path, "rb")
+
+        async def read(self, size=-1):
+            return self._fh.read(size)
+
+        def seekable(self):
+            return False
+
+        async def close(self):
+            self._fh.close()
+
+    @pytest.mark.asyncio
+    async def test_backward_seek_fails_after_cache_overflow(self, tmp_path):
+        p = tmp_path / "big.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(os.urandom(64 * 1024))  # incompressible
+
+        reader = self.NonSeekableReader(p)
+        try:
+            async with AsyncGzipBinaryFile(
+                None,
+                "rb",
+                fileobj=reader,
+                max_rewind_cache_size=16 * 1024,  # holds a few chunks, not the file
+                chunk_size=4096,
+            ) as f:
+                await f.read(100)
+                assert f.seekable() is True
+                await f.seek(0)  # cache still holds everything read so far
+                await f.read()  # drains the file; cache cap is exceeded
+                assert f.seekable() is False
+                with pytest.raises(OSError, match="not seekable"):
+                    await f.seek(0)
+        finally:
+            await reader.close()
