@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-07-02
+
 ### Announced
 
 - The 1.x line is the last to support Python 3.8 and 3.9 (both past
@@ -29,6 +31,19 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - `AsyncGzipTextFile` file-API parity with the binary class: `mtime`, `isatty()`, `detach()`, `truncate()`; `seekable()` now delegates to the binary layer instead of returning a constant `True`.
+
+### Packaging
+
+- PyPI metadata now carries the MIT license classifier, Documentation and
+  Changelog URLs, and keywords; sdists have deterministic contents via
+  MANIFEST.in and include CHANGELOG.md/SECURITY.md. Publishing is gated on
+  a test run and a tag-vs-version check.
+
+### Documentation
+
+- Corrected the text `seek()`/`tell()` docs: plain-offset seeks replay only
+  the forward delta when possible (not always "from the start"), and
+  `tell()` returns a plain offset at clean boundaries, a cookie otherwise.
 
 ## [1.8.0] - 2026-06-10
 
