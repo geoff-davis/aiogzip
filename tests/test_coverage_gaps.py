@@ -54,7 +54,6 @@ def _gzip_member_with_all_header_fields(body: bytes, mtime: int) -> bytes:
     return bytes(header) + compressed + trailer
 
 
-@pytest.mark.asyncio
 async def test_reads_member_with_all_optional_header_fields(tmp_path):
     """A member with FEXTRA+FNAME+FCOMMENT+FHCRC must decompress and expose mtime.
 
@@ -79,7 +78,6 @@ async def test_reads_member_with_all_optional_header_fields(tmp_path):
         assert f.mtime == mtime
 
 
-@pytest.mark.asyncio
 async def test_header_fields_parsed_with_large_single_chunk(tmp_path):
     """Same member read in one chunk exercises the completed parse path."""
     body = b"single-chunk body"
@@ -121,7 +119,6 @@ class _CloseFailsWriter:
         raise OSError("underlying close failed")
 
 
-@pytest.mark.asyncio
 async def test_close_propagates_underlying_close_failure():
     """When the writer is owned (closefd=True) and its close() raises with no
     prior write failure, close() must surface that error."""
@@ -133,7 +130,6 @@ async def test_close_propagates_underlying_close_failure():
         await f.close()
 
 
-@pytest.mark.asyncio
 async def test_binary_anext_on_closed_file_stops_iteration(tmp_path):
     """__anext__ on a closed binary stream raises StopAsyncIteration."""
     target = tmp_path / "lines.gz"

@@ -2,13 +2,12 @@
 
 ## Supported Versions
 
-We actively support the following versions of aiogzip with security updates:
+Security fixes are released on top of the latest release line:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-| 0.4.x   | :x:                |
-| < 0.4   | :x:                |
+| 1.8.x   | :white_check_mark: |
+| < 1.8   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -57,31 +56,24 @@ When using aiogzip:
 
 ### Decompression Bombs
 
-Like all compression libraries, aiogzip can be vulnerable to decompression bombs (ZIP bombs). When processing untrusted gzip files:
-
-- Set reasonable limits on decompressed output size
-- Monitor memory usage
-- Consider implementing timeouts for decompression operations
-
-Example defensive code:
+Like all compression libraries, aiogzip can be vulnerable to decompression bombs (ZIP bombs). When processing untrusted gzip files, use the built-in `max_decompressed_size` guard — it aborts *during* decompression, before a bomb can expand into memory:
 
 ```python
-import asyncio
 from aiogzip import AsyncGzipFile
 
 MAX_DECOMPRESSED_SIZE = 100 * 1024 * 1024  # 100 MB
 
 async def safe_decompress(filename):
-    total_size = 0
-    async with AsyncGzipFile(filename, "rb") as f:
-        while True:
-            chunk = await f.read(8192)
-            if not chunk:
-                break
-            total_size += len(chunk)
-            if total_size > MAX_DECOMPRESSED_SIZE:
-                raise ValueError("Decompressed size exceeds limit")
+    async with AsyncGzipFile(
+        filename, "rb", max_decompressed_size=MAX_DECOMPRESSED_SIZE
+    ) as f:
+        return await f.read()  # raises OSError once the cap is exceeded
 ```
+
+The guard applies to every read path (full reads, chunked reads, line iteration) and to both the binary and text classes. Additional hardening options:
+
+- Consider implementing timeouts for decompression operations on untrusted input
+- `strict_size=True` (write side) refuses to produce members whose ISIZE field would silently truncate at 4 GiB
 
 ## Contact
 

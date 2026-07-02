@@ -23,7 +23,6 @@ async def _read_back(path):
 
 
 class TestDefaultCompressionUnchanged:
-    @pytest.mark.asyncio
     async def test_installing_extra_does_not_change_default_output(
         self, monkeypatch, tmp_path
     ):
@@ -47,7 +46,6 @@ class TestDefaultCompressionUnchanged:
 
 @pytest.mark.skipif(not ZNG_AVAILABLE, reason="zlib-ng not installed")
 class TestFastCompressEnabled:
-    @pytest.mark.asyncio
     async def test_roundtrip_binary(self, monkeypatch, tmp_path):
         monkeypatch.setattr(_engine, "_HAVE_ZNG", True)
         path = tmp_path / "fast.gz"
@@ -55,7 +53,6 @@ class TestFastCompressEnabled:
             await f.write(PAYLOAD)
         assert await _read_back(path) == PAYLOAD
 
-    @pytest.mark.asyncio
     async def test_readable_by_stdlib_gzip(self, monkeypatch, tmp_path):
         monkeypatch.setattr(_engine, "_HAVE_ZNG", True)
         path = tmp_path / "fast_interop.gz"
@@ -64,7 +61,6 @@ class TestFastCompressEnabled:
         with gzip.open(path, "rb") as f:
             assert f.read() == PAYLOAD
 
-    @pytest.mark.asyncio
     async def test_fast_output_differs_from_default(self, monkeypatch, tmp_path):
         monkeypatch.setattr(_engine, "_HAVE_ZNG", True)
         # Same path/name and mtime so only the deflate body can differ.
@@ -79,7 +75,6 @@ class TestFastCompressEnabled:
         # different deflate implementation produced it.
         assert default_bytes != fast_bytes
 
-    @pytest.mark.asyncio
     async def test_roundtrip_text(self, monkeypatch, tmp_path):
         monkeypatch.setattr(_engine, "_HAVE_ZNG", True)
         path = tmp_path / "fast.txt.gz"
@@ -89,7 +84,6 @@ class TestFastCompressEnabled:
         async with AsyncGzipTextFile(path, "rt") as f:
             assert await f.read() == text
 
-    @pytest.mark.asyncio
     async def test_factory_threads_flag(self, monkeypatch, tmp_path):
         monkeypatch.setattr(_engine, "_HAVE_ZNG", True)
         path = tmp_path / "factory.gz"
@@ -105,7 +99,6 @@ class TestFastCompressFallback:
         with pytest.warns(UserWarning, match="zlib-ng is not available"):
             AsyncGzipBinaryFile(tmp_path / "x.gz", "wb", fast_compress=True)
 
-    @pytest.mark.asyncio
     async def test_falls_back_and_roundtrips(self, monkeypatch, tmp_path):
         monkeypatch.setattr(_engine, "_HAVE_ZNG", False)
         path = tmp_path / "fallback.gz"

@@ -107,7 +107,6 @@ class TestAsyncGzipFile:
         assert gz_file._text_buffer == ""  # pyrefly: ignore
         assert gz_file._is_closed is False
 
-    @pytest.mark.asyncio
     async def test_context_manager_write_read_binary(self, temp_file, sample_data):
         """Test writing and reading data using context manager in binary mode."""
         async with AsyncGzipFile(temp_file, "wb") as gz_file:
@@ -118,7 +117,6 @@ class TestAsyncGzipFile:
             read_data = await gz_file.read()
             assert read_data == sample_data
 
-    @pytest.mark.asyncio
     async def test_context_manager_write_read_text(self, temp_file):
         """Test writing and reading data using context manager in text mode."""
         test_text = "Hello, World! This is a test string."
@@ -131,7 +129,6 @@ class TestAsyncGzipFile:
             read_data = await gz_file.read()
             assert read_data == test_text
 
-    @pytest.mark.asyncio
     async def test_partial_read_binary(self, temp_file, sample_data):
         """Test partial reading in binary mode."""
         async with AsyncGzipFile(temp_file, "wb") as gz_file:
@@ -144,7 +141,6 @@ class TestAsyncGzipFile:
             remaining_data = await gz_file.read()
             assert remaining_data == sample_data[10:]
 
-    @pytest.mark.asyncio
     async def test_partial_read_text(self, temp_file):
         """Test partial reading in text mode."""
         test_text = "Hello, World! This is a test string."
@@ -159,7 +155,6 @@ class TestAsyncGzipFile:
             remaining_data = await gz_file.read()
             assert remaining_data == test_text[10:]
 
-    @pytest.mark.asyncio
     async def test_large_data_binary(self, temp_file, large_data):
         """Test with large data in binary mode."""
         async with AsyncGzipFile(temp_file, "wb") as gz_file:
@@ -169,7 +164,6 @@ class TestAsyncGzipFile:
             read_data = await gz_file.read()
             assert read_data == large_data
 
-    @pytest.mark.asyncio
     async def test_large_data_text(self, temp_file):
         """Test with large data in text mode."""
         large_text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 1000
@@ -181,7 +175,6 @@ class TestAsyncGzipFile:
             read_data = await gz_file.read()
             assert read_data == large_text
 
-    @pytest.mark.asyncio
     async def test_write_type_error_binary(self, temp_file):
         """Test write with wrong type in binary mode."""
         async with AsyncGzipFile(temp_file, "wb") as gz_file:
@@ -190,28 +183,24 @@ class TestAsyncGzipFile:
             ):
                 await gz_file.write("string data")  # pyrefly: ignore
 
-    @pytest.mark.asyncio
     async def test_write_type_error_text(self, temp_file):
         """Test write with wrong type in text mode."""
         async with AsyncGzipFile(temp_file, "wt") as gz_file:
             with pytest.raises(TypeError, match="write\\(\\) argument must be str"):
                 await gz_file.write(b"bytes data")  # pyrefly: ignore
 
-    @pytest.mark.asyncio
     async def test_read_type_error_binary(self, temp_file):
         """Test read with wrong mode in binary mode."""
         async with AsyncGzipFile(temp_file, "wb") as gz_file:
             with pytest.raises(IOError, match="File not open for reading"):
                 await gz_file.read()
 
-    @pytest.mark.asyncio
     async def test_read_type_error_text(self, temp_file):
         """Test read with wrong mode in text mode."""
         async with AsyncGzipFile(temp_file, "wt") as gz_file:
             with pytest.raises(IOError, match="File not open for reading"):
                 await gz_file.read()
 
-    @pytest.mark.asyncio
     async def test_line_iteration_binary_mode(self, temp_file):
         """Test line iteration in binary mode."""
         async with AsyncGzipFile(temp_file, "wb") as f:
@@ -223,7 +212,6 @@ class TestAsyncGzipFile:
                 lines.append(line)
             assert lines == [b"line1\n", b"line2"]
 
-    @pytest.mark.asyncio
     async def test_line_iteration_text_mode(self, temp_file):
         """Test line iteration in text mode."""
         test_lines = ["Line 1\n", "Line 2\n", "Line 3\n"]
@@ -238,7 +226,6 @@ class TestAsyncGzipFile:
                 lines.append(line)
             assert lines == test_lines
 
-    @pytest.mark.asyncio
     async def test_mode_mapping(self):
         """Test that modes are correctly mapped to underlying file modes."""
         gz_file = AsyncGzipFile("test.gz", "r")
@@ -259,12 +246,10 @@ class TestAsyncGzipFile:
         gz_file = AsyncGzipFile("test.gz", "at")
         assert gz_file._binary_mode == "ab"  # pyrefly: ignore
 
-    @pytest.mark.asyncio
     async def test_default_chunk_size(self):
         """Test default chunk size."""
         assert AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE == 256 * 1024
 
-    @pytest.mark.asyncio
     async def test_interoperability_with_gzip_binary(self, temp_file, sample_data):
         """Test interoperability with gzip.open for binary data."""
         async with AsyncGzipFile(temp_file, "wb") as f:
@@ -281,7 +266,6 @@ class TestAsyncGzipFile:
             read_data = await f.read()
             assert read_data == sample_data
 
-    @pytest.mark.asyncio
     async def test_interoperability_with_gzip_text(self, temp_file):
         """Test interoperability with gzip.open for text data."""
         test_text = "Hello, World! This is a test string."

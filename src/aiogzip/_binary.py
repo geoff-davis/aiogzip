@@ -127,6 +127,7 @@ class AsyncGzipBinaryFile:
         "_decompressed_total",
         "_strict_size",
         "_fast_compress",
+        "_saw_compressed_data",
     )
 
     # 256 KiB balances bulk-read throughput against per-file memory. Below it
@@ -228,6 +229,7 @@ class AsyncGzipBinaryFile:
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._decompressed_total: int = 0
         self._strict_size: bool = bool(strict_size)
+        self._saw_compressed_data: bool = False
 
     async def open(self) -> "AsyncGzipBinaryFile":
         """Open the file for I/O and return ``self``.
@@ -286,6 +288,7 @@ class AsyncGzipBinaryFile:
                 self._header_probe_buffer.clear()
                 self._compressed_cache.clear()
                 self._replay_offset = None
+                self._saw_compressed_data = False
                 self._underlying_seekable = await self._probe_underlying_seekable()
                 self._cache_rewindable_reads = not self._underlying_seekable
 
@@ -313,10 +316,14 @@ class AsyncGzipBinaryFile:
     # File API compatibility helpers
     async def tell(self) -> int:
         """Return the current uncompressed file position."""
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
         return self._position
 
     async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
         """Move to a new file position, mirroring gzip.GzipFile semantics."""
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
         if self._writing_mode:
@@ -413,6 +420,11 @@ class AsyncGzipBinaryFile:
             raise io.UnsupportedOperation("fileno() not supported by underlying file")
         result = fileno_method()
         if hasattr(result, "__await__"):
+            # Dispose of the never-awaited coroutine so it does not emit a
+            # "coroutine was never awaited" RuntimeWarning.
+            close_method = getattr(result, "close", None)
+            if callable(close_method):
+                close_method()
             raise io.UnsupportedOperation(
                 "fileno() is not awaitable in underlying file"
             )
@@ -623,7 +635,10 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
-        if limit is None:
+        if limit is None or limit < 0:
+            # Any negative limit means "no limit", matching io.IOBase. Values
+            # below -1 must not reach the arithmetic below, where they would
+            # move the buffer offset backwards.
             limit = -1
         if limit == 0:
             return b""
@@ -790,7 +805,17 @@ class AsyncGzipBinaryFile:
                 # not guaranteed safe across thread boundaries while we
                 # may still mutate the caller's bytearray.
                 payload = bytes(buffer) if not isinstance(buffer, bytes) else buffer
-                compressed = await _run_zlib_in_thread(self._engine.compress, payload)
+                try:
+                    compressed = await _run_zlib_in_thread(
+                        self._engine.compress, payload
+                    )
+                except asyncio.CancelledError:
+                    # Cancelling this await does not stop the executor
+                    # thread: compress() may still run and advance the
+                    # shared compressor past bytes we never accounted
+                    # for, so the member is no longer recoverable.
+                    self._write_broken = True
+                    raise
             else:
                 compressed = self._engine.compress(buffer)
         except _engine.ZLIB_ERRORS as e:
@@ -947,6 +972,9 @@ class AsyncGzipBinaryFile:
 
         compressed_chunk = await self._read_compressed_chunk()
 
+        if compressed_chunk:
+            self._saw_compressed_data = True
+
         if self._mtime is None and compressed_chunk:
             self._header_probe_buffer.extend(compressed_chunk)
             parsed_mtime, complete = _try_parse_gzip_header_mtime(
@@ -972,8 +1000,10 @@ class AsyncGzipBinaryFile:
             # After the underlying file is drained, the decompressor must
             # have consumed a complete gzip member — otherwise the file
             # was truncated mid-stream and silently ignoring that would
-            # hand the caller a partial read with no indication.
-            if not getattr(self._engine, "eof", True):
+            # hand the caller a partial read with no indication. A file
+            # that never yielded any compressed bytes is not truncated:
+            # gzip.open() reads a zero-byte file as empty, so we do too.
+            if self._saw_compressed_data and not getattr(self._engine, "eof", True):
                 raise gzip.BadGzipFile(
                     "Error decompressing gzip data: stream ended before "
                     "the member trailer was read; the file is truncated "
@@ -1092,6 +1122,7 @@ class AsyncGzipBinaryFile:
         self._eof = False
         self._position = 0
         self._decompressed_total = 0
+        self._saw_compressed_data = False
 
     async def _probe_underlying_seekable(self) -> bool:
         """Return whether the underlying file should be rewound with seek()."""
@@ -1190,7 +1221,15 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
 
-        if self._writing_mode and self._file is not None and not self._write_broken:
+        if self._writing_mode and self._write_broken:
+            # Pretending the flush succeeded would tell the caller their
+            # bytes are safely on disk when the member is already torn.
+            raise OSError(
+                "write stream is broken after a prior write failure; "
+                "the gzip member is unusable"
+            )
+
+        if self._writing_mode and self._file is not None:
             # Flush any buffered compressed data (but not the final trailer)
             # Using Z_SYNC_FLUSH allows us to flush without ending the stream
             try:

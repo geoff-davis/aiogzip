@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Announced
+
+- The 1.x line is the last to support Python 3.8 and 3.9 (both past
+  end-of-life; together ~0.35% of downloads over the last 180 days).
+  aiogzip 2.0 will require Python 3.11+. Older interpreters keep resolving
+  the latest 1.x release via the `requires-python` metadata.
+
+### Fixed
+
+- `readline(limit)` with a limit below -1 corrupted the read position: the binary fast path could move the buffer offset backwards and re-serve already-consumed bytes, and the text path drove the buffer offset negative so subsequent reads returned empty strings. Any negative limit now means "no limit", matching `io.IOBase`.
+- Reading a zero-byte file raised `BadGzipFile` ("truncated") where `gzip.open()` returns empty output. Truncation is now reported only when a gzip member actually started. Files that end mid-member still raise.
+- `seek()`, `tell()`, `rewind()`, `readinto()` and `readinto1()` on a closed file now raise `ValueError` like `read()`/`peek()`; previously `seek()` silently succeeded.
+- `flush()` on a writer whose stream was broken by a prior write failure now raises `OSError` instead of silently returning as if the data were flushed.
+- Cancelling a `write()` while it awaits the offloaded zlib compress now marks the stream broken — the executor thread may still consume the input, so continuing to write could silently produce a torn member.
+- `fileno()` no longer leaks an un-awaited coroutine (RuntimeWarning) when the underlying file's `fileno` is async.
+
+### Added
+
+- `AsyncGzipTextFile` file-API parity with the binary class: `mtime`, `isatty()`, `detach()`, `truncate()`; `seekable()` now delegates to the binary layer instead of returning a constant `True`.
+
 ## [1.8.0] - 2026-06-10
 
 ### Added

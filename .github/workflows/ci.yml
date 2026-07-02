@@ -22,6 +22,42 @@ concurrency:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
+  # Lint and type-check once, on one interpreter. Running these in every
+  # matrix leg wasted time and — worse — checked with *different* tool
+  # versions per interpreter (Python 3.8 resolves an old mypy).
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev,csv]
+
+      - name: Lint with Ruff
+        run: ruff check .
+
+      - name: Check formatting with Ruff
+        run: ruff format --check .
+
+      - name: Type check with Mypy
+        run: mypy src
+
+      - name: Type check with Ty
+        run: ty check src
+
+      - name: Check Python 3.8 compatibility
+        run: python scripts/check_py38_compat.py src/aiogzip/*.py
+
   build:
     # The type of runner that the job will run on
     runs-on: ${{ matrix.os }}
@@ -52,6 +88,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: "pip"
 
       # Step 3: Install dependencies
       - name: Install dependencies
@@ -59,34 +96,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .[dev,csv]
 
-      # Step 4: Lint with Ruff
-      - name: Lint with Ruff
-        run: |
-          ruff check .
-
-      # Step 5: Check formatting with Ruff
-      - name: Check formatting with Ruff
-        run: |
-          ruff format --check .
-
-      # Step 6: Type check with Mypy
-      - name: Type check with Mypy
-        run: |
-          mypy src
-
-      # Step 7: Type check with Ty
-      - name: Type check with Ty
-        run: |
-          ty check src
-
-      # Step 8: Check Python 3.8 source syntax compatibility
-      - name: Check Python 3.8 compatibility
-        run: |
-          python scripts/check_py38_compat.py src/aiogzip/*.py
-
-      # Step 9: Run tests with pytest and coverage
+      # Step 4: Run tests with pytest and coverage
       # --cov-fail-under gates against silent coverage regressions. The
-      # threshold sits a couple points below the current ~87% to absorb
+      # threshold sits a few points below the current ~91% to absorb
       # benign per-platform branch differences without nuisance failures.
       - name: Run tests with pytest and coverage
         run: |
@@ -108,6 +120,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install dependencies (with fast extra)
         run: |
@@ -137,6 +150,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install dependencies
         run: |

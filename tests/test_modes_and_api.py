@@ -32,7 +32,6 @@ class TestModeParsingErrors:
 class TestNewAPIMethods:
     """Test new API methods: flush() and readline()."""
 
-    @pytest.mark.asyncio
     async def test_binary_flush_method(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"Hello")
@@ -44,7 +43,6 @@ class TestNewAPIMethods:
             data = await f.read()
             assert data == b"Hello World"
 
-    @pytest.mark.asyncio
     async def test_text_flush_method(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("Hello")
@@ -56,7 +54,6 @@ class TestNewAPIMethods:
             data = await f.read()
             assert data == "Hello World"
 
-    @pytest.mark.asyncio
     async def test_flush_on_closed_file_raises(self, temp_file):
         f = AsyncGzipBinaryFile(temp_file, "wb")
         async with f:
@@ -65,7 +62,6 @@ class TestNewAPIMethods:
         with pytest.raises(ValueError, match="I/O operation on closed file"):
             await f.flush()
 
-    @pytest.mark.asyncio
     async def test_flush_in_read_mode_is_noop(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"test data")
@@ -75,7 +71,6 @@ class TestNewAPIMethods:
             data = await f.read()
             assert data == b"test data"
 
-    @pytest.mark.asyncio
     async def test_readline_basic(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("Line 1\nLine 2\nLine 3")
@@ -93,7 +88,6 @@ class TestNewAPIMethods:
             eof = await f.readline()
             assert eof == ""
 
-    @pytest.mark.asyncio
     async def test_readline_empty_file(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             pass
@@ -102,7 +96,6 @@ class TestNewAPIMethods:
             line = await f.readline()
             assert line == ""
 
-    @pytest.mark.asyncio
     async def test_readline_single_line(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("Single line\n")
@@ -113,7 +106,6 @@ class TestNewAPIMethods:
             eof = await f.readline()
             assert eof == ""
 
-    @pytest.mark.asyncio
     async def test_readline_vs_iteration(self, temp_file):
         test_data = "Line 1\nLine 2\nLine 3\n"
 
@@ -135,13 +127,11 @@ class TestNewAPIMethods:
 
         assert lines_readline == lines_iter
 
-    @pytest.mark.asyncio
     async def test_readline_in_write_mode_raises(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             with pytest.raises(IOError, match="File not open for reading"):
                 await f.readline()
 
-    @pytest.mark.asyncio
     async def test_readline_on_closed_file_raises(self, temp_file):
         f = AsyncGzipTextFile(temp_file, "wt")
         async with f:
@@ -150,7 +140,6 @@ class TestNewAPIMethods:
         with pytest.raises(ValueError, match="I/O operation on closed file"):
             await f.readline()
 
-    @pytest.mark.asyncio
     async def test_readline_large_lines(self, temp_file):
         large_line = "x" * 100000 + "\n"
 
@@ -164,7 +153,6 @@ class TestNewAPIMethods:
             line2 = await f.readline()
             assert line2 == "small line\n"
 
-    @pytest.mark.asyncio
     async def test_readline_with_limit(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("Hello World\n")
@@ -177,7 +165,6 @@ class TestNewAPIMethods:
             eof = await f.readline()
             assert eof == ""
 
-    @pytest.mark.asyncio
     async def test_readline_limit_at_newline(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("abc\ndef\n")
@@ -188,7 +175,6 @@ class TestNewAPIMethods:
             line2 = await f.readline()
             assert line2 == "def\n"
 
-    @pytest.mark.asyncio
     async def test_readline_limit_before_newline(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("abcdef\n")
@@ -201,7 +187,6 @@ class TestNewAPIMethods:
             part3 = await f.readline()
             assert part3 == "\n"
 
-    @pytest.mark.asyncio
     async def test_readline_limit_larger_than_line(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("short\n")
@@ -210,7 +195,6 @@ class TestNewAPIMethods:
             line = await f.readline(100)
             assert line == "short\n"
 
-    @pytest.mark.asyncio
     async def test_readline_limit_zero(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("Hello\n")
@@ -221,7 +205,6 @@ class TestNewAPIMethods:
             line = await f.readline()
             assert line == "Hello\n"
 
-    @pytest.mark.asyncio
     async def test_readline_limit_on_file_without_newline(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("Hello World")
@@ -234,7 +217,6 @@ class TestNewAPIMethods:
             eof = await f.readline()
             assert eof == ""
 
-    @pytest.mark.asyncio
     async def test_readline_limit_multiple_lines(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("Line1\nLine2\nLine3\n")
@@ -245,7 +227,6 @@ class TestNewAPIMethods:
             assert await f.readline(10) == "Line2\n"
             assert await f.readline() == "Line3\n"
 
-    @pytest.mark.asyncio
     async def test_readlines_basic(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("Line 1\nLine 2\nLine 3\n")
@@ -254,7 +235,6 @@ class TestNewAPIMethods:
             lines = await f.readlines()
             assert lines == ["Line 1\n", "Line 2\n", "Line 3\n"]
 
-    @pytest.mark.asyncio
     async def test_readlines_no_trailing_newline(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("Line 1\nLine 2\nLine 3")
@@ -263,7 +243,6 @@ class TestNewAPIMethods:
             lines = await f.readlines()
             assert lines == ["Line 1\n", "Line 2\n", "Line 3"]
 
-    @pytest.mark.asyncio
     async def test_readlines_empty_file(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             pass
@@ -272,7 +251,6 @@ class TestNewAPIMethods:
             lines = await f.readlines()
             assert lines == []
 
-    @pytest.mark.asyncio
     async def test_readlines_with_hint(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             for i in range(100):
@@ -285,13 +263,11 @@ class TestNewAPIMethods:
             total_chars = sum(len(line) for line in lines)
             assert total_chars >= 50
 
-    @pytest.mark.asyncio
     async def test_readlines_in_write_mode_raises(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             with pytest.raises(OSError, match="File not open for reading"):
                 await f.readlines()
 
-    @pytest.mark.asyncio
     async def test_readlines_on_closed_file_raises(self, temp_file):
         f = AsyncGzipTextFile(temp_file, "wt")
         async with f:
@@ -300,7 +276,6 @@ class TestNewAPIMethods:
         with pytest.raises(ValueError, match="I/O operation on closed file"):
             await f.readlines()
 
-    @pytest.mark.asyncio
     async def test_writelines_basic(self, temp_file):
         lines = ["Line 1\n", "Line 2\n", "Line 3\n"]
 
@@ -311,7 +286,6 @@ class TestNewAPIMethods:
             result = await f.readlines()
             assert result == lines
 
-    @pytest.mark.asyncio
     async def test_writelines_generator(self, temp_file):
         def line_generator():
             for i in range(5):
@@ -324,7 +298,6 @@ class TestNewAPIMethods:
             lines = await f.readlines()
             assert lines == ["Line 0\n", "Line 1\n", "Line 2\n", "Line 3\n", "Line 4\n"]
 
-    @pytest.mark.asyncio
     async def test_writelines_empty_list(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.writelines([])
@@ -333,7 +306,6 @@ class TestNewAPIMethods:
             content = await f.read()
             assert content == ""
 
-    @pytest.mark.asyncio
     async def test_writelines_no_newlines(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.writelines(["a", "b", "c"])
@@ -342,7 +314,6 @@ class TestNewAPIMethods:
             content = await f.read()
             assert content == "abc"
 
-    @pytest.mark.asyncio
     async def test_writelines_in_read_mode_raises(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("test")
@@ -351,7 +322,6 @@ class TestNewAPIMethods:
             with pytest.raises(OSError, match="File not open for writing"):
                 await f.writelines(["line"])
 
-    @pytest.mark.asyncio
     async def test_writelines_on_closed_file_raises(self, temp_file):
         f = AsyncGzipTextFile(temp_file, "wt")
         async with f:
@@ -360,7 +330,6 @@ class TestNewAPIMethods:
         with pytest.raises(ValueError, match="I/O operation on closed file"):
             await f.writelines(["line"])
 
-    @pytest.mark.asyncio
     async def test_readlines_writelines_roundtrip(self, temp_file):
         original_lines = ["First line\n", "Second line\n", "Third line without newline"]
 

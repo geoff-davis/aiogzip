@@ -10,7 +10,6 @@ from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 class TestEdgeCasesAndErrors:
     """Targeted tests to improve code coverage and handle edge cases."""
 
-    @pytest.mark.asyncio
     async def test_compresslevel_validation(self):
         """Test validation of compresslevel."""
         # -1 is valid (zlib default)
@@ -26,7 +25,6 @@ class TestEdgeCasesAndErrors:
         ):
             AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=10)
 
-    @pytest.mark.asyncio
     async def test_mtime_validation(self):
         """Test validation of mtime values."""
         AsyncGzipBinaryFile("test.gz", mode="wb", mtime=0xFFFFFFFF)
@@ -38,7 +36,6 @@ class TestEdgeCasesAndErrors:
         with pytest.raises(ValueError, match=r"mtime must be <= 4294967295"):
             AsyncGzipTextFile("test.gz", mode="wt", mtime=0x100000000)
 
-    @pytest.mark.asyncio
     async def test_binary_file_init_errors(self):
         """Test initialization errors for AsyncGzipBinaryFile."""
         # Binary mode cannot include text
@@ -59,7 +56,6 @@ class TestEdgeCasesAndErrors:
         with pytest.raises(TypeError, match="mode must be a string"):
             AsyncGzipFile("test.gz", mode=123)  # type: ignore[arg-type]
 
-    @pytest.mark.asyncio
     async def test_binary_file_filename_none_error(self):
         """Test error when filename is None and no fileobj provided."""
         # Error is raised during init, not aenter
@@ -68,7 +64,6 @@ class TestEdgeCasesAndErrors:
         ):
             AsyncGzipBinaryFile(None)
 
-    @pytest.mark.asyncio
     async def test_text_file_init_errors(self):
         """Test initialization errors for AsyncGzipTextFile."""
         # Empty encoding
@@ -92,7 +87,6 @@ class TestEdgeCasesAndErrors:
         with pytest.raises(ValueError, match="illegal newline value"):
             AsyncGzipTextFile("test.gz", newline="bad")
 
-    @pytest.mark.asyncio
     async def test_text_file_plus_mode(self, tmp_path):
         """Test 'rt+' mode handling in AsyncGzipTextFile."""
         # This should set _binary_mode to 'rb+'
@@ -102,7 +96,6 @@ class TestEdgeCasesAndErrors:
         async with AsyncGzipTextFile(p, "rt+") as f:
             assert f._binary_mode == "rb+"
 
-    @pytest.mark.asyncio
     async def test_write_newlines_coverage(self, tmp_path):
         """Test write with different newline settings to cover branching."""
         p = tmp_path / "newlines.gz"
@@ -119,7 +112,6 @@ class TestEdgeCasesAndErrors:
         async with AsyncGzipTextFile(p, "wt", newline="") as f:
             await f.write("line1\n")
 
-    @pytest.mark.asyncio
     async def test_read_size_none_or_negative(self, tmp_path):
         """Test read with size=None or size < 0."""
         p = tmp_path / "read_size.gz"
@@ -138,7 +130,6 @@ class TestEdgeCasesAndErrors:
         async with AsyncGzipTextFile(p, "rt") as f:
             assert await f.read(-5) == "data"
 
-    @pytest.mark.asyncio
     async def test_read_zero(self, tmp_path):
         """Test read with size=0."""
         p = tmp_path / "read_zero.gz"
@@ -151,7 +142,6 @@ class TestEdgeCasesAndErrors:
         async with AsyncGzipTextFile(p, "rt") as f:
             assert await f.read(0) == ""
 
-    @pytest.mark.asyncio
     async def test_binary_write_errors(self, tmp_path):
         """Test binary write error conditions."""
         p = tmp_path / "write_err.gz"
@@ -176,7 +166,6 @@ class TestEdgeCasesAndErrors:
         with pytest.raises(ValueError, match="File not opened"):
             await f.write(b"fail")
 
-    @pytest.mark.asyncio
     async def test_binary_read_errors(self, tmp_path):
         """Test binary read error conditions."""
         p = tmp_path / "read_err.gz"
@@ -200,7 +189,6 @@ class TestEdgeCasesAndErrors:
         with pytest.raises(ValueError, match="File not opened"):
             await f.read()
 
-    @pytest.mark.asyncio
     async def test_binary_compression_error(self, tmp_path):
         """Test zlib error during compression."""
         p = tmp_path / "comp_err.gz"
@@ -219,7 +207,6 @@ class TestEdgeCasesAndErrors:
             with pytest.raises(OSError, match="Error compressing data"):
                 await f.write(b"data")
 
-    @pytest.mark.asyncio
     async def test_binary_flush_error(self, tmp_path):
         """Test zlib error during flush."""
         p = tmp_path / "flush_err.gz"
@@ -242,7 +229,6 @@ class TestEdgeCasesAndErrors:
             with pytest.raises(OSError, match="Error flushing compressed data"):
                 await f.flush()
 
-    @pytest.mark.asyncio
     async def test_binary_enter_failure_closes_owned_file(self, monkeypatch, tmp_path):
         """Failed binary __aenter__ should close internally opened file handles."""
         import aiogzip._binary as binary_module
@@ -271,7 +257,6 @@ class TestEdgeCasesAndErrors:
         assert opened_file.close_called is True
         assert f._file is None
 
-    @pytest.mark.asyncio
     async def test_text_enter_failure_closes_nested_binary_file(
         self, monkeypatch, tmp_path
     ):
@@ -301,7 +286,6 @@ class TestEdgeCasesAndErrors:
         assert FailingBinaryFile.last_instance.close_called is True
         assert f._binary_file is None
 
-    @pytest.mark.asyncio
     async def test_text_write_type_error(self, tmp_path):
         """Test write raises TypeError for non-string input."""
         p = tmp_path / "text_type_err.gz"
@@ -309,7 +293,6 @@ class TestEdgeCasesAndErrors:
             with pytest.raises(TypeError, match="write\\(\\) argument must be str"):
                 await f.write(b"bytes")  # type: ignore
 
-    @pytest.mark.asyncio
     async def test_text_read_eof_flush_data(self, tmp_path):
         """Test that decoder flush at EOF returns remaining data."""
         p = tmp_path / "text_flush.gz"
@@ -324,7 +307,6 @@ class TestEdgeCasesAndErrors:
         async with AsyncGzipTextFile(p, "rt") as f:
             assert await f.read() == "test"
 
-    @pytest.mark.asyncio
     async def test_text_anext_stops_iteration(self, tmp_path):
         """Test __anext__ raises StopAsyncIteration when closed."""
         p = tmp_path / "iter.gz"
@@ -338,7 +320,6 @@ class TestEdgeCasesAndErrors:
         with pytest.raises(StopAsyncIteration):
             await f.__anext__()
 
-    @pytest.mark.asyncio
     async def test_binary_iteration_requires_read_mode(self, tmp_path):
         """Binary iteration should raise if the file is not open for reading."""
         p = tmp_path / "iter_write.gz"
@@ -352,7 +333,6 @@ class TestEdgeCasesAndErrors:
 class TestAdditionalCoverage:
     """Additional tests to improve code coverage."""
 
-    @pytest.mark.asyncio
     async def test_derive_header_filename_type_error(self, tmp_path):
         """Test _derive_header_filename raises TypeError for invalid type."""
         from aiogzip._common import _derive_header_filename
@@ -361,7 +341,6 @@ class TestAdditionalCoverage:
         with pytest.raises(TypeError, match="original_filename must be"):
             _derive_header_filename(12345, None)
 
-    @pytest.mark.asyncio
     async def test_derive_header_filename_unicode_error(self, tmp_path):
         """Test _derive_header_filename handles UnicodeEncodeError gracefully."""
         from aiogzip._common import _derive_header_filename
@@ -378,7 +357,6 @@ class TestAdditionalCoverage:
         with pytest.raises(ValueError, match="original_filename cannot contain NUL"):
             AsyncGzipTextFile("test.gz", "wt", original_filename="a\x00b")
 
-    @pytest.mark.asyncio
     async def test_rewind_in_write_mode_raises(self, tmp_path):
         """Test rewind() raises error in write mode."""
         p = tmp_path / "test.gz"
@@ -387,7 +365,6 @@ class TestAdditionalCoverage:
             with pytest.raises(OSError, match="Can't rewind in write mode"):
                 await f.rewind()
 
-    @pytest.mark.asyncio
     async def test_peek_in_write_mode_raises(self, tmp_path):
         """Test peek() raises error in write mode."""
         p = tmp_path / "test.gz"
@@ -395,7 +372,6 @@ class TestAdditionalCoverage:
             with pytest.raises(OSError, match="File not open for reading"):
                 await f.peek()
 
-    @pytest.mark.asyncio
     async def test_readinto_in_write_mode_raises(self, tmp_path):
         """Test readinto() raises error in write mode."""
         p = tmp_path / "test.gz"
@@ -404,7 +380,6 @@ class TestAdditionalCoverage:
             with pytest.raises(OSError, match="File not open for reading"):
                 await f.readinto(buf)
 
-    @pytest.mark.asyncio
     async def test_seek_invalid_whence(self, tmp_path):
         """Test seek() with invalid whence value."""
         p = tmp_path / "test.gz"
@@ -415,7 +390,6 @@ class TestAdditionalCoverage:
             with pytest.raises(ValueError, match="Invalid whence"):
                 await f.seek(0, 99)  # Invalid whence
 
-    @pytest.mark.asyncio
     async def test_seek_end_in_write_mode(self, tmp_path):
         """Test seek(SEEK_END) in write mode raises error."""
         import os
@@ -426,7 +400,6 @@ class TestAdditionalCoverage:
             with pytest.raises(ValueError, match="Seek from end not supported"):
                 await f.seek(0, os.SEEK_END)
 
-    @pytest.mark.asyncio
     async def test_seek_end_in_read_mode(self, tmp_path):
         """Test seek(SEEK_END) in read mode matches gzip.GzipFile semantics."""
         import os
@@ -439,7 +412,6 @@ class TestAdditionalCoverage:
             assert await f.seek(-4, os.SEEK_END) == 5
             assert await f.read() == b"data"
 
-    @pytest.mark.asyncio
     async def test_fileno_no_fileno_method(self, tmp_path):
         """Test fileno() raises when underlying file has no fileno."""
         import io
@@ -468,7 +440,36 @@ class TestAdditionalCoverage:
         finally:
             await f.__aexit__(None, None, None)
 
-    @pytest.mark.asyncio
+    async def test_fileno_awaitable_does_not_leak_coroutine(self, tmp_path):
+        """An async fileno() must be rejected without leaving an un-awaited coroutine."""
+        import gc
+        import io
+        import warnings
+
+        class AsyncFilenoFile:
+            async def read(self, size=-1):
+                return b""
+
+            async def fileno(self):
+                return 3
+
+            async def close(self):
+                pass
+
+        f = AsyncGzipBinaryFile(None, "rb", fileobj=AsyncFilenoFile())
+        await f.__aenter__()
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                with pytest.raises(io.UnsupportedOperation, match="fileno"):
+                    f.fileno()
+                gc.collect()
+            assert not any("never awaited" in str(w.message) for w in caught), [
+                str(w.message) for w in caught
+            ]
+        finally:
+            await f.__aexit__(None, None, None)
+
     async def test_text_seek_cookie_remains_valid_after_many_tells(self, tmp_path):
         """tell() cookies should remain valid for the full stream lifetime."""
         p = tmp_path / "long_lived_cookie.gz"
@@ -488,7 +489,6 @@ class TestAdditionalCoverage:
             await f.seek(cookie)
             assert await f.read(10) == expected
 
-    @pytest.mark.asyncio
     async def test_text_tell_cookies_are_self_contained(self, tmp_path):
         """Text cookies should not rely on per-position cache state in the stream."""
         p = tmp_path / "self_contained_cookie.gz"
@@ -503,7 +503,6 @@ class TestAdditionalCoverage:
             assert isinstance(cookie, int)
             assert cookie < 0
 
-    @pytest.mark.asyncio
     async def test_text_seek_cookie_from_other_stream_raises(self, tmp_path):
         """Cookies should remain scoped to the open handle that created them."""
         p = tmp_path / "cross_stream_cookie.gz"
@@ -520,7 +519,6 @@ class TestAdditionalCoverage:
             ):
                 await second.seek(cookie)
 
-    @pytest.mark.asyncio
     async def test_text_seek_invalid_cookie_raises(self, tmp_path):
         """Seeking an arbitrary cookie should fail cleanly."""
         p = tmp_path / "invalid_cookie.gz"
@@ -533,7 +531,6 @@ class TestAdditionalCoverage:
             ):
                 await f.seek(-1)
 
-    @pytest.mark.asyncio
     async def test_text_seek_non_seek_set(self, tmp_path):
         """Test text file seek() non-SEEK_SET semantics."""
         import os
@@ -549,7 +546,6 @@ class TestAdditionalCoverage:
             ):
                 await f.seek(1, os.SEEK_CUR)
 
-    @pytest.mark.asyncio
     async def test_coerce_byteslike_invalid_type(self, tmp_path):
         """Test _coerce_byteslike with invalid type."""
         from aiogzip import AsyncGzipBinaryFile
@@ -559,7 +555,6 @@ class TestAdditionalCoverage:
             with pytest.raises(TypeError, match="must be a bytes-like object"):
                 await f.write("string not allowed")  # type: ignore
 
-    @pytest.mark.asyncio
     async def test_runtime_checkable_protocols(self):
         """Test that protocols are runtime checkable."""
         from aiogzip import WithAsyncRead, WithAsyncReadWrite, WithAsyncWrite
@@ -590,7 +585,6 @@ class TestAdditionalCoverage:
         assert isinstance(writer, WithAsyncWrite)
         assert isinstance(readwriter, WithAsyncReadWrite)
 
-    @pytest.mark.asyncio
     async def test_get_line_terminator_explicit_cr(self, tmp_path):
         """Test line terminator detection with explicit CR newline mode."""
         p = tmp_path / "test.gz"
@@ -606,7 +600,6 @@ class TestAdditionalCoverage:
             assert line1 == "line1\r"
             assert line2 == "line2\r"
 
-    @pytest.mark.asyncio
     async def test_get_line_terminator_explicit_crlf(self, tmp_path):
         """Test line terminator detection with explicit CRLF newline mode."""
         p = tmp_path / "test.gz"
@@ -626,7 +619,6 @@ class TestAdditionalCoverage:
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
-    @pytest.mark.asyncio
     async def test_tricky_unicode_split(self, temp_file):
         """
         Tests that multi-byte characters are decoded correctly even when
@@ -703,7 +695,6 @@ class TestEdgeCases:
         # Exactly at the cap is allowed.
         AsyncGzipBinaryFile("test.gz", chunk_size=128 * 1024 * 1024)
 
-    @pytest.mark.asyncio
     async def test_peek_size_upper_bound(self, temp_file, sample_data):
         """peek(size) must reject absurd sizes rather than try to buffer them."""
         async with AsyncGzipBinaryFile(temp_file, mode="wb") as f:
@@ -788,7 +779,6 @@ class TestEdgeCases:
             f = AsyncGzipTextFile("test.gz", errors=error_val)
             assert f._errors == error_val
 
-    @pytest.mark.asyncio
     async def test_empty_file_operations(self, temp_file):
         """Test operations on empty files."""
         # Write empty file
@@ -805,7 +795,6 @@ class TestEdgeCases:
             data = await f.read(100)
             assert data == b""
 
-    @pytest.mark.asyncio
     async def test_empty_text_file_operations(self, temp_file):
         """Test operations on empty text files."""
         # Write empty text file
@@ -824,7 +813,6 @@ class TestEdgeCases:
                 lines.append(line)
             assert lines == []
 
-    @pytest.mark.asyncio
     async def test_corrupted_file_handling(self, temp_file):
         """Test handling of corrupted gzip files."""
         # Create a file with invalid gzip data
@@ -836,7 +824,6 @@ class TestEdgeCases:
             with pytest.raises(gzip.BadGzipFile, match="Error decompressing gzip data"):
                 await f.read()
 
-    @pytest.mark.asyncio
     async def test_operations_on_closed_file(self, temp_file):
         """Test operations on closed files."""
         f = AsyncGzipBinaryFile(temp_file, "wb")
@@ -847,7 +834,6 @@ class TestEdgeCases:
         with pytest.raises(ValueError, match="I/O operation on closed file"):
             await f.write(b"more data")
 
-    @pytest.mark.asyncio
     async def test_operations_without_context_manager(self, temp_file):
         """Test operations without using context manager."""
         f = AsyncGzipBinaryFile(temp_file, "wb")
@@ -855,7 +841,6 @@ class TestEdgeCases:
         with pytest.raises(ValueError, match="File not opened"):
             await f.write(b"test")
 
-    @pytest.mark.asyncio
     async def test_compression_levels(self, temp_file):
         """Test different compression levels."""
         test_data = b"Hello, World! " * 1000  # Repeating data compresses well
@@ -883,7 +868,6 @@ class TestEdgeCases:
         # Level 9 (max compression) should be smallest for this data
         assert sizes[0] > sizes[9]
 
-    @pytest.mark.asyncio
     async def test_unicode_edge_cases(self, temp_file):
         """Test Unicode edge cases in text mode."""
         # Test various Unicode characters
@@ -905,7 +889,6 @@ class TestEdgeCases:
                 read_str = await f.read()
                 assert read_str == test_str
 
-    @pytest.mark.asyncio
     async def test_multiple_writes_and_reads(self, temp_file):
         """Test multiple write operations followed by reads."""
         chunks = [b"chunk1", b"chunk2", b"chunk3", b"chunk4"]
@@ -932,7 +915,6 @@ class TestEdgeCases:
 class TestErrorHandlingConsistency:
     """Test consistent error handling across the module."""
 
-    @pytest.mark.asyncio
     async def test_zlib_errors_wrapped_as_oserror(self, temp_file):
         """Test that zlib errors are consistently wrapped in OSError."""
         # Create corrupted gzip file
@@ -944,7 +926,6 @@ class TestErrorHandlingConsistency:
             with pytest.raises(OSError, match="Error decompressing gzip data"):
                 await f.read()
 
-    @pytest.mark.asyncio
     async def test_all_operation_errors_are_oserror(self, temp_file):
         """Test that all operation failures raise OSError consistently."""
         # Write valid data first
@@ -961,7 +942,6 @@ class TestErrorHandlingConsistency:
             with pytest.raises(IOError, match="File not open for reading"):
                 await f.read()
 
-    @pytest.mark.asyncio
     async def test_exception_chaining_preserved(self, temp_file):
         """Test that exception chaining is used (from e) for debugging.
 
@@ -990,7 +970,6 @@ class TestErrorHandlingConsistency:
                 or "error" in str(type(e.__cause__)).lower()
             )
 
-    @pytest.mark.asyncio
     async def test_clear_error_messages(self, temp_file):
         """Test that error messages clearly indicate which operation failed."""
         # Test compression error message
@@ -1004,7 +983,6 @@ class TestErrorHandlingConsistency:
                 # Error message should indicate it's a decompression error
                 assert "decompress" in str(e).lower()
 
-    @pytest.mark.asyncio
     async def test_io_errors_not_wrapped(self, tmp_path):
         """Test that I/O errors are re-raised as-is, not wrapped."""
         # Create a file that we'll delete while reading
@@ -1029,3 +1007,208 @@ class TestErrorHandlingConsistency:
 
         # Clean up
         await f.__aexit__(None, None, None)
+
+
+class TestClosedFileGuards:
+    """Every positional/IO method must raise ValueError on a closed file.
+
+    Regression: peek() reached the closed underlying handle (surfacing a
+    confusing OSError) and seek() on a closed file silently succeeded.
+    """
+
+    async def _closed_binary_reader(self, path):
+        async with AsyncGzipBinaryFile(path, "wb") as f:
+            await f.write(b"payload\n")
+        f = AsyncGzipBinaryFile(path, "rb")
+        await f.__aenter__()
+        await f.close()
+        return f
+
+    async def test_binary_methods_raise_on_closed(self, tmp_path):
+        f = await self._closed_binary_reader(tmp_path / "closed.gz")
+        with pytest.raises(ValueError, match="closed"):
+            await f.peek(4)
+        with pytest.raises(ValueError, match="closed"):
+            await f.seek(0)
+        with pytest.raises(ValueError, match="closed"):
+            await f.tell()
+        with pytest.raises(ValueError, match="closed"):
+            await f.rewind()
+        with pytest.raises(ValueError, match="closed"):
+            await f.readinto(bytearray(4))
+        with pytest.raises(ValueError, match="closed"):
+            await f.readinto1(bytearray(4))
+
+    async def test_text_seek_tell_raise_on_closed(self, tmp_path):
+        p = tmp_path / "closed_text.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("payload\n")
+        f = AsyncGzipTextFile(p, "rt")
+        await f.__aenter__()
+        await f.close()
+        with pytest.raises(ValueError, match="closed"):
+            await f.seek(0)
+        with pytest.raises(ValueError, match="closed"):
+            await f.tell()
+
+    async def test_flush_raises_on_broken_write_stream(self):
+        """flush() must not report success once the member is torn."""
+
+        class FailOnSecondWrite:
+            def __init__(self):
+                self.calls = 0
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls == 2:
+                    raise OSError("simulated disk full")
+                return len(data)
+
+            async def close(self):
+                pass
+
+        payload = os.urandom(64 * 1024)  # incompressible: forces output
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=FailOnSecondWrite(), closefd=False)
+        await f.__aenter__()
+        with pytest.raises(OSError, match="simulated disk full"):
+            await f.write(payload)
+        with pytest.raises(OSError, match="broken"):
+            await f.flush()
+        await f.__aexit__(None, None, None)
+
+
+class TestExclusiveCreateMode:
+    """'x' modes must refuse to clobber an existing file."""
+
+    async def test_binary_x_mode_raises_on_existing_file(self, tmp_path):
+        p = tmp_path / "exists.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"original")
+
+        with pytest.raises(FileExistsError):
+            async with AsyncGzipBinaryFile(p, "xb"):
+                pass
+
+        # The original file must be untouched.
+        async with AsyncGzipBinaryFile(p, "rb") as f:
+            assert await f.read() == b"original"
+
+    async def test_text_x_mode_raises_on_existing_file(self, tmp_path):
+        p = tmp_path / "exists.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("original")
+
+        with pytest.raises(FileExistsError):
+            async with AsyncGzipTextFile(p, "xt"):
+                pass
+
+        async with AsyncGzipTextFile(p, "rt") as f:
+            assert await f.read() == "original"
+
+
+class TestTrailerCorruption:
+    """Corrupted trailer fields must raise BadGzipFile, matching stdlib."""
+
+    @staticmethod
+    def _flip_byte(path, offset_from_end):
+        with open(path, "rb") as fh:
+            data = bytearray(fh.read())
+        data[-offset_from_end] ^= 0xFF
+        with open(path, "wb") as fh:
+            fh.write(data)
+
+    async def test_corrupted_crc_raises(self, tmp_path):
+        p = tmp_path / "bad_crc.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"hello world" * 100)
+        self._flip_byte(p, 8)  # trailer = CRC32 (4 bytes) + ISIZE (4 bytes)
+
+        async with AsyncGzipBinaryFile(p, "rb") as f:
+            with pytest.raises(gzip.BadGzipFile, match="data check"):
+                await f.read()
+
+    async def test_corrupted_isize_raises(self, tmp_path):
+        p = tmp_path / "bad_isize.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"hello world" * 100)
+        self._flip_byte(p, 1)  # last ISIZE byte
+
+        async with AsyncGzipBinaryFile(p, "rb") as f:
+            with pytest.raises(gzip.BadGzipFile, match="length check"):
+                await f.read()
+
+
+class TestTextModeGuardPlumbing:
+    """Safety kwargs must reach the binary layer through the text class."""
+
+    async def test_max_decompressed_size_enforced_in_text_mode(self, tmp_path):
+        p = tmp_path / "bomb.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("0" * (1024 * 1024))
+
+        async with AsyncGzipTextFile(p, "rt", max_decompressed_size=1024) as f:
+            with pytest.raises(OSError, match="max_decompressed_size"):
+                await f.read()
+
+
+class TestReadlinesHintBoundary:
+    """The line crossing the hint must still be returned whole."""
+
+    async def test_binary_hint_crossing_line_returned_whole(self, tmp_path):
+        p = tmp_path / "hint.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(b"aaaa\nbbbb\ncccc\n")
+
+        async with AsyncGzipBinaryFile(p, "rb") as f:
+            lines = await f.readlines(7)  # hint lands inside the second line
+        assert lines == [b"aaaa\n", b"bbbb\n"]
+
+    async def test_text_hint_crossing_line_returned_whole(self, tmp_path):
+        p = tmp_path / "hint_t.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("aaaa\nbbbb\ncccc\n")
+
+        async with AsyncGzipTextFile(p, "rt") as f:
+            lines = await f.readlines(7)
+        assert lines == ["aaaa\n", "bbbb\n"]
+
+
+class TestRewindCacheOverflowTransition:
+    """A backward seek that was valid earlier fails once the cache overflows."""
+
+    class NonSeekableReader:
+        def __init__(self, path):
+            self._fh = open(path, "rb")
+
+        async def read(self, size=-1):
+            return self._fh.read(size)
+
+        def seekable(self):
+            return False
+
+        async def close(self):
+            self._fh.close()
+
+    async def test_backward_seek_fails_after_cache_overflow(self, tmp_path):
+        p = tmp_path / "big.gz"
+        async with AsyncGzipBinaryFile(p, "wb") as f:
+            await f.write(os.urandom(64 * 1024))  # incompressible
+
+        reader = self.NonSeekableReader(p)
+        try:
+            async with AsyncGzipBinaryFile(
+                None,
+                "rb",
+                fileobj=reader,
+                max_rewind_cache_size=16 * 1024,  # holds a few chunks, not the file
+                chunk_size=4096,
+            ) as f:
+                await f.read(100)
+                assert f.seekable() is True
+                await f.seek(0)  # cache still holds everything read so far
+                await f.read()  # drains the file; cache cap is exceeded
+                assert f.seekable() is False
+                with pytest.raises(OSError, match="not seekable"):
+                    await f.seek(0)
+        finally:
+            await reader.close()

@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+# gh-deploy force-pushes gh-pages; never run two deploys concurrently.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

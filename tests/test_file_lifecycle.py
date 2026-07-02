@@ -8,7 +8,6 @@ from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 class TestClosefdParameter:
     """Test closefd parameter behavior."""
 
-    @pytest.mark.asyncio
     async def test_closefd_true_closes_file(self, tmp_path):
         import aiofiles
 
@@ -23,7 +22,6 @@ class TestClosefdParameter:
         with pytest.raises((ValueError, AttributeError)):
             await file_handle.write(b"more data")
 
-    @pytest.mark.asyncio
     async def test_closefd_false_keeps_file_open(self, tmp_path):
         import aiofiles
 
@@ -43,7 +41,6 @@ class TestClosefdParameter:
 
         assert len(content) > 0
 
-    @pytest.mark.asyncio
     async def test_closefd_default_with_fileobj_keeps_file_open(self, tmp_path):
         import aiofiles
 
@@ -56,7 +53,6 @@ class TestClosefdParameter:
         await file_handle.write(b"more data")
         await file_handle.close()
 
-    @pytest.mark.asyncio
     async def test_closefd_default_closes_owned_file(self, tmp_path):
         p = tmp_path / "test_closefd_default.gz"
 
@@ -66,7 +62,6 @@ class TestClosefdParameter:
 
         assert f._is_closed is True
 
-    @pytest.mark.asyncio
     async def test_closefd_with_text_file(self, tmp_path):
         import aiofiles
 
@@ -80,7 +75,6 @@ class TestClosefdParameter:
 
         await file_handle.close()
 
-    @pytest.mark.asyncio
     async def test_closefd_default_with_text_fileobj_keeps_file_open(self, tmp_path):
         import aiofiles
 
@@ -97,7 +91,6 @@ class TestClosefdParameter:
 class TestResourceCleanup:
     """Test proper resource cleanup and concurrent close handling."""
 
-    @pytest.mark.asyncio
     async def test_double_close_binary(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"test data")
@@ -105,7 +98,6 @@ class TestResourceCleanup:
         await f.close()
         await f.close()
 
-    @pytest.mark.asyncio
     async def test_double_close_text(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("test data")
@@ -113,7 +105,6 @@ class TestResourceCleanup:
         await f.close()
         await f.close()
 
-    @pytest.mark.asyncio
     async def test_text_close_after_partial_multibyte_read_closes_fileobj(
         self, tmp_path
     ):
@@ -152,7 +143,6 @@ class TestResourceCleanup:
 
         assert reader.close_called is True
 
-    @pytest.mark.asyncio
     async def test_concurrent_close_binary(self, temp_file):
         import asyncio
 
@@ -166,7 +156,6 @@ class TestResourceCleanup:
             f.close(),
         )
 
-    @pytest.mark.asyncio
     async def test_concurrent_close_text(self, temp_file):
         import asyncio
 
@@ -180,7 +169,6 @@ class TestResourceCleanup:
             f.close(),
         )
 
-    @pytest.mark.asyncio
     async def test_operations_after_close_raise_errors(self, temp_file):
         f = AsyncGzipBinaryFile(temp_file, "wb")
         async with f:
@@ -189,7 +177,6 @@ class TestResourceCleanup:
         with pytest.raises(ValueError, match="I/O operation on closed file"):
             await f.write(b"more data")
 
-    @pytest.mark.asyncio
     async def test_close_with_exception_during_flush(self, temp_file):
         f = AsyncGzipBinaryFile(temp_file, "wb")
         await f.__aenter__()
@@ -205,7 +192,6 @@ class TestResourceCleanup:
         await f.close()
         await f.close()
 
-    @pytest.mark.asyncio
     async def test_binary_close_failure_still_closes_fileobj(self):
         class FailingCloseTrackingWriter:
             def __init__(self):
@@ -230,7 +216,6 @@ class TestResourceCleanup:
 
         assert writer.close_called is True
 
-    @pytest.mark.asyncio
     async def test_binary_write_error_wins_over_close_error(self):
         """When both final write and close fail, the write error propagates."""
 
@@ -254,7 +239,6 @@ class TestResourceCleanup:
         with pytest.raises(OSError, match="final write failed"):
             await f.close()
 
-    @pytest.mark.asyncio
     async def test_text_close_does_not_raise_on_partial_multibyte(self, tmp_path):
         """Regression: close() used to call decoder.decode(b'', final=True),
         which raised UnicodeDecodeError if the decoder held partial multibyte

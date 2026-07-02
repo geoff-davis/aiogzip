@@ -61,7 +61,7 @@ Before committing code changes, verify:
    pytest --cov --cov-report=term-missing
    ```
 
-   Ensure all 329+ tests pass with good coverage.
+   Ensure all 790+ tests pass with good coverage.
 
 3. **Check imports:**
 
@@ -73,22 +73,17 @@ Before committing code changes, verify:
 
 4. **Test with Python 3.8 (optional but recommended):**
 
-   If you have pyenv installed:
+   The pre-commit `python38-compat` hook (`scripts/check_py38_compat.py`)
+   catches syntax-level incompatibilities. For a runtime check with pyenv:
 
    ```bash
    pyenv install 3.8.18  # One-time setup
    pyenv exec python3.8 -c "import aiogzip"  # Quick import test
    ```
 
-   Or use nox for multi-version testing:
-
-   ```bash
-   nox  # Tests against all supported Python versions
-   ```
-
 ## Test Coverage Best Practices
 
-- **Current coverage:** 87.27% (329 tests)
+- **Current coverage:** ~92% (790+ tests)
 - **Target:** Maintain or improve coverage. CI enforces a floor via
   `--cov-fail-under=85`.
 - Always add tests for new features
@@ -102,6 +97,53 @@ Tests are organized by priority:
 - `TestMediumPriorityEdgeCases` - Robustness
 - `TestLowPriorityEdgeCases` - Defensive validations
 - `TestNewlineHandlingBugs` - Specific bug fixes
+
+## Performance Regression Checks
+
+The read/readline/iteration paths in `_binary.py` and `_text.py` are hot:
+seemingly harmless changes there (an extra branch, attribute lookup, or
+method call per line/chunk) have measurably cost throughput before. When
+touching them, benchmark before and after:
+
+Check out the baseline *source* in a worktree, but run both sides with the
+**same venv and interpreter** by shadowing the editable install via
+PYTHONPATH (aiogzip is pure Python, so no build step is needed):
+
+```bash
+git worktree add /tmp/aiogzip-baseline main
+
+# Baseline source, current venv (PYTHONPATH shadows the editable install)
+PYTHONPATH=/tmp/aiogzip-baseline/src AIOGZIP_ENGINE=stdlib \
+    uv run python benchmarks/run_benchmarks.py \
+    --category io,micro --output /tmp/bench-before.json
+
+# Current branch source
+AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
+    --category io,micro --output /tmp/bench-after.json
+
+# Compare
+uv run python benchmarks/bench_compare.py /tmp/bench-before.json /tmp/bench-after.json
+
+git worktree remove /tmp/aiogzip-baseline
+```
+
+Notes:
+
+- **Never `uv run` from inside the baseline worktree** — it creates a fresh
+  venv that can resolve a *different Python version* (interpreter speed
+  differences of ±10% masquerade as code regressions) and may lack the
+  `fast` extra (zlib-ng vs stdlib skews read benchmarks several-fold).
+  Verify the source swap with
+  `PYTHONPATH=... python -c "import aiogzip; print(aiogzip.__file__)"`.
+- Pin the codec with `AIOGZIP_ENGINE=stdlib` on both sides.
+- Run on a quiet machine — background load skews results badly. Interleave
+  several before/after rounds and compare per-benchmark *minimum* times;
+  single-run deltas are noise.
+- `io,micro` covers the hot paths; use `--all` for changes to compression,
+  concurrency, or memory behavior.
+- Treat deltas that survive interleaved min-of-N comparison as real; chase
+  anything above ~5% with a targeted timeit-style micro-test before
+  concluding either way.
 
 ## Known Issues & Gotchas
 
@@ -177,11 +219,14 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **1.5.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
-  work includes the rewind cache for non-seekable streams, decompression-bomb
-  guards (`max_decompressed_size`), `strict_size`, and zlib executor offload.
+- **1.8.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
+  work includes the public `open()` lifecycle method and `__repr__`, Hypothesis
+  parity tests against stdlib gzip, the optional zlib-ng codec
+  (`aiogzip[fast]`), batched readline splitting, the 256 KiB default chunk
+  size, the rewind cache for non-seekable streams, decompression-bomb guards
+  (`max_decompressed_size`), `strict_size`, and zlib executor offload.
 
 ---
 
-**Last Updated:** 2026-05-28
+**Last Updated:** 2026-07-02
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!

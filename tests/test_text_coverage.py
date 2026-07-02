@@ -48,7 +48,6 @@ def mixed_file():
 
 @pytest.mark.parametrize("newline", ["\r\n", ""])
 @pytest.mark.parametrize("chunk_size", [1, 8, 64])
-@pytest.mark.asyncio
 async def test_iteration_fallback_matches_gzip(mixed_file, newline, chunk_size):
     async with AsyncGzipTextFile(
         mixed_file, "rt", newline=newline, chunk_size=chunk_size
@@ -61,7 +60,6 @@ async def test_iteration_fallback_matches_gzip(mixed_file, newline, chunk_size):
 
 @pytest.mark.parametrize("newline", ["\r\n", ""])
 @pytest.mark.parametrize("chunk_size", [1, 8, 64])
-@pytest.mark.asyncio
 async def test_readline_fallback_matches_gzip(mixed_file, newline, chunk_size):
     out = []
     async with AsyncGzipTextFile(
@@ -78,7 +76,6 @@ async def test_readline_fallback_matches_gzip(mixed_file, newline, chunk_size):
 
 
 @pytest.mark.parametrize("newline", ["\n", "\r"])
-@pytest.mark.asyncio
 async def test_bounded_readline_single_char_newline(tmp_path, newline):
     """Bounded readline (limit != -1) uses _find_line_terminator even for the
     single-char newline modes that an unbounded readline would fast-path."""
@@ -89,7 +86,6 @@ async def test_bounded_readline_single_char_newline(tmp_path, newline):
         assert await f.readline(4) == "line"  # truncated before terminator
 
 
-@pytest.mark.asyncio
 async def test_incomplete_multibyte_at_eof_fallback_mode():
     """A truncated multibyte sequence at EOF in a fallback newline mode must be
     handled by the final decode (errors='replace')."""
@@ -112,7 +108,6 @@ async def test_incomplete_multibyte_at_eof_fallback_mode():
 
 
 @pytest.mark.parametrize("chunk_size", [1, 4, 64])
-@pytest.mark.asyncio
 async def test_newlines_property_matches_gzip(mixed_file, chunk_size):
     """Universal mode should report the same observed newline styles as gzip,
     including when a CRLF is split across a chunk boundary (chunk_size=1)."""
@@ -128,7 +123,6 @@ async def test_newlines_property_matches_gzip(mixed_file, chunk_size):
 
 
 @pytest.mark.parametrize("chunk_size", [1, 3])
-@pytest.mark.asyncio
 async def test_newlines_tracked_during_universal_iteration(mixed_file, chunk_size):
     """Iterating in universal mode decodes chunk-by-chunk, exercising the
     trailing-CR / split-CRLF seen-tracking branches that read(-1) skips."""
@@ -143,7 +137,6 @@ async def test_newlines_tracked_during_universal_iteration(mixed_file, chunk_siz
     assert set(got) == {"\n", "\r", "\r\n"}
 
 
-@pytest.mark.asyncio
 async def test_newlines_none_before_any_newline_read(tmp_path):
     path = tmp_path / "nonl.gz"
     _write_raw(str(path), "no newline here")
@@ -156,7 +149,6 @@ async def test_newlines_none_before_any_newline_read(tmp_path):
 # --- seek cookie validation and forward plain-position seek ------------------
 
 
-@pytest.mark.asyncio
 async def test_seek_invalid_cookie_raises(mixed_file):
     async with AsyncGzipTextFile(mixed_file, "rt") as f:
         await f.read(3)
@@ -164,7 +156,6 @@ async def test_seek_invalid_cookie_raises(mixed_file):
             await f.seek(-987654321)  # negative but not a real cookie
 
 
-@pytest.mark.asyncio
 async def test_seek_cookie_from_other_stream_rejected(tmp_path):
     """A cookie minted by one open handle must be rejected by another (the
     per-stream nonce guards against it)."""
@@ -183,7 +174,6 @@ async def test_seek_cookie_from_other_stream_rejected(tmp_path):
             await f2.seek(cookie)
 
 
-@pytest.mark.asyncio
 async def test_seek_forward_plain_position_then_read(tmp_path):
     """Forward seek to a plain (ASCII) position replays from the start; covers
     the peek/EOF branches of _seek_to_plain_position."""

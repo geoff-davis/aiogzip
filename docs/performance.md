@@ -49,12 +49,12 @@ pip install "aiogzip[fast]"
 
 - **Decompression** uses zlib-ng automatically whenever it is installed. Its
   output is **byte-identical** to stdlib `zlib`, so this is transparent. Measured
-  read-throughput gains range from ~**1.2x** on typical data to **~7-10x** on
+  read-throughput gains range from ~**1.2-2x** on typical data to **~7-10x** on
   highly compressible data and bulk `read(-1)`.
 - **Compression** stays on stdlib `zlib` by default, because zlib-ng's compressed
   *bytes* are not identical to stdlib's — installing the extra alone must not
   change produced `.gz` output. Opt in per file with `fast_compress=True` for a
-  ~**1.5x** compression speedup; the output is valid gzip readable by any
+  ~**1.2-1.5x** compression speedup; the output is valid gzip readable by any
   decompressor, just not byte-for-byte identical to stdlib.
 
   ```python

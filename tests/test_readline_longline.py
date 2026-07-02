@@ -82,7 +82,6 @@ def _gzip_lines(path, newline):
 
 @pytest.mark.parametrize("newline", NEWLINE_MODES)
 @pytest.mark.parametrize("chunk_size", CHUNK_SIZES)
-@pytest.mark.asyncio
 async def test_iteration_matches_gzip(longline_file, newline, chunk_size):
     expected = _gzip_lines(longline_file, newline)
     got = await _aiogzip_iter(longline_file, newline, chunk_size)
@@ -91,7 +90,6 @@ async def test_iteration_matches_gzip(longline_file, newline, chunk_size):
 
 @pytest.mark.parametrize("newline", NEWLINE_MODES)
 @pytest.mark.parametrize("chunk_size", CHUNK_SIZES)
-@pytest.mark.asyncio
 async def test_readline_matches_gzip(longline_file, newline, chunk_size):
     expected = _gzip_lines(longline_file, newline)
     got = await _aiogzip_readline(longline_file, newline, chunk_size)
@@ -99,7 +97,6 @@ async def test_readline_matches_gzip(longline_file, newline, chunk_size):
 
 
 @pytest.mark.parametrize("newline", [None, "\n", "\r"])
-@pytest.mark.asyncio
 async def test_single_long_line_no_terminator(newline):
     """The accumulate-to-EOF branch of the fast path: one line, no terminator."""
     path = tempfile.mktemp(suffix=".gz")
@@ -115,7 +112,6 @@ async def test_single_long_line_no_terminator(newline):
         os.unlink(path)
 
 
-@pytest.mark.asyncio
 async def test_limit_readline_still_bounded(longline_file):
     """readline(limit) keeps the existing bounded behaviour (fallback path)."""
     async with AsyncGzipTextFile(longline_file, "rt", chunk_size=64) as f:
@@ -125,7 +121,6 @@ async def test_limit_readline_still_bounded(longline_file):
         assert rest == "ha\n"
 
 
-@pytest.mark.asyncio
 async def test_tell_seek_around_fast_readline(longline_file):
     """tell() after a fast-path readline must round-trip through seek()."""
     async with AsyncGzipTextFile(longline_file, "rt", chunk_size=128) as f:

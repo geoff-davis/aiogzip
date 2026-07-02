@@ -2,9 +2,13 @@
 
 `aiogzip` exposes its supported public API from the top-level package:
 
-- `AsyncGzipBinaryFile`
-- `AsyncGzipTextFile`
-- `AsyncGzipFile`
+- `AsyncGzipBinaryFile` — binary-mode reader/writer
+- `AsyncGzipTextFile` — text-mode reader/writer
+- `AsyncGzipFile` — factory returning the right class for a mode string (accepts `r`/`w`/`a`/`x` ops with a `b` or `t` suffix)
+- `WithAsyncRead`, `WithAsyncWrite`, `WithAsyncReadWrite` — runtime-checkable protocols describing the async file objects accepted via `fileobj=`
+- `ZlibEngine` — type alias for zlib compressor/decompressor objects (currently `Any`; the concrete C types are not exposed in type stubs)
+- `GZIP_WBITS`, `GZIP_METHOD_DEFLATE`, `GZIP_OS_UNKNOWN`, and the `GZIP_FLAG_FNAME` / `GZIP_FLAG_FHCRC` / `GZIP_FLAG_FEXTRA` / `GZIP_FLAG_FCOMMENT` header-flag constants — useful when inspecting gzip headers alongside this library
+- `__version__`
 
 Implementation internals live in `aiogzip._common`, `aiogzip._binary`, and `aiogzip._text`. Treat those modules as private and unstable.
 

@@ -1,7 +1,6 @@
 # pyrefly: ignore
 # pyrefly: disable=all
 import aiocsv
-import pytest
 
 from aiogzip import AsyncGzipFile
 
@@ -9,7 +8,6 @@ from aiogzip import AsyncGzipFile
 class TestAiocsvIntegration:
     """Test integration with aiocsv."""
 
-    @pytest.mark.asyncio
     async def test_csv_read_write_roundtrip(self, temp_file):
         """Test CSV read/write roundtrip with aiocsv."""
         test_data = [
@@ -34,7 +32,6 @@ class TestAiocsvIntegration:
                 rows.append(row)
             assert rows == test_data
 
-    @pytest.mark.asyncio
     async def test_csv_large_data(self, temp_file):
         """Test CSV with large data."""
         test_data = []

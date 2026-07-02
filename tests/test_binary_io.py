@@ -15,7 +15,6 @@ from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 class TestAsyncGzipBinaryFile:
     """Test the AsyncGzipBinaryFile class."""
 
-    @pytest.mark.asyncio
     async def test_binary_write_read_roundtrip(self, temp_file, sample_data):
         """Test basic write/read roundtrip in binary mode."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -25,7 +24,6 @@ class TestAsyncGzipBinaryFile:
             read_data = await f.read()
             assert read_data == sample_data
 
-    @pytest.mark.asyncio
     async def test_binary_partial_read(self, temp_file, sample_data):
         """Test partial reading in binary mode."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -38,7 +36,6 @@ class TestAsyncGzipBinaryFile:
             remaining_data = await f.read()
             assert remaining_data == sample_data[10:]
 
-    @pytest.mark.asyncio
     async def test_binary_read_negative_size_returns_all(self, temp_file, sample_data):
         """Negative size arguments should read the entire remaining stream."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -48,7 +45,6 @@ class TestAsyncGzipBinaryFile:
             data = await f.read(-5)
             assert data == sample_data
 
-    @pytest.mark.asyncio
     async def test_binary_large_data(self, temp_file, large_data):
         """Test with large data in binary mode."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -58,7 +54,6 @@ class TestAsyncGzipBinaryFile:
             read_data = await f.read()
             assert read_data == large_data
 
-    @pytest.mark.asyncio
     async def test_binary_type_error(self, temp_file):
         """Test type error when writing string to binary file."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -67,7 +62,6 @@ class TestAsyncGzipBinaryFile:
             ):
                 await f.write("string data")  # pyrefly: ignore
 
-    @pytest.mark.asyncio
     async def test_binary_mode_xb(self, temp_file, sample_data):
         """Exclusive create mode should work for binary files."""
         exclusive_path = temp_file + ".xb"
@@ -82,7 +76,6 @@ class TestAsyncGzipBinaryFile:
 
         os.unlink(exclusive_path)
 
-    @pytest.mark.asyncio
     async def test_binary_mode_rb_plus_allows_read_only(self, temp_file, sample_data):
         """rb+ should open successfully but still disallow writes, matching gzip."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -93,7 +86,6 @@ class TestAsyncGzipBinaryFile:
             with pytest.raises(IOError, match="File not open for writing"):
                 await f.write(sample_data)
 
-    @pytest.mark.asyncio
     async def test_binary_bytes_path(self, temp_file, sample_data):
         """Ensure binary mode accepts bytes paths."""
         path_bytes = os.fsencode(temp_file)
@@ -104,7 +96,6 @@ class TestAsyncGzipBinaryFile:
         async with AsyncGzipBinaryFile(path_bytes, "rb") as f:
             assert await f.read() == sample_data
 
-    @pytest.mark.asyncio
     async def test_binary_accepts_bytearray_and_memoryview(self, temp_file):
         """Binary writes should support general buffer-protocol inputs."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -114,7 +105,6 @@ class TestAsyncGzipBinaryFile:
         async with AsyncGzipBinaryFile(temp_file, "rb") as f:
             assert await f.read() == b"abcdef"
 
-    @pytest.mark.asyncio
     async def test_binary_accepts_noncontiguous_and_multibyte_buffers(self, temp_file):
         """write() must coerce buffer-protocol inputs that are not already a
         flat, single-byte, contiguous view.
@@ -149,7 +139,6 @@ class TestAsyncGzipBinaryFile:
         async with AsyncGzipBinaryFile(temp_file, "rb") as f:
             assert await f.read() == expected
 
-    @pytest.mark.asyncio
     async def test_binary_interoperability_with_gzip(self, temp_file, sample_data):
         """Test interoperability with gzip.open for binary data."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -166,7 +155,6 @@ class TestAsyncGzipBinaryFile:
             read_data = await f.read()
             assert read_data == sample_data
 
-    @pytest.mark.asyncio
     async def test_binary_custom_header_metadata(self, tmp_path):
         """Binary writer should honor provided mtime and original filename."""
         target = tmp_path / "custom_meta.gz"
@@ -183,7 +171,6 @@ class TestAsyncGzipBinaryFile:
         with gzip.open(target, "rb") as fh:
             assert fh.read() == b"payload"
 
-    @pytest.mark.asyncio
     async def test_binary_header_defaults_to_basename(self, tmp_path):
         """When no original filename provided, derive from the gzip path."""
         target = tmp_path / "dataset.gz"
@@ -194,7 +181,6 @@ class TestAsyncGzipBinaryFile:
         assert header["filename"] == b"dataset"
         assert abs(header["mtime"] - int(time.time())) < 10
 
-    @pytest.mark.asyncio
     async def test_text_custom_header_metadata(self, tmp_path):
         """Text writer should forward metadata options to the binary layer."""
         target = tmp_path / "text_meta.gz"
@@ -210,7 +196,6 @@ class TestAsyncGzipBinaryFile:
         with gzip.open(target, "rt") as fh:
             assert fh.read() == "hello"
 
-    @pytest.mark.asyncio
     async def test_binary_seek_tell_peek(self, temp_file, sample_data):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(sample_data)
@@ -231,7 +216,6 @@ class TestAsyncGzipBinaryFile:
             await f.seek(1, os.SEEK_CUR)
             assert await f.tell() == 7
 
-    @pytest.mark.asyncio
     async def test_binary_seek_from_end_clamps_to_stream_bounds(self, temp_file):
         payload = b"abcdef"
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -253,7 +237,6 @@ class TestAsyncGzipBinaryFile:
             assert await f.seek(100, os.SEEK_END) == len(payload)
             assert await f.read() == b""
 
-    @pytest.mark.asyncio
     async def test_binary_readinto(self, temp_file, sample_data):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(sample_data)
@@ -264,7 +247,6 @@ class TestAsyncGzipBinaryFile:
             assert read == 10
             assert bytes(buf) == sample_data[:10]
 
-    @pytest.mark.asyncio
     async def test_binary_peek_zero_returns_data_without_advancing(self, temp_file):
         """peek(0) should still return available bytes like gzip.GzipFile.peek()."""
         payload = b"abcdef"
@@ -280,7 +262,6 @@ class TestAsyncGzipBinaryFile:
             assert before == after
             assert await f.read() == payload
 
-    @pytest.mark.asyncio
     async def test_binary_peek_on_closed_file_raises(self, temp_file):
         """peek() on a closed file raises the same ValueError as read()."""
         payload = b"abcdef"
@@ -293,7 +274,6 @@ class TestAsyncGzipBinaryFile:
         with pytest.raises(ValueError, match="closed"):
             await f.peek(1)
 
-    @pytest.mark.asyncio
     async def test_binary_peek_from_start_returns_data(self, temp_file):
         """peek() from a fresh reader should not return empty for valid gzip data."""
         payload = b"abcdefghijklmnopqrstuvwxyz"
@@ -307,7 +287,6 @@ class TestAsyncGzipBinaryFile:
             assert await f.tell() == 0
             assert await f.read(len(payload)) == payload
 
-    @pytest.mark.asyncio
     async def test_binary_fileno_and_raw(self, temp_file, sample_data):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(sample_data)
@@ -317,7 +296,6 @@ class TestAsyncGzipBinaryFile:
             assert isinstance(fd, int)
             assert f.raw() is not None
 
-    @pytest.mark.asyncio
     async def test_binary_fileno_missing(self, temp_file, sample_data):
         class NoFileno:
             async def write(self, data):
@@ -331,7 +309,6 @@ class TestAsyncGzipBinaryFile:
         with pytest.raises(io.UnsupportedOperation, match="fileno\\(\\)"):
             f.fileno()
 
-    @pytest.mark.asyncio
     async def test_binary_read1_and_readinto1(self, temp_file, sample_data):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(sample_data)
@@ -343,7 +320,6 @@ class TestAsyncGzipBinaryFile:
             read = await f.readinto1(buf)
             assert read == 5
 
-    @pytest.mark.asyncio
     async def test_binary_read1_negative_size_leaves_remaining_data(self, temp_file):
         payload = os.urandom(200000)
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -357,7 +333,6 @@ class TestAsyncGzipBinaryFile:
         assert rest != b""
         assert first + rest == payload
 
-    @pytest.mark.asyncio
     async def test_binary_read1_zero_length_does_not_touch_underlying_reader(self):
         payload = gzip.compress(b"abcdef")
 
@@ -399,7 +374,6 @@ class TestAsyncGzipBinaryFile:
         assert writer.writable()
         assert not writer.readable()
 
-    @pytest.mark.asyncio
     async def test_binary_seek_write_extends_with_zeros(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"hi")
@@ -410,7 +384,6 @@ class TestAsyncGzipBinaryFile:
             data = await f.read()
             assert data == b"hi" + b"\x00" * 3 + b"X"
 
-    @pytest.mark.asyncio
     async def test_tarfile_like_iteration(self, tmp_path):
         """Simulate tarfile's seek/tell pattern over a gzip tarball."""
         tar_path = tmp_path / "archive.tar.gz"

@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/aiogzip.svg)](https://pypi.org/project/aiogzip/)
-[![Python 3.8-3.14](https://img.shields.io/badge/python-3.8--3.14-blue.svg)](https://www.python.org/downloads/)
+[![Python versions](https://img.shields.io/pypi/pyversions/aiogzip.svg)](https://pypi.org/project/aiogzip/)
 [![Tests](https://github.com/geoff-davis/aiogzip/workflows/Python%20CI/badge.svg)](https://github.com/geoff-davis/aiogzip/actions)
 [![Coverage](https://raw.githubusercontent.com/geoff-davis/aiogzip/python-coverage-comment-action-data/badge.svg)](https://github.com/geoff-davis/aiogzip/tree/python-coverage-comment-action-data)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://geoff-davis.github.io/aiogzip/)
@@ -61,13 +61,13 @@ async def main():
     async with AsyncGzipFile("file.gz", "rb") as f:
         print(await f.read())
 
-asyncio.run(main())
+    # Deterministic metadata
+    async with AsyncGzipFile(
+        "dataset.gz", "wb", mtime=0, original_filename="dataset.csv"
+    ) as f:
+        await f.write(b"stable bytes")
 
-# Deterministic metadata
-async with AsyncGzipFile(
-    "dataset.gz", "wb", mtime=0, original_filename="dataset.csv"
-) as f:
-    await f.write(b"stable bytes")
+asyncio.run(main())
 ```
 
 > **Default compression level.** As a drop-in replacement, `aiogzip` matches
@@ -95,14 +95,21 @@ finally:
 
 - **Text I/O**: Often ~2-3x faster than standard `gzip` in bulk text workflows.
 - **Binary I/O**: Near parity with `gzip` for bulk writes, with fast bulk reads (a full `read(-1)` of compressible data runs at several hundred MB/s); can be slower for very small chunk sizes.
-- **Concurrency**: CPU-heavy `zlib` compress/decompress calls run in the default executor above a 256 KiB threshold, so multiple gzip streams on the same event loop compress and decompress in parallel instead of serializing on the loop thread. The repo's concurrent-I/O benchmark runs ~4x faster on 1.4.0 than on 1.3.x as a result; single-stream throughput stays at parity.
+- **Concurrency**: CPU-heavy `zlib` compress/decompress calls run in the default executor above a 256 KiB threshold, so multiple gzip streams on the same event loop compress and decompress in parallel instead of serializing on the loop thread. The repo's concurrent-I/O benchmark runs ~4x faster since this landed in 1.4.0; single-stream throughput stays at parity.
 - **Line Iteration**: For the single-character newline modes (`None`, `"\n"`, `"\r"`), lines are bulk-split per chunk and served from a batch, making `async for`/`readline()` roughly ~1.2–1.3x faster (~4M lines/sec).
-- **Optional faster codec**: With `aiogzip[fast]` installed, decompression uses `zlib-ng` automatically (~1.2x typical, up to ~10x on compressible data; byte-identical output), and `fast_compress=True` gives ~1.5x compression. See the [Performance Guide](https://geoff-davis.github.io/aiogzip/performance/).
+- **Optional faster codec**: With `aiogzip[fast]` installed, decompression uses `zlib-ng` automatically (~1.2-2x on typical data, up to ~7-10x on highly compressible bulk reads; byte-identical output), and `fast_compress=True` gives ~1.2-1.5x compression. See the [Performance Guide](https://geoff-davis.github.io/aiogzip/performance/).
 - **Memory**: Optimized buffer management for stable memory usage.
 - **JSONL**: For large gzipped JSONL files, prefer `AsyncGzipTextFile(..., newline="\n", chunk_size=512 * 1024)` to reduce line-iteration overhead.
 
 See the [Performance Guide](https://geoff-davis.github.io/aiogzip/performance/) for detailed benchmarks.
 
+## Python version support
+
+`aiogzip` 1.x supports Python 3.8-3.14. **The 1.x line is the last to support
+Python 3.8 and 3.9** (both past end-of-life); `aiogzip` 2.0 will require
+Python 3.11+. Older interpreters will continue to resolve the latest 1.x
+release from PyPI automatically.
+
 ## Contributing
 
-See [CONTRIBUTING.md](docs/contributing.md) for development instructions.
+See the [Contributing Guide](https://geoff-davis.github.io/aiogzip/contributing/) for development instructions.
