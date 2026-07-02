@@ -1,27 +1,10 @@
-# Dependabot keeps CI actions and Python dev dependencies current, so the
-# action runtimes don't silently drift onto deprecated versions again.
 version: 2
 updates:
-  # GitHub Actions used in the workflows under .github/workflows/
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: "Update"
-    groups:
-      actions:
-        patterns:
-          - "*"
-
-  # Python dependencies declared in pyproject.toml (dev/test/docs extras)
+      interval: "monthly"
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: "Update"
-    groups:
-      python-deps:
-        patterns:
-          - "*"
+      interval: "monthly"
