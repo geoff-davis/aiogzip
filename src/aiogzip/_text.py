@@ -174,8 +174,7 @@ class AsyncGzipTextFile:
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
         if saw_b:
             raise ValueError("Text mode cannot include binary ('b')")
-        if mode_op not in {"r", "w", "a", "x"}:
-            raise ValueError(f"Invalid mode '{mode}'.")
+        # _parse_mode_tokens guarantees mode_op is one of r/w/a/x here.
 
         self._filename = filename
         self._mode = mode
@@ -284,7 +283,10 @@ class AsyncGzipTextFile:
         )
         try:
             await self._binary_file.open()
-        except Exception:
+        except BaseException:
+            # BaseException, not Exception: a cancelled open must not leave
+            # _binary_file set, or the instance wedges on "File is already
+            # open" at the next attempt.
             try:
                 await self._binary_file.close()
             except Exception:
@@ -314,7 +316,7 @@ class AsyncGzipTextFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         decoder_state = self._decoder.getstate()
         if self._can_use_plain_position(decoder_state):
             return self._binary_file._position
@@ -344,7 +346,7 @@ class AsyncGzipTextFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         if whence == os.SEEK_CUR:
             if offset != 0:
                 raise io.UnsupportedOperation("can't do nonzero cur-relative seeks")
@@ -389,7 +391,7 @@ class AsyncGzipTextFile:
 
     def fileno(self) -> int:
         if self._binary_file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         return self._binary_file.fileno()
 
     def isatty(self) -> bool:
@@ -408,7 +410,7 @@ class AsyncGzipTextFile:
 
     def raw(self) -> Any:
         if self._binary_file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         return self._binary_file.raw()
 
     @property
@@ -467,7 +469,7 @@ class AsyncGzipTextFile:
     def buffer(self) -> AsyncGzipBinaryFile:
         """Expose the underlying binary gzip stream."""
         if self._binary_file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         return self._binary_file
 
     @property
@@ -504,7 +506,7 @@ class AsyncGzipTextFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
 
         if not isinstance(data, str):
             raise TypeError("write() argument must be str, not bytes")
@@ -576,7 +578,7 @@ class AsyncGzipTextFile:
     async def _reset_to_start(self) -> None:
         """Reset the text stream to its initial read state."""
         if self._binary_file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
         await self._binary_file.seek(0)
         self._decoder.reset()
         self._decoder_byte_position = 0
@@ -630,7 +632,7 @@ class AsyncGzipTextFile:
         Otherwise reset and replay from the start.
         """
         if self._binary_file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
 
         decoder_bytes, decoder_flag = self._decoder.getstate()
         if (
@@ -863,7 +865,7 @@ class AsyncGzipTextFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
-            raise ValueError("File not opened. Use async context manager.")
+            raise ValueError("File not opened. Call await open() or use async with.")
 
         if size is None:
             size = -1

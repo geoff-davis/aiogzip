@@ -25,6 +25,8 @@ repos:
         pass_filenames: false
 
   # Ruff - Fast Python linter (replaces flake8, isort, etc.)
+  # Keep this rev in sync with the ruff pin in pyproject.toml [dev];
+  # dependabot bumps the pin but nothing updates pre-commit revs.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.20
     hooks:

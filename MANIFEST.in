@@ -5,5 +5,5 @@ include SECURITY.md
 include mkdocs.yml
 recursive-include tests *.py
 recursive-include docs *.md
-recursive-include scripts *.py
+recursive-include scripts *.py *.sh
 recursive-include benchmarks *.py *.md

@@ -25,3 +25,16 @@ updates:
       python-deps:
         patterns:
           - "*"
+
+  # Keep the committed uv.lock in step with pyproject bumps; the pip
+  # updater above edits pyproject.toml but never touches the lockfile.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "Update"
+    groups:
+      uv-lock:
+        patterns:
+          - "*"

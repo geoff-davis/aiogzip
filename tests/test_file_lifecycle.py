@@ -1,5 +1,7 @@
 # pyrefly: ignore
 # pyrefly: disable=all
+import asyncio
+
 import pytest
 
 from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
@@ -504,3 +506,85 @@ class TestReprOnPartialObjects:
             pass
         r = repr(obj)  # must not raise
         assert cls.__name__ in r
+
+
+class TestCancelledOpenRecovery:
+    """A cancelled open() must leave the instance retryable, like a failed one.
+
+    Regression: the open() cleanup caught only Exception, so CancelledError
+    (a BaseException) escaped it: _file stayed set, the handle leaked, and
+    every retry raised "File is already open".
+    """
+
+    class _ParkedWriter:
+        """Parks the first write (the gzip header) until released."""
+
+        def __init__(self):
+            self.release = asyncio.Event()
+            self.writes = 0
+
+        async def write(self, data):
+            self.writes += 1
+            if self.writes == 1:
+                await self.release.wait()
+            return len(data)
+
+        async def close(self):
+            pass
+
+    async def test_binary_cancelled_open_leaves_instance_retryable(self):
+        writer = self._ParkedWriter()
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False)
+
+        task = asyncio.ensure_future(f.open())
+        await asyncio.sleep(0)  # let open() reach the parked header write
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert f._file is None
+        async with f:  # retry succeeds
+            await f.write(b"recovered")
+
+    async def test_text_cancelled_open_leaves_instance_retryable(self):
+        writer = self._ParkedWriter()
+        f = AsyncGzipTextFile(None, "wt", fileobj=writer, closefd=False)
+
+        task = asyncio.ensure_future(f.open())
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert f._binary_file is None
+        async with f:
+            await f.write("recovered")
+
+
+class TestFailedTextOpenRecovery:
+    """Text-mode open() failure recovery, mirroring the binary-only tests."""
+
+    async def test_failed_text_open_with_external_fileobj_can_retry(self, tmp_path):
+        import gzip
+
+        import aiofiles
+
+        p = tmp_path / "flaky_text.gz"
+        inner = await aiofiles.open(p, "wb")
+        try:
+            writer = TestFailedOpenRecovery._FlakyWriter(inner)
+            f = AsyncGzipTextFile(None, "wt", fileobj=writer)
+
+            with pytest.raises(OSError, match="transient write failure"):
+                await f.open()
+
+            assert f._binary_file is None
+            assert writer.closed is False
+
+            async with f:
+                await f.write("recovered text")
+        finally:
+            await inner.close()
+
+        with gzip.open(p, "rt") as check:
+            assert check.read() == "recovered text"

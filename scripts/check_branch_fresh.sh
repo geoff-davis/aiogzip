@@ -4,6 +4,10 @@
 # drifted behind) a stale main. This repo is developed from multiple
 # machines, so a locally-green branch can still be based on old code.
 # See CLAUDE.md "Sync Before Working".
+#
+# Limitation: this checks HEAD, not the refs actually being pushed (which
+# arrive on stdin). Pushing a non-checked-out branch validates the wrong
+# ref; acceptable for the single-developer workflow this guards.
 set -u
 
 # Fail open when offline: a fetch failure must not block pushing.
