@@ -2,6 +2,27 @@
 
 This document contains important reminders and best practices for maintaining the aiogzip library.
 
+## Sync Before Working
+
+This library is developed from multiple machines, so the local checkout can
+silently lag origin. **Before reviewing code or starting any changes:**
+
+```bash
+git fetch origin
+git log --oneline main..origin/main   # anything here means local main is stale
+```
+
+If local main is behind, fast-forward it (`git checkout main && git pull
+--ff-only`) and branch from the updated main. As a cross-check, `__version__`
+in `src/aiogzip/__init__.py` should match the newest `CHANGELOG.md` entry and
+the latest tag (`git tag --sort=-v:refname | head -1`).
+
+Why this matters: a stale checkout here once produced a full package review
+and a 21-commit branch built on v1.7.0 while origin was already at v1.8.0 —
+two commits duplicated already-shipped work, the PR opened conflicting, and
+everything had to be rebased. The git status snapshot at session start only
+reflects the local clone; it says nothing about freshness relative to origin.
+
 ## Python 3.8 Compatibility Checklist
 
 **IMPORTANT:** This library supports Python 3.8+. Always check for PEP 585 compatibility before committing!
