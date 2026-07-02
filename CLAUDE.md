@@ -17,6 +17,18 @@ If local main is behind, fast-forward it (`git checkout main && git pull
 in `src/aiogzip/__init__.py` should match the newest `CHANGELOG.md` entry and
 the latest tag (`git tag --sort=-v:refname | head -1`).
 
+After pulling, also sync the dev environment from the committed lockfile so
+every machine runs identical tool/dependency versions (mismatched dev envs
+have corrupted benchmark comparisons before):
+
+```bash
+uv sync --all-extras
+```
+
+The lockfile pins development only — CI deliberately installs unpinned via
+pip so new dependency releases are exercised across 3.8-3.14 before users
+hit them. Dependabot's `uv` ecosystem keeps `uv.lock` current.
+
 Why this matters: a stale checkout here once produced a full package review
 and a 21-commit branch built on v1.7.0 while origin was already at v1.8.0 —
 two commits duplicated already-shipped work, the PR opened conflicting, and
