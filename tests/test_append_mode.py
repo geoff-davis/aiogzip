@@ -10,7 +10,6 @@ from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
 class TestAppendMode:
     """Test append mode operations and limitations."""
 
-    @pytest.mark.asyncio
     async def test_append_mode_binary(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"first write")
@@ -23,7 +22,6 @@ class TestAppendMode:
 
         assert data == b"first writesecond write"
 
-    @pytest.mark.asyncio
     async def test_append_mode_text(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("first line\n")
@@ -36,7 +34,6 @@ class TestAppendMode:
 
         assert data == "first line\nsecond line\n"
 
-    @pytest.mark.asyncio
     async def test_append_mode_multiple_appends(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"part1")
@@ -52,7 +49,6 @@ class TestAppendMode:
 
         assert data == b"part1part2part3"
 
-    @pytest.mark.asyncio
     async def test_append_to_empty_file(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "ab") as f:
             await f.write(b"appended data")
@@ -62,7 +58,6 @@ class TestAppendMode:
 
         assert data == b"appended data"
 
-    @pytest.mark.asyncio
     async def test_append_mode_interoperability_with_gzip(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"async write")
@@ -75,13 +70,11 @@ class TestAppendMode:
 
         assert data == b"async write gzip append"
 
-    @pytest.mark.asyncio
     async def test_cannot_read_in_append_mode(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "ab") as f:
             with pytest.raises(IOError, match="File not open for reading"):
                 await f.read()
 
-    @pytest.mark.asyncio
     async def test_append_mode_with_line_iteration(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             await f.write("line1\nline2\n")

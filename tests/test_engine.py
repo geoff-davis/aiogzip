@@ -111,7 +111,6 @@ class TestCompressionOptIn:
 
 
 class TestEndToEndUnderEngines:
-    @pytest.mark.asyncio
     async def test_roundtrip(self, active_engine, tmp_path):
         path = tmp_path / "rt.gz"
         payload = b"end to end payload " * 10_000  # exceeds offload threshold
@@ -120,7 +119,6 @@ class TestEndToEndUnderEngines:
         async with AsyncGzipBinaryFile(path, "rb") as f:
             assert await f.read() == payload
 
-    @pytest.mark.asyncio
     async def test_interop_with_stdlib_gzip(self, active_engine, tmp_path):
         """aiogzip reads a stdlib-written .gz back identically under any engine."""
         path = tmp_path / "interop.gz"
@@ -130,7 +128,6 @@ class TestEndToEndUnderEngines:
         async with AsyncGzipBinaryFile(path, "rb") as f:
             assert await f.read() == payload
 
-    @pytest.mark.asyncio
     async def test_corrupt_stream_wrapped(self, active_engine, tmp_path):
         """A corrupted deflate body must raise BadGzipFile (OSError subclass)
         under both engines — the regression guard for zlib-ng's foreign error

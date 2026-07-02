@@ -9,11 +9,12 @@ from aiogzip import (
     AsyncGzipTextFile,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class TestPerformanceAndMemory:
     """Test performance and memory efficiency."""
 
-    @pytest.mark.asyncio
     async def test_memory_efficiency_large_file(self, temp_file):
         """Test that large files don't consume excessive memory."""
         try:
@@ -60,25 +61,14 @@ class TestPerformanceAndMemory:
 
         assert total_read == len(large_data)
 
-    @pytest.mark.asyncio
-    async def test_streaming_performance(self, temp_file):
-        """Test streaming performance with different chunk sizes."""
-        import time
-
-        # Create test data
+    async def test_streaming_correct_across_chunk_sizes(self, temp_file):
+        """Streaming reads stay correct across representative chunk sizes."""
         test_data = b"Hello, World! " * 100000  # ~1.3MB
 
-        # Write the data
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(test_data)
 
-        # Test different chunk sizes
-        chunk_sizes = [1024, 8192, 64 * 1024, 256 * 1024]
-        times = {}
-
-        for chunk_size in chunk_sizes:
-            start_time = time.time()
-
+        for chunk_size in [1024, 8192, 64 * 1024, 256 * 1024]:
             total_read = 0
             async with AsyncGzipBinaryFile(temp_file, "rb", chunk_size=chunk_size) as f:
                 while True:
@@ -87,22 +77,14 @@ class TestPerformanceAndMemory:
                         break
                     total_read += len(chunk)
 
-            end_time = time.time()
-            times[chunk_size] = end_time - start_time
-
             assert total_read == len(test_data)
 
-        # Larger chunk sizes should generally be faster (or at least not much slower)
-        # This is a rough heuristic - actual performance depends on many factors
-        print(f"Chunk size performance: {times}")
-
-    @pytest.mark.asyncio
-    async def test_concurrent_access_different_files(self, temp_file):
+    async def test_concurrent_access_different_files(self, tmp_path):
         """Test concurrent access to different files."""
         import asyncio
 
-        # Create multiple temp files
-        temp_files = [f"{temp_file}_{i}" for i in range(5)]
+        # Create multiple temp files (tmp_path handles cleanup on failure too)
+        temp_files = [str(tmp_path / f"concurrent_{i}.gz") for i in range(5)]
 
         async def write_and_read_file(filename, data):
             # Write data
@@ -128,12 +110,6 @@ class TestPerformanceAndMemory:
         for i, result in enumerate(results):
             assert result == test_data_bytes[i]
 
-        # Clean up
-        for temp_file_path in temp_files:
-            if os.path.exists(temp_file_path):
-                os.unlink(temp_file_path)
-
-    @pytest.mark.asyncio
     async def test_text_mode_memory_efficiency(self, temp_file):
         """Test memory efficiency in text mode with large files."""
         try:
@@ -174,8 +150,7 @@ class TestPerformanceAndMemory:
 
         assert lines_read == 100000
 
-    @pytest.mark.asyncio
-    async def test_compression_efficiency(self, temp_file):
+    async def test_compression_efficiency(self, tmp_path):
         """Test compression efficiency at different levels."""
         # Create highly compressible data
         test_data = b"AAAAAAAAAA" * 100000  # 1MB of repeated data
@@ -183,7 +158,7 @@ class TestPerformanceAndMemory:
         compression_ratios = {}
 
         for level in [0, 1, 6, 9]:
-            temp_file_level = f"{temp_file}_{level}"
+            temp_file_level = str(tmp_path / f"level_{level}.gz")
 
             async with AsyncGzipBinaryFile(
                 temp_file_level, "wb", compresslevel=level
@@ -199,10 +174,6 @@ class TestPerformanceAndMemory:
                 read_data = await f.read()
                 assert read_data == test_data
 
-            # Clean up
-            os.unlink(temp_file_level)
-
         # Level 0 should have minimal compression
         # Level 9 should have maximum compression for this data
         assert compression_ratios[0] < compression_ratios[9]
-        print(f"Compression ratios: {compression_ratios}")

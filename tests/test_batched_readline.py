@@ -45,7 +45,6 @@ def oracle_lines(path, newline):
 @pytest.mark.parametrize("newline", [None, "\n", "\r", "\r\n", ""])
 @pytest.mark.parametrize("chunk_size", [4, 7, 64, 1 << 20])
 class TestMatchesStdlibOracle:
-    @pytest.mark.asyncio
     async def test_async_iteration_matches_oracle(self, rich_gz, newline, chunk_size):
         expected = oracle_lines(rich_gz, newline)
         async with AsyncGzipTextFile(
@@ -54,7 +53,6 @@ class TestMatchesStdlibOracle:
             got = [line async for line in f]
         assert got == expected
 
-    @pytest.mark.asyncio
     async def test_readline_loop_matches_oracle(self, rich_gz, newline, chunk_size):
         expected = oracle_lines(rich_gz, newline)
         got = []
@@ -72,7 +70,6 @@ class TestMatchesStdlibOracle:
 class TestNoOverSplitting:
     """The control/Unicode chars in SPECIALS must NOT create line breaks."""
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("newline", [None, "\n", "\r"])
     async def test_specials_stay_inline(self, tmp_path, newline):
         # Use the mode's own terminator so there are exactly two lines, with the
@@ -89,7 +86,6 @@ class TestNoOverSplitting:
 
 
 class TestInterleavedReadAndIterate:
-    @pytest.mark.asyncio
     async def test_read_after_partial_iteration(self, rich_gz):
         """read() after consuming some lines returns exactly the remainder."""
         expected_all = "".join(oracle_lines(rich_gz, None))
@@ -99,7 +95,6 @@ class TestInterleavedReadAndIterate:
             rest = await f.read()
         assert first + second + rest == expected_all
 
-    @pytest.mark.asyncio
     async def test_iterate_then_read_sized_then_iterate(self, tmp_path):
         text = "".join(f"line {i}\n" for i in range(200))
         path = tmp_path / "many.gz"
@@ -116,7 +111,6 @@ class TestInterleavedReadAndIterate:
 
 
 class TestTellSeekDuringIteration:
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("chunk_size", [8, 64])
     async def test_tell_seek_roundtrip_midstream(self, rich_gz, chunk_size):
         async with AsyncGzipTextFile(
@@ -136,7 +130,6 @@ class TestTellSeekDuringIteration:
             "\r", "\n"
         )
 
-    @pytest.mark.asyncio
     async def test_tell_at_start_of_each_line_seekable(self, tmp_path):
         text = "".join(f"row{i}\n" for i in range(50))
         path = tmp_path / "rows.gz"
@@ -158,7 +151,6 @@ class TestBatchWindowing:
     chunk_size full of tiny lines does not materialize the whole chunk at once.
     A tiny cap forces many windowed refills within one buffered chunk."""
 
-    @pytest.mark.asyncio
     async def test_many_small_lines_across_windows(self, tmp_path, monkeypatch):
         monkeypatch.setattr(AsyncGzipTextFile, "_LINE_BATCH_CHARS", 16)
         text = "".join(f"{i}\n" for i in range(5000))
@@ -169,7 +161,6 @@ class TestBatchWindowing:
             lines = [line async for line in f]
         assert lines == oracle_lines(path, "\n")
 
-    @pytest.mark.asyncio
     async def test_line_longer_than_window(self, tmp_path, monkeypatch):
         # A line longer than the batch window must still be emitted whole
         # (exercises the find()-fallback when the window holds no terminator).
@@ -183,7 +174,6 @@ class TestBatchWindowing:
 
 
 class TestBoundedReadlineInterleaving:
-    @pytest.mark.asyncio
     async def test_bounded_readline_clears_pending_batch(self, tmp_path):
         """A bounded readline(limit) after iteration has populated the batch
         must not let stale pre-split lines be served on the next iteration."""
@@ -202,7 +192,6 @@ class TestBoundedReadlineInterleaving:
 
 
 class TestLongLineSpanningChunks:
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("newline", [None, "\n", "\r"])
     async def test_single_line_longer_than_chunk(self, tmp_path, newline):
         term = "\r" if newline == "\r" else "\n"

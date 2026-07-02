@@ -108,6 +108,9 @@ disallow_untyped_defs = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "slow: long-running performance/memory tests (deselect with '-m \"not slow\"')",
+]
 
 [tool.coverage.run]
 source = ["src/aiogzip"]

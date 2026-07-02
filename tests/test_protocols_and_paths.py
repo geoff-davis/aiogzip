@@ -2,8 +2,6 @@
 # pyrefly: disable=all
 from typing import Union
 
-import pytest
-
 from aiogzip import (
     AsyncGzipBinaryFile,
     AsyncGzipFile,
@@ -48,7 +46,6 @@ class TestProtocols:
 class TestPathlibSupport:
     """Test support for pathlib.Path objects."""
 
-    @pytest.mark.asyncio
     async def test_binary_file_with_path_object(self, temp_file):
         from pathlib import Path
 
@@ -63,7 +60,6 @@ class TestPathlibSupport:
 
         assert read_data == test_data
 
-    @pytest.mark.asyncio
     async def test_text_file_with_path_object(self, temp_file):
         from pathlib import Path
 
@@ -78,7 +74,6 @@ class TestPathlibSupport:
 
         assert read_text == test_text
 
-    @pytest.mark.asyncio
     async def test_factory_with_path_object(self, temp_file):
         from pathlib import Path
 
@@ -93,7 +88,6 @@ class TestPathlibSupport:
 
         assert read_data == test_data
 
-    @pytest.mark.asyncio
     async def test_path_with_bytes(self, temp_file):
         path_bytes = temp_file.encode("utf-8")
         test_data = b"Hello, bytes path!"
@@ -110,13 +104,11 @@ class TestPathlibSupport:
 class TestNameProperty:
     """Test the name property for file API compatibility."""
 
-    @pytest.mark.asyncio
     async def test_binary_file_name_with_string(self, temp_file):
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             assert f.name == temp_file
             await f.write(b"test")
 
-    @pytest.mark.asyncio
     async def test_binary_file_name_with_path(self, temp_file):
         from pathlib import Path
 
@@ -125,14 +117,12 @@ class TestNameProperty:
             assert f.name == path_obj
             await f.write(b"test")
 
-    @pytest.mark.asyncio
     async def test_binary_file_name_with_bytes(self, temp_file):
         path_bytes = temp_file.encode("utf-8")
         async with AsyncGzipBinaryFile(path_bytes, "wb") as f:
             assert f.name == path_bytes
             await f.write(b"test")
 
-    @pytest.mark.asyncio
     async def test_binary_file_name_with_fileobj(self, temp_file):
         import aiofiles
 
@@ -146,13 +136,11 @@ class TestNameProperty:
         finally:
             await file_handle.close()
 
-    @pytest.mark.asyncio
     async def test_text_file_name_with_string(self, temp_file):
         async with AsyncGzipTextFile(temp_file, "wt") as f:
             assert f.name == temp_file
             await f.write("test")
 
-    @pytest.mark.asyncio
     async def test_text_file_name_with_path(self, temp_file):
         from pathlib import Path
 
@@ -161,7 +149,6 @@ class TestNameProperty:
             assert f.name == path_obj
             await f.write("test")
 
-    @pytest.mark.asyncio
     async def test_text_file_name_with_fileobj(self, temp_file):
         import aiofiles
 
@@ -175,12 +162,10 @@ class TestNameProperty:
         finally:
             await file_handle.close()
 
-    @pytest.mark.asyncio
     async def test_name_available_before_enter(self, temp_file):
         f = AsyncGzipBinaryFile(temp_file, "wb")
         assert f.name == temp_file
 
-    @pytest.mark.asyncio
     async def test_name_available_after_close(self, temp_file):
         f = AsyncGzipBinaryFile(temp_file, "wb")
         async with f:
