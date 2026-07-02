@@ -669,3 +669,70 @@ class TestNewlineHandlingBugs:
 
             rest = await f.read()
             assert rest == b", World! This is a test."
+
+
+class TestTextFileApiParity:
+    """Text class exposes the same file-API surface as the binary class."""
+
+    @pytest.mark.asyncio
+    async def test_text_mtime_property(self, temp_file):
+        async with AsyncGzipTextFile(temp_file, "wt", mtime=1234) as f:
+            await f.write("data")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            assert f.mtime is None  # header not read yet
+            await f.read()
+            assert f.mtime == 1234
+
+    @pytest.mark.asyncio
+    async def test_text_isatty_regular_file(self, temp_file):
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("data")
+            assert f.isatty() is False
+
+    @pytest.mark.asyncio
+    async def test_text_detach_and_truncate_unsupported(self, temp_file):
+        import io
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("data")
+            with pytest.raises(io.UnsupportedOperation):
+                f.detach()
+            with pytest.raises(io.UnsupportedOperation):
+                f.truncate()
+
+    @pytest.mark.asyncio
+    async def test_text_seekable_delegates_to_binary(self, temp_file):
+        """seekable() must reflect the binary layer instead of a constant True."""
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("line\n" * 20000)
+
+        # Regular file: seekable.
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            assert f.seekable() is True
+
+        # Non-seekable stream whose rewind cache overflows: not seekable.
+        class NonSeekableReader:
+            def __init__(self, path):
+                self._fh = open(path, "rb")
+
+            async def read(self, size=-1):
+                return self._fh.read(size)
+
+            def seekable(self):
+                return False
+
+            async def close(self):
+                self._fh.close()
+
+        reader = NonSeekableReader(temp_file)
+        try:
+            async with AsyncGzipTextFile(
+                None, "rt", fileobj=reader, max_rewind_cache_size=16
+            ) as f:
+                assert f.seekable() is True  # cache still armed
+                await f.read()
+                assert f.seekable() is False  # cache overflowed and was disabled
+        finally:
+            await reader.close()

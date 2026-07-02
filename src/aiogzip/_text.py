@@ -392,6 +392,20 @@ class AsyncGzipTextFile:
             raise ValueError("File not opened. Use async context manager.")
         return self._binary_file.fileno()
 
+    def isatty(self) -> bool:
+        """Return True if the underlying stream is interactive."""
+        if self._binary_file is None:
+            return False
+        return self._binary_file.isatty()
+
+    def detach(self) -> Any:
+        """Detach is unsupported to mirror gzip.GzipFile behavior."""
+        raise io.UnsupportedOperation("detach")
+
+    def truncate(self, size: Optional[int] = None) -> int:
+        """Truncation is unsupported for gzip-compressed streams."""
+        raise io.UnsupportedOperation("truncate")
+
     def raw(self) -> Any:
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
@@ -456,6 +470,13 @@ class AsyncGzipTextFile:
             raise ValueError("File not opened. Use async context manager.")
         return self._binary_file
 
+    @property
+    def mtime(self) -> Optional[int]:
+        """Return the gzip member mtime after the header has been read."""
+        if self._binary_file is None:
+            return None
+        return self._binary_file.mtime
+
     def readable(self) -> bool:
         return self._mode_op == "r"
 
@@ -463,7 +484,9 @@ class AsyncGzipTextFile:
         return self._writing_mode
 
     def seekable(self) -> bool:
-        return True
+        if self._binary_file is None:
+            return True
+        return self._binary_file.seekable()
 
     async def write(self, data: str) -> int:
         """
@@ -1283,10 +1306,11 @@ class AsyncGzipTextFile:
         Read and return a list of lines from the file.
 
         Args:
-            hint: Optional size hint. If given and greater than 0, lines totaling
-                approximately hint bytes are read (counted before decoding).
-                The actual number of bytes read may be more or less than hint.
-                If hint is -1 or not given, all remaining lines are read.
+            hint: Optional size hint. If given and greater than 0, reading
+                stops once the decoded lines returned so far total at least
+                hint characters (the line that crosses the hint is still
+                returned whole). If hint is -1 or not given, all remaining
+                lines are read.
 
         Returns:
             List[str]: A list of lines from the file, each including any trailing
