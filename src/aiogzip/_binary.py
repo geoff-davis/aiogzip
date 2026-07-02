@@ -416,6 +416,11 @@ class AsyncGzipBinaryFile:
             raise io.UnsupportedOperation("fileno() not supported by underlying file")
         result = fileno_method()
         if hasattr(result, "__await__"):
+            # Dispose of the never-awaited coroutine so it does not emit a
+            # "coroutine was never awaited" RuntimeWarning.
+            close_method = getattr(result, "close", None)
+            if callable(close_method):
+                close_method()
             raise io.UnsupportedOperation(
                 "fileno() is not awaitable in underlying file"
             )

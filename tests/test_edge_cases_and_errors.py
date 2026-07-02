@@ -469,6 +469,37 @@ class TestAdditionalCoverage:
             await f.__aexit__(None, None, None)
 
     @pytest.mark.asyncio
+    async def test_fileno_awaitable_does_not_leak_coroutine(self, tmp_path):
+        """An async fileno() must be rejected without leaving an un-awaited coroutine."""
+        import gc
+        import io
+        import warnings
+
+        class AsyncFilenoFile:
+            async def read(self, size=-1):
+                return b""
+
+            async def fileno(self):
+                return 3
+
+            async def close(self):
+                pass
+
+        f = AsyncGzipBinaryFile(None, "rb", fileobj=AsyncFilenoFile())
+        await f.__aenter__()
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                with pytest.raises(io.UnsupportedOperation, match="fileno"):
+                    f.fileno()
+                gc.collect()
+            assert not any("never awaited" in str(w.message) for w in caught), [
+                str(w.message) for w in caught
+            ]
+        finally:
+            await f.__aexit__(None, None, None)
+
+    @pytest.mark.asyncio
     async def test_text_seek_cookie_remains_valid_after_many_tells(self, tmp_path):
         """tell() cookies should remain valid for the full stream lifetime."""
         p = tmp_path / "long_lived_cookie.gz"
