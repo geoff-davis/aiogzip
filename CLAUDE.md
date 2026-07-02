@@ -98,6 +98,37 @@ Tests are organized by priority:
 - `TestLowPriorityEdgeCases` - Defensive validations
 - `TestNewlineHandlingBugs` - Specific bug fixes
 
+## Performance Regression Checks
+
+The read/readline/iteration paths in `_binary.py` and `_text.py` are hot:
+seemingly harmless changes there (an extra branch, attribute lookup, or
+method call per line/chunk) have measurably cost throughput before. When
+touching them, benchmark before and after:
+
+```bash
+# Baseline from main in a throwaway worktree
+git worktree add /tmp/aiogzip-baseline main
+(cd /tmp/aiogzip-baseline && uv run python benchmarks/run_benchmarks.py \
+    --category io,micro --output /tmp/bench-before.json)
+
+# Current branch
+uv run python benchmarks/run_benchmarks.py \
+    --category io,micro --output /tmp/bench-after.json
+
+# Compare
+uv run python benchmarks/bench_compare.py /tmp/bench-before.json /tmp/bench-after.json
+
+git worktree remove /tmp/aiogzip-baseline
+```
+
+Notes:
+
+- Run on a quiet machine — background load skews results badly.
+- `io,micro` covers the hot paths; use `--all` for changes to compression,
+  concurrency, or memory behavior.
+- Treat consistent regressions above ~5% as real; single-run deltas below
+  that are usually noise (re-run to confirm).
+
 ## Known Issues & Gotchas
 
 ### Newline Handling
