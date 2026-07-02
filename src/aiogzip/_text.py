@@ -1229,7 +1229,10 @@ class AsyncGzipTextFile:
         if self._mode_op != "r":
             raise OSError("File not open for reading")
 
-        if limit is None:
+        if limit is None or limit < 0:
+            # Any negative limit means "no limit", matching io.TextIOBase.
+            # Values below -1 must not reach _consume_buffer, where they
+            # would move the buffer offset backwards.
             limit = -1
         if limit == 0:
             return ""

@@ -1138,3 +1138,49 @@ class TestLowPriorityEdgeCases:
             await f.flush()
 
         await f.__aexit__(None, None, None)
+
+
+class TestNegativeReadlineLimit:
+    """A negative readline limit must mean "no limit" (io.IOBase semantics).
+
+    Regression: limits below -1 previously reached the offset arithmetic and
+    moved the buffer offset backwards, re-serving already-consumed bytes
+    (binary) or driving the text buffer offset negative so every subsequent
+    readline returned "".
+    """
+
+    async def test_binary_negative_limit_returns_full_line(self, temp_file):
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"hello world\nsecond line\n")
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.readline(-2) == b"hello world\n"
+            assert await f.readline(-100) == b"second line\n"
+
+    async def test_binary_negative_limit_does_not_rewind_position(self, temp_file):
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"hello world\nsecond line\n")
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            await f.read(3)  # populate the buffer, consume "hel"
+            assert await f.readline(-2) == b"lo world\n"
+            assert await f.tell() == 12
+            assert await f.read(6) == b"second"
+
+    async def test_text_negative_limit_returns_full_line(self, temp_file):
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("hello world\nsecond line\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            assert await f.readline(-2) == "hello world\n"
+            assert await f.readline(-100) == "second line\n"
+            assert await f.readline(-1) == ""
+
+    async def test_text_negative_limit_does_not_corrupt_buffer(self, temp_file):
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            await f.write("hello world\nsecond line\n")
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            await f.read(3)  # populate the buffer, consume "hel"
+            assert await f.readline(-5) == "lo world\n"
+            assert await f.readline() == "second line\n"

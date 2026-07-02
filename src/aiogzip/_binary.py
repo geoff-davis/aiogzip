@@ -623,7 +623,10 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
-        if limit is None:
+        if limit is None or limit < 0:
+            # Any negative limit means "no limit", matching io.IOBase. Values
+            # below -1 must not reach the arithmetic below, where they would
+            # move the buffer offset backwards.
             limit = -1
         if limit == 0:
             return b""
