@@ -24,13 +24,6 @@ All notable changes to this project will be documented in this file.
 
 - `AsyncGzipTextFile` file-API parity with the binary class: `mtime`, `isatty()`, `detach()`, `truncate()`; `seekable()` now delegates to the binary layer instead of returning a constant `True`.
 
-### Announced
-
-- The 1.x line is the last to support Python 3.8 and 3.9 (both past
-  end-of-life; together ~0.35% of downloads over the last 180 days).
-  aiogzip 2.0 will require Python 3.11+. Older interpreters keep resolving
-  the latest 1.x release via the `requires-python` metadata.
-
 ## [1.8.0] - 2026-06-10
 
 ### Added

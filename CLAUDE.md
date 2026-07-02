@@ -61,7 +61,7 @@ Before committing code changes, verify:
    pytest --cov --cov-report=term-missing
    ```
 
-   Ensure all 500+ tests pass with good coverage.
+   Ensure all 790+ tests pass with good coverage.
 
 3. **Check imports:**
 
@@ -83,7 +83,7 @@ Before committing code changes, verify:
 
 ## Test Coverage Best Practices
 
-- **Current coverage:** ~91% (500+ tests)
+- **Current coverage:** ~92% (790+ tests)
 - **Target:** Maintain or improve coverage. CI enforces a floor via
   `--cov-fail-under=85`.
 - Always add tests for new features
@@ -219,11 +219,12 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **1.7.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
-  work includes the optional zlib-ng codec (`aiogzip[fast]`), batched readline
-  splitting, the 256 KiB default chunk size, the rewind cache for non-seekable
-  streams, decompression-bomb guards (`max_decompressed_size`), `strict_size`,
-  and zlib executor offload.
+- **1.8.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
+  work includes the public `open()` lifecycle method and `__repr__`, Hypothesis
+  parity tests against stdlib gzip, the optional zlib-ng codec
+  (`aiogzip[fast]`), batched readline splitting, the 256 KiB default chunk
+  size, the rewind cache for non-seekable streams, decompression-bomb guards
+  (`max_decompressed_size`), `strict_size`, and zlib executor offload.
 
 ---
 
