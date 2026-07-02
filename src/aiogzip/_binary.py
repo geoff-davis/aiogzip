@@ -805,7 +805,17 @@ class AsyncGzipBinaryFile:
                 # not guaranteed safe across thread boundaries while we
                 # may still mutate the caller's bytearray.
                 payload = bytes(buffer) if not isinstance(buffer, bytes) else buffer
-                compressed = await _run_zlib_in_thread(self._engine.compress, payload)
+                try:
+                    compressed = await _run_zlib_in_thread(
+                        self._engine.compress, payload
+                    )
+                except asyncio.CancelledError:
+                    # Cancelling this await does not stop the executor
+                    # thread: compress() may still run and advance the
+                    # shared compressor past bytes we never accounted
+                    # for, so the member is no longer recoverable.
+                    self._write_broken = True
+                    raise
             else:
                 compressed = self._engine.compress(buffer)
         except _engine.ZLIB_ERRORS as e:

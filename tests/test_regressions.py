@@ -1224,3 +1224,42 @@ class TestZeroByteFile:
         async with AsyncGzipBinaryFile(temp_file, "rb") as f:
             with pytest.raises(gzip.BadGzipFile, match="truncated"):
                 await f.read()
+
+
+class TestWriteCancellationDuringOffload:
+    """Cancelling a write during the executor compress hop must break the stream.
+
+    Regression: the executor thread keeps running after the await is
+    cancelled, so the shared compressor can consume bytes that were never
+    accounted for; a subsequent write would silently produce a torn member.
+    """
+
+    async def test_cancelled_offloaded_write_marks_stream_broken(
+        self, temp_file, monkeypatch
+    ):
+        import asyncio
+
+        from aiogzip import _binary
+
+        release = asyncio.Event()
+
+        async def blocking_offload(method, data):
+            await release.wait()  # park until cancelled
+            return method(data)
+
+        monkeypatch.setattr(_binary, "_run_zlib_in_thread", blocking_offload)
+
+        payload = os.urandom(512 * 1024)  # above the offload threshold
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        await f.__aenter__()
+        try:
+            task = asyncio.ensure_future(f.write(payload))
+            await asyncio.sleep(0)  # let the write reach the offload await
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+            with pytest.raises(OSError, match="broken"):
+                await f.write(b"more")
+        finally:
+            await f.__aexit__(None, None, None)
