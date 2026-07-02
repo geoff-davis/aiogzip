@@ -127,6 +127,7 @@ class AsyncGzipBinaryFile:
         "_decompressed_total",
         "_strict_size",
         "_fast_compress",
+        "_saw_compressed_data",
     )
 
     # 256 KiB balances bulk-read throughput against per-file memory. Below it
@@ -228,6 +229,7 @@ class AsyncGzipBinaryFile:
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._decompressed_total: int = 0
         self._strict_size: bool = bool(strict_size)
+        self._saw_compressed_data: bool = False
 
     async def open(self) -> "AsyncGzipBinaryFile":
         """Open the file for I/O and return ``self``.
@@ -286,6 +288,7 @@ class AsyncGzipBinaryFile:
                 self._header_probe_buffer.clear()
                 self._compressed_cache.clear()
                 self._replay_offset = None
+                self._saw_compressed_data = False
                 self._underlying_seekable = await self._probe_underlying_seekable()
                 self._cache_rewindable_reads = not self._underlying_seekable
 
@@ -950,6 +953,9 @@ class AsyncGzipBinaryFile:
 
         compressed_chunk = await self._read_compressed_chunk()
 
+        if compressed_chunk:
+            self._saw_compressed_data = True
+
         if self._mtime is None and compressed_chunk:
             self._header_probe_buffer.extend(compressed_chunk)
             parsed_mtime, complete = _try_parse_gzip_header_mtime(
@@ -975,8 +981,10 @@ class AsyncGzipBinaryFile:
             # After the underlying file is drained, the decompressor must
             # have consumed a complete gzip member — otherwise the file
             # was truncated mid-stream and silently ignoring that would
-            # hand the caller a partial read with no indication.
-            if not getattr(self._engine, "eof", True):
+            # hand the caller a partial read with no indication. A file
+            # that never yielded any compressed bytes is not truncated:
+            # gzip.open() reads a zero-byte file as empty, so we do too.
+            if self._saw_compressed_data and not getattr(self._engine, "eof", True):
                 raise gzip.BadGzipFile(
                     "Error decompressing gzip data: stream ended before "
                     "the member trailer was read; the file is truncated "
@@ -1095,6 +1103,7 @@ class AsyncGzipBinaryFile:
         self._eof = False
         self._position = 0
         self._decompressed_total = 0
+        self._saw_compressed_data = False
 
     async def _probe_underlying_seekable(self) -> bool:
         """Return whether the underlying file should be rewound with seek()."""

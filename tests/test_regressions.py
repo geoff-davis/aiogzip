@@ -1184,3 +1184,43 @@ class TestNegativeReadlineLimit:
             await f.read(3)  # populate the buffer, consume "hel"
             assert await f.readline(-5) == "lo world\n"
             assert await f.readline() == "second line\n"
+
+
+class TestZeroByteFile:
+    """A zero-byte file must read as empty, matching gzip.open().
+
+    Regression: the truncation guard fired for files that never yielded any
+    compressed bytes, raising BadGzipFile where stdlib returns empty output.
+    Files that end mid-member must still raise.
+    """
+
+    async def test_binary_read_returns_empty(self, temp_file):
+        open(temp_file, "wb").close()
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.read() == b""
+            assert await f.readline() == b""
+
+    async def test_text_read_returns_empty(self, temp_file):
+        open(temp_file, "wb").close()
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            assert await f.read() == ""
+
+    async def test_binary_iteration_yields_nothing(self, temp_file):
+        open(temp_file, "wb").close()
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            lines = [line async for line in f]
+        assert lines == []
+
+    async def test_truncated_file_still_raises(self, temp_file):
+        import gzip
+
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            await f.write(b"payload that will be truncated mid-member")
+        with open(temp_file, "rb") as raw:
+            data = raw.read()
+        with open(temp_file, "wb") as raw:
+            raw.write(data[: len(data) // 2])
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            with pytest.raises(gzip.BadGzipFile, match="truncated"):
+                await f.read()
