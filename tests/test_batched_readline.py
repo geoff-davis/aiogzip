@@ -176,18 +176,28 @@ class TestBatchWindowing:
 class TestBoundedReadlineInterleaving:
     async def test_bounded_readline_clears_pending_batch(self, tmp_path):
         """A bounded readline(limit) after iteration has populated the batch
-        must not let stale pre-split lines be served on the next iteration."""
+        must not let stale pre-split lines be served on the next iteration.
+
+        The first __anext__ returns via the prefix path without splitting;
+        only the second call bulk-splits the buffered remainder into
+        _pending_lines, so the batch must be populated (and asserted) before
+        the bounded readline for this test to exercise the drop-guard at all.
+        """
         text = "abcdefgh\nij\nklmno\npqr\n"
         path = tmp_path / "bnd.gz"
         path.write_bytes(gzip.compress(text.encode("utf-8")))
         async with AsyncGzipTextFile(path, "rt", newline="\n") as f:
-            first = await f.__anext__()  # populates the pending batch
+            first = await f.__anext__()  # prefix path; batch still empty
+            second = await f.__anext__()  # bulk-splits: populates the batch
+            assert f._pending_lines, "premise: pending batch must be populated"
             mid = await f.readline(3)  # bounded -> must drop the batch
-            nxt = await f.__anext__()  # must be the real next line, not stale
+            assert not f._pending_lines
+            nxt = await f.__anext__()  # must be the real next text, not stale
             tail = await f.read()
         assert first == "abcdefgh\n"
-        assert mid == "ij\n"
-        assert nxt == "klmno\n"
+        assert second == "ij\n"
+        assert mid == "klm"
+        assert nxt == "no\n"
         assert tail == "pqr\n"
 
 
