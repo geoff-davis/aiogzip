@@ -17,16 +17,12 @@ class TestAiocsvIntegration:
         ]
 
         async with AsyncGzipFile(temp_file, "wt") as f:
-            writer = aiocsv.AsyncDictWriter(
-                f, fieldnames=["name", "age", "city"]
-            )  # pyrefly: ignore
+            writer = aiocsv.AsyncDictWriter(f, fieldnames=["name", "age", "city"])  # pyrefly: ignore
             for row in test_data:
                 await writer.writerow(row)
 
         async with AsyncGzipFile(temp_file, "rt") as f:
-            reader = aiocsv.AsyncDictReader(
-                f, fieldnames=["name", "age", "city"]
-            )  # pyrefly: ignore
+            reader = aiocsv.AsyncDictReader(f, fieldnames=["name", "age", "city"])  # pyrefly: ignore
             rows = []
             async for row in reader:
                 rows.append(row)
