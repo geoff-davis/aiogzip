@@ -61,7 +61,7 @@ Before committing code changes, verify:
    pytest --cov --cov-report=term-missing
    ```
 
-   Ensure all 329+ tests pass with good coverage.
+   Ensure all 500+ tests pass with good coverage.
 
 3. **Check imports:**
 
@@ -73,22 +73,17 @@ Before committing code changes, verify:
 
 4. **Test with Python 3.8 (optional but recommended):**
 
-   If you have pyenv installed:
+   The pre-commit `python38-compat` hook (`scripts/check_py38_compat.py`)
+   catches syntax-level incompatibilities. For a runtime check with pyenv:
 
    ```bash
    pyenv install 3.8.18  # One-time setup
    pyenv exec python3.8 -c "import aiogzip"  # Quick import test
    ```
 
-   Or use nox for multi-version testing:
-
-   ```bash
-   nox  # Tests against all supported Python versions
-   ```
-
 ## Test Coverage Best Practices
 
-- **Current coverage:** 87.27% (329 tests)
+- **Current coverage:** ~91% (500+ tests)
 - **Target:** Maintain or improve coverage. CI enforces a floor via
   `--cov-fail-under=85`.
 - Always add tests for new features
@@ -177,11 +172,13 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **1.5.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
-  work includes the rewind cache for non-seekable streams, decompression-bomb
-  guards (`max_decompressed_size`), `strict_size`, and zlib executor offload.
+- **1.7.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
+  work includes the optional zlib-ng codec (`aiogzip[fast]`), batched readline
+  splitting, the 256 KiB default chunk size, the rewind cache for non-seekable
+  streams, decompression-bomb guards (`max_decompressed_size`), `strict_size`,
+  and zlib executor offload.
 
 ---
 
-**Last Updated:** 2026-05-28
+**Last Updated:** 2026-07-02
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
