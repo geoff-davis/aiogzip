@@ -17,9 +17,13 @@ description = "Asynchronous gzip file reader/writer with aiocsv support."
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
+keywords = ["gzip", "async", "asyncio", "compression", "aiofiles", "zlib"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
+    # Remove this classifier when the PEP 639 migration lands in 2.0 (639
+    # forbids license classifiers alongside an SPDX license expression).
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -50,11 +54,13 @@ docs = [
 ]
 dev = [
     "pytest>=8.0.0",
-    "pytest-asyncio",
+    "pytest-asyncio>=0.24",
     "pytest-cov>=4.0.0",
     "hypothesis>=6.0.0",
     "psutil",
     "tomli; python_version < \"3.11\"",
+    # Keep in sync with the ruff-pre-commit rev in .pre-commit-config.yaml;
+    # dependabot bumps this pin but nothing updates pre-commit revs.
     "ruff==0.15.20",
     "mypy>=1.0.0",
     "ty>=0.0.1a16",
@@ -64,6 +70,8 @@ dev = [
 ]
 [project.urls]
 Homepage = "https://github.com/geoff-davis/aiogzip"
+Documentation = "https://geoff-davis.github.io/aiogzip/"
+Changelog = "https://github.com/geoff-davis/aiogzip/blob/main/CHANGELOG.md"
 "Source Code" = "https://github.com/geoff-davis/aiogzip"
 "Bug Tracker" = "https://github.com/geoff-davis/aiogzip/issues"
 
