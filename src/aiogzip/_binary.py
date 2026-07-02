@@ -316,10 +316,14 @@ class AsyncGzipBinaryFile:
     # File API compatibility helpers
     async def tell(self) -> int:
         """Return the current uncompressed file position."""
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
         return self._position
 
     async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
         """Move to a new file position, mirroring gzip.GzipFile semantics."""
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Use async context manager.")
         if self._writing_mode:
@@ -1207,7 +1211,15 @@ class AsyncGzipBinaryFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
 
-        if self._writing_mode and self._file is not None and not self._write_broken:
+        if self._writing_mode and self._write_broken:
+            # Pretending the flush succeeded would tell the caller their
+            # bytes are safely on disk when the member is already torn.
+            raise OSError(
+                "write stream is broken after a prior write failure; "
+                "the gzip member is unusable"
+            )
+
+        if self._writing_mode and self._file is not None:
             # Flush any buffered compressed data (but not the final trailer)
             # Using Z_SYNC_FLUSH allows us to flush without ending the stream
             try:

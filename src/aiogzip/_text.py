@@ -311,6 +311,8 @@ class AsyncGzipTextFile:
 
     # File API compatibility helpers
     async def tell(self) -> int:
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
         decoder_state = self._decoder.getstate()
@@ -339,6 +341,8 @@ class AsyncGzipTextFile:
         )
 
     async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
+        if self._is_closed:
+            raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Use async context manager.")
         if whence == os.SEEK_CUR:

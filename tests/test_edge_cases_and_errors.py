@@ -1060,3 +1060,74 @@ class TestErrorHandlingConsistency:
 
         # Clean up
         await f.__aexit__(None, None, None)
+
+
+class TestClosedFileGuards:
+    """Every positional/IO method must raise ValueError on a closed file.
+
+    Regression: peek() reached the closed underlying handle (surfacing a
+    confusing OSError) and seek() on a closed file silently succeeded.
+    """
+
+    async def _closed_binary_reader(self, path):
+        async with AsyncGzipBinaryFile(path, "wb") as f:
+            await f.write(b"payload\n")
+        f = AsyncGzipBinaryFile(path, "rb")
+        await f.__aenter__()
+        await f.close()
+        return f
+
+    @pytest.mark.asyncio
+    async def test_binary_methods_raise_on_closed(self, tmp_path):
+        f = await self._closed_binary_reader(tmp_path / "closed.gz")
+        with pytest.raises(ValueError, match="closed"):
+            await f.peek(4)
+        with pytest.raises(ValueError, match="closed"):
+            await f.seek(0)
+        with pytest.raises(ValueError, match="closed"):
+            await f.tell()
+        with pytest.raises(ValueError, match="closed"):
+            await f.rewind()
+        with pytest.raises(ValueError, match="closed"):
+            await f.readinto(bytearray(4))
+        with pytest.raises(ValueError, match="closed"):
+            await f.readinto1(bytearray(4))
+
+    @pytest.mark.asyncio
+    async def test_text_seek_tell_raise_on_closed(self, tmp_path):
+        p = tmp_path / "closed_text.gz"
+        async with AsyncGzipTextFile(p, "wt") as f:
+            await f.write("payload\n")
+        f = AsyncGzipTextFile(p, "rt")
+        await f.__aenter__()
+        await f.close()
+        with pytest.raises(ValueError, match="closed"):
+            await f.seek(0)
+        with pytest.raises(ValueError, match="closed"):
+            await f.tell()
+
+    @pytest.mark.asyncio
+    async def test_flush_raises_on_broken_write_stream(self):
+        """flush() must not report success once the member is torn."""
+
+        class FailOnSecondWrite:
+            def __init__(self):
+                self.calls = 0
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls == 2:
+                    raise OSError("simulated disk full")
+                return len(data)
+
+            async def close(self):
+                pass
+
+        payload = os.urandom(64 * 1024)  # incompressible: forces output
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=FailOnSecondWrite(), closefd=False)
+        await f.__aenter__()
+        with pytest.raises(OSError, match="simulated disk full"):
+            await f.write(payload)
+        with pytest.raises(OSError, match="broken"):
+            await f.flush()
+        await f.__aexit__(None, None, None)
