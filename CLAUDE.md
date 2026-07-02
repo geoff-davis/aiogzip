@@ -105,14 +105,20 @@ seemingly harmless changes there (an extra branch, attribute lookup, or
 method call per line/chunk) have measurably cost throughput before. When
 touching them, benchmark before and after:
 
-```bash
-# Baseline from main in a throwaway worktree
-git worktree add /tmp/aiogzip-baseline main
-(cd /tmp/aiogzip-baseline && uv run python benchmarks/run_benchmarks.py \
-    --category io,micro --output /tmp/bench-before.json)
+Check out the baseline *source* in a worktree, but run both sides with the
+**same venv and interpreter** by shadowing the editable install via
+PYTHONPATH (aiogzip is pure Python, so no build step is needed):
 
-# Current branch
-uv run python benchmarks/run_benchmarks.py \
+```bash
+git worktree add /tmp/aiogzip-baseline main
+
+# Baseline source, current venv (PYTHONPATH shadows the editable install)
+PYTHONPATH=/tmp/aiogzip-baseline/src AIOGZIP_ENGINE=stdlib \
+    uv run python benchmarks/run_benchmarks.py \
+    --category io,micro --output /tmp/bench-before.json
+
+# Current branch source
+AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
     --category io,micro --output /tmp/bench-after.json
 
 # Compare
@@ -123,11 +129,21 @@ git worktree remove /tmp/aiogzip-baseline
 
 Notes:
 
-- Run on a quiet machine — background load skews results badly.
+- **Never `uv run` from inside the baseline worktree** — it creates a fresh
+  venv that can resolve a *different Python version* (interpreter speed
+  differences of ±10% masquerade as code regressions) and may lack the
+  `fast` extra (zlib-ng vs stdlib skews read benchmarks several-fold).
+  Verify the source swap with
+  `PYTHONPATH=... python -c "import aiogzip; print(aiogzip.__file__)"`.
+- Pin the codec with `AIOGZIP_ENGINE=stdlib` on both sides.
+- Run on a quiet machine — background load skews results badly. Interleave
+  several before/after rounds and compare per-benchmark *minimum* times;
+  single-run deltas are noise.
 - `io,micro` covers the hot paths; use `--all` for changes to compression,
   concurrency, or memory behavior.
-- Treat consistent regressions above ~5% as real; single-run deltas below
-  that are usually noise (re-run to confirm).
+- Treat deltas that survive interleaved min-of-N comparison as real; chase
+  anything above ~5% with a targeted timeit-style micro-test before
+  concluding either way.
 
 ## Known Issues & Gotchas
 
