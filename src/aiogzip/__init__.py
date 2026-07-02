@@ -170,12 +170,13 @@ def AsyncGzipFile(
 
     Args:
         filename: Path to the file
-        mode: File mode ('rb', 'wb', 'rt', 'wt', etc.)
+        mode: File mode; any of 'r', 'w', 'a', 'x' with an optional 'b'
+            (binary, the default) or 't' (text) suffix
         **kwargs: Additional arguments passed to the appropriate class
 
     Returns:
-        AsyncGzipBinaryFile for binary modes ('rb', 'wb', 'ab')
-        AsyncGzipTextFile for text modes ('rt', 'wt', 'at')
+        AsyncGzipBinaryFile for binary modes ('rb', 'wb', 'ab', 'xb')
+        AsyncGzipTextFile for text modes ('rt', 'wt', 'at', 'xt')
     """
     if not isinstance(mode, str):
         raise TypeError("mode must be a string")
