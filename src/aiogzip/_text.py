@@ -284,7 +284,10 @@ class AsyncGzipTextFile:
         )
         try:
             await self._binary_file.open()
-        except Exception:
+        except BaseException:
+            # BaseException, not Exception: a cancelled open must not leave
+            # _binary_file set, or the instance wedges on "File is already
+            # open" at the next attempt.
             try:
                 await self._binary_file.close()
             except Exception:

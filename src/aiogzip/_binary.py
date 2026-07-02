@@ -293,7 +293,10 @@ class AsyncGzipBinaryFile:
                 self._cache_rewindable_reads = not self._underlying_seekable
 
             return self
-        except Exception:
+        except BaseException:
+            # BaseException, not Exception: a task cancelled mid-open (e.g.
+            # during the header write) must not leave _file set — the handle
+            # would leak and every retry would hit "File is already open".
             await self._cleanup_failed_enter()
             raise
 
