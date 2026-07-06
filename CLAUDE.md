@@ -25,9 +25,16 @@ have corrupted benchmark comparisons before):
 uv sync --all-extras
 ```
 
-The lockfile pins development only — CI deliberately installs unpinned via
-pip so new dependency releases are exercised across 3.8-3.14 before users
-hit them. Dependabot's `uv` ecosystem keeps `uv.lock` current.
+The lockfile pins development only — CI deliberately installs unpinned
+(`uv pip install --system`, which resolves fresh from PyPI and never reads
+`uv.lock`) so new dependency releases are exercised across 3.8-3.14 before
+users hit them. Dependabot's `uv` ecosystem keeps `uv.lock` current.
+
+The lockfile also only resolves for Python >= 3.10
+(`tool.uv.environments` in pyproject.toml): the 3.8/3.9 branches carried
+urllib3/wheel pins frozen on known CVEs because the fixes dropped old
+Pythons. `uv sync`/`uv run` under 3.8/3.9 is therefore refused — for a
+local old-Python check use pip/pyenv (see the 3.8 checklist below).
 
 Why this matters: a stale checkout here once produced a full package review
 and a 21-commit branch built on v1.7.0 while origin was already at v1.8.0 —
@@ -102,7 +109,7 @@ Before committing code changes, verify:
    pytest --cov --cov-report=term-missing
    ```
 
-   Ensure all 790+ tests pass with good coverage.
+   Ensure all 850+ tests pass with good coverage.
 
 3. **Check imports:**
 
@@ -124,7 +131,7 @@ Before committing code changes, verify:
 
 ## Test Coverage Best Practices
 
-- **Current coverage:** ~92% (790+ tests)
+- **Current coverage:** ~92% (850+ tests)
 - **Target:** Maintain or improve coverage. CI enforces a floor via
   `--cov-fail-under=85`.
 - Always add tests for new features
@@ -213,6 +220,25 @@ The project uses GitHub Actions which tests against Python 3.8 through 3.14.
 Linux runs the full version sweep; Windows and macOS each run one version to
 guard platform-specific paths (e.g. `os.linesep` newline translation).
 
+`main` has branch protection requiring every CI job (lint, all build matrix
+legs, fast-engine — not coverage-comment), and repo auto-merge is enabled:
+`gh pr merge <n> --auto --merge` lands a PR when checks pass. **Gotcha:**
+the required checks are matched by job name, so changing the matrix (adding
+a Python version, renaming a job, swapping an OS) requires updating the
+branch-protection contexts too, or merges block forever waiting on a
+check that no longer exists (a *new* leg that isn't required will pass
+unnoticed instead). Update via
+`gh api -X PUT repos/geoff-davis/aiogzip/branches/main/protection`.
+
+The test matrix installs the `[test]` extra (not `[dev]`, which adds
+lint-only tooling). mypy/types-aiofiles/typing_extensions belong to
+`[test]` because `test_factory_typing.py` shells out to `mypy --strict`
+and silently skips when mypy is absent.
+
+`astral-sh/setup-uv` publishes no moving major tag from v8 on — pin the
+exact version (e.g. `@v8.3.0`); a bare `@v8` fails to resolve. Dependabot's
+github-actions ecosystem keeps the pin current.
+
 **Any Python 3.9+ only syntax will fail CI!**
 
 Common causes of CI failures:
@@ -260,7 +286,7 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **1.8.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
+- **1.9.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
   work includes the public `open()` lifecycle method and `__repr__`, Hypothesis
   parity tests against stdlib gzip, the optional zlib-ng codec
   (`aiogzip[fast]`), batched readline splitting, the 256 KiB default chunk
@@ -269,5 +295,5 @@ Always include:
 
 ---
 
-**Last Updated:** 2026-07-02
+**Last Updated:** 2026-07-06
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
