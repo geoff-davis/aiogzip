@@ -48,11 +48,16 @@ Prepare a new release of aiogzip. This skill handles changelog generation, versi
 ### 4. Bump version
 
 - Update `__version__` in `src/aiogzip/__init__.py` to the new version.
+- Update the current-version line in CLAUDE.md's **Version History** section
+  (`- **<old> (current)** - ...` → `- **<version> (current)** - ...`), and
+  refresh its "Recent work includes ..." summary if this release adds
+  notable items. No other process owns this line — skipping this step is
+  how it goes stale.
 
 ### 5. Create release branch and PR
 
 - Create branch `release/v<version>` from `origin/main`.
-- Stage `CHANGELOG.md` and `src/aiogzip/__init__.py`.
+- Stage `CHANGELOG.md`, `src/aiogzip/__init__.py`, and `CLAUDE.md`.
 - Commit with message: `Prepare release v<version>`
 - Push the branch.
 - Create a PR with title `Prepare release v<version>` and body summarizing the changelog entries.
