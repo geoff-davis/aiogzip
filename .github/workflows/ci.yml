@@ -36,12 +36,14 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-          cache: "pip"
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.3.0
+
+      # Deliberately unpinned (uv.lock is not consulted): CI exercises fresh
+      # dependency releases before users hit them. uv just installs faster.
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[dev,csv]
+        run: uv pip install --system -e ".[dev,csv]"
 
       - name: Lint with Ruff
         run: ruff check .
@@ -88,13 +90,15 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
 
-      # Step 3: Install dependencies
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.3.0
+
+      # Step 3: Install dependencies. The [test] extra skips lint-only
+      # tooling (ruff, ty, pre-commit); deliberately unpinned (uv.lock is
+      # not consulted) so CI exercises fresh dependency releases.
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[dev,csv]
+        run: uv pip install --system -e ".[test,csv]"
 
       # Step 4: Run tests with pytest and coverage
       # --cov-fail-under gates against silent coverage regressions. The
@@ -104,7 +108,18 @@ jobs:
         run: |
           pytest --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=85
 
-  # The main matrix above installs only [dev,csv], so it exercises the
+      # The coverage-comment job reuses this leg's coverage data instead of
+      # re-running the suite. relative_files = true in [tool.coverage.run]
+      # keeps the paths portable across jobs.
+      - name: Upload coverage data
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-data
+          path: .coverage
+          include-hidden-files: true
+
+  # The main matrix above installs only [test,csv], so it exercises the
   # pure-Python default (stdlib zlib, zlib-ng absent) — the common
   # `pip install aiogzip` install — across the full version/OS sweep. This
   # job adds the [fast] extra so the zlib-ng decompression and opt-in
@@ -120,12 +135,12 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-          cache: "pip"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.3.0
 
       - name: Install dependencies (with fast extra)
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[dev,csv,fast]
+        run: uv pip install --system -e ".[test,csv,fast]"
 
       - name: Run tests with zlib-ng active
         run: |
@@ -135,6 +150,8 @@ jobs:
         run: |
           AIOGZIP_ENGINE=stdlib pytest -q
 
+  # Posts the coverage comment from the ubuntu/3.12 build leg's uploaded
+  # .coverage data — no dependency install or duplicate test run needed.
   coverage-comment:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -146,20 +163,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v6
+      - name: Download coverage data
+        uses: actions/download-artifact@v8
         with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[dev,csv]
-
-      - name: Run tests with coverage
-        run: |
-          pytest --cov --cov-report=xml
+          name: coverage-data
 
       - name: Coverage comment
         uses: py-cov-action/python-coverage-comment-action@v3

@@ -118,29 +118,41 @@ docs = [
 fast = [
     { name = "zlib-ng", marker = "python_full_version >= '3.10'" },
 ]
+test = [
+    { name = "hypothesis", marker = "python_full_version >= '3.10'" },
+    { name = "mypy", marker = "python_full_version >= '3.10'" },
+    { name = "psutil", marker = "python_full_version >= '3.10'" },
+    { name = "pytest", marker = "python_full_version >= '3.10'" },
+    { name = "pytest-asyncio", marker = "python_full_version >= '3.10'" },
+    { name = "pytest-cov", marker = "python_full_version >= '3.10'" },
+    { name = "tomli", marker = "python_full_version == '3.10.*'" },
+    { name = "types-aiofiles", marker = "python_full_version >= '3.10'" },
+    { name = "typing-extensions", marker = "python_full_version >= '3.10'" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "aiocsv", marker = "extra == 'csv'", specifier = ">=1.2.0" },
     { name = "aiofiles", specifier = ">=23.0.0" },
-    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0.0" },
+    { name = "aiogzip", extras = ["test"], marker = "extra == 'dev'" },
+    { name = "hypothesis", marker = "extra == 'test'", specifier = ">=6.0.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.5.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
+    { name = "mypy", marker = "extra == 'test'", specifier = ">=1.0.0" },
     { name = "pre-commit", marker = "extra == 'dev'" },
-    { name = "psutil", marker = "extra == 'dev'" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "psutil", marker = "extra == 'test'" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.24" },
+    { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.15.20" },
-    { name = "tomli", marker = "python_full_version < '3.11' and extra == 'dev'" },
+    { name = "tomli", marker = "python_full_version < '3.11' and extra == 'test'" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.1a16" },
-    { name = "types-aiofiles", marker = "extra == 'dev'" },
-    { name = "typing-extensions", marker = "extra == 'dev'" },
+    { name = "types-aiofiles", marker = "extra == 'test'" },
+    { name = "typing-extensions", marker = "extra == 'test'" },
     { name = "zlib-ng", marker = "extra == 'fast'", specifier = ">=0.4.0" },
 ]
-provides-extras = ["csv", "fast", "docs", "dev"]
+provides-extras = ["csv", "fast", "docs", "test", "dev"]
 
 [[package]]
 name = "ast-serialize"
