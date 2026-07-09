@@ -41,6 +41,10 @@ All notable changes to this project will be documented in this file.
   that general pending consumption already happened in the two intentionally
   inlined hot paths, removing redundant pending-state handling without adding a
   per-line function call.
+- The benchmark runner now executes each category three times by default and
+  reports median durations with metrics from the closest real sample. Use
+  `--repeat` to tune stability versus runtime. Removed an unused mypy override
+  that produced a configuration warning on every source-only type check.
 
 ### Documentation
 
