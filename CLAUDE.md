@@ -286,14 +286,14 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **1.9.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
-  work includes the public `open()` lifecycle method and `__repr__`, Hypothesis
-  parity tests against stdlib gzip, the optional zlib-ng codec
-  (`aiogzip[fast]`), batched readline splitting, the 256 KiB default chunk
-  size, the rewind cache for non-seekable streams, decompression-bomb guards
-  (`max_decompressed_size`), `strict_size`, and zlib executor offload.
+- **1.9.1 (current)** - See `CHANGELOG.md` for the full release history. Recent
+  work bounds decompression-bomb output before allocation, preserves stateful
+  text encoders across writes, rejects reuse after cancelled decompression,
+  completes short external writes, batches `writelines()`, tightens tuning
+  parameter validation, and reports median benchmark results from repeated
+  runs.
 
 ---
 
-**Last Updated:** 2026-07-06
+**Last Updated:** 2026-07-09
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
