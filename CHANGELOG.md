@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-07-09
+
 ### Fixed
 
 - `max_decompressed_size` now bounds each inflate call to the remaining
