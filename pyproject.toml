@@ -63,7 +63,7 @@ dev = [
     "aiogzip[test]",
     # Keep in sync with the ruff-pre-commit rev in .pre-commit-config.yaml;
     # dependabot bumps this pin but nothing updates pre-commit revs.
-    "ruff==0.15.20",
+    "ruff==0.15.21",
     "ty>=0.0.1a16",
     "pre-commit",
 ]
