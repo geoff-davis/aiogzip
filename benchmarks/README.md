@@ -95,8 +95,14 @@ Options:
   --category, -c CAT    Run specific categories (comma-separated)
   --quick              Run quick benchmarks (io, compression)
   --size N             Data size in MB (default: 1)
+  --repeat N           Run each category N times, report median (default: 3)
   --output, -o FILE    Save results to JSON file
 ```
+
+Each category runs three times by default. Reported durations are medians, and
+the displayed secondary metrics come from the sample closest to that median.
+Use `--repeat 1` for a faster smoke run or a larger odd count for more stable
+release comparisons.
 
 ### Usage Examples
 

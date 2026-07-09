@@ -22,6 +22,7 @@ from ._common import (
     _validate_chunk_size,
     _validate_compresslevel,
     _validate_filename,
+    _validate_optional_positive_int,
     _validate_original_filename,
 )
 
@@ -91,6 +92,8 @@ class AsyncGzipTextFile:
         "_binary_file",
         "_is_closed",
         "_decoder",
+        "_encoder",
+        "_encoder_used",
         "_text_buffer",
         "_text_buffer_offset",
         "_trailing_cr",
@@ -156,10 +159,8 @@ class AsyncGzipTextFile:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
         _validate_chunk_size(chunk_size)
-        if max_decompressed_size is not None and max_decompressed_size <= 0:
-            raise ValueError("max_decompressed_size must be a positive integer")
-        if max_rewind_cache_size is not None and max_rewind_cache_size <= 0:
-            raise ValueError("max_rewind_cache_size must be a positive integer")
+        _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")
+        _validate_optional_positive_int(max_rewind_cache_size, "max_rewind_cache_size")
 
         # Validate text-specific parameters
         if encoding is None:
@@ -207,6 +208,12 @@ class AsyncGzipTextFile:
         self._decoder = codecs.getincrementaldecoder(self._encoding)(
             errors=self._errors
         )
+        self._encoder = (
+            codecs.getincrementalencoder(self._encoding)(errors=self._errors)
+            if self._writing_mode
+            else None
+        )
+        self._encoder_used: bool = False
         self._text_buffer: str = ""  # Backing store for buffered decoded text
         self._text_buffer_offset: int = 0  # Start of unread text within _text_buffer
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
@@ -522,9 +529,23 @@ class AsyncGzipTextFile:
             # newline == '' means no translation; any other value treat as no translation
             pass
 
-        # Encode string to bytes
-        encoded_data = text_to_encode.encode(self._encoding, errors=self._errors)
-        await self._binary_file.write(encoded_data)
+        # Keep one encoder for the lifetime of the stream. Stateless str.encode()
+        # would emit a fresh BOM or reset sequence on every write for encodings
+        # such as UTF-16 and ISO-2022-JP.
+        encoder = self._encoder
+        assert encoder is not None
+        encoder_state = encoder.getstate()
+        encoder_was_used = self._encoder_used
+        self._encoder_used = True
+        try:
+            encoded_data = encoder.encode(text_to_encode, final=False)
+            await self._binary_file.write(encoded_data)
+        except BaseException:
+            # Preserve retryability when the binary layer rejected the write
+            # before consuming it (for example strict_size validation).
+            encoder.setstate(encoder_state)
+            self._encoder_used = encoder_was_used
+            raise
         return len(data)
 
     def _buffered_text_len(self) -> int:
@@ -1082,38 +1103,24 @@ class AsyncGzipTextFile:
     # boundaries and stay on the buffer-accumulating path.
     _FAST_READLINE_NEWLINES = frozenset({None, "\n", "\r"})
 
-    def _take_pending_line(self) -> Optional[str]:
-        """Pop the next pre-split line, advancing the buffer offset by its length.
-
-        Advancing ``_text_buffer_offset`` exactly as ``_consume_buffer`` would
-        keeps tell()/seek() bookkeeping identical to consuming one line at a
-        time. Returns None when ``_pending_lines`` is exhausted.
-
-        This is the canonical implementation; ``__anext__`` and
-        ``_readline_fast`` inline the same logic in their hot paths (a per-line
-        method call costs ~7% throughput). Keep all three in sync.
-        """
-        idx = self._pending_idx
+    def _take_first_refilled_line(self) -> str:
+        """Take the first line immediately after a bounded batch refill."""
         pending = self._pending_lines
-        if idx < len(pending):
-            line = pending[idx]
-            self._pending_idx = idx + 1
-            self._text_buffer_offset += len(line)
-            return line
-        return None
+        assert self._pending_idx == 0 and pending
+        line = pending[0]
+        self._pending_idx = 1
+        self._text_buffer_offset += len(line)
+        return line
 
     async def _next_fast_line(self) -> Optional[str]:
         """Return the next line for a single-character terminator mode.
 
-        Serves from ``_pending_lines`` first; when those run out it bulk-splits
-        the complete lines in the buffered remainder in one C-level pass, or
-        (for a line spanning the chunk boundary or the final unterminated line)
-        accumulates across chunks exactly as the original per-line path did.
-        Returns None at end of input.
+        Called only after ``_pending_lines`` is exhausted. Bulk-splits complete
+        lines in the buffered remainder in one C-level pass, or (for a line
+        spanning the chunk boundary or the final unterminated line) accumulates
+        across chunks. Returns None at end of input.
         """
-        line = self._take_pending_line()
-        if line is not None:
-            return line
+        assert self._pending_idx >= len(self._pending_lines)
 
         term = self._line_term
         split_re = self._line_split_re
@@ -1138,7 +1145,7 @@ class AsyncGzipTextFile:
             region = buf[start : last + 1]
             self._pending_lines = split_re.findall(region)
             self._pending_idx = 0
-            return self._take_pending_line()
+            return self._take_first_refilled_line()
 
         # The remainder has no terminator: it is the head of a line that
         # continues into later chunks (or the final unterminated line). Pull it
@@ -1177,9 +1184,10 @@ class AsyncGzipTextFile:
         Returns "" at end of input. Only valid when
         ``self._line_term is not None``.
         """
-        # Inlined pending-line pop (canonical copy: _take_pending_line). Kept
-        # inline in the two hot read paths because a per-line method call
-        # measurably (~7%) lowers iteration throughput; keep the copies in sync.
+        # Pending-line consumption is inlined in the two hot read paths because
+        # a per-line method call measurably (~7%) lowers iteration throughput.
+        # Keep this block in sync with __anext__; the refill-only helper has a
+        # narrower contract and cannot consume an arbitrary pending position.
         idx = self._pending_idx
         pending = self._pending_lines
         if idx < len(pending):
@@ -1200,8 +1208,8 @@ class AsyncGzipTextFile:
             raise StopAsyncIteration
 
         if self._line_term is not None:
-            # Inlined pending-line pop (canonical copy: _take_pending_line);
-            # kept inline in this hot path for throughput. Keep copies in sync.
+            # Keep this inline block in sync with _readline_fast; a helper call
+            # in this per-line hot path measurably lowers iteration throughput.
             idx = self._pending_idx
             pending = self._pending_lines
             if idx < len(pending):
@@ -1370,8 +1378,42 @@ class AsyncGzipTextFile:
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
 
-        for line in lines:
-            await self.write(line)
+        pending: List[str] = []
+        pending_chars = 0
+        iterator = iter(lines)
+        while True:
+            try:
+                line = next(iterator)
+            except StopIteration:
+                break
+            except BaseException:
+                if pending:
+                    await self.write("".join(pending))
+                raise
+
+            if not isinstance(line, str):
+                if pending:
+                    await self.write("".join(pending))
+                await self.write(line)
+                continue
+
+            length = len(line)
+            if length >= self._chunk_size:
+                if pending:
+                    await self.write("".join(pending))
+                    pending = []
+                    pending_chars = 0
+                await self.write(line)
+            else:
+                if pending and pending_chars + length > self._chunk_size:
+                    await self.write("".join(pending))
+                    pending = []
+                    pending_chars = 0
+                pending.append(line)
+                pending_chars += length
+
+        if pending:
+            await self.write("".join(pending))
 
     async def flush(self) -> None:
         """
@@ -1402,5 +1444,24 @@ class AsyncGzipTextFile:
         # Mark as closed immediately to prevent concurrent close attempts
         self._is_closed = True
 
-        if self._binary_file is not None:
-            await self._binary_file.close()
+        binary_file = self._binary_file
+        if binary_file is None:
+            return
+
+        encoder_failed = False
+        try:
+            if self._writing_mode and self._encoder_used:
+                encoder = self._encoder
+                assert encoder is not None
+                final_data = encoder.encode("", final=True)
+                if final_data:
+                    await binary_file.write(final_data)
+        except BaseException:
+            encoder_failed = True
+            raise
+        finally:
+            try:
+                await binary_file.close()
+            except BaseException:
+                if not encoder_failed:
+                    raise

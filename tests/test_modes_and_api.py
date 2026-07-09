@@ -351,3 +351,57 @@ class TestNewAPIMethods:
         finally:
             if os.path.exists(temp_file2):
                 os.unlink(temp_file2)
+
+    async def test_text_writelines_batches_small_inputs(self, temp_file, monkeypatch):
+        lines = [f"{i:03d}\n" for i in range(100)]
+        calls = []
+        original = AsyncGzipTextFile.write
+
+        async def tracking_write(self, data):
+            calls.append(len(data))
+            return await original(self, data)
+
+        monkeypatch.setattr(AsyncGzipTextFile, "write", tracking_write)
+        async with AsyncGzipTextFile(temp_file, "wt", chunk_size=32) as f:
+            await f.writelines(lines)
+
+        assert len(calls) < len(lines)
+        assert max(calls) <= 32
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            assert await f.readlines() == lines
+
+    async def test_binary_writelines_batches_small_inputs(self, temp_file, monkeypatch):
+        lines = [f"{i:03d}\n".encode() for i in range(100)]
+        calls = []
+        original = AsyncGzipBinaryFile.write
+
+        async def tracking_write(self, data):
+            calls.append(len(data))
+            return await original(self, data)
+
+        monkeypatch.setattr(AsyncGzipBinaryFile, "write", tracking_write)
+        async with AsyncGzipBinaryFile(temp_file, "wb", chunk_size=32) as f:
+            await f.writelines(lines)
+
+        assert len(calls) < len(lines)
+        assert max(calls) <= 32
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.readlines() == lines
+
+    async def test_writelines_flushes_yielded_data_before_iterator_error(
+        self, temp_file
+    ):
+        class IteratorFailure(Exception):
+            pass
+
+        def broken_lines():
+            yield "first\n"
+            yield "second\n"
+            raise IteratorFailure
+
+        async with AsyncGzipTextFile(temp_file, "wt") as f:
+            with pytest.raises(IteratorFailure):
+                await f.writelines(broken_lines())
+
+        async with AsyncGzipTextFile(temp_file, "rt") as f:
+            assert await f.read() == "first\nsecond\n"

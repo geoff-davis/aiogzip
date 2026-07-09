@@ -30,8 +30,9 @@
 - **Backward seeks restart decompression** from the beginning of the file, so forward-only access is much faster than mixed-direction access.
 - **Non-seekable input streams use a bounded rewind cache**. By default, up to 128 MiB of compressed input is retained so backward seeks can replay the stream; pass `max_rewind_cache_size=<bytes>` to tune this, or `None` to allow an unbounded cache.
 - **Writes past 4 GiB of uncompressed data** produce a gzip trailer whose `ISIZE` field wraps to `size & 0xFFFFFFFF` (this matches the gzip format spec and `gzip.open()`). Pass `strict_size=True` to refuse writes that would exceed the limit instead.
-- **Guard against decompression bombs** by passing `max_decompressed_size=<bytes>` when reading untrusted files; the decompressor aborts with `OSError` once the cap is exceeded.
+- **Guard against decompression bombs** by passing `max_decompressed_size=<bytes>` when reading untrusted files. The decompressor limits each inflate call to the remaining allowance (plus one byte for overflow detection) and raises `OSError` without materializing the payload beyond that bound.
 - **Use one file object per task.** An open `aiogzip` file is not safe for concurrent use by multiple `asyncio` tasks — its internal buffers and decoder/compressor state are mutated without locking, the same contract as standard-library file objects. Give each task its own file object, or serialize access behind your own lock.
+- **Reopen after cancelling CPU-heavy reads.** If a task is cancelled while a large decompression call is running in the executor, the open reader becomes unusable because the worker thread cannot be stopped safely. Later reads and seeks raise `OSError`; close that handle and open a new one.
 
 ## Quickstart
 
@@ -97,6 +98,7 @@ finally:
 - **Binary I/O**: Near parity with `gzip` for bulk writes, with fast bulk reads (a full `read(-1)` of compressible data runs at several hundred MB/s); can be slower for very small chunk sizes.
 - **Concurrency**: CPU-heavy `zlib` compress/decompress calls run in the default executor above a 256 KiB threshold, so multiple gzip streams on the same event loop compress and decompress in parallel instead of serializing on the loop thread. The repo's concurrent-I/O benchmark runs ~4x faster since this landed in 1.4.0; single-stream throughput stays at parity.
 - **Line Iteration**: For the single-character newline modes (`None`, `"\n"`, `"\r"`), lines are bulk-split per chunk and served from a batch, making `async for`/`readline()` roughly ~1.2–1.3x faster (~4M lines/sec).
+- **Batched line writes**: `writelines()` combines small binary or text inputs into bounded `chunk_size` batches, avoiding one compression call per line while preserving generator streaming.
 - **Optional faster codec**: With `aiogzip[fast]` installed, decompression uses `zlib-ng` automatically (~1.2-2x on typical data, up to ~7-10x on highly compressible bulk reads; byte-identical output), and `fast_compress=True` gives ~1.2-1.5x compression. See the [Performance Guide](https://geoff-davis.github.io/aiogzip/performance/).
 - **Memory**: Optimized buffer management for stable memory usage.
 - **JSONL**: For large gzipped JSONL files, prefer `AsyncGzipTextFile(..., newline="\n", chunk_size=512 * 1024)` to reduce line-iteration overhead.

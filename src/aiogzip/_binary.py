@@ -5,6 +5,7 @@ import gzip
 import io
 import os
 import warnings
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Iterable, List, Optional, Union, cast
 
@@ -29,6 +30,7 @@ from ._common import (
     _validate_chunk_size,
     _validate_compresslevel,
     _validate_filename,
+    _validate_optional_positive_int,
     _validate_original_filename,
 )
 
@@ -123,6 +125,7 @@ class AsyncGzipBinaryFile:
         "_underlying_seekable",
         "_max_rewind_cache_size",
         "_write_broken",
+        "_read_broken",
         "_max_decompressed_size",
         "_decompressed_total",
         "_strict_size",
@@ -164,10 +167,8 @@ class AsyncGzipBinaryFile:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
         _validate_chunk_size(chunk_size)
-        if max_decompressed_size is not None and max_decompressed_size <= 0:
-            raise ValueError("max_decompressed_size must be a positive integer")
-        if max_rewind_cache_size is not None and max_rewind_cache_size <= 0:
-            raise ValueError("max_rewind_cache_size must be a positive integer")
+        _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")
+        _validate_optional_positive_int(max_rewind_cache_size, "max_rewind_cache_size")
 
         # Validate mode and derive file characteristics
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
@@ -225,6 +226,7 @@ class AsyncGzipBinaryFile:
         self._underlying_seekable: bool = True
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._write_broken: bool = False
+        self._read_broken: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._decompressed_total: int = 0
         self._strict_size: bool = bool(strict_size)
@@ -276,7 +278,7 @@ class AsyncGzipBinaryFile:
                     self._header_mtime,
                     self._compresslevel,
                 )
-                await self._file.write(header)
+                await self._write_all(header)
                 self._crc = 0
                 self._input_size = 0
             else:  # read mode
@@ -349,6 +351,8 @@ class AsyncGzipBinaryFile:
                     await self.write(chunk)
                     remaining -= len(chunk)
             return self._position
+
+        self._check_read_usable()
 
         if whence == os.SEEK_SET:
             target = offset
@@ -462,6 +466,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
         if size is not None and size > _MAX_CHUNK_SIZE:
             raise ValueError(
                 f"peek size must be <= {_MAX_CHUNK_SIZE} bytes "
@@ -536,6 +541,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto() argument must be writable")
@@ -567,6 +573,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
 
         if size is None:
             size = -1
@@ -613,6 +620,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto1() argument must be writable")
@@ -636,6 +644,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
         if limit is None or limit < 0:
             # Any negative limit means "no limit", matching io.IOBase. Values
             # below -1 must not reach the arithmetic below, where they would
@@ -728,14 +737,45 @@ class AsyncGzipBinaryFile:
         return lines
 
     async def writelines(self, lines: Iterable[bytes]) -> None:
-        """Write a sequence of bytes-like lines to the binary stream."""
+        """Write bytes-like lines in bounded batches without adding separators."""
         if not self._writing_mode:
             raise OSError("File not open for writing")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
 
-        for line in lines:
-            await self.write(line)
+        pending = bytearray()
+        iterator = iter(lines)
+        while True:
+            try:
+                line = next(iterator)
+            except StopIteration:
+                break
+            except BaseException:
+                if pending:
+                    await self.write(pending)
+                raise
+
+            try:
+                data = self._coerce_byteslike(line)
+            except BaseException:
+                if pending:
+                    await self.write(pending)
+                raise
+
+            length = len(data)
+            if length >= self._chunk_size:
+                if pending:
+                    await self.write(pending)
+                    pending.clear()
+                await self.write(data)
+            else:
+                if pending and len(pending) + length > self._chunk_size:
+                    await self.write(pending)
+                    pending.clear()
+                pending.extend(data)
+
+        if pending:
+            await self.write(pending)
 
     def readable(self) -> bool:
         return self._mode_op == "r"
@@ -826,7 +866,7 @@ class AsyncGzipBinaryFile:
 
         if compressed:
             try:
-                await self._file.write(compressed)
+                await self._write_all(compressed)
             except BaseException:
                 # File write failed after compressor already consumed input;
                 # further writes would produce a torn member.
@@ -865,6 +905,30 @@ class AsyncGzipBinaryFile:
             return view.cast("B")
         return view
 
+    async def _write_all(self, data: bytes) -> None:
+        """Write every byte to the underlying sink or raise on no progress."""
+        if self._file is None:
+            raise ValueError("File not opened. Call await open() or use async with.")
+
+        offset = 0
+        length = len(data)
+        while offset < length:
+            written = await self._file.write(data if offset == 0 else data[offset:])
+            if not isinstance(written, int) or isinstance(written, bool):
+                raise OSError(
+                    "underlying file write() returned an invalid byte count "
+                    f"({written!r})"
+                )
+            remaining = length - offset
+            if written <= 0:
+                raise OSError("underlying file write() made no progress")
+            if written > remaining:
+                raise OSError(
+                    "underlying file write() returned more bytes than requested "
+                    f"({written} > {remaining})"
+                )
+            offset += written
+
     async def read(self, size: int = -1) -> bytes:
         """
         Reads and decompresses binary data from the file.
@@ -886,6 +950,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
 
         if size is None:
             size = -1
@@ -1015,15 +1080,18 @@ class AsyncGzipBinaryFile:
         # Decompress the chunk
         pieces = []
         try:
-            if len(compressed_chunk) >= _ZLIB_OFFLOAD_THRESHOLD:
-                decompressed = await _run_zlib_in_thread(
-                    self._engine.decompress, compressed_chunk
-                )
+            if self._max_decompressed_size is None:
+                if len(compressed_chunk) >= _ZLIB_OFFLOAD_THRESHOLD:
+                    decompressed = await self._run_decompress_in_thread(
+                        self._engine.decompress, compressed_chunk
+                    )
+                else:
+                    decompressed = self._engine.decompress(compressed_chunk)
+                if decompressed:
+                    self._account_decompressed(len(decompressed))
+                    pieces.append(decompressed)
             else:
-                decompressed = self._engine.decompress(compressed_chunk)
-            if decompressed:
-                self._account_decompressed(len(decompressed))
-                pieces.append(decompressed)
+                pieces.extend(await self._decompress_payload_limited(compressed_chunk))
 
             # Handle multi-member gzip archives (created by append mode).
             # CPython's gzip reader ignores zero padding between/after members,
@@ -1035,15 +1103,18 @@ class AsyncGzipBinaryFile:
                     break
 
                 self._engine = _engine.decompressobj(GZIP_WBITS)
-                if len(unused) >= _ZLIB_OFFLOAD_THRESHOLD:
-                    decompressed = await _run_zlib_in_thread(
-                        self._engine.decompress, unused
-                    )
+                if self._max_decompressed_size is None:
+                    if len(unused) >= _ZLIB_OFFLOAD_THRESHOLD:
+                        decompressed = await self._run_decompress_in_thread(
+                            self._engine.decompress, unused
+                        )
+                    else:
+                        decompressed = self._engine.decompress(unused)
+                    if decompressed:
+                        self._account_decompressed(len(decompressed))
+                        pieces.append(decompressed)
                 else:
-                    decompressed = self._engine.decompress(unused)
-                if decompressed:
-                    self._account_decompressed(len(decompressed))
-                    pieces.append(decompressed)
+                    pieces.extend(await self._decompress_payload_limited(unused))
                 unused = self._engine.unused_data
         except _engine.ZLIB_ERRORS as e:
             raise gzip.BadGzipFile(f"Error decompressing gzip data: {e}") from e
@@ -1054,6 +1125,62 @@ class AsyncGzipBinaryFile:
         except Exception as e:
             raise OSError(f"Unexpected error during decompression: {e}") from e
         return pieces
+
+    async def _decompress_payload_limited(self, compressed: bytes) -> List[bytes]:
+        """Inflate one compressed span without exceeding the configured cap.
+
+        Zlib receives the remaining allowance plus one byte: that extra byte lets
+        us detect an over-limit stream without first materializing its full
+        expansion. ``unconsumed_tail`` is replayed until the input is drained or
+        the cap trips. The unlimited hot path stays inline in ``_decompress_next``
+        so readers that do not request a safety cap pay no extra coroutine call.
+        """
+        cap = self._max_decompressed_size
+        assert cap is not None
+
+        pieces: List[bytes] = []
+        pending = compressed
+        while pending:
+            remaining = cap - self._decompressed_total
+            max_length = remaining + 1
+            decompress = partial(self._engine.decompress, max_length=max_length)
+            if len(pending) >= _ZLIB_OFFLOAD_THRESHOLD:
+                decompressed = await self._run_decompress_in_thread(decompress, pending)
+            else:
+                decompressed = decompress(pending)
+
+            if decompressed:
+                self._account_decompressed(len(decompressed))
+                pieces.append(decompressed)
+
+            tail = self._engine.unconsumed_tail
+            if not tail:
+                break
+            if len(tail) == len(pending) and tail == pending and not decompressed:
+                raise OSError("gzip decompressor made no progress")
+            pending = tail
+
+        return pieces
+
+    def _check_read_usable(self) -> None:
+        """Reject access after cancellation may have advanced the decompressor."""
+        if self._read_broken:
+            raise OSError(
+                "read stream is broken after cancelled decompression; "
+                "close and reopen the gzip file"
+            )
+
+    async def _run_decompress_in_thread(
+        self, method: Callable[[bytes], bytes], data: bytes
+    ) -> bytes:
+        """Offload decompression and poison state if the await is cancelled."""
+        try:
+            return await _run_zlib_in_thread(method, data)
+        except asyncio.CancelledError:
+            # Cancelling the await cannot stop an already-running executor call.
+            # It may still advance the shared engine after control returns here.
+            self._read_broken = True
+            raise
 
     async def _fill_buffer(self) -> None:
         """Decompress the next compressed chunk into the read buffer.
@@ -1236,7 +1363,13 @@ class AsyncGzipBinaryFile:
             try:
                 flushed_data = self._engine.flush(_engine.Z_SYNC_FLUSH)
                 if flushed_data:
-                    await self._file.write(flushed_data)
+                    try:
+                        await self._write_all(flushed_data)
+                    except BaseException:
+                        # Z_SYNC_FLUSH advanced the compressor. If its output did
+                        # not reach the sink, no later bytes can repair the member.
+                        self._write_broken = True
+                        raise
 
                 # Also flush the underlying file if it has a flush method
                 flush_method = getattr(self._file, "flush", None)
@@ -1272,9 +1405,9 @@ class AsyncGzipBinaryFile:
                 # trailer would lie about the bytes actually on disk.
                 remaining_data = self._engine.flush()
                 if remaining_data:
-                    await self._file.write(remaining_data)
+                    await self._write_all(remaining_data)
                 trailer = _build_gzip_trailer(self._crc, self._input_size)
-                await self._file.write(trailer)
+                await self._write_all(trailer)
         except BaseException:
             write_failed = True
             raise

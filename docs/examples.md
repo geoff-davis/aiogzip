@@ -155,7 +155,9 @@ asyncio.run(safe_read())
 ## Reading Untrusted Files Safely
 
 When reading gzip data from untrusted sources, cap decompressed output to avoid
-expanding a small compressed file into unbounded memory usage:
+expanding a small compressed file into unbounded memory usage. The inflater is
+limited to the remaining allowance plus one byte, so the guard does not first
+allocate the complete expanded payload:
 
 ```python
 import asyncio

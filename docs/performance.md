@@ -18,6 +18,11 @@ All benchmarks were conducted on standard hardware using Python 3.12+.
 
 **Why?** `aiogzip` uses optimized UTF-8 decoding strategies (using `codecs.getincrementaldecoder`) and manages buffers efficiently to minimize encoding/decoding overhead. For the single-character newline modes (`None`, `"\n"`, `"\r"`), each decoded chunk's lines are bulk-split in one pass and served from a batch, which makes `async for` line iteration roughly **1.3x** faster than per-line scanning.
 
+For writing many small records, prefer `writelines()` over an explicit loop of
+`await f.write(line)`. It combines inputs into bounded `chunk_size` batches,
+reducing Python coroutine and compressor-call overhead without loading the full
+iterable into memory.
+
 ### Binary Operations (Tie)
 
 For bulk binary I/O, `aiogzip` matches the throughput of standard `gzip`.

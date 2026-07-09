@@ -15,6 +15,11 @@ import importlib
 import sys
 from pathlib import Path
 
+try:
+    from .bench_common import median_results
+except ImportError:  # Direct script execution: benchmarks/ is on sys.path.
+    from bench_common import median_results
+
 # Available benchmark categories
 CATEGORIES = {
     "io": "bench_io",
@@ -29,8 +34,8 @@ CATEGORIES = {
 QUICK_CATEGORIES = ["io", "compression"]
 
 
-async def run_category(category: str, data_size_mb: int = 1):
-    """Run benchmarks for a specific category."""
+async def run_category(category: str, data_size_mb: int = 1, repeat: int = 3):
+    """Run a category repeatedly and return median-duration results."""
     if category not in CATEGORIES:
         print(f"Error: Unknown category '{category}'")
         print(f"Available categories: {', '.join(CATEGORIES.keys())}")
@@ -52,24 +57,34 @@ async def run_category(category: str, data_size_mb: int = 1):
         return None
 
     benchmark_class = getattr(module, benchmark_class_name)
-    benchmark = benchmark_class(data_size_mb=data_size_mb)
 
     print(f"\n{'=' * 60}")
-    print(f"Running {category.upper()} Benchmarks")
+    print(f"Running {category.upper()} Benchmarks (median of {repeat} runs)")
     print(f"{'=' * 60}")
 
-    try:
-        benchmark.setup()
-        await benchmark.run_all()
-        results = benchmark.get_results()
+    repeated_results = []
+    for _ in range(repeat):
+        benchmark = benchmark_class(data_size_mb=data_size_mb)
+        try:
+            benchmark.setup()
+            await benchmark.run_all()
+            repeated_results.append(benchmark.get_results())
+        finally:
+            benchmark.cleanup()
 
-        # Print results
-        for result in results:
-            print(f"\n{result}")
+    results = median_results(repeated_results)
+    for result in results:
+        print(f"\n{result}")
 
-        return results
-    finally:
-        benchmark.cleanup()
+    return results
+
+
+def positive_int(value: str) -> int:
+    """Argparse type for strictly positive repeat counts."""
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
 
 
 async def main():
@@ -91,6 +106,12 @@ async def main():
     parser.add_argument(
         "--size", type=int, default=1, help="Data size in MB (default: 1)"
     )
+    parser.add_argument(
+        "--repeat",
+        type=positive_int,
+        default=3,
+        help="Run each category N times and report medians (default: 3)",
+    )
     parser.add_argument("--output", "-o", type=str, help="Save results to JSON file")
 
     args = parser.parse_args()
@@ -110,7 +131,9 @@ async def main():
     # Run benchmarks
     all_results = []
     for category in categories_to_run:
-        results = await run_category(category, data_size_mb=args.size)
+        results = await run_category(
+            category, data_size_mb=args.size, repeat=args.repeat
+        )
         if results:
             all_results.extend(results)
 
@@ -123,6 +146,7 @@ async def main():
         data = {
             "categories": categories_to_run,
             "data_size_mb": args.size,
+            "repeat": args.repeat,
             "results": [r.to_dict() for r in all_results],
         }
         with open(output_path, "w") as f:

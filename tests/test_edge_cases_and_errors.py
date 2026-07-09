@@ -25,6 +25,21 @@ class TestEdgeCasesAndErrors:
         ):
             AsyncGzipBinaryFile("test.gz", mode="wb", compresslevel=10)
 
+    @pytest.mark.parametrize("invalid", [1.5, "1024", True])
+    def test_integer_only_size_and_compression_parameters(self, invalid):
+        for cls, mode in (
+            (AsyncGzipBinaryFile, "wb"),
+            (AsyncGzipTextFile, "wt"),
+        ):
+            with pytest.raises(TypeError, match="Chunk size must be an integer"):
+                cls("test.gz", mode=mode, chunk_size=invalid)
+            with pytest.raises(TypeError, match="Compression level must be an integer"):
+                cls("test.gz", mode=mode, compresslevel=invalid)
+            with pytest.raises(TypeError, match="max_decompressed_size"):
+                cls("test.gz", mode=mode, max_decompressed_size=invalid)
+            with pytest.raises(TypeError, match="max_rewind_cache_size"):
+                cls("test.gz", mode=mode, max_rewind_cache_size=invalid)
+
     async def test_mtime_validation(self):
         """Test validation of mtime values."""
         AsyncGzipBinaryFile("test.gz", mode="wb", mtime=0xFFFFFFFF)

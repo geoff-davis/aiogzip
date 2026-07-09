@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `max_decompressed_size` now bounds each inflate call to the remaining
+  allowance plus one byte instead of checking only after zlib returned its full
+  output. Highly compressible untrusted input can no longer allocate its entire
+  expansion before the decompression-bomb guard raises `OSError`.
+- A failed write of `flush()` output now marks the compressor stream broken.
+  Follow-up writes are rejected and `close()` does not append a misleading
+  final block or trailer to an already torn gzip member.
+- Text writers now keep one incremental encoder across `write()` calls and
+  finalize it before closing the gzip member. Stateful encodings such as
+  UTF-16 and ISO-2022-JP no longer emit repeated BOMs or reset sequences when a
+  document is written in multiple calls.
+- Cancelling a read while decompression is running in the executor now marks
+  that reader unusable. The worker thread may still advance its zlib state, so
+  subsequent reads and seeks raise `OSError` instead of risking skipped or
+  corrupted output; close the handle and reopen the gzip file to continue.
+- Short writes from external `fileobj` sinks are now retried until every gzip
+  header, compressed block, flush block, and trailer byte has been accepted.
+  Zero-progress and invalid write counts raise `OSError` instead of silently
+  producing a truncated or malformed archive.
+- `chunk_size`, `compresslevel`, `max_decompressed_size`, and
+  `max_rewind_cache_size` now reject floats, strings, and booleans immediately
+  with `TypeError` instead of failing later inside slicing, file I/O, or zlib.
+
+### Performance
+
+- Binary and text `writelines()` now combine small inputs into bounded batches
+  before encoding/compression, reducing coroutine and compressor-call overhead
+  while preserving streaming behavior for large inputs and failing iterators.
+
+### Maintenance
+
+- The fast text-line refill path now has a narrow first-line helper and asserts
+  that general pending consumption already happened in the two intentionally
+  inlined hot paths, removing redundant pending-state handling without adding a
+  per-line function call.
+- The benchmark runner now executes each category three times by default and
+  reports median durations with metrics from the closest real sample. Use
+  `--repeat` to tune stability versus runtime. Removed an unused mypy override
+  that produced a configuration warning on every source-only type check.
+
+### Documentation
+
+- Clarified that `max_decompressed_size` bounds individual inflate output and
+  documented continuous incremental encoding for text writers.
+- Documented bounded `writelines()` batching and strict integer-only tuning
+  parameters.
+
 ## [1.9.0] - 2026-07-02
 
 ### Announced

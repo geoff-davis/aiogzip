@@ -9,6 +9,7 @@ import json
 import os
 import random
 import shutil
+import statistics
 import string
 import tempfile
 import time
@@ -44,6 +45,45 @@ class BenchmarkResults:
             else:
                 lines.append(f"  {key}: {value}")
         return "\n".join(lines)
+
+
+def median_results(
+    runs: List[List[BenchmarkResults]],
+) -> List[BenchmarkResults]:
+    """Aggregate repeated benchmark runs by median duration.
+
+    Metrics come from the sample closest to the median so related throughput
+    values remain internally consistent with a real run rather than being
+    combined independently.
+    """
+    if not runs:
+        return []
+
+    expected_names = [result.name for result in runs[0]]
+    expected_set = set(expected_names)
+    for run in runs[1:]:
+        if {result.name for result in run} != expected_set:
+            raise ValueError("benchmark runs produced different result sets")
+
+    lookups = [{result.name: result for result in run} for run in runs]
+    aggregated: List[BenchmarkResults] = []
+    for name in expected_names:
+        samples = [lookup[name] for lookup in lookups]
+        duration = float(statistics.median(sample.duration for sample in samples))
+        representative = min(
+            samples, key=lambda sample: abs(sample.duration - duration)
+        )
+        metrics = dict(representative.metrics)
+        metrics["suite_repeats"] = len(runs)
+        aggregated.append(
+            BenchmarkResults(
+                name=name,
+                category=representative.category,
+                duration=duration,
+                metrics=metrics,
+            )
+        )
+    return aggregated
 
 
 class TempFileManager:

@@ -12,6 +12,36 @@
 
 Implementation internals live in `aiogzip._common`, `aiogzip._binary`, and `aiogzip._text`. Treat those modules as private and unstable.
 
+When writing through an external asynchronous `fileobj`, its `write()` method
+may accept fewer bytes than requested as long as it returns the accepted byte
+count. `aiogzip` retries short writes until the complete gzip block is written.
+A zero-progress or otherwise invalid count raises `OSError`.
+
+## Safety limits
+
+Set `max_decompressed_size=<bytes>` when reading untrusted gzip data. The
+limit applies to cumulative decompressed output for the current pass through
+the stream. Each inflate call is restricted to the remaining allowance plus
+one byte, so an over-limit member raises `OSError` without first materializing
+its full expansion in memory. Rewinding resets the accounting because the new
+read pass starts again at byte zero.
+
+## Text encodings
+
+`AsyncGzipTextFile` keeps one incremental encoder for the lifetime of a write
+stream. Multiple `write()` or `writelines()` calls therefore produce one
+continuous encoded byte stream, including for stateful encodings such as
+UTF-16, UTF-32, and ISO-2022-JP. Any final encoder shift sequence is written
+before the gzip member's final block and trailer.
+
+Both binary and text `writelines()` collect small inputs into bounded
+`chunk_size` batches before compression. Inputs larger than a batch are written
+directly, so generators remain streaming and memory use stays bounded.
+
+Byte-count and compression tuning parameters are integer-only:
+`chunk_size`, `compresslevel`, `max_decompressed_size`, and
+`max_rewind_cache_size` reject floats, strings, and booleans with `TypeError`.
+
 ## `seek()` and `tell()` in text mode
 
 `AsyncGzipBinaryFile.tell()` returns the current position as a plain non-negative count of decompressed bytes, and `seek(offset)` accepts any such offset.
