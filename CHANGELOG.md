@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Packaging
+
+- Switched the build backend from setuptools to `flit_core` so source builds
+  keep working on Python 3.8 while adopting modern PEP 639 metadata. The
+  project now publishes an SPDX `MIT` license expression and explicit license
+  file without deprecated license classifiers or build warnings.
+
 ## [1.9.1] - 2026-07-09
 
 ### Fixed

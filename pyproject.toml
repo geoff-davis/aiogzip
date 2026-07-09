@@ -1,11 +1,6 @@
 [build-system]
-# NOTE: PEP 639 (license = "MIT" SPDX string + license-files) is deferred to
-# 2.0: it needs setuptools >= 77, which requires Python >= 3.9 at build time,
-# and CI's editable install on the 3.8 leg builds from source. Until 3.8/3.9
-# are dropped, keep the legacy license table below despite the deprecation
-# warning from newer setuptools.
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["flit_core>=3.11,<5"]
+build-backend = "flit_core.buildapi"
 
 [project]
 name = "aiogzip"
@@ -16,14 +11,12 @@ authors = [
 description = "Asynchronous gzip file reading and writing for Python asyncio — aiofiles-style API, streaming text/binary modes, decompression-bomb guards, optional zlib-ng acceleration."
 readme = "README.md"
 requires-python = ">=3.8"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = ["gzip", "async", "asyncio", "compression", "decompression", "aiofiles", "zlib", "zlib-ng", "file-io"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    # Remove this classifier when the PEP 639 migration lands in 2.0 (639
-    # forbids license classifiers alongside an SPDX license expression).
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -90,15 +83,16 @@ Changelog = "https://github.com/geoff-davis/aiogzip/blob/main/CHANGELOG.md"
 # `uv run --python 3.8`. Remove when 3.8/3.9 support is dropped in 2.0.
 environments = ["python_full_version >= '3.10'"]
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-packages = ["aiogzip"]
-
-[tool.setuptools.package-data]
-"aiogzip" = ["py.typed"]
-
-[tool.setuptools.dynamic]
-version = { attr = "aiogzip.__version__" }
+[tool.flit.sdist]
+include = [
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "mkdocs.yml",
+    "benchmarks/",
+    "docs/",
+    "scripts/",
+    "tests/",
+]
 
 [tool.ruff]
 line-length = 88
