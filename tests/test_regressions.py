@@ -1318,3 +1318,52 @@ class TestWriteCancellationDuringOffload:
                 await f.write(b"more")
         finally:
             await f.__aexit__(None, None, None)
+
+
+class TestReadCancellationDuringOffload:
+    """Cancelling executor decompression must make later reads fail safely."""
+
+    @pytest.mark.parametrize("use_cap", [False, True])
+    async def test_cancelled_offloaded_read_marks_stream_broken(
+        self, temp_file, monkeypatch, use_cap
+    ):
+        import asyncio
+        import gzip
+
+        from aiogzip import _binary
+
+        payload = os.urandom(512 * 1024)
+        with gzip.open(temp_file, "wb") as raw:
+            raw.write(payload)
+
+        started = asyncio.Event()
+
+        async def blocking_offload(method, data):
+            started.set()
+            await asyncio.Event().wait()
+
+        monkeypatch.setattr(_binary, "_run_zlib_in_thread", blocking_offload)
+        cap = len(payload) * 2 if use_cap else None
+        f = AsyncGzipBinaryFile(
+            temp_file,
+            "rb",
+            chunk_size=1024 * 1024,
+            max_decompressed_size=cap,
+        )
+        await f.open()
+        try:
+            task = asyncio.ensure_future(f.read())
+            await started.wait()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+            assert f._read_broken is True
+            with pytest.raises(OSError, match="broken.*close and reopen"):
+                await f.read()
+            with pytest.raises(OSError, match="broken.*close and reopen"):
+                await f.peek(1)
+            with pytest.raises(OSError, match="broken.*close and reopen"):
+                await f.seek(0)
+        finally:
+            await f.close()

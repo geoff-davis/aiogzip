@@ -32,6 +32,7 @@
 - **Writes past 4 GiB of uncompressed data** produce a gzip trailer whose `ISIZE` field wraps to `size & 0xFFFFFFFF` (this matches the gzip format spec and `gzip.open()`). Pass `strict_size=True` to refuse writes that would exceed the limit instead.
 - **Guard against decompression bombs** by passing `max_decompressed_size=<bytes>` when reading untrusted files. The decompressor limits each inflate call to the remaining allowance (plus one byte for overflow detection) and raises `OSError` without materializing the payload beyond that bound.
 - **Use one file object per task.** An open `aiogzip` file is not safe for concurrent use by multiple `asyncio` tasks — its internal buffers and decoder/compressor state are mutated without locking, the same contract as standard-library file objects. Give each task its own file object, or serialize access behind your own lock.
+- **Reopen after cancelling CPU-heavy reads.** If a task is cancelled while a large decompression call is running in the executor, the open reader becomes unusable because the worker thread cannot be stopped safely. Later reads and seeks raise `OSError`; close that handle and open a new one.
 
 ## Quickstart
 

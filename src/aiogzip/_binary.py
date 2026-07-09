@@ -124,6 +124,7 @@ class AsyncGzipBinaryFile:
         "_underlying_seekable",
         "_max_rewind_cache_size",
         "_write_broken",
+        "_read_broken",
         "_max_decompressed_size",
         "_decompressed_total",
         "_strict_size",
@@ -226,6 +227,7 @@ class AsyncGzipBinaryFile:
         self._underlying_seekable: bool = True
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._write_broken: bool = False
+        self._read_broken: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._decompressed_total: int = 0
         self._strict_size: bool = bool(strict_size)
@@ -351,6 +353,8 @@ class AsyncGzipBinaryFile:
                     remaining -= len(chunk)
             return self._position
 
+        self._check_read_usable()
+
         if whence == os.SEEK_SET:
             target = offset
         elif whence == os.SEEK_CUR:
@@ -463,6 +467,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
         if size is not None and size > _MAX_CHUNK_SIZE:
             raise ValueError(
                 f"peek size must be <= {_MAX_CHUNK_SIZE} bytes "
@@ -537,6 +542,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto() argument must be writable")
@@ -568,6 +574,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
 
         if size is None:
             size = -1
@@ -614,6 +621,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto1() argument must be writable")
@@ -637,6 +645,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
         if limit is None or limit < 0:
             # Any negative limit means "no limit", matching io.IOBase. Values
             # below -1 must not reach the arithmetic below, where they would
@@ -887,6 +896,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        self._check_read_usable()
 
         if size is None:
             size = -1
@@ -969,6 +979,7 @@ class AsyncGzipBinaryFile:
         ``_fill_buffer`` extends the buffer with them for the partial-read
         paths. Returns an empty list at or after EOF.
         """
+        self._check_read_usable()
         if self._eof or self._file is None:
             return []
 
@@ -1018,7 +1029,7 @@ class AsyncGzipBinaryFile:
         try:
             if self._max_decompressed_size is None:
                 if len(compressed_chunk) >= _ZLIB_OFFLOAD_THRESHOLD:
-                    decompressed = await _run_zlib_in_thread(
+                    decompressed = await self._run_decompress_in_thread(
                         self._engine.decompress, compressed_chunk
                     )
                 else:
@@ -1041,7 +1052,7 @@ class AsyncGzipBinaryFile:
                 self._engine = _engine.decompressobj(GZIP_WBITS)
                 if self._max_decompressed_size is None:
                     if len(unused) >= _ZLIB_OFFLOAD_THRESHOLD:
-                        decompressed = await _run_zlib_in_thread(
+                        decompressed = await self._run_decompress_in_thread(
                             self._engine.decompress, unused
                         )
                     else:
@@ -1081,7 +1092,7 @@ class AsyncGzipBinaryFile:
             max_length = remaining + 1
             decompress = partial(self._engine.decompress, max_length=max_length)
             if len(pending) >= _ZLIB_OFFLOAD_THRESHOLD:
-                decompressed = await _run_zlib_in_thread(decompress, pending)
+                decompressed = await self._run_decompress_in_thread(decompress, pending)
             else:
                 decompressed = decompress(pending)
 
@@ -1097,6 +1108,26 @@ class AsyncGzipBinaryFile:
             pending = tail
 
         return pieces
+
+    def _check_read_usable(self) -> None:
+        """Reject access after cancellation may have advanced the decompressor."""
+        if self._read_broken:
+            raise OSError(
+                "read stream is broken after cancelled decompression; "
+                "close and reopen the gzip file"
+            )
+
+    async def _run_decompress_in_thread(
+        self, method: Callable[[bytes], bytes], data: bytes
+    ) -> bytes:
+        """Offload decompression and poison state if the await is cancelled."""
+        try:
+            return await _run_zlib_in_thread(method, data)
+        except asyncio.CancelledError:
+            # Cancelling the await cannot stop an already-running executor call.
+            # It may still advance the shared engine after control returns here.
+            self._read_broken = True
+            raise
 
     async def _fill_buffer(self) -> None:
         """Decompress the next compressed chunk into the read buffer.

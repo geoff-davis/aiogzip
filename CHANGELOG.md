@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
   finalize it before closing the gzip member. Stateful encodings such as
   UTF-16 and ISO-2022-JP no longer emit repeated BOMs or reset sequences when a
   document is written in multiple calls.
+- Cancelling a read while decompression is running in the executor now marks
+  that reader unusable. The worker thread may still advance its zlib state, so
+  subsequent reads and seeks raise `OSError` instead of risking skipped or
+  corrupted output; close the handle and reopen the gzip file to continue.
 
 ### Documentation
 
