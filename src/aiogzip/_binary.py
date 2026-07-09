@@ -279,7 +279,7 @@ class AsyncGzipBinaryFile:
                     self._header_mtime,
                     self._compresslevel,
                 )
-                await self._file.write(header)
+                await self._write_all(header)
                 self._crc = 0
                 self._input_size = 0
             else:  # read mode
@@ -836,7 +836,7 @@ class AsyncGzipBinaryFile:
 
         if compressed:
             try:
-                await self._file.write(compressed)
+                await self._write_all(compressed)
             except BaseException:
                 # File write failed after compressor already consumed input;
                 # further writes would produce a torn member.
@@ -874,6 +874,30 @@ class AsyncGzipBinaryFile:
         if view.itemsize != 1:
             return view.cast("B")
         return view
+
+    async def _write_all(self, data: bytes) -> None:
+        """Write every byte to the underlying sink or raise on no progress."""
+        if self._file is None:
+            raise ValueError("File not opened. Call await open() or use async with.")
+
+        offset = 0
+        length = len(data)
+        while offset < length:
+            written = await self._file.write(data if offset == 0 else data[offset:])
+            if not isinstance(written, int) or isinstance(written, bool):
+                raise OSError(
+                    "underlying file write() returned an invalid byte count "
+                    f"({written!r})"
+                )
+            remaining = length - offset
+            if written <= 0:
+                raise OSError("underlying file write() made no progress")
+            if written > remaining:
+                raise OSError(
+                    "underlying file write() returned more bytes than requested "
+                    f"({written} > {remaining})"
+                )
+            offset += written
 
     async def read(self, size: int = -1) -> bytes:
         """
@@ -1311,7 +1335,7 @@ class AsyncGzipBinaryFile:
                 flushed_data = self._engine.flush(_engine.Z_SYNC_FLUSH)
                 if flushed_data:
                     try:
-                        await self._file.write(flushed_data)
+                        await self._write_all(flushed_data)
                     except BaseException:
                         # Z_SYNC_FLUSH advanced the compressor. If its output did
                         # not reach the sink, no later bytes can repair the member.
@@ -1352,9 +1376,9 @@ class AsyncGzipBinaryFile:
                 # trailer would lie about the bytes actually on disk.
                 remaining_data = self._engine.flush()
                 if remaining_data:
-                    await self._file.write(remaining_data)
+                    await self._write_all(remaining_data)
                 trailer = _build_gzip_trailer(self._crc, self._input_size)
-                await self._file.write(trailer)
+                await self._write_all(trailer)
         except BaseException:
             write_failed = True
             raise

@@ -12,6 +12,11 @@
 
 Implementation internals live in `aiogzip._common`, `aiogzip._binary`, and `aiogzip._text`. Treat those modules as private and unstable.
 
+When writing through an external asynchronous `fileobj`, its `write()` method
+may accept fewer bytes than requested as long as it returns the accepted byte
+count. `aiogzip` retries short writes until the complete gzip block is written.
+A zero-progress or otherwise invalid count raises `OSError`.
+
 ## Safety limits
 
 Set `max_decompressed_size=<bytes>` when reading untrusted gzip data. The

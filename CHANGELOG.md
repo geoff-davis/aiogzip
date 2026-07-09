@@ -21,6 +21,10 @@ All notable changes to this project will be documented in this file.
   that reader unusable. The worker thread may still advance its zlib state, so
   subsequent reads and seeks raise `OSError` instead of risking skipped or
   corrupted output; close the handle and reopen the gzip file to continue.
+- Short writes from external `fileobj` sinks are now retried until every gzip
+  header, compressed block, flush block, and trailer byte has been accepted.
+  Zero-progress and invalid write counts raise `OSError` instead of silently
+  producing a truncated or malformed archive.
 
 ### Documentation
 
