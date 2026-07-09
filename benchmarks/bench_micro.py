@@ -125,6 +125,32 @@ class MicroBenchmarks(BenchmarkBase):
             ops_per_sec=f"{1000 / duration:.0f}",
         )
 
+    async def benchmark_text_writelines_batching(self):
+        """Compare batched writelines against explicit per-line writes."""
+        individual_file = self.temp_mgr.get_path("micro_lines_individual.gz")
+        batched_file = self.temp_mgr.get_path("micro_lines_batched.gz")
+        lines = [f"record {i:05d}\n" for i in range(10_000)]
+
+        start = time.perf_counter()
+        async with AsyncGzipTextFile(individual_file, "wt") as f:
+            for line in lines:
+                await f.write(line)
+        individual_time = time.perf_counter() - start
+
+        start = time.perf_counter()
+        async with AsyncGzipTextFile(batched_file, "wt") as f:
+            await f.writelines(lines)
+        batched_time = time.perf_counter() - start
+
+        self.add_result(
+            "Text writelines batching (10K lines)",
+            "micro",
+            batched_time,
+            individual_time=f"{individual_time * 1000:.3f}ms",
+            batched_time=f"{batched_time * 1000:.3f}ms",
+            speedup=f"{individual_time / batched_time:.2f}x",
+        )
+
     async def benchmark_binary_readline_long_line_small_chunks(self):
         """Benchmark binary readline on long lines with tiny compressed chunks."""
         binary_file = self.temp_mgr.get_path("micro_binary_readline.gz")
@@ -162,4 +188,5 @@ class MicroBenchmarks(BenchmarkBase):
         await self.benchmark_line_iteration()
         await self.benchmark_readline_loop()
         await self.benchmark_small_writes()
+        await self.benchmark_text_writelines_batching()
         await self.benchmark_binary_readline_long_line_small_chunks()

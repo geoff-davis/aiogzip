@@ -30,6 +30,7 @@ from ._common import (
     _validate_chunk_size,
     _validate_compresslevel,
     _validate_filename,
+    _validate_optional_positive_int,
     _validate_original_filename,
 )
 
@@ -166,10 +167,8 @@ class AsyncGzipBinaryFile:
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
         _validate_chunk_size(chunk_size)
-        if max_decompressed_size is not None and max_decompressed_size <= 0:
-            raise ValueError("max_decompressed_size must be a positive integer")
-        if max_rewind_cache_size is not None and max_rewind_cache_size <= 0:
-            raise ValueError("max_rewind_cache_size must be a positive integer")
+        _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")
+        _validate_optional_positive_int(max_rewind_cache_size, "max_rewind_cache_size")
 
         # Validate mode and derive file characteristics
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
@@ -738,14 +737,45 @@ class AsyncGzipBinaryFile:
         return lines
 
     async def writelines(self, lines: Iterable[bytes]) -> None:
-        """Write a sequence of bytes-like lines to the binary stream."""
+        """Write bytes-like lines in bounded batches without adding separators."""
         if not self._writing_mode:
             raise OSError("File not open for writing")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
 
-        for line in lines:
-            await self.write(line)
+        pending = bytearray()
+        iterator = iter(lines)
+        while True:
+            try:
+                line = next(iterator)
+            except StopIteration:
+                break
+            except BaseException:
+                if pending:
+                    await self.write(pending)
+                raise
+
+            try:
+                data = self._coerce_byteslike(line)
+            except BaseException:
+                if pending:
+                    await self.write(pending)
+                raise
+
+            length = len(data)
+            if length >= self._chunk_size:
+                if pending:
+                    await self.write(pending)
+                    pending.clear()
+                await self.write(data)
+            else:
+                if pending and len(pending) + length > self._chunk_size:
+                    await self.write(pending)
+                    pending.clear()
+                pending.extend(data)
+
+        if pending:
+            await self.write(pending)
 
     def readable(self) -> bool:
         return self._mode_op == "r"
@@ -1003,7 +1033,6 @@ class AsyncGzipBinaryFile:
         ``_fill_buffer`` extends the buffer with them for the partial-read
         paths. Returns an empty list at or after EOF.
         """
-        self._check_read_usable()
         if self._eof or self._file is None:
             return []
 

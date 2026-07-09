@@ -25,11 +25,29 @@ All notable changes to this project will be documented in this file.
   header, compressed block, flush block, and trailer byte has been accepted.
   Zero-progress and invalid write counts raise `OSError` instead of silently
   producing a truncated or malformed archive.
+- `chunk_size`, `compresslevel`, `max_decompressed_size`, and
+  `max_rewind_cache_size` now reject floats, strings, and booleans immediately
+  with `TypeError` instead of failing later inside slicing, file I/O, or zlib.
+
+### Performance
+
+- Binary and text `writelines()` now combine small inputs into bounded batches
+  before encoding/compression, reducing coroutine and compressor-call overhead
+  while preserving streaming behavior for large inputs and failing iterators.
+
+### Maintenance
+
+- The fast text-line refill path now has a narrow first-line helper and asserts
+  that general pending consumption already happened in the two intentionally
+  inlined hot paths, removing redundant pending-state handling without adding a
+  per-line function call.
 
 ### Documentation
 
 - Clarified that `max_decompressed_size` bounds individual inflate output and
   documented continuous incremental encoding for text writers.
+- Documented bounded `writelines()` batching and strict integer-only tuning
+  parameters.
 
 ## [1.9.0] - 2026-07-02
 

@@ -101,6 +101,8 @@ def _validate_chunk_size(chunk_size: int) -> None:
     Raises:
         ValueError: If chunk size is invalid
     """
+    if not isinstance(chunk_size, int) or isinstance(chunk_size, bool):
+        raise TypeError("Chunk size must be an integer")
     if chunk_size <= 0:
         raise ValueError("Chunk size must be positive")
     if chunk_size > _MAX_CHUNK_SIZE:
@@ -119,8 +121,20 @@ def _validate_compresslevel(compresslevel: int) -> None:
     Raises:
         ValueError: If compression level is not between -1 and 9
     """
+    if not isinstance(compresslevel, int) or isinstance(compresslevel, bool):
+        raise TypeError("Compression level must be an integer")
     if not (-1 <= compresslevel <= 9):
         raise ValueError("Compression level must be between -1 and 9")
+
+
+def _validate_optional_positive_int(value: Optional[int], name: str) -> None:
+    """Validate an optional byte-count limit shared by both stream classes."""
+    if value is None:
+        return
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError(f"{name} must be a positive integer or None")
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive integer")
 
 
 def _normalize_mtime(mtime: Optional[Union[int, float]]) -> Optional[int]:
@@ -338,6 +352,7 @@ __all__ = [
     "_validate_filename",
     "_validate_chunk_size",
     "_validate_compresslevel",
+    "_validate_optional_positive_int",
     "_normalize_mtime",
     "_validate_original_filename",
     "_derive_header_filename",

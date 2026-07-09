@@ -34,6 +34,14 @@ continuous encoded byte stream, including for stateful encodings such as
 UTF-16, UTF-32, and ISO-2022-JP. Any final encoder shift sequence is written
 before the gzip member's final block and trailer.
 
+Both binary and text `writelines()` collect small inputs into bounded
+`chunk_size` batches before compression. Inputs larger than a batch are written
+directly, so generators remain streaming and memory use stays bounded.
+
+Byte-count and compression tuning parameters are integer-only:
+`chunk_size`, `compresslevel`, `max_decompressed_size`, and
+`max_rewind_cache_size` reject floats, strings, and booleans with `TypeError`.
+
 ## `seek()` and `tell()` in text mode
 
 `AsyncGzipBinaryFile.tell()` returns the current position as a plain non-negative count of decompressed bytes, and `seek(offset)` accepts any such offset.
