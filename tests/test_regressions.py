@@ -530,6 +530,27 @@ class TestMediumPriorityEdgeCases:
             data = await f.read()
             assert data == test_text
 
+    @pytest.mark.parametrize(
+        ("encoding", "parts"),
+        [
+            ("utf-16", ["Hello ", "世界", " 🚀"]),
+            ("iso2022_jp", ["日本", "語の", "文章"]),
+        ],
+    )
+    async def test_stateful_encoding_is_preserved_across_writes(
+        self, temp_file, encoding, parts
+    ):
+        """Separate text writes must share one incremental encoder state."""
+        import gzip as _gzip
+
+        async with AsyncGzipTextFile(temp_file, "wt", encoding=encoding) as f:
+            for part in parts:
+                await f.write(part)
+
+        with open(temp_file, "rb") as raw_file:
+            raw = _gzip.decompress(raw_file.read())
+        assert raw == "".join(parts).encode(encoding)
+
     async def test_write_failure_does_not_advance_accounting(self):
         """If the underlying file.write fails, CRC/size/position must not
         reflect bytes that never reached the file, and subsequent writes
@@ -580,6 +601,38 @@ class TestMediumPriorityEdgeCases:
         # a trailer that claims data never written.
         await f.__aexit__(None, None, None)
 
+    async def test_flush_write_failure_marks_stream_broken(self):
+        """A failed sync-flush write advances zlib and must poison the stream."""
+
+        class FlushFailingWriter:
+            def __init__(self):
+                self.calls = 0
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls == 2:
+                    raise OSError("simulated flush failure")
+                return len(data)
+
+            async def close(self):
+                pass
+
+        writer = FlushFailingWriter()
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False)
+        await f.open()
+        await f.write(b"pending data")
+
+        with pytest.raises(OSError, match="simulated flush failure"):
+            await f.flush()
+
+        assert f._write_broken is True
+        with pytest.raises(OSError, match="broken"):
+            await f.write(b"more")
+
+        # A broken stream must not append a final block or trailer on close.
+        await f.close()
+        assert writer.calls == 2
+
     async def test_max_decompressed_size_trips_on_bomb(self, temp_file):
         """A highly compressible gzip should not expand past the caller's
         max_decompressed_size cap."""
@@ -597,6 +650,66 @@ class TestMediumPriorityEdgeCases:
                 temp_file, "rb", max_decompressed_size=1 * 1024 * 1024
             ) as f:
                 await f.read()
+
+    async def test_max_decompressed_size_bounds_each_inflate_call(
+        self, temp_file, monkeypatch
+    ):
+        """The guard must limit zlib output, not inspect it after allocation."""
+        import gzip as _gzip
+        import zlib
+
+        from aiogzip import _binary
+
+        cap = 1 * 1024 * 1024
+        with open(temp_file, "wb") as raw_file:
+            raw_file.write(_gzip.compress(b"x" * (20 * 1024 * 1024)))
+
+        class TrackingDecompressor:
+            def __init__(self, wbits):
+                self.inner = zlib.decompressobj(wbits)
+                self.limits = []
+                self.output_sizes = []
+
+            def decompress(self, data, max_length=0):
+                self.limits.append(max_length)
+                output = self.inner.decompress(data, max_length)
+                self.output_sizes.append(len(output))
+                return output
+
+            def flush(self):
+                return self.inner.flush()
+
+            @property
+            def eof(self):
+                return self.inner.eof
+
+            @property
+            def unconsumed_tail(self):
+                return self.inner.unconsumed_tail
+
+            @property
+            def unused_data(self):
+                return self.inner.unused_data
+
+        engines = []
+
+        def tracking_factory(wbits):
+            engine = TrackingDecompressor(wbits)
+            engines.append(engine)
+            return engine
+
+        monkeypatch.setattr(_binary._engine, "decompressobj", tracking_factory)
+
+        with pytest.raises(OSError, match="max_decompressed_size"):
+            async with AsyncGzipBinaryFile(
+                temp_file, "rb", max_decompressed_size=cap
+            ) as f:
+                await f.read()
+
+        assert engines
+        assert engines[0].limits
+        assert all(limit > 0 for limit in engines[0].limits)
+        assert max(engines[0].output_sizes) <= cap + 1
 
     async def test_max_decompressed_size_allows_under_cap(self, temp_file):
         """Reads comfortably under the cap should succeed."""

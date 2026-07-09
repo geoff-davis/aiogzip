@@ -91,6 +91,8 @@ class AsyncGzipTextFile:
         "_binary_file",
         "_is_closed",
         "_decoder",
+        "_encoder",
+        "_encoder_used",
         "_text_buffer",
         "_text_buffer_offset",
         "_trailing_cr",
@@ -207,6 +209,12 @@ class AsyncGzipTextFile:
         self._decoder = codecs.getincrementaldecoder(self._encoding)(
             errors=self._errors
         )
+        self._encoder = (
+            codecs.getincrementalencoder(self._encoding)(errors=self._errors)
+            if self._writing_mode
+            else None
+        )
+        self._encoder_used: bool = False
         self._text_buffer: str = ""  # Backing store for buffered decoded text
         self._text_buffer_offset: int = 0  # Start of unread text within _text_buffer
         self._trailing_cr: bool = False  # Track if last decoded chunk ended with \r
@@ -522,9 +530,23 @@ class AsyncGzipTextFile:
             # newline == '' means no translation; any other value treat as no translation
             pass
 
-        # Encode string to bytes
-        encoded_data = text_to_encode.encode(self._encoding, errors=self._errors)
-        await self._binary_file.write(encoded_data)
+        # Keep one encoder for the lifetime of the stream. Stateless str.encode()
+        # would emit a fresh BOM or reset sequence on every write for encodings
+        # such as UTF-16 and ISO-2022-JP.
+        encoder = self._encoder
+        assert encoder is not None
+        encoder_state = encoder.getstate()
+        encoder_was_used = self._encoder_used
+        self._encoder_used = True
+        try:
+            encoded_data = encoder.encode(text_to_encode, final=False)
+            await self._binary_file.write(encoded_data)
+        except BaseException:
+            # Preserve retryability when the binary layer rejected the write
+            # before consuming it (for example strict_size validation).
+            encoder.setstate(encoder_state)
+            self._encoder_used = encoder_was_used
+            raise
         return len(data)
 
     def _buffered_text_len(self) -> int:
@@ -1402,5 +1424,24 @@ class AsyncGzipTextFile:
         # Mark as closed immediately to prevent concurrent close attempts
         self._is_closed = True
 
-        if self._binary_file is not None:
-            await self._binary_file.close()
+        binary_file = self._binary_file
+        if binary_file is None:
+            return
+
+        encoder_failed = False
+        try:
+            if self._writing_mode and self._encoder_used:
+                encoder = self._encoder
+                assert encoder is not None
+                final_data = encoder.encode("", final=True)
+                if final_data:
+                    await binary_file.write(final_data)
+        except BaseException:
+            encoder_failed = True
+            raise
+        finally:
+            try:
+                await binary_file.close()
+            except BaseException:
+                if not encoder_failed:
+                    raise

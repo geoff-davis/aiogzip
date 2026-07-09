@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `max_decompressed_size` now bounds each inflate call to the remaining
+  allowance plus one byte instead of checking only after zlib returned its full
+  output. Highly compressible untrusted input can no longer allocate its entire
+  expansion before the decompression-bomb guard raises `OSError`.
+- A failed write of `flush()` output now marks the compressor stream broken.
+  Follow-up writes are rejected and `close()` does not append a misleading
+  final block or trailer to an already torn gzip member.
+- Text writers now keep one incremental encoder across `write()` calls and
+  finalize it before closing the gzip member. Stateful encodings such as
+  UTF-16 and ISO-2022-JP no longer emit repeated BOMs or reset sequences when a
+  document is written in multiple calls.
+
+### Documentation
+
+- Clarified that `max_decompressed_size` bounds individual inflate output and
+  documented continuous incremental encoding for text writers.
+
 ## [1.9.0] - 2026-07-02
 
 ### Announced
