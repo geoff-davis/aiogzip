@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Maintenance
+
+- Dependabot now preserves compatible lower bounds for pip requirements and
+  limits uv updates to `uv.lock`, preventing grouped updates from dropping
+  supported Python versions or rewriting build metadata. Ruff remains a
+  manual paired update with its pre-commit hook revision.
+
 ### Packaging
 
 - Switched the build backend from setuptools to `flit_core` so source builds

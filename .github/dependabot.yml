@@ -19,19 +19,27 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # This is a library: keep compatible lower bounds when they already admit
+    # a newer release instead of silently dropping supported Python versions.
+    versioning-strategy: "increase-if-necessary"
     commit-message:
       prefix: "Update"
+    # Ruff's project pin and pre-commit hook revision must move together, which
+    # Dependabot cannot express as one update.
+    ignore:
+      - dependency-name: "ruff"
     groups:
       python-deps:
         patterns:
           - "*"
 
-  # Keep the committed uv.lock in step with pyproject bumps; the pip
-  # updater above edits pyproject.toml but never touches the lockfile.
+  # Refresh resolved development dependencies without rewriting the library's
+  # compatibility constraints in pyproject.toml.
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
+    versioning-strategy: "lockfile-only"
     commit-message:
       prefix: "Update"
     groups:
