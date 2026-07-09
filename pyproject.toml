@@ -4,7 +4,7 @@
 # and CI's editable install on the 3.8 leg builds from source. Until 3.8/3.9
 # are dropped, keep the legacy license table below despite the deprecation
 # warning from newer setuptools.
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=83.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -38,31 +38,31 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "aiofiles>=23.0.0",
+    "aiofiles>=25.1.0",
 ]
 [project.optional-dependencies]
 csv = [
-    "aiocsv>=1.2.0",
+    "aiocsv>=1.4.1",
 ]
 fast = [
-    "zlib-ng>=0.4.0",
+    "zlib-ng>=1.0.0",
 ]
 docs = [
-    "mkdocs>=1.5.0",
-    "mkdocs-material>=9.5.0",
-    "mkdocstrings[python]>=0.24.0",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.6",
+    "mkdocstrings[python]>=1.0.4",
 ]
 # What the CI test matrix installs. mypy, types-aiofiles and
 # typing_extensions live here (not in dev) because test_factory_typing.py
 # shells out to `mypy --strict`; dropping them would silently skip that test.
 test = [
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.24",
-    "pytest-cov>=4.0.0",
-    "hypothesis>=6.0.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "hypothesis>=6.156.4",
     "psutil",
     "tomli; python_version < \"3.11\"",
-    "mypy>=1.0.0",
+    "mypy>=2.2.0",
     "types-aiofiles",
     "typing_extensions",
 ]
@@ -71,7 +71,7 @@ dev = [
     # Keep in sync with the ruff-pre-commit rev in .pre-commit-config.yaml;
     # dependabot bumps this pin but nothing updates pre-commit revs.
     "ruff==0.15.20",
-    "ty>=0.0.1a16",
+    "ty>=0.0.57",
     "pre-commit",
 ]
 [project.urls]
