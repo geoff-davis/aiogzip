@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome! This project uses `setuptools` for packaging and modern tooling for quality assurance.
+Contributions are welcome! This project uses `flit_core` for packaging and modern tooling for quality assurance.
 
 ## Development Setup
 

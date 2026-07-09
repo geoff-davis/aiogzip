@@ -22,14 +22,29 @@ def test_version_consistency():
     )
     assert "version" in project.get("dynamic", []), "Version must be declared dynamic"
 
-    dynamic_cfg = data["tool"]["setuptools"]["dynamic"]["version"]
-    assert dynamic_cfg["attr"] == "aiogzip.__version__", (
-        "Dynamic version should reference aiogzip.__version__"
+    build_system = data["build-system"]
+    assert build_system["build-backend"] == "flit_core.buildapi"
+    assert any(
+        requirement.startswith("flit_core>=3.11")
+        for requirement in build_system["requires"]
     )
 
     module = importlib.import_module("aiogzip")
     assert module.__version__ == aiogzip.__version__, (
         "aiogzip exposes inconsistent __version__ values"
+    )
+
+
+def test_pep639_license_metadata():
+    """License metadata should use the modern PEP 639 representation."""
+    root = Path(__file__).resolve().parents[1]
+    data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+
+    project = data["project"]
+    assert project["license"] == "MIT"
+    assert project["license-files"] == ["LICENSE"]
+    assert not any(
+        classifier.startswith("License ::") for classifier in project["classifiers"]
     )
 
 

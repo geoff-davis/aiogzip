@@ -1,9 +1,0 @@
-# Explicit sdist contents so builds do not depend on which setuptools
-# file-finder plugins happen to be installed in the build environment.
-include CHANGELOG.md
-include SECURITY.md
-include mkdocs.yml
-recursive-include tests *.py
-recursive-include docs *.md
-recursive-include scripts *.py *.sh
-recursive-include benchmarks *.py *.md
