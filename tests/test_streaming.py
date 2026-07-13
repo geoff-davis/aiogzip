@@ -66,6 +66,25 @@ class InstrumentedSource:
         self.closed = True
 
 
+class NoCloseSource:
+    def __init__(self, values):
+        self.values = iter(values)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self.values)
+        except StopIteration as error:
+            raise StopAsyncIteration from error
+
+
+class NoisyCloseSource(NoCloseSource):
+    async def aclose(self):
+        raise RuntimeError("source close failed")
+
+
 class TestDecompressChunks:
     @pytest.mark.parametrize("values", [[], [b""], [b"", b"", b""]])
     async def test_zero_byte_source(self, values):
@@ -250,6 +269,14 @@ class TestDecompressChunks:
         with pytest.raises(TypeError, match="asynchronous iterable"):
             aiogzip.decompress_chunks(source)
 
+    async def test_aiter_must_return_an_async_iterator(self):
+        class InvalidAsyncIterable:
+            def __aiter__(self):
+                return object()
+
+        with pytest.raises(TypeError, match="must return an asynchronous iterator"):
+            await _collect(InvalidAsyncIterable())
+
     @pytest.mark.parametrize("invalid", [bytearray(), memoryview(b"data"), "data", 1])
     async def test_invalid_source_item_types(self, invalid):
         with pytest.raises(TypeError, match="source items must be bytes"):
@@ -273,6 +300,23 @@ class TestDecompressChunks:
 
         assert b"".join(await _collect(source)) == b"payload"
         assert source.closed
+
+    async def test_source_without_aclose_is_supported(self):
+        source = NoCloseSource([gzip.compress(b"payload", mtime=0)])
+
+        assert b"".join(await _collect(source)) == b"payload"
+
+    async def test_source_close_error_propagates_after_success(self):
+        source = NoisyCloseSource([gzip.compress(b"payload", mtime=0)])
+
+        with pytest.raises(RuntimeError, match="source close failed"):
+            await _collect(source)
+
+    async def test_source_close_error_does_not_replace_operation_failure(self):
+        source = NoisyCloseSource(["not bytes"])
+
+        with pytest.raises(TypeError, match="source items must be bytes"):
+            await _collect(source)
 
     async def test_no_eager_source_consumption_and_early_close(self):
         compressed = gzip.compress(b"payload", mtime=0)

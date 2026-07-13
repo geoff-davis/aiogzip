@@ -208,7 +208,12 @@ class _IncrementalGzipDecoder:
         return self._uncompressed_size
 
     def discard(self) -> None:
-        """Release codec state and buffered data without final validation."""
+        """Irreversibly release codec state without performing validation.
+
+        This is a one-way teardown used when a streaming operation completes
+        or is abandoned, so even a successfully finalized decoder is marked
+        unusable rather than retaining buffers for accidental reuse.
+        """
         self._failed = True
         self._pending.clear()
         self._engine = None

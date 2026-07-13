@@ -12,7 +12,7 @@ def _decompress_chunks(
     output_chunk_size: int,
     max_decompressed_size: Optional[int],
 ) -> AsyncIterator[bytes]:
-    """Validate arguments eagerly and return the decompression generator."""
+    """Validate call-time arguments and return the decompression generator."""
     if not callable(getattr(source, "__aiter__", None)):
         raise TypeError("source must be an asynchronous iterable of bytes")
     _validate_chunk_size(output_chunk_size)
