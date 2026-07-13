@@ -3,6 +3,11 @@
 An asynchronous API modeled after Python's `gzip` module for reading and
 writing gzip-compressed files.
 
+It can substantially outperform sequential `gzip` when async work overlaps or
+optional zlib-ng accelerates bulk decompression; direct single-file line
+iteration remains faster with synchronous `gzip`. See
+[Performance and optional acceleration](#performance-and-optional-acceleration).
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/aiogzip.svg)](https://pypi.org/project/aiogzip/)
 [![Python versions](https://img.shields.io/pypi/pyversions/aiogzip.svg)](https://pypi.org/project/aiogzip/)
@@ -17,15 +22,6 @@ pip install aiogzip
 ```
 
 Python 3.8 through 3.14 are supported by the 1.x release line.
-
-> **Performance profile:** aiogzip can substantially outperform sequential
-> `gzip` when independent latency-bound steps overlap or optional zlib-ng
-> accelerates bulk decompression. In one representative run, ten files with
-> simulated 10 ms latency completed roughly 7x faster, and a highly compressible
-> bulk read with zlib-ng was about 6x faster. Direct single-file line
-> iteration remains faster with synchronous `gzip`; aiogzip's advantage there
-> is non-blocking integration and concurrency. See
-> [Performance and optional acceleration](#performance-and-optional-acceleration).
 
 ## Text-mode quickstart
 
