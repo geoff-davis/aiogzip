@@ -12,11 +12,13 @@ from typing import Union
 from typing_extensions import assert_type
 
 from aiogzip import AsyncGzipBinaryFile, AsyncGzipFile, AsyncGzipTextFile
+from aiogzip import open as gzip_open
 
 p = Path("data.gz")
 
 # --- Text modes narrow to AsyncGzipTextFile ---------------------------------
 assert_type(AsyncGzipFile(p, "rt"), AsyncGzipTextFile)
+assert_type(gzip_open(p, "rt"), AsyncGzipTextFile)
 assert_type(AsyncGzipFile(p, "wt"), AsyncGzipTextFile)
 assert_type(AsyncGzipFile(p, "at"), AsyncGzipTextFile)
 assert_type(AsyncGzipFile(p, "xt"), AsyncGzipTextFile)
@@ -31,6 +33,7 @@ assert_type(
 
 # --- Binary modes narrow to AsyncGzipBinaryFile -----------------------------
 assert_type(AsyncGzipFile(p), AsyncGzipBinaryFile)  # default mode "rb"
+assert_type(gzip_open(p), AsyncGzipBinaryFile)
 assert_type(AsyncGzipFile(p, "rb"), AsyncGzipBinaryFile)
 assert_type(AsyncGzipFile(p, "wb"), AsyncGzipBinaryFile)
 assert_type(AsyncGzipFile(p, "ab"), AsyncGzipBinaryFile)
@@ -50,6 +53,9 @@ async def _check_reads() -> None:
     async with AsyncGzipFile(p, "rb") as binary_file:
         assert_type(binary_file, AsyncGzipBinaryFile)
         assert_type(await binary_file.read(), bytes)
+    async with gzip_open(p, "rt") as text_file:
+        assert_type(text_file, AsyncGzipTextFile)
+        assert_type(await text_file.read(), str)
 
 
 # --- A non-literal (dynamic) mode falls back to the union -------------------

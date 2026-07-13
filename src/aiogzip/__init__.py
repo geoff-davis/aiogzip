@@ -196,6 +196,64 @@ def AsyncGzipFile(
         return AsyncGzipBinaryFile(filename, mode, **kwargs)
 
 
+@overload
+def open(
+    filename: _Filename,
+    mode: _TextMode,
+    *,
+    chunk_size: int = ...,
+    encoding: Optional[str] = ...,
+    errors: Optional[str] = ...,
+    newline: Optional[str] = ...,
+    compresslevel: int = ...,
+    mtime: Optional[Union[int, float]] = ...,
+    original_filename: Optional[Union[str, bytes]] = ...,
+    fileobj: _FileObj = ...,
+    closefd: Optional[bool] = ...,
+    max_decompressed_size: Optional[int] = ...,
+    max_rewind_cache_size: Optional[int] = ...,
+    strict_size: bool = ...,
+    fast_compress: bool = ...,
+) -> AsyncGzipTextFile: ...
+
+
+@overload
+def open(
+    filename: _Filename,
+    mode: _BinaryMode = ...,
+    *,
+    chunk_size: int = ...,
+    compresslevel: int = ...,
+    mtime: Optional[Union[int, float]] = ...,
+    original_filename: Optional[Union[str, bytes]] = ...,
+    fileobj: _FileObj = ...,
+    closefd: Optional[bool] = ...,
+    max_decompressed_size: Optional[int] = ...,
+    max_rewind_cache_size: Optional[int] = ...,
+    strict_size: bool = ...,
+    fast_compress: bool = ...,
+) -> AsyncGzipBinaryFile: ...
+
+
+@overload
+def open(
+    filename: _Filename,
+    mode: str,
+    **kwargs: Any,
+) -> Union[AsyncGzipBinaryFile, AsyncGzipTextFile]: ...
+
+
+def open(
+    filename: _Filename, mode: str = "rb", **kwargs: Any
+) -> Union[AsyncGzipBinaryFile, AsyncGzipTextFile]:
+    """Open a gzip stream in binary or text mode.
+
+    This is the recommended public entry point. ``AsyncGzipFile`` remains
+    available and has identical behavior.
+    """
+    return AsyncGzipFile(filename, mode, **kwargs)
+
+
 __all__ = [
     "__version__",
     "AsyncGzipBinaryFile",
@@ -212,4 +270,5 @@ __all__ = [
     "GZIP_FLAG_FCOMMENT",
     "GZIP_METHOD_DEFLATE",
     "GZIP_OS_UNKNOWN",
+    "open",
 ]

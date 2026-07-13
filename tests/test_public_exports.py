@@ -25,6 +25,7 @@ def test_key_re_exports_are_stable():
         WithAsyncRead,
         WithAsyncReadWrite,
         WithAsyncWrite,
+        open,
     )
 
     assert AsyncGzipBinaryFile is aiogzip.AsyncGzipBinaryFile
@@ -33,3 +34,4 @@ def test_key_re_exports_are_stable():
     assert WithAsyncRead is aiogzip.WithAsyncRead
     assert WithAsyncWrite is aiogzip.WithAsyncWrite
     assert WithAsyncReadWrite is aiogzip.WithAsyncReadWrite
+    assert open is aiogzip.open
