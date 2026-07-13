@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Text `readlines()` now drains the reader's existing bounded line batches
+  directly instead of awaiting `readline()` once per line. Hinted calls retain
+  complete-line and text-position semantics while substantially reducing
+  coroutine overhead for batch-oriented processing.
+- Universal-newline text reads now recognize LF-only decoded chunks with one
+  CR scan, avoiding repeated full-string CRLF/LF/CR counts while preserving
+  mixed-newline tracking, translation, and chunk-boundary behavior.
 - Comparative benchmarks now use deterministic data, identical compressed
   fixtures for reads, explicit compression level 6 for both writers, separate
   read/write timings, realistic size-scaled line workloads, and median results.

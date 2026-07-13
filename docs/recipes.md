@@ -22,6 +22,30 @@ For large UTF-8 JSON Lines files that are known to use `\n` terminators,
 project use `chunk_size=512 * 1024` to reduce async read overhead; tune that
 value for your memory budget and workload.
 
+For CPU-bound parsing, bounded `readlines()` batches avoid one async transition
+per input line while retaining a predictable application-level working set:
+
+```python
+async with aiogzip.open(
+    "events.jsonl.gz",
+    "rt",
+    newline="\n",
+    chunk_size=512 * 1024,
+) as f:
+    while True:
+        lines = await f.readlines(1024 * 1024)
+        if not lines:
+            break
+        for line in lines:
+            event = json.loads(line)
+            process(event)
+```
+
+The hint counts decoded characters and reading stops after the whole line that
+reaches it, so it is an approximate batch target rather than a strict memory
+limit. Prefer `async for` when each record is handed to an asynchronous
+consumer and per-line backpressure is desirable.
+
 ## Writing JSON Lines
 
 Write records as they become available instead of building the complete file

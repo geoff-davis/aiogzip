@@ -195,6 +195,12 @@ inputs and the concurrency case used ten 1 MiB files:
 - equal-level bulk text writes were at parity;
 - tuned single-file JSONL iteration was about 1.7-1.8x slower than `gzip`
   because each line crosses an async-iterator boundary;
+- bounded `readlines()` batches reduced an 8 MiB JSONL read-and-parse workload
+  by about 10-15% versus direct iteration and brought it roughly to `gzip`
+  parity;
+- an LF-only universal-newline fast path made the representative zlib-ng bulk
+  text read about 1.6x faster than `gzip` (the stdlib engine remained about
+  1.4x slower);
 - optional zlib-ng made a highly compressible bulk `read(-1)` about 5.6x
   faster than `gzip`; and
 - overlapping ten files with simulated 10 ms latency was about 6x faster than
@@ -203,12 +209,16 @@ inputs and the concurrency case used ten 1 MiB files:
 The concurrency result measures overlapped waiting, not a faster deflate
 codec, and benchmark ratios vary by hardware, storage, Python version, and
 data. Large codec calls are offloaded to the default executor so independent
-tasks can keep making progress. Line iteration and `writelines()` use bounded
-batching to reduce aiogzip's own coroutine overhead.
+tasks can keep making progress. Line splitting, `readlines()`, and
+`writelines()` use bounded batching to reduce aiogzip's own coroutine overhead.
 
 For large UTF-8 JSON Lines files with `\n` terminators, the measured fast path
 uses `newline="\n"` and `chunk_size=512 * 1024`. Tune memory and throughput for
 your workload rather than assuming one chunk size fits every application.
+When CPU-bound per-line processing permits it, repeated
+`await f.readlines(hint)` calls can process bounded groups of complete lines
+with fewer async transitions than `async for`; the hint is an approximate
+decoded-character target, not a hard memory limit.
 
 Install the optional codec with:
 

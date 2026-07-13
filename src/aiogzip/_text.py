@@ -1060,12 +1060,32 @@ class AsyncGzipTextFile:
         if need:
             start = 1 if crlf_completed else 0
             end = len(text) - 1 if pending_trailing_cr else len(text)
+            cr_count: Optional[int] = None
+
+            # LF-only text is overwhelmingly common and needs no translation.
+            # Count CR first when bare-CR tracking is still outstanding: if
+            # none exist, record a possible LF and avoid the two or three
+            # additional full-string scans below. When CR is present, reuse
+            # the count so mixed-newline input performs no extra scan.
+            if need & self._SEEN_CR and not crlf_completed and not pending_trailing_cr:
+                cr_count = text.count("\r")
+                if cr_count == 0:
+                    if need & self._SEEN_LF and "\n" in text:
+                        seen |= self._SEEN_LF
+                    self._seen_newline_types = seen
+                    self._trailing_cr = False
+                    return text
+
             crlf = text.count("\r\n", start, end)
             if crlf:
                 seen |= self._SEEN_CRLF
             if need & self._SEEN_LF and text.count("\n", start, end) > crlf:
                 seen |= self._SEEN_LF
-            if need & self._SEEN_CR and text.count("\r", start, end) > crlf:
+            if (
+                need & self._SEEN_CR
+                and (cr_count if cr_count is not None else text.count("\r", start, end))
+                > crlf
+            ):
                 seen |= self._SEEN_CR
 
         self._seen_newline_types = seen
@@ -1197,6 +1217,64 @@ class AsyncGzipTextFile:
             return line
         refilled = await self._next_fast_line()
         return refilled if refilled is not None else ""
+
+    async def _readlines_fast(self, hint: int) -> List[str]:
+        """Return lines while draining pre-split batches without per-line awaits.
+
+        ``_next_fast_line`` advances the text-buffer offset for the first line
+        in each new batch. This method advances it for the remaining lines as
+        they are transferred into the result, preserving tell()/seek() state.
+        """
+        lines: List[str] = []
+        total_size = 0
+
+        while True:
+            idx = self._pending_idx
+            pending = self._pending_lines
+            if idx < len(pending):
+                remaining = pending[idx:]
+                remaining_size = sum(map(len, remaining))
+
+                # Consume a complete pending batch when it cannot cross the
+                # hint. An exact hit may also be transferred in bulk and then
+                # returned immediately.
+                if hint <= 0 or total_size + remaining_size <= hint:
+                    lines.extend(remaining)
+                    self._pending_idx = len(pending)
+                    self._text_buffer_offset += remaining_size
+                    total_size += remaining_size
+                    if hint > 0 and total_size >= hint:
+                        return lines
+                    continue
+
+                # The hint lands within this batch. Walk only as far as the
+                # first whole line that reaches it, leaving the rest pending.
+                text_offset = self._text_buffer_offset
+                while idx < len(pending):
+                    line = pending[idx]
+                    idx += 1
+                    line_size = len(line)
+                    lines.append(line)
+                    total_size += line_size
+                    text_offset += line_size
+                    if total_size >= hint:
+                        self._pending_idx = idx
+                        self._text_buffer_offset = text_offset
+                        return lines
+
+                # Runtime callers can still pass non-integer values despite
+                # the annotation. Keep the stream state coherent even for an
+                # unusual comparison value such as float("nan").
+                self._pending_idx = idx
+                self._text_buffer_offset = text_offset
+
+            refilled = await self._next_fast_line()
+            if refilled is None:
+                return lines
+            lines.append(refilled)
+            total_size += len(refilled)
+            if hint > 0 and total_size >= hint:
+                return lines
 
     def __aiter__(self) -> "AsyncGzipTextFile":
         """Make AsyncGzipTextFile iterable for line-by-line reading."""
@@ -1340,6 +1418,9 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
+
+        if self._line_term is not None:
+            return await self._readlines_fast(hint)
 
         lines: List[str] = []
         total_size = 0
