@@ -286,12 +286,11 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **1.9.1 (current)** - See `CHANGELOG.md` for the full release history. Recent
-  work bounds decompression-bomb output before allocation, preserves stateful
-  text encoders across writes, rejects reuse after cancelled decompression,
-  completes short external writes, batches `writelines()`, tightens tuning
-  parameter validation, and reports median benchmark results from repeated
-  runs.
+- **1.10.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
+  work adds package-level `open()`, whole-file helpers, engine diagnostics,
+  gzip inspection and verification, and bounded async-iterable compression and
+  decompression. It also expands migration, recipe, streaming, operational, and
+  benchmark documentation.
 
 ---
 
