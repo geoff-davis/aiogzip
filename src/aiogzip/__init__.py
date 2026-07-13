@@ -25,7 +25,7 @@ from ._inspection import (
     VerificationResult,
     _scan_gzip,
 )
-from ._streaming import _decompress_chunks
+from ._streaming import _compress_chunks, _decompress_chunks
 from ._text import AsyncGzipTextFile
 
 __version__ = "1.9.1"
@@ -392,6 +392,32 @@ def decompress_chunks(
     )
 
 
+def compress_chunks(
+    source: AsyncIterable[bytes],
+    *,
+    compresslevel: int = 6,
+    mtime: Optional[Union[int, float]] = None,
+    original_filename: Optional[Union[str, bytes]] = None,
+    fast_compress: bool = False,
+    strict_size: bool = False,
+    output_chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
+) -> AsyncIterator[bytes]:
+    """Incrementally compress an asynchronous byte iterable as one gzip member.
+
+    The header is emitted before the first source item is requested. Output
+    chunks are non-empty and no larger than ``output_chunk_size``.
+    """
+    return _compress_chunks(
+        source,
+        compresslevel=compresslevel,
+        mtime=mtime,
+        original_filename=original_filename,
+        fast_compress=fast_compress,
+        strict_size=strict_size,
+        output_chunk_size=output_chunk_size,
+    )
+
+
 __all__ = [
     "__version__",
     "AsyncGzipBinaryFile",
@@ -419,4 +445,5 @@ __all__ = [
     "inspect",
     "verify",
     "decompress_chunks",
+    "compress_chunks",
 ]

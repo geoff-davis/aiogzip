@@ -223,6 +223,7 @@ async def _decompress_chunks_impl(
     )
     iterator = source.__aiter__()
     if not callable(getattr(iterator, "__anext__", None)):
+        decoder.discard()
         raise TypeError("source.__aiter__() must return an asynchronous iterator")
     failed = False
     try:
@@ -245,12 +246,77 @@ async def _decompress_chunks_impl(
         raise
     finally:
         decoder.discard()
-        close = getattr(iterator, "aclose", None)
-        if callable(close):
+        await _close_async_iterator(iterator, failed=failed)
+
+
+def _compress_chunks(
+    source: AsyncIterable[bytes],
+    *,
+    compresslevel: int,
+    mtime: Optional[Union[int, float]],
+    original_filename: Optional[Union[str, bytes]],
+    fast_compress: bool,
+    strict_size: bool,
+    output_chunk_size: int,
+) -> AsyncIterator[bytes]:
+    """Validate arguments and return the one-member compression generator."""
+    if not callable(getattr(source, "__aiter__", None)):
+        raise TypeError("source must be an asynchronous iterable of bytes")
+    encoder = _IncrementalGzipEncoder(
+        compresslevel=compresslevel,
+        mtime=mtime,
+        original_filename=original_filename,
+        fast_compress=fast_compress,
+        strict_size=strict_size,
+        output_chunk_size=output_chunk_size,
+    )
+    return _compress_chunks_impl(source, encoder)
+
+
+async def _compress_chunks_impl(
+    source: AsyncIterable[bytes], encoder: _IncrementalGzipEncoder
+) -> AsyncIterator[bytes]:
+    """Emit one gzip member without reading ahead from the async source."""
+    iterator = source.__aiter__()
+    if not callable(getattr(iterator, "__anext__", None)):
+        encoder.discard()
+        raise TypeError("source.__aiter__() must return an asynchronous iterator")
+    failed = False
+    try:
+        for output in encoder.start():
+            yield output
+
+        while True:
             try:
-                result: Any = close()
-                if hasattr(result, "__await__"):
-                    await result
-            except BaseException:
-                if not failed:
-                    raise
+                uncompressed = await iterator.__anext__()
+            except StopAsyncIteration:
+                break
+            if not isinstance(uncompressed, bytes):
+                raise TypeError("compress_chunks() source items must be bytes")
+            if not uncompressed:
+                continue
+            async for output in encoder.feed(uncompressed):
+                yield output
+
+        async for output in encoder.finish():
+            yield output
+    except BaseException:
+        failed = True
+        raise
+    finally:
+        encoder.discard()
+        await _close_async_iterator(iterator, failed=failed)
+
+
+async def _close_async_iterator(iterator: Any, *, failed: bool) -> None:
+    """Close a source iterator without replacing an active operation error."""
+    close = getattr(iterator, "aclose", None)
+    if not callable(close):
+        return
+    try:
+        result: Any = close()
+        if hasattr(result, "__await__"):
+            await result
+    except BaseException:
+        if not failed:
+            raise

@@ -19,6 +19,7 @@ from aiogzip import (
     GzipInfo,
     GzipMemberInfo,
     VerificationResult,
+    compress_chunks,
     decompress_chunks,
     engine_info,
     inspect,
@@ -117,3 +118,4 @@ async def _compressed_source() -> AsyncIterator[bytes]:
 
 def _check_streaming_functions() -> None:
     assert_type(decompress_chunks(_compressed_source()), AsyncIterator[bytes])
+    assert_type(compress_chunks(_compressed_source()), AsyncIterator[bytes])
