@@ -21,6 +21,12 @@ All notable changes to this project will be documented in this file.
 - Added `aiogzip.decompress_chunks()` for pull-driven, bounded-output gzip
   decompression from asynchronous byte iterables, including cumulative output
   limits and complete-stream integrity validation.
+- Added `aiogzip.compress_chunks()` for pull-driven, bounded-output creation of
+  one gzip member from asynchronous byte iterables, with existing compression,
+  metadata, reproducibility, strict-size, and optional zlib-ng controls.
+- Added a shared private incremental gzip encoder alongside the incremental
+  decoder so iterable streaming uses the same header, trailer, engine,
+  executor-offload, CRC-32, and `ISIZE` rules as file operations.
 
 ### Documentation
 
@@ -30,7 +36,15 @@ All notable changes to this project will be documented in this file.
   recipes page covering JSON Lines, untrusted input, reproducible output,
   append mode, seeking, cancellation, and external async file objects.
 - Added an async-iterable streaming guide covering backpressure, validation
-  timing, untrusted-input limits, cancellation, and early exit.
+  timing, untrusted-input limits, reproducible compression, cancellation,
+  incomplete-output handling, direct pipelines, and early exit.
+
+### Security
+
+- Complete-stream decompression APIs share cumulative decompressed-size limits
+  that cap every inflate call to the remaining allowance plus one byte.
+  Iterable compression and decompression retain bounded codec/parser state and
+  do not introduce producer tasks or unbounded queues.
 
 ### Maintenance
 

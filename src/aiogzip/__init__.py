@@ -384,6 +384,20 @@ def decompress_chunks(
     Output chunks are non-empty and no larger than ``output_chunk_size``.
     Complete CRC and trailer validation occurs only when the returned iterator
     is consumed to completion.
+
+    Args:
+        source: Asynchronous iterable yielding compressed ``bytes``.
+        output_chunk_size: Strict upper bound for each yielded chunk.
+        max_decompressed_size: Optional cumulative decompressed-byte limit.
+
+    Returns:
+        A single-consumer asynchronous iterator of decompressed ``bytes``.
+
+    Raises:
+        TypeError: If call-time arguments or a source item have invalid types.
+        ValueError: If a size argument is outside its supported range.
+        gzip.BadGzipFile: If the consumed gzip stream is malformed or corrupt.
+        OSError: If the cumulative output limit is exceeded.
     """
     return _decompress_chunks(
         source,
@@ -406,6 +420,23 @@ def compress_chunks(
 
     The header is emitted before the first source item is requested. Output
     chunks are non-empty and no larger than ``output_chunk_size``.
+
+    Args:
+        source: Asynchronous iterable yielding uncompressed ``bytes``.
+        compresslevel: Compression level from ``-1`` through ``9``.
+        mtime: Optional gzip header timestamp. Use zero for reproducibility.
+        original_filename: Optional filename stored in the gzip header.
+        fast_compress: Opt into zlib-ng compression when available.
+        strict_size: Reject payloads exceeding gzip's 32-bit ``ISIZE`` field.
+        output_chunk_size: Strict upper bound for each yielded chunk.
+
+    Returns:
+        A single-consumer asynchronous iterator containing one gzip member.
+
+    Raises:
+        TypeError: If call-time arguments or a source item have invalid types.
+        ValueError: If an option is outside its supported range.
+        OSError: If compression fails or ``strict_size`` rejects the payload.
     """
     return _compress_chunks(
         source,

@@ -12,12 +12,15 @@
 - `GzipMemberInfo`, `GzipInfo`, and `inspect` — validated per-member metadata and aggregate sizes from a complete decompression scan
 - `VerificationResult` and `verify` — lightweight aggregate counts after complete integrity verification
 - `decompress_chunks` — pull-driven decompression from an `AsyncIterable[bytes]` with bounded output chunks
+- `compress_chunks` — one-member gzip compression from an `AsyncIterable[bytes]` with bounded output chunks
 - `WithAsyncRead`, `WithAsyncWrite`, `WithAsyncReadWrite` — runtime-checkable protocols describing the async file objects accepted via `fileobj=`
 - `ZlibEngine` — type alias for zlib compressor/decompressor objects (currently `Any`; the concrete C types are not exposed in type stubs)
 - `GZIP_WBITS`, `GZIP_METHOD_DEFLATE`, `GZIP_OS_UNKNOWN`, and the `GZIP_FLAG_FNAME` / `GZIP_FLAG_FHCRC` / `GZIP_FLAG_FEXTRA` / `GZIP_FLAG_FCOMMENT` header-flag constants — useful when inspecting gzip headers alongside this library
 - `__version__`
 
-Implementation internals live in `aiogzip._common`, `aiogzip._binary`, and `aiogzip._text`. Treat those modules as private and unstable.
+Implementation internals live in `aiogzip._common`, `aiogzip._binary`,
+`aiogzip._text`, `aiogzip._inspection`, and `aiogzip._streaming`. Treat those
+modules as private and unstable.
 
 ```python
 import aiogzip
@@ -106,6 +109,25 @@ when iteration ends normally. Corruption raises `gzip.BadGzipFile`, output
 limit violations raise `OSError`, invalid source items raise `TypeError`, and
 source exceptions and cancellation propagate. See the
 [streaming guide](streaming.md) for backpressure and lifecycle details.
+
+`compress_chunks()` accepts an asynchronous iterable of uncompressed `bytes`
+and yields exactly one gzip member. It emits the header promptly, before
+requesting the first source item. Empty sources therefore produce a valid empty
+member rather than zero bytes.
+
+```python
+async for data in aiogzip.compress_chunks(
+    raw_source(),
+    mtime=0,
+    output_chunk_size=64 * 1024,
+):
+    await send(data)
+```
+
+The trailer is emitted only after the source ends normally. If the source
+raises, compression is cancelled, or output consumption stops early, bytes
+already yielded form an incomplete member and must be discarded. Compression
+levels, metadata, `strict_size`, and `fast_compress` match the file writer.
 
 When writing through an external asynchronous `fileobj`, its `write()` method
 may accept fewer bytes than requested as long as it returns the accepted byte

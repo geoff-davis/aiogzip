@@ -132,7 +132,8 @@ Backward seeks restart decompression from the beginning of the gzip stream. For 
 
 **Note:** `aiogzip` does not provide whole-buffer `compress()` or
 `decompress()` helpers analogous to `gzip.compress()` and `gzip.decompress()`.
-For asynchronous byte sources, use [`decompress_chunks()`](streaming.md).
+For asynchronous byte sources, use [`compress_chunks()` and
+`decompress_chunks()`](streaming.md).
 
 ## Resumable text processing
 

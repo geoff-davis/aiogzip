@@ -56,17 +56,22 @@ await aiogzip.write("copy.bin.gz", data)
 into memory. Use `open()` to stream large files. The existing
 `AsyncGzipFile()` factory remains fully supported for compatibility.
 
-For compressed bytes arriving from an arbitrary asynchronous source, stream
-bounded decompressed chunks without adapting the source to a file object:
+For arbitrary asynchronous byte sources, compress or decompress without
+adapting the source to a file object:
 
 ```python
 async for data in aiogzip.decompress_chunks(compressed_source()):
     await consume(data)
+
+async for data in aiogzip.compress_chunks(raw_source(), mtime=0):
+    await send(data)
 ```
 
-Complete integrity validation occurs only if the iterator is consumed to the
-end. See the [async-iterable streaming guide](https://geoff-davis.github.io/aiogzip/streaming/)
-for backpressure, limits, cancellation, and early-exit behavior.
+Complete decompression integrity validation occurs only if the iterator is
+consumed to the end. Compression output is incomplete if its source fails or
+the consumer exits early. See the
+[async-iterable streaming guide](https://geoff-davis.github.io/aiogzip/streaming/)
+for backpressure, limits, cancellation, metadata, and lifecycle behavior.
 
 See the [recipes](https://geoff-davis.github.io/aiogzip/recipes/) for JSON
 Lines, untrusted input, reproducible output, append mode, seeking,
@@ -82,7 +87,7 @@ cancellation recovery, and external async streams.
 - Configurable gzip metadata for reproducible archives.
 - Bounded decompression and rewind-cache controls for untrusted or
   non-seekable input.
-- Pull-driven decompression from arbitrary `AsyncIterable[bytes]` sources.
+- Pull-driven compression and decompression for `AsyncIterable[bytes]` sources.
 - Optional zlib-ng acceleration without a required runtime dependency.
 - Verified tarfile-style access patterns and `aiocsv` workflows.
 

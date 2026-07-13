@@ -73,6 +73,24 @@ pip install "aiogzip[fast]"
 
 ## Optimization Tips
 
+### Async-iterable streaming benchmarks
+
+The focused streaming benchmark compares source and output chunk sizes,
+file-reader/file-writer baselines, event-loop ticker progress, and peak Python
+allocations for highly compressible data. It also includes zlib-ng compression
+when the optional engine is installed:
+
+```bash
+uv run python benchmarks/run_benchmarks.py \
+  --category streaming --size 32 --repeat 3
+```
+
+Inputs below the 256 KiB codec-offload threshold often maximize raw throughput
+for short operations but may complete inline without giving an independent
+event-loop task a turn. Larger codec calls are offloaded, trading a thread hop
+for event-loop responsiveness. Measure with source chunk sizes representative
+of the real producer rather than selecting solely from synthetic throughput.
+
 ### 1. Choose the Right Chunk Size
 
 The default `chunk_size` is 256 KiB. Values must be positive and no larger than
