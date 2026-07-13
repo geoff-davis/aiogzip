@@ -15,6 +15,8 @@ from aiogzip import (
     AsyncGzipBinaryFile,
     AsyncGzipFile,
     AsyncGzipTextFile,
+    EngineInfo,
+    engine_info,
     read,
     write,
 )
@@ -77,3 +79,10 @@ async def _check_whole_file_helpers() -> None:
     assert_type(await write(p, b"payload"), None)
     assert_type(await write(p, bytearray(b"payload")), None)
     assert_type(await write(p, memoryview(b"payload")), None)
+
+
+def _check_engine_info() -> None:
+    info = engine_info()
+    assert_type(info, EngineInfo)
+    assert_type(info.compression, str)
+    assert_type(info.decompression, str)

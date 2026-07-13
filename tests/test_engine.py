@@ -9,10 +9,11 @@ zlib.error.
 import gzip
 import importlib
 import zlib
+from dataclasses import FrozenInstanceError
 
 import pytest
 
-from aiogzip import AsyncGzipBinaryFile, _engine
+from aiogzip import AsyncGzipBinaryFile, EngineInfo, _engine, engine_info
 from aiogzip._common import GZIP_WBITS
 
 ZNG_AVAILABLE = _engine._zng is not None
@@ -47,6 +48,36 @@ class TestEngineSelection:
 
     def test_crc32_is_stdlib(self):
         assert _engine.crc32 is zlib.crc32
+
+
+class TestEngineInfo:
+    def test_reports_default_configuration(self):
+        expected_decompression = "zlib-ng" if _engine._HAVE_ZNG else "stdlib-zlib"
+
+        assert engine_info() == EngineInfo(
+            compression="stdlib-zlib",
+            decompression=expected_decompression,
+        )
+
+    @pytest.mark.parametrize(
+        ("have_zng", "expected_decompression"),
+        [(False, "stdlib-zlib"), (True, "zlib-ng")],
+    )
+    def test_tracks_optional_decompression_engine(
+        self, monkeypatch, have_zng, expected_decompression
+    ):
+        monkeypatch.setattr(_engine, "_HAVE_ZNG", have_zng)
+
+        info = engine_info()
+
+        assert info.compression == "stdlib-zlib"
+        assert info.decompression == expected_decompression
+
+    def test_result_is_immutable(self):
+        info = engine_info()
+
+        with pytest.raises(FrozenInstanceError):
+            info.compression = "changed"
 
 
 class TestEnvEscapeHatch:

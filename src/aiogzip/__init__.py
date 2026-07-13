@@ -18,6 +18,7 @@ from ._common import (
     WithAsyncWrite,
     ZlibEngine,
 )
+from ._engine import EngineInfo, engine_info
 from ._text import AsyncGzipTextFile
 
 __version__ = "1.9.1"
@@ -313,6 +314,7 @@ __all__ = [
     "AsyncGzipBinaryFile",
     "AsyncGzipFile",
     "AsyncGzipTextFile",
+    "EngineInfo",
     "WithAsyncRead",
     "WithAsyncReadWrite",
     "WithAsyncWrite",
@@ -327,4 +329,5 @@ __all__ = [
     "open",
     "read",
     "write",
+    "engine_info",
 ]
