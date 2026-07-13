@@ -58,6 +58,7 @@ nav:
   - Home: index.md
   - Examples: examples.md
   - Recipes: recipes.md
+  - Async-iterable streaming: streaming.md
   - Performance: performance.md
   - API Reference: api.md
   - Contributing: contributing.md

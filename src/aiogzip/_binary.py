@@ -40,7 +40,7 @@ from ._common import (
 # KiB, decompressing a single chunk is faster than the hop, so the
 # event-loop benefit does not pay for itself. Above it, the CPU work
 # dominates and the hop is amortised.
-_ZLIB_OFFLOAD_THRESHOLD = 256 * 1024
+_ZLIB_OFFLOAD_THRESHOLD = _engine.ZLIB_OFFLOAD_THRESHOLD
 
 
 async def _run_zlib_in_thread(method: Callable[[bytes], bytes], data: bytes) -> bytes:
@@ -51,8 +51,7 @@ async def _run_zlib_in_thread(method: Callable[[bytes], bytes], data: bytes) -> 
     the GIL internally, so offloading large chunks keeps the event loop
     responsive during CPU-bound work.
     """
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, method, data)
+    return await _engine.run_zlib_in_thread(method, data)
 
 
 class AsyncGzipBinaryFile:

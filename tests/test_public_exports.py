@@ -23,12 +23,19 @@ def test_key_re_exports_are_stable():
         AsyncGzipFile,
         AsyncGzipTextFile,
         EngineInfo,
+        GzipInfo,
+        GzipMemberInfo,
+        VerificationResult,
         WithAsyncRead,
         WithAsyncReadWrite,
         WithAsyncWrite,
+        compress_chunks,
+        decompress_chunks,
         engine_info,
+        inspect,
         open,
         read,
+        verify,
         write,
     )
 
@@ -36,6 +43,9 @@ def test_key_re_exports_are_stable():
     assert AsyncGzipTextFile is aiogzip.AsyncGzipTextFile
     assert AsyncGzipFile is aiogzip.AsyncGzipFile
     assert EngineInfo is aiogzip.EngineInfo
+    assert GzipInfo is aiogzip.GzipInfo
+    assert GzipMemberInfo is aiogzip.GzipMemberInfo
+    assert VerificationResult is aiogzip.VerificationResult
     assert WithAsyncRead is aiogzip.WithAsyncRead
     assert WithAsyncWrite is aiogzip.WithAsyncWrite
     assert WithAsyncReadWrite is aiogzip.WithAsyncReadWrite
@@ -43,3 +53,7 @@ def test_key_re_exports_are_stable():
     assert read is aiogzip.read
     assert write is aiogzip.write
     assert engine_info is aiogzip.engine_info
+    assert inspect is aiogzip.inspect
+    assert verify is aiogzip.verify
+    assert decompress_chunks is aiogzip.decompress_chunks
+    assert compress_chunks is aiogzip.compress_chunks

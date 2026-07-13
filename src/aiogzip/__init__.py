@@ -1,7 +1,7 @@
 """Async gzip file reader/writer public API."""
 
 from pathlib import Path
-from typing import Any, Literal, Optional, Union, overload
+from typing import Any, AsyncIterable, AsyncIterator, Literal, Optional, Union, overload
 
 from ._binary import AsyncGzipBinaryFile
 from ._common import (
@@ -19,6 +19,13 @@ from ._common import (
     ZlibEngine,
 )
 from ._engine import EngineInfo, engine_info
+from ._inspection import (
+    GzipInfo,
+    GzipMemberInfo,
+    VerificationResult,
+    _scan_gzip,
+)
+from ._streaming import _compress_chunks, _decompress_chunks
 from ._text import AsyncGzipTextFile
 
 __version__ = "1.9.1"
@@ -309,12 +316,148 @@ async def write(
         await stream.write(data)
 
 
+async def inspect(
+    filename: _Filename,
+    *,
+    chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
+    fileobj: _ReadFileObj = None,
+    closefd: Optional[bool] = None,
+    max_decompressed_size: Optional[int] = None,
+) -> GzipInfo:
+    """Inspect and validate every member in a complete gzip stream.
+
+    This performs a full decompression scan while discarding payload bytes.
+    ``mtime`` preserves the literal header value, including zero; filename and
+    comment metadata use Latin-1 decoding.
+    """
+    result = await _scan_gzip(
+        filename,
+        fileobj=fileobj,
+        closefd=closefd,
+        max_decompressed_size=max_decompressed_size,
+        chunk_size=chunk_size,
+        collect_members=True,
+    )
+    return GzipInfo(
+        members=result.members,
+        compressed_size=result.compressed_size,
+        uncompressed_size=result.uncompressed_size,
+    )
+
+
+async def verify(
+    filename: _Filename,
+    *,
+    chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
+    fileobj: _ReadFileObj = None,
+    closefd: Optional[bool] = None,
+    max_decompressed_size: Optional[int] = None,
+) -> VerificationResult:
+    """Validate a complete gzip stream and return aggregate counts.
+
+    Successful return means every header, deflate payload, CRC, and ``ISIZE``
+    was valid. Invalid input and resource-limit failures raise instead.
+    """
+    result = await _scan_gzip(
+        filename,
+        fileobj=fileobj,
+        closefd=closefd,
+        max_decompressed_size=max_decompressed_size,
+        chunk_size=chunk_size,
+        collect_members=False,
+    )
+    return VerificationResult(
+        member_count=result.member_count,
+        compressed_size=result.compressed_size,
+        uncompressed_size=result.uncompressed_size,
+    )
+
+
+def decompress_chunks(
+    source: AsyncIterable[bytes],
+    *,
+    output_chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
+    max_decompressed_size: Optional[int] = None,
+) -> AsyncIterator[bytes]:
+    """Incrementally decompress gzip bytes from an asynchronous iterable.
+
+    Output chunks are non-empty and no larger than ``output_chunk_size``.
+    Complete CRC and trailer validation occurs only when the returned iterator
+    is consumed to completion.
+
+    Args:
+        source: Asynchronous iterable yielding compressed ``bytes``.
+        output_chunk_size: Strict upper bound for each yielded chunk.
+        max_decompressed_size: Optional cumulative decompressed-byte limit.
+
+    Returns:
+        A single-consumer asynchronous iterator of decompressed ``bytes``.
+
+    Raises:
+        TypeError: If call-time arguments or a source item have invalid types.
+        ValueError: If a size argument is outside its supported range.
+        gzip.BadGzipFile: If the consumed gzip stream is malformed or corrupt.
+        OSError: If the cumulative output limit is exceeded.
+    """
+    return _decompress_chunks(
+        source,
+        output_chunk_size=output_chunk_size,
+        max_decompressed_size=max_decompressed_size,
+    )
+
+
+def compress_chunks(
+    source: AsyncIterable[bytes],
+    *,
+    compresslevel: int = 6,
+    mtime: Optional[Union[int, float]] = None,
+    original_filename: Optional[Union[str, bytes]] = None,
+    fast_compress: bool = False,
+    strict_size: bool = False,
+    output_chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
+) -> AsyncIterator[bytes]:
+    """Incrementally compress an asynchronous byte iterable as one gzip member.
+
+    The header is emitted before the first source item is requested. Output
+    chunks are non-empty and no larger than ``output_chunk_size``.
+
+    Args:
+        source: Asynchronous iterable yielding uncompressed ``bytes``.
+        compresslevel: Compression level from ``-1`` through ``9``.
+        mtime: Optional gzip header timestamp. Use zero for reproducibility.
+        original_filename: Optional filename stored in the gzip header.
+        fast_compress: Opt into zlib-ng compression when available.
+        strict_size: Reject payloads exceeding gzip's 32-bit ``ISIZE`` field.
+        output_chunk_size: Strict upper bound for each yielded chunk.
+
+    Returns:
+        A single-consumer asynchronous iterator containing one gzip member.
+
+    Raises:
+        TypeError: If call-time arguments or a source item have invalid types.
+        ValueError: If an option is outside its supported range.
+        OSError: If compression fails or ``strict_size`` rejects the payload.
+    """
+    return _compress_chunks(
+        source,
+        compresslevel=compresslevel,
+        mtime=mtime,
+        original_filename=original_filename,
+        fast_compress=fast_compress,
+        strict_size=strict_size,
+        output_chunk_size=output_chunk_size,
+    )
+
+
 __all__ = [
     "__version__",
     "AsyncGzipBinaryFile",
     "AsyncGzipFile",
     "AsyncGzipTextFile",
     "EngineInfo",
+    "GzipInfo",
+    "GzipMemberInfo",
+    "VerificationResult",
     "WithAsyncRead",
     "WithAsyncReadWrite",
     "WithAsyncWrite",
@@ -330,4 +473,8 @@ __all__ = [
     "read",
     "write",
     "engine_info",
+    "inspect",
+    "verify",
+    "decompress_chunks",
+    "compress_chunks",
 ]

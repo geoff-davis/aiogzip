@@ -62,6 +62,17 @@ resources. Crossing it raises `OSError`; the inflater is bounded to the
 remaining allowance plus one byte for overflow detection instead of first
 allocating the complete expanded payload.
 
+When the payload is not needed, use `verify()` to perform the same complete
+validation scan while discarding decompressed bytes:
+
+```python
+result = await aiogzip.verify(
+    "uploaded-data.gz",
+    max_decompressed_size=100 * 1024 * 1024,
+)
+print(result.uncompressed_size)
+```
+
 ## Reproducible gzip output
 
 The gzip header timestamp and embedded filename both affect output bytes. Set

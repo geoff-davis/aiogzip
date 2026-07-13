@@ -7,7 +7,7 @@ type by mode.
 """
 
 from pathlib import Path
-from typing import Union
+from typing import AsyncIterator, Union
 
 from typing_extensions import assert_type
 
@@ -16,8 +16,15 @@ from aiogzip import (
     AsyncGzipFile,
     AsyncGzipTextFile,
     EngineInfo,
+    GzipInfo,
+    GzipMemberInfo,
+    VerificationResult,
+    compress_chunks,
+    decompress_chunks,
     engine_info,
+    inspect,
     read,
+    verify,
     write,
 )
 from aiogzip import open as gzip_open
@@ -86,3 +93,29 @@ def _check_engine_info() -> None:
     assert_type(info, EngineInfo)
     assert_type(info.compression, str)
     assert_type(info.decompression, str)
+
+
+def _check_inspection_result_types(
+    member: GzipMemberInfo,
+    info: GzipInfo,
+    verified: VerificationResult,
+) -> None:
+    assert_type(member.index, int)
+    assert_type(member.mtime, int)
+    assert_type(info.members, tuple[GzipMemberInfo, ...])
+    assert_type(info.member_count, int)
+    assert_type(verified.uncompressed_size, int)
+
+
+async def _check_inspection_functions() -> None:
+    assert_type(await inspect(p), GzipInfo)
+    assert_type(await verify(p), VerificationResult)
+
+
+async def _compressed_source() -> AsyncIterator[bytes]:
+    yield b"compressed"
+
+
+def _check_streaming_functions() -> None:
+    assert_type(decompress_chunks(_compressed_source()), AsyncIterator[bytes])
+    assert_type(compress_chunks(_compressed_source()), AsyncIterator[bytes])

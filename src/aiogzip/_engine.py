@@ -13,11 +13,12 @@ Set ``AIOGZIP_ENGINE=stdlib`` to force stdlib everywhere (useful for
 reproducible error behaviour or debugging).
 """
 
+import asyncio
 import importlib
 import os
 import zlib
 from dataclasses import dataclass
-from typing import Any, Tuple, Type
+from typing import Any, Callable, Tuple, Type
 
 from ._common import ZlibEngine
 
@@ -41,6 +42,16 @@ _FORCE_STDLIB = os.environ.get("AIOGZIP_ENGINE", "").strip().lower() == "stdlib"
 
 # Whether zlib-ng is available *and* permitted as the active engine.
 _HAVE_ZNG = _zng is not None and not _FORCE_STDLIB
+
+# Inputs below this size run inline; above it, a thread hop is amortized and
+# keeps the event loop responsive during CPU-heavy codec work.
+ZLIB_OFFLOAD_THRESHOLD = 256 * 1024
+
+
+async def run_zlib_in_thread(method: Callable[[bytes], bytes], data: bytes) -> bytes:
+    """Run one codec call in the event loop's default executor."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, method, data)
 
 
 @dataclass(frozen=True)

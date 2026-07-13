@@ -28,6 +28,8 @@ CATEGORIES = {
     "compression": "bench_compression",
     "scenarios": "bench_scenarios",
     "errors": "bench_errors",
+    "inspection": "bench_inspection",
+    "streaming": "bench_streaming",
     "micro": "bench_micro",
 }
 

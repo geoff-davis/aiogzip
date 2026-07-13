@@ -9,12 +9,18 @@
 - `read` — read and decompress a complete binary stream into memory
 - `write` — compress and write a complete bytes-like payload
 - `EngineInfo` and `engine_info` — immutable diagnostic information about the default compression and active decompression engines
+- `GzipMemberInfo`, `GzipInfo`, and `inspect` — validated per-member metadata and aggregate sizes from a complete decompression scan
+- `VerificationResult` and `verify` — lightweight aggregate counts after complete integrity verification
+- `decompress_chunks` — pull-driven decompression from an `AsyncIterable[bytes]` with bounded output chunks
+- `compress_chunks` — one-member gzip compression from an `AsyncIterable[bytes]` with bounded output chunks
 - `WithAsyncRead`, `WithAsyncWrite`, `WithAsyncReadWrite` — runtime-checkable protocols describing the async file objects accepted via `fileobj=`
 - `ZlibEngine` — type alias for zlib compressor/decompressor objects (currently `Any`; the concrete C types are not exposed in type stubs)
 - `GZIP_WBITS`, `GZIP_METHOD_DEFLATE`, `GZIP_OS_UNKNOWN`, and the `GZIP_FLAG_FNAME` / `GZIP_FLAG_FHCRC` / `GZIP_FLAG_FEXTRA` / `GZIP_FLAG_FCOMMENT` header-flag constants — useful when inspecting gzip headers alongside this library
 - `__version__`
 
-Implementation internals live in `aiogzip._common`, `aiogzip._binary`, and `aiogzip._text`. Treat those modules as private and unstable.
+Implementation internals live in `aiogzip._common`, `aiogzip._binary`,
+`aiogzip._text`, `aiogzip._inspection`, and `aiogzip._streaming`. Treat those
+modules as private and unstable.
 
 ```python
 import aiogzip
@@ -51,6 +57,77 @@ zlib-ng is installed. A writer created with `fast_compress=True` opts that
 individual stream into zlib-ng; that per-stream choice is not reflected by
 `engine_info()`. The strings are human-readable diagnostics and are not a
 stable machine-readable feature-detection API.
+
+## Inspection and verification
+
+`inspect()` scans and validates the complete gzip stream but discards its
+decompressed payload. It returns one immutable `GzipMemberInfo` per member,
+including exact compressed offsets and sizes, actual uncompressed sizes,
+literal trailer `ISIZE` values, and optional header metadata. Header `mtime=0`
+is preserved as `0`; `FNAME` and `FCOMMENT` use deterministic Latin-1 decoding.
+
+```python
+import aiogzip
+
+info = await aiogzip.inspect("events.gz", max_decompressed_size=1024**3)
+for member in info.members:
+    print(member.index, member.compressed_offset, member.uncompressed_size)
+```
+
+`verify()` performs the same complete structural, deflate, CRC-32, and `ISIZE`
+validation without retaining per-member metadata:
+
+```python
+result = await aiogzip.verify("events.gz")
+print(result.member_count, result.uncompressed_size)
+```
+
+Successful return means the entire stream is valid. Corruption raises
+`gzip.BadGzipFile`; I/O and decompression-limit failures raise `OSError`.
+Zero-byte input is valid and returns zero members and zero sizes. NUL padding
+after a valid member is accepted and included in the aggregate compressed size;
+other trailing data is treated as a malformed next member.
+
+## Async-iterable decompression
+
+`decompress_chunks()` accepts only an asynchronous iterable of `bytes` and
+returns an `AsyncIterator[bytes]`. Empty source chunks are ignored, yielded
+chunks are non-empty, and `output_chunk_size` is a strict upper bound.
+
+```python
+async for data in aiogzip.decompress_chunks(
+    compressed_source(),
+    output_chunk_size=64 * 1024,
+    max_decompressed_size=1024**3,
+):
+    await consume(data)
+```
+
+The stream is validated incrementally. Payload can be yielded before its final
+CRC and trailer are available, so complete integrity validation occurs only
+when iteration ends normally. Corruption raises `gzip.BadGzipFile`, output
+limit violations raise `OSError`, invalid source items raise `TypeError`, and
+source exceptions and cancellation propagate. See the
+[streaming guide](streaming.md) for backpressure and lifecycle details.
+
+`compress_chunks()` accepts an asynchronous iterable of uncompressed `bytes`
+and yields exactly one gzip member. It emits the header promptly, before
+requesting the first source item. Empty sources therefore produce a valid empty
+member rather than zero bytes.
+
+```python
+async for data in aiogzip.compress_chunks(
+    raw_source(),
+    mtime=0,
+    output_chunk_size=64 * 1024,
+):
+    await send(data)
+```
+
+The trailer is emitted only after the source ends normally. If the source
+raises, compression is cancelled, or output consumption stops early, bytes
+already yielded form an incomplete member and must be discarded. Compression
+levels, metadata, `strict_size`, and `fast_compress` match the file writer.
 
 When writing through an external asynchronous `fileobj`, its `write()` method
 may accept fewer bytes than requested as long as it returns the accepted byte
