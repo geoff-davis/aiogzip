@@ -28,7 +28,7 @@ from ._inspection import (
 from ._streaming import _compress_chunks, _decompress_chunks
 from ._text import AsyncGzipTextFile
 
-__version__ = "1.10.0"
+__version__ = "1.10.1"
 
 # Mode strings that select a text stream (they contain a 't'). The factory
 # parses modes character-by-character and is permutation-tolerant, so these

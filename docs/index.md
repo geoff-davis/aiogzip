@@ -14,7 +14,10 @@ It is designed for high-performance I/O operations, especially for text-based da
 ## Features
 
 - **Truly Asynchronous**: Built with `asyncio` and `aiofiles` for non-blocking file I/O.
-- **High-Performance Text Processing**: Significantly faster than the standard `gzip` library for text and JSONL file operations.
+- **Async-Native Text Processing**: Bounded line batching and optional zlib-ng
+  acceleration provide competitive text and JSONL throughput without blocking
+  the event loop. Direct single-file line iteration can be slower than
+  synchronous `gzip`; see the [Performance Guide](performance.md).
 - **Simple API**: Mimics the interface of `gzip.open()`, making it easy to adopt.
 - **Separate Binary and Text Modes**: `AsyncGzipBinaryFile` and `AsyncGzipTextFile` provide clear, type-safe handling of data.
 - **Excellent Compression Quality**: Achieves compression ratios nearly identical to the standard `gzip` module.

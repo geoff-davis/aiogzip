@@ -3,6 +3,11 @@
 An asynchronous API modeled after Python's `gzip` module for reading and
 writing gzip-compressed files.
 
+It can substantially outperform sequential `gzip` when async work overlaps or
+optional zlib-ng accelerates bulk decompression; direct single-file line
+iteration remains faster with synchronous `gzip`. See
+[Performance and optional acceleration](#performance-and-optional-acceleration).
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/aiogzip.svg)](https://pypi.org/project/aiogzip/)
 [![Python versions](https://img.shields.io/pypi/pyversions/aiogzip.svg)](https://pypi.org/project/aiogzip/)
@@ -17,15 +22,6 @@ pip install aiogzip
 ```
 
 Python 3.8 through 3.14 are supported by the 1.x release line.
-
-> **Performance profile:** aiogzip can substantially outperform sequential
-> `gzip` when independent latency-bound steps overlap or optional zlib-ng
-> accelerates bulk decompression. In one representative run, ten files with
-> simulated 10 ms latency completed about 6x faster, and a highly compressible
-> bulk read with zlib-ng was about 5.6x faster. Direct single-file line
-> iteration remains faster with synchronous `gzip`; aiogzip's advantage there
-> is non-blocking integration and concurrency. See
-> [Performance and optional acceleration](#performance-and-optional-acceleration).
 
 ## Text-mode quickstart
 
@@ -193,18 +189,19 @@ On a representative Python 3.12 Linux run, the direct I/O cases used 8 MiB
 inputs and the concurrency case used ten 1 MiB files:
 
 - equal-level bulk text writes were at parity;
-- tuned single-file JSONL iteration was about 1.7-1.8x slower than `gzip`
+- tuned single-file JSONL iteration was about 1.6x slower than `gzip`
   because each line crosses an async-iterator boundary;
-- bounded `readlines()` batches reduced an 8 MiB JSONL read-and-parse workload
-  by about 10-15% versus direct iteration and brought it roughly to `gzip`
-  parity;
+- with zlib-ng, bounded `readlines()` batches reduced an 8 MiB JSONL
+  read-and-parse workload by about 13% versus direct iteration and matched
+  `gzip` in this run; with stdlib zlib, both aiogzip paths were about 1.2x
+  slower than `gzip`;
 - an LF-only universal-newline fast path made the representative zlib-ng bulk
   text read about 1.6x faster than `gzip` (the stdlib engine remained about
   1.4x slower);
-- optional zlib-ng made a highly compressible bulk `read(-1)` about 5.6x
-  faster than `gzip`; and
-- overlapping ten files with simulated 10 ms latency was about 6x faster than
-  processing them sequentially with `gzip`.
+- optional zlib-ng made a highly compressible bulk `read(-1)` about 6.1x
+  faster than `gzip`, while stdlib zlib was at parity; and
+- overlapping ten files with simulated 10 ms latency was about 6.7-7.0x
+  faster than processing them sequentially with `gzip`.
 
 The concurrency result measures overlapped waiting, not a faster deflate
 codec, and benchmark ratios vary by hardware, storage, Python version, and
