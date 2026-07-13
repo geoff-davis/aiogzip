@@ -18,6 +18,9 @@ All notable changes to this project will be documented in this file.
   `GzipMemberInfo`, `GzipInfo`, and `VerificationResult` result types.
 - Added shared bounded-memory incremental gzip decoding internals with
   concatenated-member, metadata, CRC-32, `ISIZE`, and size-limit validation.
+- Added `aiogzip.decompress_chunks()` for pull-driven, bounded-output gzip
+  decompression from asynchronous byte iterables, including cumulative output
+  limits and complete-stream integrity validation.
 
 ### Documentation
 
@@ -26,6 +29,8 @@ All notable changes to this project will be documented in this file.
 - Added a migration guide for users of standard-library `gzip` and a focused
   recipes page covering JSON Lines, untrusted input, reproducible output,
   append mode, seeking, cancellation, and external async file objects.
+- Added an async-iterable streaming guide covering backpressure, validation
+  timing, untrusted-input limits, cancellation, and early exit.
 
 ### Maintenance
 

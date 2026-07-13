@@ -207,6 +207,14 @@ class _IncrementalGzipDecoder:
     def uncompressed_size(self) -> int:
         return self._uncompressed_size
 
+    def discard(self) -> None:
+        """Release codec state and buffered data without final validation."""
+        self._failed = True
+        self._pending.clear()
+        self._engine = None
+        self._header = None
+        self._members.clear()
+
     def feed(self, data: bytes) -> AsyncIterator[bytes]:
         """Accept compressed bytes and return a bounded-output async iterator."""
         if self._finished:

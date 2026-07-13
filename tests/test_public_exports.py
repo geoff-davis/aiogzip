@@ -29,6 +29,7 @@ def test_key_re_exports_are_stable():
         WithAsyncRead,
         WithAsyncReadWrite,
         WithAsyncWrite,
+        decompress_chunks,
         engine_info,
         inspect,
         open,
@@ -53,3 +54,4 @@ def test_key_re_exports_are_stable():
     assert engine_info is aiogzip.engine_info
     assert inspect is aiogzip.inspect
     assert verify is aiogzip.verify
+    assert decompress_chunks is aiogzip.decompress_chunks

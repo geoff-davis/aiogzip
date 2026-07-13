@@ -27,6 +27,7 @@ It is designed for high-performance I/O operations, especially for text-based da
 
 - [Installation & Usage](examples.md)
 - [Focused Recipes](recipes.md)
+- [Async-iterable Streaming](streaming.md)
 - [Performance Benchmarks](performance.md)
 - [API Reference](api.md)
 - [Contributing](contributing.md)
@@ -129,7 +130,9 @@ Backward seeks restart decompression from the beginning of the gzip stream. For 
 
 **Concurrency:** An open `aiogzip` file is not safe for concurrent use by multiple `asyncio` tasks. Its internal buffers and decoder/compressor state are mutated without locking — the same contract as standard-library file objects. Give each task its own file object, or serialize access behind your own lock.
 
-**Note:** `aiogzip` focuses on file-based operations and does not currently support in-memory compression/decompression (e.g., `gzip.compress`/`gzip.decompress`).
+**Note:** `aiogzip` does not provide whole-buffer `compress()` or
+`decompress()` helpers analogous to `gzip.compress()` and `gzip.decompress()`.
+For asynchronous byte sources, use [`decompress_chunks()`](streaming.md).
 
 ## Resumable text processing
 

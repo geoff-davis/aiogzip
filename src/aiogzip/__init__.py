@@ -1,7 +1,7 @@
 """Async gzip file reader/writer public API."""
 
 from pathlib import Path
-from typing import Any, Literal, Optional, Union, overload
+from typing import Any, AsyncIterable, AsyncIterator, Literal, Optional, Union, overload
 
 from ._binary import AsyncGzipBinaryFile
 from ._common import (
@@ -25,6 +25,7 @@ from ._inspection import (
     VerificationResult,
     _scan_gzip,
 )
+from ._streaming import _decompress_chunks
 from ._text import AsyncGzipTextFile
 
 __version__ = "1.9.1"
@@ -372,6 +373,25 @@ async def verify(
     )
 
 
+def decompress_chunks(
+    source: AsyncIterable[bytes],
+    *,
+    output_chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
+    max_decompressed_size: Optional[int] = None,
+) -> AsyncIterator[bytes]:
+    """Incrementally decompress gzip bytes from an asynchronous iterable.
+
+    Output chunks are non-empty and no larger than ``output_chunk_size``.
+    Complete CRC and trailer validation occurs only when the returned iterator
+    is consumed to completion.
+    """
+    return _decompress_chunks(
+        source,
+        output_chunk_size=output_chunk_size,
+        max_decompressed_size=max_decompressed_size,
+    )
+
+
 __all__ = [
     "__version__",
     "AsyncGzipBinaryFile",
@@ -398,4 +418,5 @@ __all__ = [
     "engine_info",
     "inspect",
     "verify",
+    "decompress_chunks",
 ]
