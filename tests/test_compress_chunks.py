@@ -180,10 +180,13 @@ class TestCompressChunks:
         if _engine.have_fast_engine():
             output = await _collect(_items([b"payload"]), mtime=0, fast_compress=True)
         else:
-            with pytest.warns(UserWarning, match="zlib-ng is not available"):
+            with pytest.warns(
+                UserWarning, match="zlib-ng is not available"
+            ) as warnings:
                 output = await _collect(
                     _items([b"payload"]), mtime=0, fast_compress=True
                 )
+            assert warnings[0].filename == __file__
 
         assert calls == [True]
         assert gzip.decompress(b"".join(output)) == b"payload"

@@ -12,6 +12,7 @@ import pytest
 
 import aiogzip
 from aiogzip import _engine
+from aiogzip import _streaming as streaming_module
 
 
 async def _chunks(data, size):
@@ -91,6 +92,35 @@ class TestDecompressChunks:
         output = await _collect(_items(values))
 
         assert output == []
+
+    async def test_final_decoder_output_is_forwarded(self, monkeypatch):
+        class FinalOutputDecoder:
+            def __init__(self, **kwargs):
+                pass
+
+            async def _empty(self):
+                if False:
+                    yield b""
+
+            def feed(self, data):
+                return self._empty()
+
+            async def _final(self):
+                yield b"final output"
+
+            def finish(self):
+                return self._final()
+
+            def discard(self):
+                pass
+
+        monkeypatch.setattr(
+            streaming_module, "_IncrementalGzipDecoder", FinalOutputDecoder
+        )
+
+        output = await _collect(_items([]))
+
+        assert output == [b"final output"]
 
     @pytest.mark.parametrize("input_chunk_size", [1, 2, 3, 7, 17, 257, 4096])
     async def test_one_member_arbitrary_input_chunks(self, input_chunk_size):

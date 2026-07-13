@@ -54,7 +54,7 @@ class _IncrementalGzipEncoder:
                 "fast_compress=True requested but zlib-ng is not available; "
                 "falling back to stdlib zlib. Install the extra with "
                 "'pip install aiogzip[fast]' to enable faster compression.",
-                stacklevel=3,
+                stacklevel=4,
             )
         self._engine: ZlibEngine = _engine.compressobj(
             compresslevel,

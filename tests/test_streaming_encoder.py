@@ -128,7 +128,11 @@ class TestIncrementalGzipEncoder:
 
         monkeypatch.setattr(_engine, "compressobj", recording_compressobj)
 
-        _, output = await _encode([b"payload"], fast_compress=True)
+        if _engine.have_fast_engine():
+            _, output = await _encode([b"payload"], fast_compress=True)
+        else:
+            with pytest.warns(UserWarning, match="zlib-ng is not available"):
+                _, output = await _encode([b"payload"], fast_compress=True)
 
         assert calls == [True]
         assert gzip.decompress(b"".join(output)) == b"payload"
@@ -299,6 +303,10 @@ class TestIncrementalGzipEncoder:
         second_feed = encoder.feed(b"second")
         with pytest.raises(RuntimeError, match="concurrently"):
             await second_feed.__anext__()
+
+        finalization = encoder.finish()
+        with pytest.raises(RuntimeError, match="concurrently"):
+            await finalization.__anext__()
 
         first.cancel()
         with pytest.raises(asyncio.CancelledError):
