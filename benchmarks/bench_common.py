@@ -5,17 +5,29 @@ This module provides shared utilities, base classes, and data generators
 used across all benchmark modules.
 """
 
+import gzip
 import json
 import os
 import random
 import shutil
 import statistics
-import string
 import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
+
+COMPARISON_COMPRESSLEVEL = 6
+
+
+def write_comparison_fixture(
+    path: Path,
+    data: bytes,
+    *,
+    compresslevel: int = COMPARISON_COMPRESSLEVEL,
+) -> None:
+    """Write one deterministic gzip fixture for comparative read benchmarks."""
+    path.write_bytes(gzip.compress(data, compresslevel=compresslevel, mtime=0))
 
 
 @dataclass
@@ -121,7 +133,8 @@ class DataGenerator:
 
     @staticmethod
     def generate_text(size_mb: int) -> str:
-        """Generate realistic text data."""
+        """Generate deterministic, realistic text data."""
+        random_source = random.Random(0)
         words = [
             "hello",
             "world",
@@ -147,7 +160,9 @@ class DataGenerator:
         current_size = 0
 
         while current_size < target_size:
-            line = " ".join(random.choices(words, k=random.randint(5, 15)))
+            line = " ".join(
+                random_source.choices(words, k=random_source.randint(5, 15))
+            )
             lines.append(line)
             current_size += len(line) + 1  # +1 for newline
 
@@ -155,7 +170,7 @@ class DataGenerator:
 
     @staticmethod
     def generate_jsonl(size_mb: int) -> str:
-        """Generate JSONL (JSON Lines) data."""
+        """Generate deterministic JSONL (JSON Lines) data."""
         lines: List[str] = []
         target_size = size_mb * 1024 * 1024
         current_size = 0
@@ -165,9 +180,9 @@ class DataGenerator:
             record = {
                 "id": record_id,
                 "name": f"item_{record_id}",
-                "value": random.randint(1, 1000),
-                "description": "".join(random.choices(string.ascii_letters, k=20)),
-                "timestamp": time.time(),
+                "value": (record_id * 37) % 1000 + 1,
+                "description": f"benchmark-event-{record_id % 1000:04d}",
+                "timestamp": 1_700_000_000 + record_id,
             }
             line = json.dumps(record)
             lines.append(line)

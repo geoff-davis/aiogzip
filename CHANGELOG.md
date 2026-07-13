@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Comparative benchmarks now use deterministic data, identical compressed
+  fixtures for reads, explicit compression level 6 for both writers, separate
+  read/write timings, realistic size-scaled line workloads, and median results.
+- JSON Lines benchmarks now isolate read-and-parse performance instead of
+  folding unequal-default compression into the reported speedup.
+
+### Documentation
+
+- Corrected performance claims that previously described combined text
+  read/write and JSON Lines timings as read-speed improvements. The README and
+  performance guide now distinguish synchronous single-file overhead, async
+  concurrency, and optional zlib-ng acceleration.
+- Added a required before/after benchmark workflow for performance-sensitive
+  changes, including engine-controlled runs and result comparison commands.
+
 ## [1.10.0] - 2026-07-13
 
 ### Added

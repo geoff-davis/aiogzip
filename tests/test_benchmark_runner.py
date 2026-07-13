@@ -1,4 +1,6 @@
 import argparse
+import ast
+import gzip
 import importlib
 import sys
 from pathlib import Path
@@ -10,8 +12,11 @@ sys.path.insert(0, str(BENCHMARKS_DIR))
 bench_common = importlib.import_module("bench_common")
 run_benchmarks = importlib.import_module("run_benchmarks")
 BenchmarkResults = bench_common.BenchmarkResults
+COMPARISON_COMPRESSLEVEL = bench_common.COMPARISON_COMPRESSLEVEL
+DataGenerator = bench_common.DataGenerator
 median_results = bench_common.median_results
 positive_int = run_benchmarks.positive_int
+write_comparison_fixture = bench_common.write_comparison_fixture
 
 
 def _result(name, duration, marker):
@@ -59,3 +64,59 @@ def test_positive_int(value, expected):
 def test_positive_int_rejects_nonpositive_values(value):
     with pytest.raises(argparse.ArgumentTypeError, match="positive integer"):
         positive_int(value)
+
+
+def test_comparison_fixture_is_deterministic(tmp_path):
+    payload = b"repeatable benchmark payload\n" * 100
+    first = tmp_path / "first.gz"
+    second = tmp_path / "second.gz"
+
+    write_comparison_fixture(first, payload)
+    write_comparison_fixture(second, payload)
+
+    assert COMPARISON_COMPRESSLEVEL == 6
+    assert first.read_bytes() == second.read_bytes()
+    assert gzip.decompress(first.read_bytes()) == payload
+
+
+def test_text_generators_are_deterministic():
+    assert DataGenerator.generate_text(1) == DataGenerator.generate_text(1)
+    assert DataGenerator.generate_jsonl(1) == DataGenerator.generate_jsonl(1)
+
+
+def _gzip_open_write_calls(path):
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        function = node.func
+        if not (
+            isinstance(function, ast.Attribute)
+            and isinstance(function.value, ast.Name)
+            and function.value.id == "gzip"
+            and function.attr == "open"
+        ):
+            continue
+        mode = None
+        if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant):
+            mode = node.args[1].value
+        for keyword in node.keywords:
+            if keyword.arg == "mode" and isinstance(keyword.value, ast.Constant):
+                mode = keyword.value.value
+        if isinstance(mode, str) and any(operation in mode for operation in "wax"):
+            yield node
+
+
+def test_comparative_gzip_writes_set_compression_level_explicitly():
+    benchmark_paths = sorted(BENCHMARKS_DIR.glob("bench_*.py"))
+    write_calls = [
+        (path, call)
+        for path in benchmark_paths
+        for call in _gzip_open_write_calls(path)
+    ]
+
+    assert write_calls
+    for path, call in write_calls:
+        assert any(keyword.arg == "compresslevel" for keyword in call.keywords), (
+            f"{path.name}:{call.lineno} uses gzip's implicit compression level"
+        )
