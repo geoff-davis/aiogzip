@@ -66,6 +66,14 @@ class TestMatchesStdlibOracle:
                 got.append(line)
         assert got == expected
 
+    async def test_readlines_matches_oracle(self, rich_gz, newline, chunk_size):
+        expected = oracle_lines(rich_gz, newline)
+        async with AsyncGzipTextFile(
+            rich_gz, "rt", newline=newline, chunk_size=chunk_size
+        ) as f:
+            got = await f.readlines()
+        assert got == expected
+
 
 class TestNoOverSplitting:
     """The control/Unicode chars in SPECIALS must NOT create line breaks."""
@@ -171,6 +179,122 @@ class TestBatchWindowing:
         async with AsyncGzipTextFile(path, "rt", newline="\n", chunk_size=1 << 20) as f:
             lines = [line async for line in f]
         assert lines == ["x" * 500 + "\n", "short\n", "y" * 300 + "\n"]
+
+
+class TestBatchedReadlines:
+    async def test_fast_readlines_does_not_await_per_line(self, tmp_path, monkeypatch):
+        lines = [f"row {i}\n" for i in range(10_000)]
+        path = tmp_path / "readlines-fast.gz"
+        path.write_bytes(gzip.compress("".join(lines).encode("utf-8")))
+
+        async def unexpected_readline(self):
+            raise AssertionError("readlines() awaited the per-line helper")
+
+        monkeypatch.setattr(AsyncGzipTextFile, "_readline_fast", unexpected_readline)
+        async with AsyncGzipTextFile(path, "rt", newline="\n") as f:
+            assert await f.readlines() == lines
+
+    async def test_hint_leaves_pending_lines_and_tell_seek_roundtrips(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr(AsyncGzipTextFile, "_LINE_BATCH_CHARS", 128)
+        expected = [f"row {i:04d}\n" for i in range(1000)]
+        path = tmp_path / "readlines-hint.gz"
+        path.write_bytes(gzip.compress("".join(expected).encode("utf-8")))
+
+        async with AsyncGzipTextFile(path, "rt", newline="\n", chunk_size=1 << 20) as f:
+            first = await f.readlines(50)
+            assert sum(map(len, first)) >= 50
+            assert f._pending_idx < len(f._pending_lines)
+
+            cookie = await f.tell()
+            remainder = await f.read()
+            await f.seek(cookie)
+            replayed = await f.read()
+
+        assert "".join(first) + remainder == "".join(expected)
+        assert replayed == remainder
+
+    async def test_repeated_hinted_batches_preserve_every_line(self, tmp_path):
+        expected = [f"item {i}\n" for i in range(10_000)]
+        max_line_size = max(map(len, expected))
+        path = tmp_path / "readlines-repeated.gz"
+        path.write_bytes(gzip.compress("".join(expected).encode("utf-8")))
+
+        actual = []
+        async with AsyncGzipTextFile(path, "rt", newline="\n") as f:
+            while True:
+                batch = await f.readlines(1024)
+                if not batch:
+                    break
+                batch_size = sum(map(len, batch))
+                assert batch_size >= 1024 or batch[-1] == expected[-1]
+                assert batch_size < 1024 + max_line_size
+                actual.extend(batch)
+
+        assert actual == expected
+
+    @pytest.mark.parametrize(
+        ("newline", "terminator"), [(None, "\n"), ("\n", "\n"), ("\r", "\r")]
+    )
+    @pytest.mark.parametrize("chunk_size", [3, 64, 1 << 20])
+    async def test_hinted_batches_cover_all_fast_newline_modes(
+        self, tmp_path, newline, terminator, chunk_size
+    ):
+        expected = [f"héllo {i}{terminator}" for i in range(200)]
+        expected.append("final unterminated line")
+        max_line_size = max(map(len, expected))
+        path = tmp_path / "readlines-newline-modes.gz"
+        path.write_bytes(gzip.compress("".join(expected).encode("utf-8")))
+
+        actual = []
+        async with AsyncGzipTextFile(
+            path, "rt", newline=newline, chunk_size=chunk_size
+        ) as f:
+            while True:
+                batch = await f.readlines(37)
+                if not batch:
+                    break
+                batch_size = sum(map(len, batch))
+                assert batch_size >= 37 or batch[-1] == expected[-1]
+                assert batch_size < 37 + max_line_size
+                actual.extend(batch)
+
+        assert actual == expected
+
+    async def test_exact_hint_drains_pending_batch_in_bulk(self, tmp_path):
+        expected = [f"line {i}\n" for i in range(100)]
+        path = tmp_path / "readlines-exact-hint.gz"
+        path.write_bytes(gzip.compress("".join(expected).encode("utf-8")))
+
+        async with AsyncGzipTextFile(path, "rt", newline="\n") as f:
+            assert await f.readline() == expected[0]
+            assert await f.readline() == expected[1]
+            pending = f._pending_lines[f._pending_idx :]
+            assert pending
+            exact_hint = sum(map(len, pending))
+
+            assert await f.readlines(exact_hint) == pending
+            assert f._pending_idx == len(f._pending_lines)
+            assert await f.readlines() == []
+
+    async def test_hint_reached_by_first_refilled_line(self, tmp_path):
+        expected = ["first line\n", "second line\n"]
+        path = tmp_path / "readlines-first-line-hint.gz"
+        path.write_bytes(gzip.compress("".join(expected).encode("utf-8")))
+
+        async with AsyncGzipTextFile(path, "rt", newline="\n") as f:
+            assert await f.readlines(1) == expected[:1]
+            assert await f.readlines() == expected[1:]
+
+    async def test_nan_hint_preserves_unbounded_legacy_behavior(self, tmp_path):
+        expected = ["first\n", "second\n", "third\n", "fourth\n", "final"]
+        path = tmp_path / "readlines-nan-hint.gz"
+        path.write_bytes(gzip.compress("".join(expected).encode("utf-8")))
+
+        async with AsyncGzipTextFile(path, "rt", newline="\n") as f:
+            assert await f.readlines(float("nan")) == expected
+            assert await f.readlines() == []
 
 
 class TestBoundedReadlineInterleaving:

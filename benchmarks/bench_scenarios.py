@@ -39,6 +39,26 @@ class ScenariosBenchmarks(BenchmarkBase):
         aiogzip_time = time.perf_counter() - start
 
         start = time.perf_counter()
+        batched_count = 0
+        batched_id_sum = 0
+        async with AsyncGzipTextFile(
+            fixture,
+            "rt",
+            encoding="utf-8",
+            newline="\n",
+            chunk_size=512 * 1024,
+        ) as f:
+            while True:
+                lines = await f.readlines(1024 * 1024)
+                if not lines:
+                    break
+                for line in lines:
+                    record = json.loads(line)
+                    batched_count += 1
+                    batched_id_sum += record["id"]
+        batched_time = time.perf_counter() - start
+
+        start = time.perf_counter()
         gzip_count = 0
         gzip_id_sum = 0
         with gzip.open(fixture, "rt", encoding="utf-8", newline="\n") as f:
@@ -50,6 +70,8 @@ class ScenariosBenchmarks(BenchmarkBase):
 
         assert aiogzip_count == gzip_count
         assert aiogzip_id_sum == gzip_id_sum
+        assert batched_count == gzip_count
+        assert batched_id_sum == gzip_id_sum
 
         self.add_result(
             "JSONL read and parse (identical fixture)",
@@ -60,6 +82,16 @@ class ScenariosBenchmarks(BenchmarkBase):
             records=aiogzip_count,
             speedup=format_speedup(aiogzip_time, gzip_time),
             tuning='newline="\\n", chunk_size=512 KiB',
+        )
+        self.add_result(
+            "JSONL batched readlines and parse (identical fixture)",
+            "scenarios",
+            batched_time,
+            aiogzip_time=f"{batched_time:.4f}s",
+            gzip_time=f"{gzip_time:.4f}s",
+            records=batched_count,
+            speedup=format_speedup(batched_time, gzip_time),
+            tuning='newline="\\n", chunk_size=512 KiB, readlines=1 MiB',
         )
 
     async def run_all(self):

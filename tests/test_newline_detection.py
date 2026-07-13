@@ -51,6 +51,50 @@ def _write(path, raw):
         f.write(raw)
 
 
+class CountingText(str):
+    """Track full-string count scans in the newline hot path."""
+
+    def __new__(cls, value):
+        instance = super().__new__(cls, value)
+        instance.counted = []
+        return instance
+
+    def count(self, sub, *args):
+        self.counted.append(sub)
+        return super().count(sub, *args)
+
+
+@pytest.mark.parametrize("newline", [None, ""])
+def test_lf_only_chunk_uses_one_count_scan_and_tracks_newline(newline):
+    stream = AsyncGzipTextFile("unused.gz", "rt", newline=newline)
+    text = CountingText("first\nsecond\n")
+
+    assert stream._apply_newline_decoding(text) is text
+    assert text.counted == ["\r"]
+    assert stream.newlines == "\n"
+
+
+def test_lf_only_chunks_keep_one_scan_after_lf_is_known():
+    stream = AsyncGzipTextFile("unused.gz", "rt", newline=None)
+    first = CountingText("first\n")
+    second = CountingText("second\n")
+
+    assert stream._apply_newline_decoding(first) is first
+    assert stream._apply_newline_decoding(second) is second
+    assert first.counted == ["\r"]
+    assert second.counted == ["\r"]
+    assert stream.newlines == "\n"
+
+
+def test_mixed_chunk_reuses_initial_cr_count():
+    stream = AsyncGzipTextFile("unused.gz", "rt", newline=None)
+    text = CountingText("first\r\nsecond\rthird\n")
+
+    assert stream._apply_newline_decoding(text) == "first\nsecond\nthird\n"
+    assert text.counted == ["\r", "\r\n", "\n"]
+    assert stream.newlines == ("\r", "\n", "\r\n")
+
+
 @pytest.mark.parametrize("name", list(_payloads()))
 @pytest.mark.parametrize("chunk_size", CHUNK_SIZES)
 @pytest.mark.asyncio

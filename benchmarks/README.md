@@ -26,6 +26,7 @@ Core read/write performance:
 
 - Binary I/O with small (10-byte) chunks
 - Separate bulk text read and write comparisons
+- Default universal-newline bulk text reads, including the LF-only fast path
 - Default and tuned JSONL line iteration against the exact same gzip fixture
 - Flush operations (100 flushes)
 - Read-all isolated: `read(-1)` timed on its own (write excluded) on compressible data
@@ -61,6 +62,7 @@ Compression analysis:
 Practical use cases:
 
 - Read-only JSONL parsing from one identical fixture
+- Bounded-batch JSONL parsing with `readlines(1 MiB)`
 - JSON decoding and record validation with realistic data
 
 ### 6. 🛡️ Error Handling (`bench_errors.py`)
@@ -79,6 +81,7 @@ Fine-grained performance measurements:
 - read(-1) on 1MB files (100 iterations)
 - Line iteration efficiency (100K lines)
 - readline() loop performance (100K lines)
+- Whole-file and bounded-batch readlines() performance (100K lines)
 - Small write operations (1000 x 120 bytes)
 - Binary readline stress case (200KB line, 17-byte chunks)
 

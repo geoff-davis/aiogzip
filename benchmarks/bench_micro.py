@@ -107,6 +107,66 @@ class MicroBenchmarks(BenchmarkBase):
             lines_per_sec=f"{n_lines / avg_time:.0f}",
         )
 
+    async def benchmark_readlines_batching(self):
+        """Benchmark whole-file and bounded-batch readlines consumption."""
+        text_file = self.temp_mgr.get_path("micro_readlines.gz")
+
+        n_lines = 100_000
+        lines = [f"This is line number {i}\n" for i in range(n_lines)]
+        expected_chars = sum(map(len, lines))
+        async with AsyncGzipTextFile(text_file, "wt") as f:
+            await f.write("".join(lines))
+
+        async def consume(hint):
+            line_count = 0
+            char_count = 0
+            async with AsyncGzipTextFile(
+                text_file,
+                "rt",
+                newline="\n",
+                chunk_size=512 * 1024,
+            ) as f:
+                while True:
+                    batch = await f.readlines(hint)
+                    if not batch:
+                        break
+                    line_count += len(batch)
+                    char_count += sum(map(len, batch))
+            assert line_count == n_lines
+            assert char_count == expected_chars
+
+        iterations = 30
+        whole_file_total = 0.0
+        bounded_total = 0.0
+        for _ in range(iterations):
+            start = time.perf_counter()
+            await consume(-1)
+            whole_file_total += time.perf_counter() - start
+
+            start = time.perf_counter()
+            await consume(1024 * 1024)
+            bounded_total += time.perf_counter() - start
+
+        whole_file_avg = whole_file_total / iterations
+        bounded_avg = bounded_total / iterations
+
+        self.add_result(
+            "readlines() - 100K lines",
+            "micro",
+            whole_file_avg,
+            iterations=iterations,
+            avg_time_ms=f"{whole_file_avg * 1000:.3f}ms",
+            lines_per_sec=f"{n_lines / whole_file_avg:.0f}",
+        )
+        self.add_result(
+            "readlines(1 MiB) batches - 100K lines",
+            "micro",
+            bounded_avg,
+            iterations=iterations,
+            avg_time_ms=f"{bounded_avg * 1000:.3f}ms",
+            lines_per_sec=f"{n_lines / bounded_avg:.0f}",
+        )
+
     async def benchmark_small_writes(self):
         """Benchmark many small write operations."""
         test_file = self.temp_mgr.get_path("micro_small_writes.gz")
@@ -187,6 +247,7 @@ class MicroBenchmarks(BenchmarkBase):
         await self.benchmark_read_all()
         await self.benchmark_line_iteration()
         await self.benchmark_readline_loop()
+        await self.benchmark_readlines_batching()
         await self.benchmark_small_writes()
         await self.benchmark_text_writelines_batching()
         await self.benchmark_binary_readline_long_line_small_chunks()
