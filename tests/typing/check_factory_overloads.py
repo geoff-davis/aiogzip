@@ -11,7 +11,13 @@ from typing import Union
 
 from typing_extensions import assert_type
 
-from aiogzip import AsyncGzipBinaryFile, AsyncGzipFile, AsyncGzipTextFile
+from aiogzip import (
+    AsyncGzipBinaryFile,
+    AsyncGzipFile,
+    AsyncGzipTextFile,
+    read,
+    write,
+)
 from aiogzip import open as gzip_open
 
 p = Path("data.gz")
@@ -64,3 +70,10 @@ def _dynamic(mode: str) -> None:
         AsyncGzipFile(p, mode),
         Union[AsyncGzipBinaryFile, AsyncGzipTextFile],
     )
+
+
+async def _check_whole_file_helpers() -> None:
+    assert_type(await read(p), bytes)
+    assert_type(await write(p, b"payload"), None)
+    assert_type(await write(p, bytearray(b"payload")), None)
+    assert_type(await write(p, memoryview(b"payload")), None)

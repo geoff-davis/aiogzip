@@ -6,6 +6,8 @@
 - `AsyncGzipTextFile` — text-mode reader/writer
 - `open` — recommended factory returning the right class for a mode string (accepts `r`/`w`/`a`/`x` ops with a `b` or `t` suffix)
 - `AsyncGzipFile` — compatibility name for the same factory behavior; it remains fully supported
+- `read` — read and decompress a complete binary stream into memory
+- `write` — compress and write a complete bytes-like payload
 - `WithAsyncRead`, `WithAsyncWrite`, `WithAsyncReadWrite` — runtime-checkable protocols describing the async file objects accepted via `fileobj=`
 - `ZlibEngine` — type alias for zlib compressor/decompressor objects (currently `Any`; the concrete C types are not exposed in type stubs)
 - `GZIP_WBITS`, `GZIP_METHOD_DEFLATE`, `GZIP_OS_UNKNOWN`, and the `GZIP_FLAG_FNAME` / `GZIP_FLAG_FHCRC` / `GZIP_FLAG_FEXTRA` / `GZIP_FLAG_FCOMMENT` header-flag constants — useful when inspecting gzip headers alongside this library
@@ -20,6 +22,17 @@ async with aiogzip.open("events.jsonl.gz", "rt") as stream:
     async for line in stream:
         print(line)
 ```
+
+For small files that fit comfortably in memory, the whole-file helpers avoid
+manual lifecycle management:
+
+```python
+data = await aiogzip.read("payload.bin.gz")
+await aiogzip.write("copy.bin.gz", data, mtime=0)
+```
+
+Both helpers operate in binary mode and load the entire uncompressed payload
+into memory. Use `open()` for streaming large files.
 
 When writing through an external asynchronous `fileobj`, its `write()` method
 may accept fewer bytes than requested as long as it returns the accepted byte
