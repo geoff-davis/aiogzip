@@ -22,14 +22,24 @@ def test_key_re_exports_are_stable():
         AsyncGzipBinaryFile,
         AsyncGzipFile,
         AsyncGzipTextFile,
+        EngineInfo,
         WithAsyncRead,
         WithAsyncReadWrite,
         WithAsyncWrite,
+        engine_info,
+        open,
+        read,
+        write,
     )
 
     assert AsyncGzipBinaryFile is aiogzip.AsyncGzipBinaryFile
     assert AsyncGzipTextFile is aiogzip.AsyncGzipTextFile
     assert AsyncGzipFile is aiogzip.AsyncGzipFile
+    assert EngineInfo is aiogzip.EngineInfo
     assert WithAsyncRead is aiogzip.WithAsyncRead
     assert WithAsyncWrite is aiogzip.WithAsyncWrite
     assert WithAsyncReadWrite is aiogzip.WithAsyncReadWrite
+    assert open is aiogzip.open
+    assert read is aiogzip.read
+    assert write is aiogzip.write
+    assert engine_info is aiogzip.engine_info

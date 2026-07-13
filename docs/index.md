@@ -26,6 +26,7 @@ It is designed for high-performance I/O operations, especially for text-based da
 ## Quick Links
 
 - [Installation & Usage](examples.md)
+- [Focused Recipes](recipes.md)
 - [Performance Benchmarks](performance.md)
 - [API Reference](api.md)
 - [Contributing](contributing.md)
@@ -40,15 +41,16 @@ Using `aiogzip` is as simple as using the standard `gzip` module, but with `asyn
 
 ```python
 import asyncio
-from aiogzip import AsyncGzipFile
+
+import aiogzip
 
 async def main():
     # Write binary data
-    async with AsyncGzipFile("file.gz", "wb") as f:
+    async with aiogzip.open("file.gz", "wb") as f:
         await f.write(b"Hello, async world!")
 
     # Write text data
-    async with AsyncGzipFile("file.txt.gz", "wt") as f:
+    async with aiogzip.open("file.txt.gz", "wt") as f:
         await f.write("This is a text file.")
 
 asyncio.run(main())
@@ -58,16 +60,17 @@ asyncio.run(main())
 
 ```python
 import asyncio
-from aiogzip import AsyncGzipFile
+
+import aiogzip
 
 async def main():
     # Read the entire file
-    async with AsyncGzipFile("file.gz", "rb") as f:
+    async with aiogzip.open("file.gz", "rb") as f:
         content = await f.read()
         print(content)
 
     # Iterate over lines in a text file
-    async with AsyncGzipFile("file.txt.gz", "rt") as f:
+    async with aiogzip.open("file.txt.gz", "rt") as f:
         async for line in f:
             print(line.strip())
 
@@ -82,7 +85,7 @@ impractical you can manage the lifecycle imperatively with `open()` and
 an error occurs:
 
 ```python
-f = AsyncGzipFile("file.txt.gz", "rt")
+f = aiogzip.open("file.txt.gz", "rt")
 await f.open()        # initializes the stream and returns the file; __aenter__ calls this
 try:
     async for line in f:
@@ -114,7 +117,7 @@ use async with.").
 > byte-size parity with stdlib defaults, pass `compresslevel=9`:
 >
 > ```python
-> async with AsyncGzipFile("file.gz", "wb", compresslevel=9) as f:
+> async with aiogzip.open("file.gz", "wb", compresslevel=9) as f:
 >     await f.write(b"...")
 > ```
 

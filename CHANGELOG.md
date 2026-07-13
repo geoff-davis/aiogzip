@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added `aiogzip.open()` as the recommended typed package-level entry point.
+  The existing `AsyncGzipFile()` factory remains fully supported and has
+  identical behavior.
+- Added asynchronous `aiogzip.read()` and `aiogzip.write()` helpers for small
+  binary payloads that fit in memory.
+- Added the immutable `EngineInfo` result and `engine_info()` diagnostic API,
+  which report the default compression and active decompression engines.
+
+### Documentation
+
+- Reorganized the README around installation and immediate text/binary
+  quickstarts, with detailed operational behavior moved later.
+- Added a migration guide for users of standard-library `gzip` and a focused
+  recipes page covering JSON Lines, untrusted input, reproducible output,
+  append mode, seeking, cancellation, and external async file objects.
+
 ### Maintenance
 
 - Dependabot now preserves compatible lower bounds for pip requirements and

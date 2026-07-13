@@ -138,11 +138,12 @@ async def main():
 
 ```python
 import asyncio
-from aiogzip import AsyncGzipFile
+
+import aiogzip
 
 async def safe_read():
     try:
-        async with AsyncGzipFile("non_existent.gz", "rb") as f:
+        async with aiogzip.open("non_existent.gz", "rb") as f:
             await f.read()
     except FileNotFoundError:
         print("File not found!")
@@ -161,10 +162,13 @@ allocate the complete expanded payload:
 
 ```python
 import asyncio
-from aiogzip import AsyncGzipFile
+
+import aiogzip
 
 async def read_untrusted(path):
-    async with AsyncGzipFile(path, "rb", max_decompressed_size=100 * 1024 * 1024) as f:
+    async with aiogzip.open(
+        path, "rb", max_decompressed_size=100 * 1024 * 1024
+    ) as f:
         return await f.read()
 
 asyncio.run(read_untrusted("upload.gz"))

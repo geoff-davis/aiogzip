@@ -5,6 +5,44 @@ import gzip
 import pytest
 
 from aiogzip import AsyncGzipBinaryFile, AsyncGzipFile, AsyncGzipTextFile
+from aiogzip import open as gzip_open
+
+
+class TestOpenFactory:
+    """Tests for the recommended package-level open() entry point."""
+
+    async def test_binary_roundtrip(self, temp_file, sample_data):
+        async with gzip_open(temp_file, "wb") as stream:
+            assert isinstance(stream, AsyncGzipBinaryFile)
+            await stream.write(sample_data)
+
+        async with gzip_open(temp_file, "rb") as stream:
+            assert isinstance(stream, AsyncGzipBinaryFile)
+            assert await stream.read() == sample_data
+
+    async def test_text_roundtrip(self, temp_file):
+        async with gzip_open(temp_file, "wt", encoding="utf-8") as stream:
+            assert isinstance(stream, AsyncGzipTextFile)
+            await stream.write("hello\nworld\n")
+
+        async with gzip_open(temp_file, "rt", encoding="utf-8") as stream:
+            assert isinstance(stream, AsyncGzipTextFile)
+            assert [line async for line in stream] == ["hello\n", "world\n"]
+
+    def test_matches_async_gzip_file_factory(self):
+        alias_result = gzip_open("test.gz", "rt", newline="\n", chunk_size=1024)
+        compatibility_result = AsyncGzipFile(
+            "test.gz", "rt", newline="\n", chunk_size=1024
+        )
+
+        assert type(alias_result) is type(compatibility_result)
+        assert alias_result._mode == compatibility_result._mode
+        assert alias_result._chunk_size == compatibility_result._chunk_size
+        assert alias_result._newline == compatibility_result._newline
+
+    def test_preserves_factory_validation(self):
+        with pytest.raises(ValueError, match="Invalid mode"):
+            gzip_open("test.gz", "invalid")
 
 
 class TestAsyncGzipFile:

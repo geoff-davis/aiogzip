@@ -5,6 +5,7 @@ from typing import Any, Literal, Optional, Union, overload
 
 from ._binary import AsyncGzipBinaryFile
 from ._common import (
+    _MAX_CHUNK_SIZE,
     GZIP_FLAG_FCOMMENT,
     GZIP_FLAG_FEXTRA,
     GZIP_FLAG_FHCRC,
@@ -17,6 +18,7 @@ from ._common import (
     WithAsyncWrite,
     ZlibEngine,
 )
+from ._engine import EngineInfo, engine_info
 from ._text import AsyncGzipTextFile
 
 __version__ = "1.9.1"
@@ -110,6 +112,8 @@ _BinaryMode = Literal[
 
 _Filename = Union[str, bytes, Path, None]
 _FileObj = Optional[Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]]
+_ReadFileObj = Optional[Union[WithAsyncRead, WithAsyncReadWrite]]
+_WriteFileObj = Optional[Union[WithAsyncWrite, WithAsyncReadWrite]]
 
 
 @overload
@@ -196,11 +200,121 @@ def AsyncGzipFile(
         return AsyncGzipBinaryFile(filename, mode, **kwargs)
 
 
+@overload
+def open(
+    filename: _Filename,
+    mode: _TextMode,
+    *,
+    chunk_size: int = ...,
+    encoding: Optional[str] = ...,
+    errors: Optional[str] = ...,
+    newline: Optional[str] = ...,
+    compresslevel: int = ...,
+    mtime: Optional[Union[int, float]] = ...,
+    original_filename: Optional[Union[str, bytes]] = ...,
+    fileobj: _FileObj = ...,
+    closefd: Optional[bool] = ...,
+    max_decompressed_size: Optional[int] = ...,
+    max_rewind_cache_size: Optional[int] = ...,
+    strict_size: bool = ...,
+    fast_compress: bool = ...,
+) -> AsyncGzipTextFile: ...
+
+
+@overload
+def open(
+    filename: _Filename,
+    mode: _BinaryMode = ...,
+    *,
+    chunk_size: int = ...,
+    compresslevel: int = ...,
+    mtime: Optional[Union[int, float]] = ...,
+    original_filename: Optional[Union[str, bytes]] = ...,
+    fileobj: _FileObj = ...,
+    closefd: Optional[bool] = ...,
+    max_decompressed_size: Optional[int] = ...,
+    max_rewind_cache_size: Optional[int] = ...,
+    strict_size: bool = ...,
+    fast_compress: bool = ...,
+) -> AsyncGzipBinaryFile: ...
+
+
+@overload
+def open(
+    filename: _Filename,
+    mode: str,
+    **kwargs: Any,
+) -> Union[AsyncGzipBinaryFile, AsyncGzipTextFile]: ...
+
+
+def open(
+    filename: _Filename, mode: str = "rb", **kwargs: Any
+) -> Union[AsyncGzipBinaryFile, AsyncGzipTextFile]:
+    """Open a gzip stream in binary or text mode.
+
+    This is the recommended public entry point. ``AsyncGzipFile`` remains
+    available and has identical behavior.
+    """
+    return AsyncGzipFile(filename, mode, **kwargs)
+
+
+async def read(
+    filename: _Filename,
+    *,
+    chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
+    fileobj: _ReadFileObj = None,
+    closefd: Optional[bool] = None,
+    max_decompressed_size: Optional[int] = None,
+    max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
+) -> bytes:
+    """Read and decompress an entire gzip stream into memory."""
+    async with open(
+        filename,
+        "rb",
+        chunk_size=chunk_size,
+        fileobj=fileobj,
+        closefd=closefd,
+        max_decompressed_size=max_decompressed_size,
+        max_rewind_cache_size=max_rewind_cache_size,
+    ) as stream:
+        return await stream.read()
+
+
+async def write(
+    filename: _Filename,
+    data: Union[bytes, bytearray, memoryview],
+    *,
+    chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
+    compresslevel: int = 6,
+    mtime: Optional[Union[int, float]] = None,
+    original_filename: Optional[Union[str, bytes]] = None,
+    fileobj: _WriteFileObj = None,
+    closefd: Optional[bool] = None,
+    strict_size: bool = False,
+    fast_compress: bool = False,
+) -> None:
+    """Compress and write an entire bytes-like payload to a gzip stream."""
+    async with open(
+        filename,
+        "wb",
+        chunk_size=chunk_size,
+        compresslevel=compresslevel,
+        mtime=mtime,
+        original_filename=original_filename,
+        fileobj=fileobj,
+        closefd=closefd,
+        strict_size=strict_size,
+        fast_compress=fast_compress,
+    ) as stream:
+        await stream.write(data)
+
+
 __all__ = [
     "__version__",
     "AsyncGzipBinaryFile",
     "AsyncGzipFile",
     "AsyncGzipTextFile",
+    "EngineInfo",
     "WithAsyncRead",
     "WithAsyncReadWrite",
     "WithAsyncWrite",
@@ -212,4 +326,8 @@ __all__ = [
     "GZIP_FLAG_FCOMMENT",
     "GZIP_METHOD_DEFLATE",
     "GZIP_OS_UNKNOWN",
+    "open",
+    "read",
+    "write",
+    "engine_info",
 ]

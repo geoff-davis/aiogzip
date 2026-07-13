@@ -16,6 +16,7 @@ reproducible error behaviour or debugging).
 import importlib
 import os
 import zlib
+from dataclasses import dataclass
 from typing import Any, Tuple, Type
 
 from ._common import ZlibEngine
@@ -40,6 +41,15 @@ _FORCE_STDLIB = os.environ.get("AIOGZIP_ENGINE", "").strip().lower() == "stdlib"
 
 # Whether zlib-ng is available *and* permitted as the active engine.
 _HAVE_ZNG = _zng is not None and not _FORCE_STDLIB
+
+
+@dataclass(frozen=True)
+class EngineInfo:
+    """Human-readable codec selections used by aiogzip by default."""
+
+    compression: str
+    decompression: str
+
 
 # Errors raised by the deflate engines. zlib-ng's (and isal's) error type is
 # NOT zlib.error nor a subclass of it, so callers that mean to catch decode
@@ -94,3 +104,16 @@ def have_fast_engine() -> bool:
 def decompress_engine_name() -> str:
     """Name of the engine backing decompression: ``"zlib-ng"`` or ``"stdlib"``."""
     return "zlib-ng" if _HAVE_ZNG else "stdlib"
+
+
+def engine_info() -> EngineInfo:
+    """Return the default compression and active decompression engines.
+
+    Compression remains on stdlib zlib unless a writer opts into zlib-ng with
+    ``fast_compress=True``. The returned strings are intended for diagnostics,
+    not machine-readable feature detection.
+    """
+    return EngineInfo(
+        compression="stdlib-zlib",
+        decompression="zlib-ng" if _HAVE_ZNG else "stdlib-zlib",
+    )
