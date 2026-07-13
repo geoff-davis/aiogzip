@@ -8,7 +8,7 @@ import asyncio
 import gzip
 import time
 
-from bench_common import BenchmarkBase
+from bench_common import COMPARISON_COMPRESSLEVEL, BenchmarkBase
 
 from aiogzip import AsyncGzipBinaryFile
 
@@ -24,7 +24,9 @@ class ConcurrencyBenchmarks(BenchmarkBase):
         # Async concurrent processing with simulated I/O delay
         async def process_file_async(idx):
             filepath = self.temp_mgr.get_path(f"async_{idx}.gz")
-            async with AsyncGzipBinaryFile(filepath, "wb") as f:
+            async with AsyncGzipBinaryFile(
+                filepath, "wb", compresslevel=COMPARISON_COMPRESSLEVEL
+            ) as f:
                 await f.write(test_data)
             # Simulate network/disk delay (e.g., waiting for upload)
             await asyncio.sleep(0.01)
@@ -38,7 +40,7 @@ class ConcurrencyBenchmarks(BenchmarkBase):
         # Sync sequential processing with simulated I/O delay
         def process_file_sync(idx):
             filepath = self.temp_mgr.get_path(f"sync_{idx}.gz")
-            with gzip.open(filepath, "wb") as f:
+            with gzip.open(filepath, "wb", compresslevel=COMPARISON_COMPRESSLEVEL) as f:
                 f.write(test_data)
             # Simulate network/disk delay (blocking)
             time.sleep(0.01)
@@ -75,7 +77,9 @@ class ConcurrencyBenchmarks(BenchmarkBase):
         # Create files first
         for i in range(num_tasks):
             filepath = self.temp_mgr.get_path(f"mixed_{i}.gz")
-            async with AsyncGzipBinaryFile(filepath, "wb") as f:
+            async with AsyncGzipBinaryFile(
+                filepath, "wb", compresslevel=COMPARISON_COMPRESSLEVEL
+            ) as f:
                 await f.write(test_data)
 
         # Mixed async operations (some read, some write)
@@ -88,7 +92,9 @@ class ConcurrencyBenchmarks(BenchmarkBase):
             else:
                 # Write
                 filepath = self.temp_mgr.get_path(f"mixed_new_{idx}.gz")
-                async with AsyncGzipBinaryFile(filepath, "wb") as f:
+                async with AsyncGzipBinaryFile(
+                    filepath, "wb", compresslevel=COMPARISON_COMPRESSLEVEL
+                ) as f:
                     await f.write(test_data)
 
         start = time.perf_counter()
@@ -103,7 +109,9 @@ class ConcurrencyBenchmarks(BenchmarkBase):
                     _ = f.read()
             else:
                 filepath = self.temp_mgr.get_path(f"mixed_new_{idx}.gz")
-                with gzip.open(filepath, "wb") as f:
+                with gzip.open(
+                    filepath, "wb", compresslevel=COMPARISON_COMPRESSLEVEL
+                ) as f:
                     f.write(test_data)
 
         start = time.perf_counter()

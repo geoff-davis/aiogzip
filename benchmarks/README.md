@@ -25,9 +25,9 @@ uv run python benchmarks/bench_compare.py baseline.json current.json
 Core read/write performance:
 
 - Binary I/O with small (10-byte) chunks
-- Text I/O operations
+- Separate bulk text read and write comparisons
+- Default and tuned JSONL line iteration against the exact same gzip fixture
 - Flush operations (100 flushes)
-- Line-by-line reading with `readline()` (1000 lines)
 - Read-all isolated: `read(-1)` timed on its own (write excluded) on compressible data
 - Text large reads: a single large `read(size)` and a single long-line `readline()` (guards against O(n^2) accumulation regressions)
 
@@ -43,9 +43,9 @@ Memory usage and efficiency:
 
 Async concurrency benefits:
 
-- Concurrent file operations (50 files)
+- Concurrent file operations (10 files, 1 MiB each)
 - Comparison: async concurrent vs sync sequential
-- Real-world async performance gains
+- Explicit simulated-latency and mixed-operation results
 
 ### 4. 🗜️ Compression Benchmarks (`bench_compression.py`)
 
@@ -60,9 +60,8 @@ Compression analysis:
 
 Practical use cases:
 
-- JSONL processing (write → read → parse)
-- Complete workflows with realistic data
-- End-to-end performance testing
+- Read-only JSONL parsing from one identical fixture
+- JSON decoding and record validation with realistic data
 
 ### 6. 🛡️ Error Handling (`bench_errors.py`)
 
@@ -78,8 +77,8 @@ Robustness and error recovery:
 Fine-grained performance measurements:
 
 - read(-1) on 1MB files (100 iterations)
-- Line iteration efficiency (10K lines)
-- readline() loop performance (10K lines)
+- Line iteration efficiency (100K lines)
+- readline() loop performance (100K lines)
 - Small write operations (1000 x 120 bytes)
 - Binary readline stress case (200KB line, 17-byte chunks)
 
@@ -103,6 +102,51 @@ Each category runs three times by default. Reported durations are medians, and
 the displayed secondary metrics come from the sample closest to that median.
 Use `--repeat 1` for a faster smoke run or a larger odd count for more stable
 release comparisons.
+
+## Comparison Methodology
+
+Comparisons with stdlib `gzip` follow these rules:
+
+- Read benchmarks consume the exact same deterministic compressed bytes.
+- Comparative writes explicitly use compression level 6 for both libraries;
+  their different defaults (`aiogzip=6`, `gzip=9`) must not affect the result.
+- Reads and writes are timed and reported separately unless the benchmark is
+  explicitly labeled as an end-to-end workflow.
+- Correctness checks run outside or alongside the timed work so a fast but
+  incomplete result cannot be reported.
+- Results use the same Python process, engine selection, filesystem, and data
+  size. Absolute timings from different machines are not directly comparable.
+
+An async API is not expected to beat synchronous `gzip` in every single-file
+microbenchmark. Report event-loop concurrency, optional-codec throughput, and
+per-call async overhead as separate effects.
+
+## Before/After Regression Workflow
+
+For changes to codecs, buffering, text decoding, line iteration, executor
+offloading, or parser hot paths, capture a baseline before editing:
+
+```bash
+AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
+  --category io,scenarios,concurrency --size 8 --repeat 5 \
+  --output /tmp/aiogzip-before.json
+```
+
+Run the identical command after the change, using a different output file,
+then compare the results:
+
+```bash
+AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
+  --category io,scenarios,concurrency --size 8 --repeat 5 \
+  --output /tmp/aiogzip-after.json
+
+uv run python benchmarks/bench_compare.py \
+  /tmp/aiogzip-before.json /tmp/aiogzip-after.json
+```
+
+Repeat without `AIOGZIP_ENGINE=stdlib` when the change can affect zlib-ng.
+Record the command, environment, and any material wins or regressions in the
+review or pull request.
 
 ### Usage Examples
 
@@ -156,19 +200,28 @@ uv add psutil
 ### Sample Output
 
 ```
-Binary I/O (10-byte chunks): 0.060s
-  aiogzip_write: 0.058s
-  aiogzip_read: 0.002s
-  gzip_write: 0.075s
-  gzip_read: 0.001s
-  speedup: 1.27x faster
+Text line iteration (tuned, identical fixture): 0.021s
+  aiogzip_time: 0.0210s
+  gzip_time: 0.0124s
+  speedup: 1.69x slower
+  lines: 73849
+
+Read-all isolated (compressible, read-only timing): 0.003s
+  aiogzip_read_best: 2.67ms
+  gzip_read_best: 14.88ms
+  speedup: 5.57x faster
 ```
+
+These are illustrative results from one zlib-ng-enabled machine, not expected
+values or acceptance thresholds.
 
 ### Interpreting Results
 
-- **Local SSD**: Async benefits minimal due to fast I/O
-- **Network Storage**: Async shows significant advantages
-- **Concurrent Workloads**: Best performance with multiple files
+- **Local SSD / page cache**: synchronous `gzip` often wins small single-file
+  operations because it has no coroutine handoff.
+- **Latency-bound storage**: async can overlap waits across independent files.
+- **Concurrent workloads**: compare total completion time and event-loop
+  responsiveness, not only per-file codec time.
 - **Small Chunks**: Stress test for overhead measurement
 
 ## File Structure

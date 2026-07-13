@@ -7,7 +7,7 @@ Tests compression ratios and format compatibility.
 import gzip
 import time
 
-from bench_common import BenchmarkBase, format_size
+from bench_common import COMPARISON_COMPRESSLEVEL, BenchmarkBase, format_size
 
 from aiogzip import AsyncGzipBinaryFile, _engine
 
@@ -28,11 +28,15 @@ class CompressionBenchmarks(BenchmarkBase):
             gzip_file = self.temp_mgr.get_path(f"{name}_gzip.gz")
 
             # Write with aiogzip
-            async with AsyncGzipBinaryFile(aiogzip_file, "wb") as f:
+            async with AsyncGzipBinaryFile(
+                aiogzip_file, "wb", compresslevel=COMPARISON_COMPRESSLEVEL
+            ) as f:
                 await f.write(data)
 
             # Write with gzip
-            with gzip.open(gzip_file, "wb") as f:
+            with gzip.open(
+                gzip_file, "wb", compresslevel=COMPARISON_COMPRESSLEVEL
+            ) as f:
                 f.write(data)
 
             # Compare sizes

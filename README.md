@@ -18,6 +18,15 @@ pip install aiogzip
 
 Python 3.8 through 3.14 are supported by the 1.x release line.
 
+> **Performance profile:** aiogzip can substantially outperform sequential
+> `gzip` when independent latency-bound steps overlap or optional zlib-ng
+> accelerates bulk decompression. In one representative run, ten files with
+> simulated 10 ms latency completed about 6x faster, and a highly compressible
+> bulk read with zlib-ng was about 5.6x faster. Direct single-file line
+> iteration remains faster with synchronous `gzip`; aiogzip's advantage there
+> is non-blocking integration and concurrency. See
+> [Performance and optional acceleration](#performance-and-optional-acceleration).
+
 ## Text-mode quickstart
 
 File methods are asynchronous, and line iteration uses `async for`:
@@ -79,7 +88,8 @@ cancellation recovery, and external async streams.
 
 ## Why use aiogzip?
 
-- Async file I/O built on `asyncio` and `aiofiles`.
+- Async file I/O built on `asyncio` and `aiofiles`, so independent streams can
+  overlap I/O waits.
 - Binary and text modes with distinct, typed concrete classes.
 - Async `read`, `write`, `readline`, `seek`, `tell`, `peek`, `readinto`, and
   line iteration.
@@ -174,11 +184,27 @@ replacement.
 
 ## Performance and optional acceleration
 
-Text bulk workflows are commonly faster than synchronous `gzip`; binary bulk
-writes are near parity, while very small calls can be slower due to async
-overhead. Large codec calls are offloaded to the default executor, allowing
-independent streams to make progress concurrently. Line iteration and
-`writelines()` use bounded batching.
+aiogzip's performance advantage comes from async concurrency and optional
+codec acceleration, not from being uniformly faster than synchronous `gzip`.
+Corrected comparisons use identical compressed fixtures for reads, compression
+level 6 for both writers, and median timings from repeated runs.
+
+On a representative Python 3.12 Linux run, the direct I/O cases used 8 MiB
+inputs and the concurrency case used ten 1 MiB files:
+
+- equal-level bulk text writes were at parity;
+- tuned single-file JSONL iteration was about 1.7-1.8x slower than `gzip`
+  because each line crosses an async-iterator boundary;
+- optional zlib-ng made a highly compressible bulk `read(-1)` about 5.6x
+  faster than `gzip`; and
+- overlapping ten files with simulated 10 ms latency was about 6x faster than
+  processing them sequentially with `gzip`.
+
+The concurrency result measures overlapped waiting, not a faster deflate
+codec, and benchmark ratios vary by hardware, storage, Python version, and
+data. Large codec calls are offloaded to the default executor so independent
+tasks can keep making progress. Line iteration and `writelines()` use bounded
+batching to reduce aiogzip's own coroutine overhead.
 
 For large UTF-8 JSON Lines files with `\n` terminators, the measured fast path
 uses `newline="\n"` and `chunk_size=512 * 1024`. Tune memory and throughput for
@@ -190,9 +216,11 @@ Install the optional codec with:
 pip install "aiogzip[fast]"
 ```
 
-When installed, zlib-ng is selected automatically for decompression.
-Compression remains on stdlib zlib so installation alone does not change gzip
-bytes; pass `fast_compress=True` per writer to opt in. Set
+When installed, zlib-ng is selected automatically for decompression. Its gain
+depends on the input and access pattern: it helps decompression-heavy bulk
+reads far more than per-line Python iteration. Compression remains on stdlib
+zlib so installation alone does not change gzip bytes; pass
+`fast_compress=True` per writer to opt in. Set
 `AIOGZIP_ENGINE=stdlib` to force stdlib behavior. Inspect the default selections
 for a diagnostic report:
 

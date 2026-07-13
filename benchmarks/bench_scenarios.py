@@ -8,7 +8,7 @@ import gzip
 import json
 import time
 
-from bench_common import BenchmarkBase
+from bench_common import BenchmarkBase, format_speedup, write_comparison_fixture
 
 from aiogzip import AsyncGzipTextFile
 
@@ -17,43 +17,49 @@ class ScenariosBenchmarks(BenchmarkBase):
     """Real-world scenario benchmarks."""
 
     async def benchmark_jsonl_processing(self):
-        """Benchmark JSONL file processing."""
-        jsonl_data = self.data_gen.generate_jsonl(1)
-        aiogzip_file = self.temp_mgr.get_path("data_aiogzip.jsonl.gz")
-        gzip_file = self.temp_mgr.get_path("data_gzip.jsonl.gz")
+        """Benchmark read-only JSONL parsing from one identical fixture."""
+        jsonl_data = self.data_gen.generate_jsonl(self.data_size_mb)
+        fixture = self.temp_mgr.get_path("data.jsonl.gz")
+        write_comparison_fixture(fixture, jsonl_data.encode("utf-8"))
 
-        # aiogzip: Write and read JSONL
         start = time.perf_counter()
-        async with AsyncGzipTextFile(aiogzip_file, "wt") as f:
-            await f.write(jsonl_data)
-
-        records_aiogzip = []
-        async with AsyncGzipTextFile(aiogzip_file, "rt") as f:
+        aiogzip_count = 0
+        aiogzip_id_sum = 0
+        async with AsyncGzipTextFile(
+            fixture,
+            "rt",
+            encoding="utf-8",
+            newline="\n",
+            chunk_size=512 * 1024,
+        ) as f:
             async for line in f:
-                records_aiogzip.append(json.loads(line))
+                record = json.loads(line)
+                aiogzip_count += 1
+                aiogzip_id_sum += record["id"]
         aiogzip_time = time.perf_counter() - start
 
-        # gzip: Write and read JSONL
         start = time.perf_counter()
-        with gzip.open(gzip_file, "wt") as f:
-            f.write(jsonl_data)
-
-        records_gzip = []
-        with gzip.open(gzip_file, "rt") as f:
+        gzip_count = 0
+        gzip_id_sum = 0
+        with gzip.open(fixture, "rt", encoding="utf-8", newline="\n") as f:
             for line in f:
-                records_gzip.append(json.loads(line))
+                record = json.loads(line)
+                gzip_count += 1
+                gzip_id_sum += record["id"]
         gzip_time = time.perf_counter() - start
 
-        speedup = gzip_time / aiogzip_time if aiogzip_time > 0 else 0
+        assert aiogzip_count == gzip_count
+        assert aiogzip_id_sum == gzip_id_sum
 
         self.add_result(
-            "JSONL processing",
+            "JSONL read and parse (identical fixture)",
             "scenarios",
             aiogzip_time,
-            aiogzip_time=f"{aiogzip_time:.3f}s",
-            gzip_time=f"{gzip_time:.3f}s",
-            records=len(records_aiogzip),
-            speedup=f"{speedup:.2f}x",
+            aiogzip_time=f"{aiogzip_time:.4f}s",
+            gzip_time=f"{gzip_time:.4f}s",
+            records=aiogzip_count,
+            speedup=format_speedup(aiogzip_time, gzip_time),
+            tuning='newline="\\n", chunk_size=512 KiB',
         )
 
     async def run_all(self):

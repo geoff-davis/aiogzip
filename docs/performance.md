@@ -1,47 +1,80 @@
 # Performance Guide
 
-`aiogzip` is designed to be a high-performance, asynchronous alternative to Python's `gzip` module. This guide details its performance characteristics and provides tips for optimization.
+`aiogzip` is designed to keep gzip file processing from blocking an asyncio
+application while providing competitive codec throughput. It is not uniformly
+faster than synchronous `gzip`: the result depends on the codec, access pattern,
+line size, storage latency, and how much concurrency the application can use.
 
 ## Benchmark Summary
 
-All benchmarks were conducted on standard hardware using Python 3.12+.
+The table below is from a representative Linux x86-64 run on Python 3.12.12.
+Each result is the median of five runs. Direct I/O uses 8 MiB of uncompressed
+input; the concurrency case uses ten 1 MiB files plus simulated latency. Read
+comparisons use the exact same deterministic gzip bytes, and write comparisons
+use `compresslevel=6` for both libraries. These numbers illustrate tradeoffs
+rather than promising performance on different hardware or data.
 
-### Text Operations (Winner: `aiogzip`)
+| Workload | aiogzip (stdlib) vs `gzip` | aiogzip (zlib-ng) vs `gzip` |
+| --- | ---: | ---: |
+| Bulk text write, level 6 | ~1.01x slower | ~1.01x faster |
+| Bulk text read | ~2.01x slower | ~1.35x slower |
+| Tuned JSONL line iteration | ~1.82x slower | ~1.69x slower |
+| Tuned JSONL read and parse | ~1.19x slower | ~1.11x slower |
+| Highly compressible bulk `read(-1)` | ~1.07x faster | ~5.57x faster |
+| Ten files with simulated 10 ms latency | ~6.06x faster | ~6.09x faster |
 
-`aiogzip` is significantly optimized for text processing, often outperforming the standard `gzip` module due to efficient buffering and async handling.
+Run the suite on the target workload before making a capacity or latency
+decision:
 
-| Operation | aiogzip | gzip (sync) | Speedup |
-|-----------|---------|-------------|---------|
-| **Bulk Text Read/Write** | ~37 MB/s | ~13 MB/s | **~2.9x Faster** |
-| **JSONL Processing** | - | - | **~1.8x Faster** |
-| **Line Iteration** | ~4.2M lines/sec | - | - |
+```bash
+AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
+  --category io,scenarios,concurrency --size 8 --repeat 5
+```
 
-**Why?** `aiogzip` uses optimized UTF-8 decoding strategies (using `codecs.getincrementaldecoder`) and manages buffers efficiently to minimize encoding/decoding overhead. For the single-character newline modes (`None`, `"\n"`, `"\r"`), each decoded chunk's lines are bulk-split in one pass and served from a batch, which makes `async for` line iteration roughly **1.3x** faster than per-line scanning.
+Repeat without `AIOGZIP_ENGINE=stdlib` to measure the optional zlib-ng engine.
+See the repository's
+[benchmark methodology](https://github.com/geoff-davis/aiogzip/tree/main/benchmarks)
+for before/after comparison commands.
+
+### Text operations
+
+For a single warm local file, synchronous `gzip` has less per-operation
+overhead. In particular, every `async for` line crosses an async-iterator
+boundary, so direct line iteration can be slower even though aiogzip bulk-splits
+decoded chunks internally.
+
+That batched line path remains valuable: it made aiogzip 1.7 roughly 1.3x
+faster than aiogzip 1.6's previous per-line scanning implementation. It should
+not be interpreted as a 1.3x advantage over stdlib `gzip`.
 
 For writing many small records, prefer `writelines()` over an explicit loop of
 `await f.write(line)`. It combines inputs into bounded `chunk_size` batches,
 reducing Python coroutine and compressor-call overhead without loading the full
 iterable into memory.
 
-### Binary Operations (Tie)
+### Binary operations
 
-For bulk binary I/O, `aiogzip` matches the throughput of standard `gzip`.
+Bulk binary I/O with stdlib zlib is close to `gzip`; many tiny awaited calls are
+slower. Whole-file reads of highly compressible input are where the optional
+zlib-ng engine can produce a substantial throughput gain.
 
-| Operation | aiogzip | gzip (sync) | Result |
-|-----------|---------|-------------|--------|
-| **Bulk Binary I/O** | ~61 MB/s | ~62 MB/s | **Equivalent** |
-| **Tiny (10-byte) chunk writes** | ~1.6M ops/sec | ~3.3M ops/sec | **Slower** |
+The async write path adds a per-call cost, so batch small writes when throughput
+matters. A full `read(-1)` is fastest when the output comfortably fits in
+memory; use incremental reads for large or untrusted data.
 
-The async write path adds a small per-call cost, so writing in *very* small pieces is slower than synchronous `gzip` — batch writes (or use a larger working buffer) when throughput matters. Bulk reads are fast: a full `read(-1)` of compressible data runs at several hundred MB/s.
+### Concurrency
 
-### Concurrency (Winner: `aiogzip`)
+Concurrency and event-loop responsiveness are aiogzip's primary advantages over
+calling synchronous `gzip` directly inside an async application.
 
-When processing multiple files, especially where I/O latency (disk/network) is involved, `aiogzip` shines by not blocking the event loop.
-
-- **Concurrent I/O (latency-bound)**: up to **~6x faster** than sequential synchronous processing when each file incurs I/O latency.
-- **Mixed read/write workload**: **~1.5x faster**.
+- A synthetic ten-file workload with 10 ms of simulated latency measured about
+  6x faster than sequential synchronous processing. The gain comes from
+  overlapping the delays; it is not a raw codec-speed comparison.
+- A five-operation mixed read/write workload measured about 1.6-1.8x faster in
+  the same run.
 - CPU-bound `zlib` work above a 256 KiB chunk is offloaded to a thread, so multiple streams compress/decompress in parallel instead of serializing on the loop.
-- Allows the main thread to remain responsive (e.g., for a web server) while processing heavy compression tasks.
+- Independent application tasks can continue while file or offloaded codec
+  work is pending.
 
 ### Optional Faster Codec (`aiogzip[fast]` / zlib-ng)
 
@@ -53,14 +86,16 @@ pip install "aiogzip[fast]"
 ```
 
 - **Decompression** uses zlib-ng automatically whenever it is installed. Its
-  output is **byte-identical** to stdlib `zlib`, so this is transparent. Measured
-  read-throughput gains range from ~**1.2-2x** on typical data to **~7-10x** on
-  highly compressible data and bulk `read(-1)`.
+  output is **byte-identical** to stdlib `zlib`, so this is transparent. In the
+  representative run above it made aiogzip's bulk text read about 1.46x faster
+  than aiogzip with stdlib zlib, and its highly compressible bulk `read(-1)`
+  about 5x faster. Gains depend strongly on the data and access pattern.
 - **Compression** stays on stdlib `zlib` by default, because zlib-ng's compressed
   *bytes* are not identical to stdlib's — installing the extra alone must not
-  change produced `.gz` output. Opt in per file with `fast_compress=True` for a
-  ~**1.2-1.5x** compression speedup; the output is valid gzip readable by any
-  decompressor, just not byte-for-byte identical to stdlib.
+  change produced `.gz` output. Opt in per file with `fast_compress=True` for
+  faster compression; the output is valid gzip readable by any decompressor,
+  just not byte-for-byte identical to stdlib. Measure the compression gain on
+  representative input rather than assuming a fixed multiplier.
 
   ```python
   async with AsyncGzipBinaryFile("out.gz", "wb", fast_compress=True) as f:
