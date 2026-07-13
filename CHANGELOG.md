@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-07-13
+
 ### Added
 
 - Added `aiogzip.open()` as the recommended typed package-level entry point.
