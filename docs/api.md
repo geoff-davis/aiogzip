@@ -9,6 +9,8 @@
 - `read` — read and decompress a complete binary stream into memory
 - `write` — compress and write a complete bytes-like payload
 - `EngineInfo` and `engine_info` — immutable diagnostic information about the default compression and active decompression engines
+- `GzipMemberInfo`, `GzipInfo`, and `inspect` — validated per-member metadata and aggregate sizes from a complete decompression scan
+- `VerificationResult` and `verify` — lightweight aggregate counts after complete integrity verification
 - `WithAsyncRead`, `WithAsyncWrite`, `WithAsyncReadWrite` — runtime-checkable protocols describing the async file objects accepted via `fileobj=`
 - `ZlibEngine` — type alias for zlib compressor/decompressor objects (currently `Any`; the concrete C types are not exposed in type stubs)
 - `GZIP_WBITS`, `GZIP_METHOD_DEFLATE`, `GZIP_OS_UNKNOWN`, and the `GZIP_FLAG_FNAME` / `GZIP_FLAG_FHCRC` / `GZIP_FLAG_FEXTRA` / `GZIP_FLAG_FCOMMENT` header-flag constants — useful when inspecting gzip headers alongside this library
@@ -51,6 +53,36 @@ zlib-ng is installed. A writer created with `fast_compress=True` opts that
 individual stream into zlib-ng; that per-stream choice is not reflected by
 `engine_info()`. The strings are human-readable diagnostics and are not a
 stable machine-readable feature-detection API.
+
+## Inspection and verification
+
+`inspect()` scans and validates the complete gzip stream but discards its
+decompressed payload. It returns one immutable `GzipMemberInfo` per member,
+including exact compressed offsets and sizes, actual uncompressed sizes,
+literal trailer `ISIZE` values, and optional header metadata. Header `mtime=0`
+is preserved as `0`; `FNAME` and `FCOMMENT` use deterministic Latin-1 decoding.
+
+```python
+import aiogzip
+
+info = await aiogzip.inspect("events.gz", max_decompressed_size=1024**3)
+for member in info.members:
+    print(member.index, member.compressed_offset, member.uncompressed_size)
+```
+
+`verify()` performs the same complete structural, deflate, CRC-32, and `ISIZE`
+validation without retaining per-member metadata:
+
+```python
+result = await aiogzip.verify("events.gz")
+print(result.member_count, result.uncompressed_size)
+```
+
+Successful return means the entire stream is valid. Corruption raises
+`gzip.BadGzipFile`; I/O and decompression-limit failures raise `OSError`.
+Zero-byte input is valid and returns zero members and zero sizes. NUL padding
+after a valid member is accepted and included in the aggregate compressed size;
+other trailing data is treated as a malformed next member.
 
 When writing through an external asynchronous `fileobj`, its `write()` method
 may accept fewer bytes than requested as long as it returns the accepted byte

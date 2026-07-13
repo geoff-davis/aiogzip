@@ -30,8 +30,10 @@ def test_key_re_exports_are_stable():
         WithAsyncReadWrite,
         WithAsyncWrite,
         engine_info,
+        inspect,
         open,
         read,
+        verify,
         write,
     )
 
@@ -49,3 +51,5 @@ def test_key_re_exports_are_stable():
     assert read is aiogzip.read
     assert write is aiogzip.write
     assert engine_info is aiogzip.engine_info
+    assert inspect is aiogzip.inspect
+    assert verify is aiogzip.verify

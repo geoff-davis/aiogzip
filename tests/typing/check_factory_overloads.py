@@ -20,7 +20,9 @@ from aiogzip import (
     GzipMemberInfo,
     VerificationResult,
     engine_info,
+    inspect,
     read,
+    verify,
     write,
 )
 from aiogzip import open as gzip_open
@@ -101,3 +103,8 @@ def _check_inspection_result_types(
     assert_type(info.members, tuple[GzipMemberInfo, ...])
     assert_type(info.member_count, int)
     assert_type(verified.uncompressed_size, int)
+
+
+async def _check_inspection_functions() -> None:
+    assert_type(await inspect(p), GzipInfo)
+    assert_type(await verify(p), VerificationResult)

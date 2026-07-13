@@ -19,7 +19,12 @@ from ._common import (
     ZlibEngine,
 )
 from ._engine import EngineInfo, engine_info
-from ._inspection import GzipInfo, GzipMemberInfo, VerificationResult
+from ._inspection import (
+    GzipInfo,
+    GzipMemberInfo,
+    VerificationResult,
+    _scan_gzip,
+)
 from ._text import AsyncGzipTextFile
 
 __version__ = "1.9.1"
@@ -310,6 +315,63 @@ async def write(
         await stream.write(data)
 
 
+async def inspect(
+    filename: _Filename = None,
+    *,
+    chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
+    fileobj: _ReadFileObj = None,
+    closefd: Optional[bool] = None,
+    max_decompressed_size: Optional[int] = None,
+) -> GzipInfo:
+    """Inspect and validate every member in a complete gzip stream.
+
+    This performs a full decompression scan while discarding payload bytes.
+    ``mtime`` preserves the literal header value, including zero; filename and
+    comment metadata use Latin-1 decoding.
+    """
+    result = await _scan_gzip(
+        filename,
+        fileobj=fileobj,
+        closefd=closefd,
+        max_decompressed_size=max_decompressed_size,
+        chunk_size=chunk_size,
+        collect_members=True,
+    )
+    return GzipInfo(
+        members=result.members,
+        compressed_size=result.compressed_size,
+        uncompressed_size=result.uncompressed_size,
+    )
+
+
+async def verify(
+    filename: _Filename = None,
+    *,
+    chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
+    fileobj: _ReadFileObj = None,
+    closefd: Optional[bool] = None,
+    max_decompressed_size: Optional[int] = None,
+) -> VerificationResult:
+    """Validate a complete gzip stream and return aggregate counts.
+
+    Successful return means every header, deflate payload, CRC, and ``ISIZE``
+    was valid. Invalid input and resource-limit failures raise instead.
+    """
+    result = await _scan_gzip(
+        filename,
+        fileobj=fileobj,
+        closefd=closefd,
+        max_decompressed_size=max_decompressed_size,
+        chunk_size=chunk_size,
+        collect_members=False,
+    )
+    return VerificationResult(
+        member_count=result.member_count,
+        compressed_size=result.compressed_size,
+        uncompressed_size=result.uncompressed_size,
+    )
+
+
 __all__ = [
     "__version__",
     "AsyncGzipBinaryFile",
@@ -334,4 +396,6 @@ __all__ = [
     "read",
     "write",
     "engine_info",
+    "inspect",
+    "verify",
 ]
