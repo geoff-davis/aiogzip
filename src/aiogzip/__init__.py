@@ -19,6 +19,7 @@ from ._common import (
     ZlibEngine,
 )
 from ._engine import EngineInfo, engine_info
+from ._inspection import GzipInfo, GzipMemberInfo, VerificationResult
 from ._text import AsyncGzipTextFile
 
 __version__ = "1.9.1"
@@ -315,6 +316,9 @@ __all__ = [
     "AsyncGzipFile",
     "AsyncGzipTextFile",
     "EngineInfo",
+    "GzipInfo",
+    "GzipMemberInfo",
+    "VerificationResult",
     "WithAsyncRead",
     "WithAsyncReadWrite",
     "WithAsyncWrite",

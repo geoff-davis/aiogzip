@@ -16,6 +16,9 @@ from aiogzip import (
     AsyncGzipFile,
     AsyncGzipTextFile,
     EngineInfo,
+    GzipInfo,
+    GzipMemberInfo,
+    VerificationResult,
     engine_info,
     read,
     write,
@@ -86,3 +89,15 @@ def _check_engine_info() -> None:
     assert_type(info, EngineInfo)
     assert_type(info.compression, str)
     assert_type(info.decompression, str)
+
+
+def _check_inspection_result_types(
+    member: GzipMemberInfo,
+    info: GzipInfo,
+    verified: VerificationResult,
+) -> None:
+    assert_type(member.index, int)
+    assert_type(member.mtime, Union[int, None])
+    assert_type(info.members, tuple[GzipMemberInfo, ...])
+    assert_type(info.member_count, int)
+    assert_type(verified.uncompressed_size, int)
