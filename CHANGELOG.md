@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-07-13
+
 ### Changed
 
 - Text `readlines()` now drains the reader's existing bounded line batches
