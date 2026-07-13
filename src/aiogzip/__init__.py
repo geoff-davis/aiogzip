@@ -316,7 +316,7 @@ async def write(
 
 
 async def inspect(
-    filename: _Filename = None,
+    filename: _Filename,
     *,
     chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
     fileobj: _ReadFileObj = None,
@@ -345,7 +345,7 @@ async def inspect(
 
 
 async def verify(
-    filename: _Filename = None,
+    filename: _Filename,
     *,
     chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
     fileobj: _ReadFileObj = None,

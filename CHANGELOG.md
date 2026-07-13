@@ -13,6 +13,11 @@ All notable changes to this project will be documented in this file.
   binary payloads that fit in memory.
 - Added the immutable `EngineInfo` result and `engine_info()` diagnostic API,
   which report the default compression and active decompression engines.
+- Added `aiogzip.inspect()` and `aiogzip.verify()` for complete gzip integrity
+  scans that discard decompressed payload data, plus immutable
+  `GzipMemberInfo`, `GzipInfo`, and `VerificationResult` result types.
+- Added shared bounded-memory incremental gzip decoding internals with
+  concatenated-member, metadata, CRC-32, `ISIZE`, and size-limit validation.
 
 ### Documentation
 

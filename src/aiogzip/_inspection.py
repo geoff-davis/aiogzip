@@ -22,6 +22,7 @@ from ._common import (
     WithAsyncReadWrite,
     ZlibEngine,
     _validate_chunk_size,
+    _validate_filename,
     _validate_optional_positive_int,
 )
 
@@ -43,7 +44,7 @@ class GzipMemberInfo:
     compressed_offset: int
     compressed_size: int
     uncompressed_size: int
-    mtime: Optional[int]
+    mtime: int
     original_filename: Optional[str]
     comment: Optional[str]
     extra: Optional[bytes]
@@ -414,8 +415,6 @@ async def _scan_gzip(
     collect_members: bool,
 ) -> _ScanResult:
     """Read and validate a complete gzip source without retaining payload."""
-    from ._common import _validate_filename
-
     _validate_filename(filename, fileobj)
     _validate_chunk_size(chunk_size)
     _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")

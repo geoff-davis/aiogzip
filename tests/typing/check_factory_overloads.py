@@ -99,7 +99,7 @@ def _check_inspection_result_types(
     verified: VerificationResult,
 ) -> None:
     assert_type(member.index, int)
-    assert_type(member.mtime, Union[int, None])
+    assert_type(member.mtime, int)
     assert_type(info.members, tuple[GzipMemberInfo, ...])
     assert_type(info.member_count, int)
     assert_type(verified.uncompressed_size, int)

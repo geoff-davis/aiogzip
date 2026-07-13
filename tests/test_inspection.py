@@ -268,6 +268,11 @@ class AsyncBytesReader:
 
 class TestInspectAndVerify:
     @pytest.mark.parametrize("operation", [aiogzip.inspect, aiogzip.verify])
+    def test_filename_argument_is_required(self, operation):
+        with pytest.raises(TypeError):
+            operation()
+
+    @pytest.mark.parametrize("operation", [aiogzip.inspect, aiogzip.verify])
     async def test_zero_byte_input(self, tmp_path, operation):
         path = tmp_path / "empty-input.gz"
         path.write_bytes(b"")
@@ -445,7 +450,7 @@ class TestInspectAndVerify:
             compressed_offset=0,
             compressed_size=1,
             uncompressed_size=2**32 + 5,
-            mtime=None,
+            mtime=0,
             original_filename=None,
             comment=None,
             extra=None,
