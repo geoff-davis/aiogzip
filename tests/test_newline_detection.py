@@ -52,46 +52,60 @@ def _write(path, raw):
 
 
 class CountingText(str):
-    """Track full-string count scans in the newline hot path."""
+    """Track count scans and membership probes in the newline hot path."""
 
     def __new__(cls, value):
         instance = super().__new__(cls, value)
         instance.counted = []
+        instance.probed = []
         return instance
 
     def count(self, sub, *args):
         self.counted.append(sub)
         return super().count(sub, *args)
 
+    def __contains__(self, sub):
+        self.probed.append(sub)
+        return super().__contains__(sub)
+
 
 @pytest.mark.parametrize("newline", [None, ""])
-def test_lf_only_chunk_uses_one_count_scan_and_tracks_newline(newline):
+def test_lf_only_chunk_probes_without_counting_and_tracks_newline(newline):
     stream = AsyncGzipTextFile("unused.gz", "rt", newline=newline)
     text = CountingText("first\nsecond\n")
 
     assert stream._apply_newline_decoding(text) is text
-    assert text.counted == ["\r"]
+    # LF-only text takes the early-exit membership probes and never pays a
+    # full counting scan.
+    assert text.counted == []
+    assert text.probed == ["\r", "\n"]
     assert stream.newlines == "\n"
 
 
-def test_lf_only_chunks_keep_one_scan_after_lf_is_known():
+def test_lf_only_chunks_stay_count_free_after_lf_is_known():
     stream = AsyncGzipTextFile("unused.gz", "rt", newline=None)
     first = CountingText("first\n")
     second = CountingText("second\n")
 
     assert stream._apply_newline_decoding(first) is first
     assert stream._apply_newline_decoding(second) is second
-    assert first.counted == ["\r"]
-    assert second.counted == ["\r"]
+    assert first.counted == []
+    assert first.probed == ["\r", "\n"]
+    # Once LF is recorded, later LF-only chunks pay only the single CR probe.
+    assert second.counted == []
+    assert second.probed == ["\r"]
     assert stream.newlines == "\n"
 
 
-def test_mixed_chunk_reuses_initial_cr_count():
+def test_mixed_chunk_probes_then_counts():
     stream = AsyncGzipTextFile("unused.gz", "rt", newline=None)
     text = CountingText("first\r\nsecond\rthird\n")
 
     assert stream._apply_newline_decoding(text) == "first\nsecond\nthird\n"
-    assert text.counted == ["\r", "\r\n", "\n"]
+    # The CR probe exits at the first hit, then the three counting scans
+    # classify the mix; translation re-probes CR before rewriting.
+    assert text.counted == ["\r\n", "\n", "\r"]
+    assert text.probed == ["\r", "\r"]
     assert stream.newlines == ("\r", "\n", "\r\n")
 
 
