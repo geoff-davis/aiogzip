@@ -16,6 +16,7 @@ reproducible error behaviour or debugging).
 import asyncio
 import importlib
 import os
+import sys
 import zlib
 from dataclasses import dataclass
 from typing import Any, Callable, Tuple, Type
@@ -74,9 +75,17 @@ if _zng is not None:
 else:
     ZLIB_ERRORS = (zlib.error,)
 
-# crc32 stays on stdlib: the result is engine-independent, and pinning it
-# avoids any surprise from a divergent implementation.
-crc32 = zlib.crc32
+# crc32 output is bit-identical across engines (CRC-32 is fully specified),
+# so select the fastest implementation per platform. Measured on 8 MiB
+# inputs: zlib-ng's SIMD crc32 is ~3.4x faster than stdlib on x86-64 Linux
+# (12.9 vs 3.7 GB/s), but on macOS Apple ships a hardware-accelerated zlib
+# whose crc32 is ~4x faster than zlib-ng's (42 vs 11 GB/s) — keep stdlib
+# there. Every caller goes through this name, so the choice applies to the
+# write path, streaming encoder, and inspection/verification alike.
+if _HAVE_ZNG and sys.platform != "darwin":
+    crc32 = _zng.crc32
+else:
+    crc32 = zlib.crc32
 
 # Re-export the constants _binary.py needs so it has a single import surface.
 MAX_WBITS = zlib.MAX_WBITS

@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Performance
+
+- `crc32` now uses zlib-ng's SIMD implementation when the `aiogzip[fast]`
+  extra is installed, except on macOS where Apple's hardware-accelerated
+  stdlib zlib measured ~4x faster than zlib-ng (zlib-ng measured ~3.4x
+  faster than stdlib on x86-64 Linux). CRC-32 output is fully specified and
+  bit-identical across engines, so this affects only speed; the write path,
+  streaming encoder, and inspection/verification all share the selection,
+  and `AIOGZIP_ENGINE=stdlib` still forces stdlib everywhere.
+
 ## [1.10.1] - 2026-07-13
 
 ### Changed
