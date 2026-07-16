@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Documentation
+
+- Refreshed the benchmark tables and README performance summary from
+  2026-07-16 Linux x86-64 reference runs at commit `ec931cd`, covering the
+  line-splitting, LF-detection, and crc32 optimizations. The README
+  comparison bullets now lead with the concurrency and accelerated-read
+  results.
+
 ### Changed
 
 - `crc32` now uses zlib-ng's SIMD implementation when the `aiogzip[fast]`

@@ -181,27 +181,26 @@ replacement.
 ## Performance and optional acceleration
 
 aiogzip's performance advantage comes from async concurrency and optional
-codec acceleration, not from being uniformly faster than synchronous `gzip`.
-Corrected comparisons use identical compressed fixtures for reads, compression
-level 6 for both writers, and median timings from repeated runs.
+codec acceleration. Comparisons use identical compressed fixtures for reads,
+compression level 6 for both writers, and median timings from repeated runs.
 
 On a representative Python 3.12 Linux run, the direct I/O cases used 8 MiB
 inputs and the concurrency case used ten 1 MiB files:
 
-- equal-level bulk text writes were at parity;
-- tuned single-file JSONL iteration was about 1.6x slower than `gzip`
-  because each line crosses an async-iterator boundary;
-- with zlib-ng, bounded `readlines()` batches reduced an 8 MiB JSONL
-  read-and-parse workload by about 13% versus direct iteration and matched
-  `gzip` in this run; with stdlib zlib, both aiogzip paths were about 1.2x
-  slower than `gzip`;
+- overlapping ten files with simulated 10 ms latency was about 6.6-7.3x
+  faster than processing them sequentially with `gzip`;
+- optional zlib-ng made a highly compressible bulk `read(-1)` about 5.3x
+  faster than `gzip`, and stdlib zlib finished slightly ahead (~1.08x);
 - an LF-only universal-newline fast path made the representative zlib-ng bulk
-  text read about 1.6x faster than `gzip` (the stdlib engine remained about
-  1.4x slower);
-- optional zlib-ng made a highly compressible bulk `read(-1)` about 6.1x
-  faster than `gzip`, while stdlib zlib was at parity; and
-- overlapping ten files with simulated 10 ms latency was about 6.7-7.0x
-  faster than processing them sequentially with `gzip`.
+  text read about 1.8x faster than `gzip` (the stdlib engine narrowed to
+  about 1.2x slower);
+- bounded `readlines()` batches brought an 8 MiB JSONL read-and-parse
+  workload slightly ahead of `gzip` on both engines (~1.03-1.05x faster),
+  about 9-14% faster than direct iteration;
+- equal-level bulk text writes were at parity; and
+- direct single-file JSONL iteration remained about 1.4-1.8x slower than
+  `gzip` because each line crosses an async-iterator boundary — batch with
+  `readlines(hint)` when that path is hot.
 
 The concurrency result measures overlapped waiting, not a faster deflate
 codec, and benchmark ratios vary by hardware, storage, Python version, and

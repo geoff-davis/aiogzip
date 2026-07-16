@@ -203,20 +203,20 @@ uv add psutil
 ### Sample Output
 
 ```
-Text line iteration (tuned, identical fixture): 0.020s
-  aiogzip_time: 0.0197s
-  gzip_time: 0.0121s
-  speedup: 1.62x slower
+Text line iteration (tuned, identical fixture): 0.019s
+  aiogzip_time: 0.0187s
+  gzip_time: 0.0133s
+  speedup: 1.41x slower
   lines: 73849
 
-Read-all isolated (compressible, read-only timing): 0.002s
-  aiogzip_read_best: 2.40ms
-  gzip_read_best: 14.69ms
-  speedup: 6.13x faster
+Read-all isolated (compressible, read-only timing): 0.003s
+  aiogzip_read_best: 2.82ms
+  gzip_read_best: 14.79ms
+  speedup: 5.25x faster
 ```
 
-These are illustrative results from the 2026-07-13 Python 3.12.12 run at
-commit `9e85d8d` on one zlib-ng-enabled machine, not expected values or
+These are illustrative results from the 2026-07-16 Python 3.12.12 run at
+commit `ec931cd` on one zlib-ng-enabled machine, not expected values or
 acceptance thresholds.
 
 ### Interpreting Results
