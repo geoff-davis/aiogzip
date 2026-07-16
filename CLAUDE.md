@@ -286,11 +286,12 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **1.10.1 (current)** - See `CHANGELOG.md` for the full release history. Recent
+- **1.10.2 (current)** - See `CHANGELOG.md` for the full release history. Recent
   work adds package-level `open()`, whole-file helpers, engine diagnostics,
   gzip inspection and verification, and bounded async-iterable compression and
-  decompression. It also expands migration, recipe, streaming, operational, and
-  benchmark documentation.
+  decompression. Recent performance work speeds up batched line splitting and
+  LF-only newline detection and selects the fastest crc32 engine per platform;
+  the benchmark documentation reflects 2026-07-16 reference runs.
 
 ---
 

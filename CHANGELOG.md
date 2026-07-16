@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.10.2] - 2026-07-16
+
 ### Documentation
 
 - Refreshed the benchmark tables and README performance summary from
