@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- `crc32` now uses zlib-ng's SIMD implementation when the `aiogzip[fast]`
+  extra is installed, except on macOS where Apple's hardware-accelerated
+  stdlib zlib measured ~4x faster than zlib-ng (zlib-ng measured ~3.4x
+  faster than stdlib on x86-64 Linux). CRC-32 output is fully specified and
+  bit-identical across engines, so this affects only speed; the write path,
+  streaming encoder, and inspection/verification all share the selection,
+  and `AIOGZIP_ENGINE=stdlib` still forces stdlib everywhere.
+
 - Batched text line splitting now uses C-level `str.splitlines(keepends=True)`
   when a cheap membership probe confirms the region contains none of the extra
   break characters `splitlines` recognizes (`\v`, `\f`, `\x1c`-`\x1e`, `\x85`,

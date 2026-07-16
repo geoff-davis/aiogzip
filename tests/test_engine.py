@@ -8,6 +8,7 @@ zlib.error.
 
 import gzip
 import importlib
+import sys
 import zlib
 from dataclasses import FrozenInstanceError
 
@@ -46,8 +47,26 @@ class TestEngineSelection:
         assert _engine.decompress_engine_name() == expected
         assert _engine.have_fast_engine() is active_engine
 
-    def test_crc32_is_stdlib(self):
-        assert _engine.crc32 is zlib.crc32
+    def test_crc32_selection_is_platform_gated(self):
+        """crc32 uses zlib-ng's SIMD implementation when available, except on
+        macOS where Apple's hardware-accelerated stdlib zlib measured ~4x
+        faster than zlib-ng's."""
+        if ZNG_AVAILABLE and not _engine._FORCE_STDLIB and sys.platform != "darwin":
+            assert _engine.crc32 is _engine._zng.crc32
+        else:
+            assert _engine.crc32 is zlib.crc32
+
+    @pytest.mark.skipif(not ZNG_AVAILABLE, reason="zlib-ng not installed")
+    @pytest.mark.parametrize(
+        "data",
+        [b"", b"x", b"payload" * 10_000, bytes(range(256)) * 100],
+        ids=["empty", "single", "repetitive-70k", "binary-25k"],
+    )
+    def test_crc32_engines_agree(self, data):
+        """CRC-32 is fully specified; both engines must agree bit-for-bit,
+        including with a running-checksum seed."""
+        assert _engine._zng.crc32(data) == zlib.crc32(data)
+        assert _engine._zng.crc32(data, 12345) == zlib.crc32(data, 12345)
 
 
 class TestEngineInfo:
@@ -88,6 +107,8 @@ class TestEnvEscapeHatch:
         try:
             assert reloaded.have_fast_engine() is False
             assert reloaded.decompress_engine_name() == "stdlib"
+            # The escape hatch also pins crc32 back to stdlib.
+            assert reloaded.crc32 is zlib.crc32
         finally:
             # Restore module state (and the _binary reference to it) for other tests.
             monkeypatch.delenv("AIOGZIP_ENGINE", raising=False)
