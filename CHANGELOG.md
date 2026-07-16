@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Batched text line splitting now uses C-level `str.splitlines(keepends=True)`
+  when a cheap membership probe confirms the region contains none of the extra
+  break characters `splitlines` recognizes (`\v`, `\f`, `\x1c`-`\x1e`, `\x85`,
+  U+2028, U+2029), falling back to the keepends regex otherwise. Differentially
+  verified against the regex splitter; `readlines()` batches measured ~30%
+  faster and direct line iteration ~10-15% faster on LF-only fixtures, with
+  no regression for CRLF-content or mixed input.
+- The LF-only universal-newline fast path now probes for CR with an early-exit
+  membership scan instead of a full `str.count()` pass (~16x cheaper on
+  CR-free chunks), bringing bulk text reads on LF-only files to near parity
+  with synchronous `gzip` under the stdlib engine. Mixed-newline tracking,
+  translation, and chunk-boundary behavior are unchanged.
+
 ## [1.10.1] - 2026-07-13
 
 ### Changed
