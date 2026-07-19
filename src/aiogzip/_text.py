@@ -7,7 +7,16 @@ import re
 import secrets
 import struct
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Tuple, Union
+from typing import (
+    Any,
+    AsyncIterator,
+    Iterable,
+    List,
+    NoReturn,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from ._binary import AsyncGzipBinaryFile
 from ._common import (
@@ -144,6 +153,11 @@ class AsyncGzipTextFile:
     # strings at once. 256 KiB matches the default chunk_size, so the common
     # case still splits a whole chunk in a single pass.
     _LINE_BATCH_CHARS = 256 * 1024
+    # Default characters-per-batch for iter_batches(). Chosen by interleaved
+    # min-of-N benchmark on a 1M-line file: throughput is flat from 256 KiB
+    # to ~1 MiB and degrades slightly above 2 MiB, so 1 MiB takes the top of
+    # the flat range while keeping per-batch memory modest.
+    DEFAULT_BATCH_HINT = 1024 * 1024
 
     def __init__(
         self,
@@ -327,6 +341,34 @@ class AsyncGzipTextFile:
     ) -> None:
         """Exit the context manager, flushing and closing the file."""
         await self.close()
+
+    # Sync-protocol stubs. Without these, ``with`` / ``for`` fail with generic
+    # "does not support the context manager protocol" / "is not iterable"
+    # TypeErrors; these raise the same type but tell the caller the fix.
+    def __enter__(self) -> NoReturn:
+        raise TypeError(
+            "AsyncGzipTextFile must be used with 'async with', not 'with' "
+            "(e.g. \"async with aiogzip.open(path, 'rt') as f:\")"
+        )
+
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> NoReturn:
+        # Unreachable via ``with`` because __enter__ always raises; kept so the
+        # class satisfies context-manager introspection with a curated error.
+        raise TypeError(
+            "AsyncGzipTextFile must be used with 'async with', not 'with' "
+            "(e.g. \"async with aiogzip.open(path, 'rt') as f:\")"
+        )
+
+    def __iter__(self) -> NoReturn:
+        raise TypeError(
+            "AsyncGzipTextFile must be iterated with 'async for', not 'for' "
+            '(e.g. "async for line in f:")'
+        )
 
     def __repr__(self) -> str:
         return _format_file_repr(self)
@@ -1455,6 +1497,56 @@ class AsyncGzipTextFile:
                 break
 
         return lines
+
+    def iter_batches(self, hint: int = DEFAULT_BATCH_HINT) -> AsyncIterator[List[str]]:
+        """
+        Iterate over the file in batches of complete lines.
+
+        Equivalent to calling ``readlines(hint)`` in a loop until it returns an
+        empty list, but as an async iterator::
+
+            async with aiogzip.open("file.gz", "rt") as f:
+                async for batch in f.iter_batches():
+                    for line in batch:
+                        process(line)
+
+        Each yielded batch is a non-empty list of lines (trailing newlines
+        included, exactly as ``readlines`` returns them); iteration ends at
+        EOF. Batching amortizes the per-line ``await`` overhead of ``async
+        for line in f`` and is measurably faster on line-dense files, while
+        keeping memory bounded by roughly ``hint`` characters per batch.
+
+        Args:
+            hint: Positive batch size hint in characters. A batch is complete
+                once the lines collected so far total at least ``hint``
+                characters (the line that crosses the hint is returned whole).
+
+        Returns:
+            AsyncIterator[List[str]]: An async iterator of line batches.
+
+        Raises:
+            TypeError: If hint is not an integer.
+            ValueError: If hint is not positive.
+        """
+        # Validate eagerly, at the call, not at the first __anext__ inside the
+        # generator — matching the strict-parameter conventions elsewhere.
+        if not isinstance(hint, int) or isinstance(hint, bool):
+            raise TypeError("iter_batches hint must be a positive integer")
+        if hint <= 0:
+            raise ValueError("iter_batches hint must be a positive integer")
+        return self._iter_batches(hint)
+
+    async def _iter_batches(self, hint: int) -> AsyncIterator[List[str]]:
+        """Async-generator body of iter_batches.
+
+        A thin loop over ``readlines(hint)`` so batch semantics can never
+        diverge from it (closed-file and mode errors surface identically).
+        """
+        while True:
+            batch = await self.readlines(hint)
+            if not batch:
+                return
+            yield batch
 
     async def writelines(self, lines: Iterable[str]) -> None:
         """

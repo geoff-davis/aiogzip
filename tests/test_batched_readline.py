@@ -9,9 +9,12 @@ and read() must stay correct when interleaved with iteration.
 stdlib ``gzip.open(..., 'rt')`` is used as the oracle for line splitting.
 """
 
+import asyncio
 import gzip
 
 import pytest
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 from aiogzip import AsyncGzipTextFile
 
@@ -336,3 +339,147 @@ class TestLongLineSpanningChunks:
         async with AsyncGzipTextFile(path, "rt", newline=newline, chunk_size=64) as f:
             lines = [line async for line in f]
         assert lines == ["x" * 10_000 + term, "short" + term]
+
+
+class TestIterBatches:
+    """iter_batches(hint) is a thin wrapper over readlines(hint)-in-a-loop;
+    these tests pin that equivalence and the strict hint validation."""
+
+    @pytest.mark.parametrize("newline", [None, "\n", "\r", "\r\n", ""])
+    @pytest.mark.parametrize("chunk_size", [4, 64, 1 << 20])
+    async def test_flattened_batches_match_oracle(self, rich_gz, newline, chunk_size):
+        expected = oracle_lines(rich_gz, newline)
+        async with AsyncGzipTextFile(
+            rich_gz, "rt", newline=newline, chunk_size=chunk_size
+        ) as f:
+            got = [line async for batch in f.iter_batches(hint=32) for line in batch]
+        assert got == expected
+
+    async def test_batches_are_nonempty_lists_bounded_by_hint(self, tmp_path):
+        expected = [f"item {i}\n" for i in range(5000)]
+        max_line_size = max(map(len, expected))
+        path = tmp_path / "iter-batches-bounds.gz"
+        path.write_bytes(gzip.compress("".join(expected).encode("utf-8")))
+
+        actual = []
+        async with AsyncGzipTextFile(path, "rt", newline="\n") as f:
+            async for batch in f.iter_batches(hint=512):
+                assert isinstance(batch, list)
+                assert batch
+                batch_size = sum(map(len, batch))
+                assert batch_size >= 512 or batch[-1] == expected[-1]
+                assert batch_size < 512 + max_line_size
+                actual.extend(batch)
+        assert actual == expected
+
+    async def test_default_hint_reads_everything(self, rich_gz):
+        assert AsyncGzipTextFile.DEFAULT_BATCH_HINT == 1024 * 1024
+        async with AsyncGzipTextFile(rich_gz, "rt") as f:
+            batches = [batch async for batch in f.iter_batches()]
+        # RICH_TEXT is far smaller than the default hint: one batch, then EOF.
+        assert len(batches) == 1
+        assert batches[0] == oracle_lines(rich_gz, None)
+
+    @pytest.mark.parametrize(
+        ("bad_hint", "expected_error"),
+        [
+            (0, ValueError),
+            (-1, ValueError),
+            (-4096, ValueError),
+            (True, TypeError),
+            (False, TypeError),
+            (1.5, TypeError),
+            ("1024", TypeError),
+            (None, TypeError),
+        ],
+    )
+    async def test_hint_validated_eagerly_at_the_call(
+        self, rich_gz, bad_hint, expected_error
+    ):
+        async with AsyncGzipTextFile(rich_gz, "rt") as f:
+            # No awaiting: the error must come from the call itself, not the
+            # first __anext__ of a lazily-started generator.
+            with pytest.raises(expected_error, match="positive integer"):
+                f.iter_batches(bad_hint)
+
+    async def test_closed_file_raises_on_first_step(self, rich_gz):
+        f = AsyncGzipTextFile(rich_gz, "rt")
+        await f.open()
+        await f.close()
+        it = f.iter_batches(1024)
+        with pytest.raises(ValueError, match="closed"):
+            await it.__anext__()
+
+    async def test_write_mode_raises_on_first_step(self, tmp_path):
+        async with AsyncGzipTextFile(tmp_path / "w.gz", "wt") as f:
+            it = f.iter_batches(1024)
+            with pytest.raises(OSError, match="not open for reading"):
+                await it.__anext__()
+
+    async def test_interleaves_with_read_and_tell_seek(self, tmp_path):
+        expected = [f"row {i:03d}\n" for i in range(500)]
+        path = tmp_path / "iter-batches-interleave.gz"
+        path.write_bytes(gzip.compress("".join(expected).encode("utf-8")))
+
+        async with AsyncGzipTextFile(path, "rt", newline="\n", chunk_size=64) as f:
+            it = f.iter_batches(hint=128)
+            first = await it.__anext__()
+            cookie = await f.tell()
+            second = await it.__anext__()
+            await f.seek(cookie)
+            second_again = await it.__anext__()
+        assert second_again == second
+        assert "".join(first) + "".join(second) == "".join(
+            expected[: len(first) + len(second)]
+        )
+
+
+# Hypothesis parity: random content (with the splitlines-unsafe specials mixed
+# into ordinary line text), random chunking, and a small random hint must all
+# agree with readlines() on a fresh handle and with the stdlib gzip oracle.
+_line_text = st.text(
+    alphabet=st.sampled_from("ab é\x0b\x0c\x1c\x1d\x1e\x85  "),
+    max_size=20,
+)
+_document = st.builds(
+    lambda parts, tail: "".join(p + t for p, t in parts) + tail,
+    st.lists(st.tuples(_line_text, st.sampled_from(["\n", "\r", "\r\n"])), max_size=30),
+    _line_text,
+)
+
+
+@settings(
+    max_examples=200,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+@given(
+    document=_document,
+    newline=st.sampled_from([None, "\n", "\r", "\r\n", ""]),
+    chunk_size=st.sampled_from([1, 3, 7, 64, 1024]),
+    hint=st.integers(min_value=1, max_value=64),
+)
+def test_iter_batches_hypothesis_parity(
+    tmp_path_factory, document, newline, chunk_size, hint
+):
+    path = tmp_path_factory.mktemp("hyp") / "doc.gz"
+    path.write_bytes(gzip.compress(document.encode("utf-8")))
+
+    with gzip.open(path, "rt", encoding="utf-8", newline=newline) as g:
+        oracle = g.readlines()
+
+    async def collect():
+        async with AsyncGzipTextFile(
+            path, "rt", newline=newline, chunk_size=chunk_size
+        ) as f:
+            flattened = [
+                line async for batch in f.iter_batches(hint=hint) for line in batch
+            ]
+        async with AsyncGzipTextFile(
+            path, "rt", newline=newline, chunk_size=chunk_size
+        ) as f:
+            all_lines = await f.readlines()
+        return flattened, all_lines
+
+    flattened, all_lines = asyncio.run(collect())
+    assert flattened == all_lines == oracle

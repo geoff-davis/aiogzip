@@ -56,9 +56,12 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Migrating from gzip: migration.md
   - Examples: examples.md
   - Recipes: recipes.md
   - Async-iterable streaming: streaming.md
   - Performance: performance.md
+  - Error handling: errors.md
   - API Reference: api.md
+  - Design decisions (ISA-L): adr-isal.md
   - Contributing: contributing.md

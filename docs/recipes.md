@@ -22,8 +22,8 @@ For large UTF-8 JSON Lines files that are known to use `\n` terminators,
 project use `chunk_size=512 * 1024` to reduce async read overhead; tune that
 value for your memory budget and workload.
 
-For CPU-bound parsing, bounded `readlines()` batches avoid one async transition
-per input line while retaining a predictable application-level working set:
+For CPU-bound parsing, batched iteration avoids one async transition per input
+line while retaining a predictable application-level working set:
 
 ```python
 async with aiogzip.open(
@@ -32,19 +32,18 @@ async with aiogzip.open(
     newline="\n",
     chunk_size=512 * 1024,
 ) as f:
-    while True:
-        lines = await f.readlines(1024 * 1024)
-        if not lines:
-            break
-        for line in lines:
+    async for batch in f.iter_batches():
+        for line in batch:
             event = json.loads(line)
             process(event)
 ```
 
-The hint counts decoded characters and reading stops after the whole line that
+`iter_batches(hint)` yields non-empty lists of complete lines and is exactly
+equivalent to calling `readlines(hint)` in a loop. The hint (default 1 MiB)
+counts decoded characters and a batch is complete after the whole line that
 reaches it, so it is an approximate batch target rather than a strict memory
-limit. Prefer `async for` when each record is handed to an asynchronous
-consumer and per-line backpressure is desirable.
+limit. Prefer `async for line in f` when each record is handed to an
+asynchronous consumer and per-line backpressure is desirable.
 
 ## Writing JSON Lines
 
@@ -196,3 +195,42 @@ async with aiofiles.open("payload.gz", "rb") as raw:
 With `closefd=False`, closing the gzip wrapper leaves the external object open.
 Pass `closefd=True` only when the wrapper should close it. Non-seekable readers
 use a bounded compressed-input replay cache for backward seeks.
+
+## Gzip over S3 / fsspec
+
+The same `fileobj` mechanism streams gzip straight from object storage:
+anything exposing an async `read()` (for reading) or async `write()` (for
+writing) satisfies the protocol. With [fsspec](https://filesystem-spec.readthedocs.io/)'s
+async filesystems (e.g. `s3fs`):
+
+```python
+import json
+
+import aiogzip
+import s3fs
+
+fs = s3fs.S3FileSystem(asynchronous=True)
+
+async def read_events(bucket_key):
+    session = await fs.set_session()
+    raw = await fs.open_async(bucket_key, "rb")
+    try:
+        async with aiogzip.open(None, "rt", fileobj=raw, closefd=False) as f:
+            async for batch in f.iter_batches():
+                for line in batch:
+                    process(json.loads(line))
+    finally:
+        await raw.close()
+        await session.close()
+```
+
+Notes:
+
+- Pass `filename=None` when supplying `fileobj`.
+- Object-store readers are typically non-seekable; forward reads stream
+  normally, while backward `seek()` relies on the bounded replay cache
+  (`max_rewind_cache_size`). For pure forward iteration, no tuning is needed.
+- Writing works symmetrically: open the remote object for binary write and
+  pass it as `fileobj` to `aiogzip.open(None, "wt", fileobj=...)`.
+- For untrusted buckets, combine this with `max_decompressed_size` — see
+  [Processing untrusted gzip input](#processing-untrusted-gzip-input).

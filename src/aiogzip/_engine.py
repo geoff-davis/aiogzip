@@ -61,6 +61,9 @@ class EngineInfo:
 
     compression: str
     decompression: str
+    # Defaulted so third-party code constructing EngineInfo positionally
+    # (it is public) keeps working; engine_info() always fills it in.
+    crc32: str = "stdlib-zlib"
 
 
 # Errors raised by the deflate engines. zlib-ng's (and isal's) error type is
@@ -136,4 +139,5 @@ def engine_info() -> EngineInfo:
     return EngineInfo(
         compression="stdlib-zlib",
         decompression="zlib-ng" if _HAVE_ZNG else "stdlib-zlib",
+        crc32="zlib-ng" if crc32 is not zlib.crc32 else "stdlib-zlib",
     )

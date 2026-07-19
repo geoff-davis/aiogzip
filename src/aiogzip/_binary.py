@@ -7,7 +7,7 @@ import os
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, Optional, Union, cast
+from typing import Any, Callable, Iterable, List, NoReturn, Optional, Union, cast
 
 import aiofiles
 
@@ -311,6 +311,34 @@ class AsyncGzipBinaryFile:
     ) -> None:
         """Exit the context manager, flushing and closing the file."""
         await self.close()
+
+    # Sync-protocol stubs. Without these, ``with`` / ``for`` fail with generic
+    # "does not support the context manager protocol" / "is not iterable"
+    # TypeErrors; these raise the same type but tell the caller the fix.
+    def __enter__(self) -> NoReturn:
+        raise TypeError(
+            "AsyncGzipBinaryFile must be used with 'async with', not 'with' "
+            "(e.g. \"async with aiogzip.open(path, 'rb') as f:\")"
+        )
+
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> NoReturn:
+        # Unreachable via ``with`` because __enter__ always raises; kept so the
+        # class satisfies context-manager introspection with a curated error.
+        raise TypeError(
+            "AsyncGzipBinaryFile must be used with 'async with', not 'with' "
+            "(e.g. \"async with aiogzip.open(path, 'rb') as f:\")"
+        )
+
+    def __iter__(self) -> NoReturn:
+        raise TypeError(
+            "AsyncGzipBinaryFile must be iterated with 'async for', not 'for' "
+            '(e.g. "async for chunk in f:")'
+        )
 
     def __repr__(self) -> str:
         return _format_file_repr(self)

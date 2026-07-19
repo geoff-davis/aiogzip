@@ -208,7 +208,7 @@ Why this is faster:
 In local measurements on gzipped JSONL reads, `newline="\n"` plus a larger
 chunk size was materially faster than the default text-mode configuration.
 
-If the work performed for each line is synchronous, process bounded groups to
+If the work performed for each line is synchronous, iterate in batches to
 amortize the async-iterator transition for every individual line:
 
 ```python
@@ -222,19 +222,20 @@ async with aiogzip.open(
     newline="\n",
     chunk_size=512 * 1024,
 ) as f:
-    while True:
-        lines = await f.readlines(1024 * 1024)
-        if not lines:
-            break
-        for line in lines:
+    async for batch in f.iter_batches():
+        for line in batch:
             record = json.loads(line)
 ```
 
-`readlines(hint)` stops after the complete line that reaches the approximate
-decoded-character hint. It therefore uses more than `hint` characters when a
-line crosses the boundary, and the reader also retains its normal bounded
-internal buffers. Use ordinary `async for` when per-line backpressure or the
-smallest practical result buffer matters more than throughput.
+`iter_batches(hint)` is exactly `readlines(hint)` in a loop: each batch is a
+non-empty list of complete lines totalling at least `hint` decoded characters
+(default 1 MiB), with the line that crosses the hint returned whole. In this
+project's interleaved min-of-N measurements on a line-dense file, batched
+iteration roughly halved wall-clock time versus per-line `async for`, and
+throughput was flat for hints between 256 KiB and ~1 MiB (degrading slightly
+above 2 MiB — there is no benefit to very large batches). Use ordinary
+`async for` when per-line backpressure or the smallest practical result
+buffer matters more than throughput.
 
 ### 5. Buffer Management
 
@@ -243,3 +244,25 @@ smallest practical result buffer matters more than throughput.
 - **Binary Mode**: Uses an efficient offset-pointer strategy to avoid expensive memory copies (`del buffer[:n]`) when reading small chunks.
 - **Text Mode**: Buffers decoded text to handle split multi-byte characters and split newlines correctly.
 - **Non-seekable `fileobj` Inputs**: Retains a bounded compressed-input rewind cache so backward seeks can replay the stream. The default cap is 128 MiB; lower `max_rewind_cache_size` for memory-sensitive streaming, or set it to `None` only when unbounded rewind support is acceptable.
+
+## When stdlib gzip is fine
+
+aiogzip's value is keeping an event loop responsive while gzip work happens.
+If there is no event loop to protect, the stdlib is the right tool:
+
+- **Synchronous scripts and batch jobs.** A CLI tool or cron job that just
+  decompresses a file gains nothing from async I/O; `gzip.open()` has less
+  overhead and no event-loop requirement.
+- **Small files.** Below roughly a chunk (256 KiB compressed), the whole
+  operation completes in one or two codec calls; wrapping it in coroutines
+  adds transitions without meaningful concurrency benefit.
+- **One file, nothing else to do.** Raw single-stream decompression is
+  CPU-bound in zlib either way; on equal engines, stdlib and aiogzip land in
+  the same range, and aiogzip's advantage in the benchmark tables above comes
+  from the accelerated codec, executor offload, and batched line handling —
+  not from making zlib itself faster.
+
+Reach for aiogzip when gzip I/O shares a process with other async work
+(servers, pipelines with concurrent files, object-store streaming), when you
+want CPU-heavy codec calls off the event loop, or when the async ecosystem
+(`aiocsv`, async fileobjs) is already in play.

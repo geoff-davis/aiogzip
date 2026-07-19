@@ -72,11 +72,29 @@ class TestEngineSelection:
 class TestEngineInfo:
     def test_reports_default_configuration(self):
         expected_decompression = "zlib-ng" if _engine._HAVE_ZNG else "stdlib-zlib"
+        expected_crc32 = "zlib-ng" if _engine.crc32 is not zlib.crc32 else "stdlib-zlib"
 
         assert engine_info() == EngineInfo(
             compression="stdlib-zlib",
             decompression=expected_decompression,
+            crc32=expected_crc32,
         )
+
+    def test_crc32_field_matches_selected_function(self):
+        """The reported crc32 engine tracks the actual module-level selection
+        (zlib-ng except on macOS or under AIOGZIP_ENGINE=stdlib)."""
+        info = engine_info()
+        if _engine.crc32 is zlib.crc32:
+            assert info.crc32 == "stdlib-zlib"
+        else:
+            assert _engine.crc32 is _engine._zng.crc32
+            assert info.crc32 == "zlib-ng"
+
+    def test_crc32_field_defaults_for_positional_construction(self):
+        """EngineInfo is public: two-field construction predating the crc32
+        field must keep working."""
+        info = EngineInfo("stdlib-zlib", "stdlib-zlib")
+        assert info.crc32 == "stdlib-zlib"
 
     @pytest.mark.parametrize(
         ("have_zng", "expected_decompression"),

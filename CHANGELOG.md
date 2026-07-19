@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Documentation
+
+- New "Migrating from `gzip.open`" page: the exactly-three differences
+  (`async with`, `async for`, `await` on reads/writes) with a before/after
+  pair.
+- New "Error handling" page documenting the exception taxonomy:
+  `gzip.BadGzipFile` for corrupt data (normalized across engines), `OSError`
+  for I/O failures, and a plain `OSError` — deliberately not `BadGzipFile`,
+  and thus distinguishable by type — with a stable message prefix when
+  `max_decompressed_size` is exceeded.
+- New ADR recording the ISA-L (python-isal) evaluation and why it was not
+  adopted, with revisit criteria.
+- New "Gzip over S3 / fsspec" recipe for streaming via async `fileobj`s; the
+  JSONL batching recipes and performance guide now use `iter_batches()`; new
+  "When stdlib gzip is fine" section in the performance guide.
+
+### Added
+
+- `AsyncGzipTextFile.iter_batches(hint)`: first-class batched line iteration —
+  `async for batch in f.iter_batches():` yields non-empty lists of complete
+  lines, ending naturally at EOF. Implemented as a thin wrapper over the same
+  internal drain as `readlines(hint)` so the two can never diverge; batching
+  amortizes the per-line `await` of `async for line in f` (roughly 2x on
+  line-dense files in the repo harness). The default hint is 1 MiB, chosen by
+  interleaved min-of-N benchmark: throughput was flat from 256 KiB to ~1 MiB
+  and slightly worse above 2 MiB. `hint` must be a positive integer,
+  validated eagerly at the call.
+
+- Using `with` or `for` on `AsyncGzipBinaryFile`/`AsyncGzipTextFile` now
+  raises a corrective `TypeError` (e.g. "must be used with 'async with', not
+  'with'") instead of the generic protocol errors, via `__enter__`/`__exit__`
+  and `__iter__` stubs.
+
+- `python -m aiogzip {inspect,verify} FILE`: a minimal command-line interface
+  over the existing `inspect()`/`verify()` APIs. Human-readable output by
+  default, `--json` for machine use (bytes fields hex-encoded); exit code 0
+  on success, 1 for invalid or unreadable streams, 2 for usage errors.
+
+- `EngineInfo` gained a `crc32` field reporting which engine backs the crc32
+  selection (`"zlib-ng"` except on macOS or under `AIOGZIP_ENGINE=stdlib`,
+  where it is `"stdlib-zlib"`). The field is defaulted so existing
+  two-argument `EngineInfo(...)` construction keeps working.
+
 ### Changed
 
 - Switched the git-hook runner from `pre-commit` to `prek`, a Rust drop-in
