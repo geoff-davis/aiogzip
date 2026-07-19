@@ -287,12 +287,14 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **1.10.2 (current)** - See `CHANGELOG.md` for the full release history. Recent
-  work adds package-level `open()`, whole-file helpers, engine diagnostics,
-  gzip inspection and verification, and bounded async-iterable compression and
-  decompression. Recent performance work speeds up batched line splitting and
-  LF-only newline detection and selects the fastest crc32 engine per platform;
-  the benchmark documentation reflects 2026-07-16 reference runs.
+- **1.11.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
+  work adds `iter_batches(hint)` batched line iteration, corrective TypeErrors
+  for `with`/`for` misuse, a `python -m aiogzip {inspect,verify}` CLI, an
+  `EngineInfo.crc32` field, and new docs (gzip.open migration, error taxonomy,
+  ISA-L ADR, S3/fsspec recipe). Prior releases added package-level `open()`,
+  whole-file helpers, engine diagnostics, gzip inspection and verification,
+  bounded async-iterable compression/decompression, and per-platform codec
+  selection; the benchmark documentation reflects 2026-07-16 reference runs.
 
 ---
 
