@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Documentation
+
+- New "Migrating from `gzip.open`" page: the exactly-three differences
+  (`async with`, `async for`, `await` on reads/writes) with a before/after
+  pair.
+- New "Error handling" page documenting the exception taxonomy:
+  `gzip.BadGzipFile` for corrupt data (normalized across engines), `OSError`
+  for I/O failures, and a plain `OSError` — deliberately not `BadGzipFile`,
+  and thus distinguishable by type — with a stable message prefix when
+  `max_decompressed_size` is exceeded.
+- New ADR recording the ISA-L (python-isal) evaluation and why it was not
+  adopted, with revisit criteria.
+- New "Gzip over S3 / fsspec" recipe for streaming via async `fileobj`s; the
+  JSONL batching recipes and performance guide now use `iter_batches()`; new
+  "When stdlib gzip is fine" section in the performance guide.
+
 ### Added
 
 - `AsyncGzipTextFile.iter_batches(hint)`: first-class batched line iteration —
