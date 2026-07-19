@@ -23,10 +23,11 @@ Contributions are welcome! This project uses `flit_core` for packaging and moder
 
 3. **Install Pre-commit Hooks**:
 
-    This project uses `pre-commit` to ensure code quality.
+    This project uses `prek` (a drop-in replacement for `pre-commit`) to
+    ensure code quality.
 
     ```bash
-    pre-commit install
+    prek install
     ```
 
 ## Running Tests
@@ -39,7 +40,7 @@ pytest
 
 ## Code Quality
 
-We use `ruff` for linting and formatting, and both `mypy` and `ty` for static type checking. These are run automatically by pre-commit, but you can run them manually:
+We use `ruff` for linting and formatting, and both `mypy` and `ty` for static type checking. These are run automatically by prek, but you can run them manually:
 
 ```bash
 ruff check .

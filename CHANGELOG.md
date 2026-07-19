@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Switched the git-hook runner from `pre-commit` to `prek`, a Rust drop-in
+  replacement that reads the same `.pre-commit-config.yaml`. The `[dev]`
+  extra now installs `prek` instead of `pre-commit`; reinstall hooks once
+  per clone with `uv run prek install`. The `ruff` hook id was updated to
+  its current name `ruff-check`.
+
 ## [1.10.2] - 2026-07-16
 
 ### Documentation

@@ -95,7 +95,7 @@ jobs:
         uses: astral-sh/setup-uv@v8.3.2
 
       # Step 3: Install dependencies. The [test] extra skips lint-only
-      # tooling (ruff, ty, pre-commit); deliberately unpinned (uv.lock is
+      # tooling (ruff, ty, prek); deliberately unpinned (uv.lock is
       # not consulted) so CI exercises fresh dependency releases.
       - name: Install dependencies
         run: uv pip install --system -e ".[test,csv]"

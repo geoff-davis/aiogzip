@@ -65,7 +65,7 @@ dev = [
     # Dependabot ignores this pin because it cannot update both locations.
     "ruff==0.15.20",
     "ty>=0.0.1a16",
-    "pre-commit",
+    "prek",
 ]
 [project.urls]
 Homepage = "https://github.com/geoff-davis/aiogzip"
