@@ -43,11 +43,12 @@ everything had to be rebased. The git status snapshot at session start only
 reflects the local clone; it says nothing about freshness relative to origin.
 
 A pre-push hook (`scripts/check_branch_fresh.sh`, wired up as the
-`check-branch-fresh` pre-commit hook) backstops this: it refuses a push when
-`origin/main` has commits missing from the branch's history, which also
-catches main moving *mid-session*. It requires the pre-push hook type to be
-installed — `pre-commit install` handles it via `default_install_hook_types`,
-but run it once on each machine/clone. Intentionally-behind pushes:
+`check-branch-fresh` hook in `.pre-commit-config.yaml`) backstops this: it
+refuses a push when `origin/main` has commits missing from the branch's
+history, which also catches main moving *mid-session*. Hooks run via `prek`
+(a drop-in pre-commit replacement; same config file). The pre-push hook type
+must be installed — `uv run prek install` handles it via
+`default_install_hook_types`, but run it once on each machine/clone. Intentionally-behind pushes:
 `SKIP=check-branch-fresh git push`. The hook fails open when offline.
 
 ## Python 3.8 Compatibility Checklist
@@ -121,7 +122,7 @@ Before committing code changes, verify:
 
 4. **Test with Python 3.8 (optional but recommended):**
 
-   The pre-commit `python38-compat` hook (`scripts/check_py38_compat.py`)
+   The `python38-compat` prek hook (`scripts/check_py38_compat.py`)
    catches syntax-level incompatibilities. For a runtime check with pyenv:
 
    ```bash
