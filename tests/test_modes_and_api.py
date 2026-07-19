@@ -405,3 +405,39 @@ class TestNewAPIMethods:
 
         async with AsyncGzipTextFile(temp_file, "rt") as f:
             assert await f.read() == "first\nsecond\n"
+
+
+class TestSyncProtocolStubs:
+    """`with` and `for` on the async file classes raise corrective TypeErrors
+    instead of the generic protocol errors."""
+
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    def test_with_statement_raises_corrective_typeerror(self, cls):
+        f = cls("dummy.gz")
+        with pytest.raises(TypeError, match="async with"):
+            with f:
+                pass  # pragma: no cover - __enter__ always raises
+
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    def test_enter_names_the_class(self, cls):
+        with pytest.raises(TypeError, match=cls.__name__):
+            cls("dummy.gz").__enter__()
+
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    def test_exit_raises_corrective_typeerror(self, cls):
+        # Unreachable via `with` (enter raises first) but must still be curated
+        # for anyone poking at the protocol directly.
+        with pytest.raises(TypeError, match="async with"):
+            cls("dummy.gz").__exit__(None, None, None)
+
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    def test_for_statement_raises_corrective_typeerror(self, cls):
+        f = cls("dummy.gz")
+        with pytest.raises(TypeError, match="async for"):
+            for _ in f:
+                pass  # pragma: no cover - __iter__ always raises
+
+    @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
+    def test_iter_names_the_class(self, cls):
+        with pytest.raises(TypeError, match=cls.__name__):
+            iter(cls("dummy.gz"))

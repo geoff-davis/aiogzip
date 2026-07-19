@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `AsyncGzipTextFile.iter_batches(hint)`: first-class batched line iteration —
+  `async for batch in f.iter_batches():` yields non-empty lists of complete
+  lines, ending naturally at EOF. Implemented as a thin wrapper over the same
+  internal drain as `readlines(hint)` so the two can never diverge; batching
+  amortizes the per-line `await` of `async for line in f` (roughly 2x on
+  line-dense files in the repo harness). The default hint is 1 MiB, chosen by
+  interleaved min-of-N benchmark: throughput was flat from 256 KiB to ~1 MiB
+  and slightly worse above 2 MiB. `hint` must be a positive integer,
+  validated eagerly at the call.
+
+- Using `with` or `for` on `AsyncGzipBinaryFile`/`AsyncGzipTextFile` now
+  raises a corrective `TypeError` (e.g. "must be used with 'async with', not
+  'with'") instead of the generic protocol errors, via `__enter__`/`__exit__`
+  and `__iter__` stubs.
+
+- `EngineInfo` gained a `crc32` field reporting which engine backs the crc32
+  selection (`"zlib-ng"` except on macOS or under `AIOGZIP_ENGINE=stdlib`,
+  where it is `"stdlib-zlib"`). The field is defaulted so existing
+  two-argument `EngineInfo(...)` construction keeps working.
+
 ### Changed
 
 - Switched the git-hook runner from `pre-commit` to `prek`, a Rust drop-in
