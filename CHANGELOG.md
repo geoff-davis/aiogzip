@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-07-19
+
 ### Documentation
 
 - New "Migrating from `gzip.open`" page: the exactly-three differences
