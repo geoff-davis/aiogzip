@@ -22,7 +22,9 @@ Not adopted. zlib-ng remains the only optional engine.
   dominated by zlib-ng in every measured cell. The macOS arm64 wheel of
   isal 1.8.0 decompressed at plain-C speeds (~0.45 GB/s vs 2.4 GB/s for the
   comparable manylinux aarch64 wheel) and appears to be built without the
-  optimized assembly; an upstream issue reports this.
+  optimized assembly;
+  [python-isal#254](https://github.com/pycompression/python-isal/issues/254)
+  reports this upstream with symbol-level evidence.
 - **x86-64 Linux is a narrow, conditional win.** isal beat zlib-ng by about
   1.4x on realistic-entropy data (~5x compression ratio) but lost on
   high-ratio data. Benchmark fixtures with extreme compression ratios mostly
