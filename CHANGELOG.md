@@ -21,6 +21,11 @@ All notable changes to this project will be documented in this file.
   'with'") instead of the generic protocol errors, via `__enter__`/`__exit__`
   and `__iter__` stubs.
 
+- `python -m aiogzip {inspect,verify} FILE`: a minimal command-line interface
+  over the existing `inspect()`/`verify()` APIs. Human-readable output by
+  default, `--json` for machine use (bytes fields hex-encoded); exit code 0
+  on success, 1 for invalid or unreadable streams, 2 for usage errors.
+
 - `EngineInfo` gained a `crc32` field reporting which engine backs the crc32
   selection (`"zlib-ng"` except on macOS or under `AIOGZIP_ENGINE=stdlib`,
   where it is `"stdlib-zlib"`). The field is defaulted so existing
