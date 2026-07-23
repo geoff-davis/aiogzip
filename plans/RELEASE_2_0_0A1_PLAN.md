@@ -1344,25 +1344,33 @@ Audit the result as one architecture rather than three migrated call sites.
 
 #### Tasks
 
-- [ ] Search for duplicate gzip framing, trailer, CRC/ISIZE, member-loop, and raw engine code.
-- [ ] Remove dead private classes, helpers, imports, slots, and tests.
-- [ ] Confirm all decoder paths use normalized engine accounting.
-- [ ] Confirm all encoder paths use `GzipEncoder`.
-- [ ] Confirm every async codec operation is exhausted or explicitly closed.
-- [ ] Confirm no wrapper calls `list(operation)` before yielding/writing.
-- [ ] Confirm no wrapper reads the next async source item while output from the current item remains unconsumed.
-- [ ] Audit cancellation paths for BaseException handling and resource ownership.
-- [ ] Audit close paths for preservation of primary errors.
-- [ ] Audit type annotations and public `__all__`.
-- [ ] Add a source-level architecture test or focused assertions only where they protect an important boundary without becoming brittle.
-- [ ] Run mutation-like manual checks by temporarily breaking CRC, size limits, source cleanup, and output bounds to ensure tests fail.
+- [x] Search for duplicate gzip framing, trailer, CRC/ISIZE, member-loop, and raw engine code.
+- [x] Remove dead private classes, helpers, imports, slots, and tests.
+- [x] Confirm all decoder paths use normalized engine accounting.
+- [x] Confirm all encoder paths use `GzipEncoder`.
+- [x] Confirm every async codec operation is exhausted or explicitly closed.
+- [x] Confirm no wrapper calls `list(operation)` before yielding/writing.
+- [x] Confirm no wrapper reads the next async source item while output from the current item remains unconsumed.
+- [x] Audit cancellation paths for BaseException handling and resource ownership.
+- [x] Audit close paths for preservation of primary errors.
+- [x] Audit type annotations and public `__all__`.
+- [x] Add a source-level architecture test or focused assertions only where they protect an important boundary without becoming brittle.
+- [x] Run mutation-like manual checks by temporarily breaking CRC, size limits, source cleanup, and output bounds to ensure tests fail.
 
 #### Exit criteria
 
-- [ ] There is one production gzip state machine.
-- [ ] Async wrappers are thin enough to review independently from codec correctness.
-- [ ] No known dead compatibility code remains.
-- [ ] Coverage does not fall materially from the baseline; new core branches are tested directly.
+- [x] There is one production gzip state machine.
+- [x] Async wrappers are thin enough to review independently from codec correctness.
+- [x] No known dead compatibility code remains.
+- [x] Coverage does not fall materially from the baseline; new core branches are tested directly.
+
+WP7 audit note (2026-07-22): framing, raw DEFLATE, CRC/ISIZE accounting,
+member traversal, and normalized engine accounting are confined to the codec;
+transport wrappers only drive codec operations and preserve source/resource
+lifecycle. A focused AST boundary test prevents those responsibilities from
+drifting back into wrappers. Temporary mutations to CRC validation, cumulative
+size enforcement, output chunk bounds, and async-source cleanup each caused its
+focused test to fail and were then reverted.
 
 Suggested commit title:
 
