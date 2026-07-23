@@ -1134,47 +1134,47 @@ Move the least stateful async consumers onto the new codec and validate the asyn
 
 #### Tasks
 
-- [ ] Add `_codec_async.py` or an equivalent private module.
-- [ ] Implement safe inline/executor iteration of codec operations.
-- [ ] Use the existing offload threshold.
-- [ ] Use a sentinel helper around `next()` for executor calls.
-- [ ] Handle cancellation without racing codec cleanup against a worker.
-- [ ] Migrate `compress_chunks()` to `GzipEncoder`.
-- [ ] Migrate `decompress_chunks()` to `GzipDecoder`.
-- [ ] Preserve `bytes`-subclass acceptance in async iterable sources, but
+- [x] Add `_codec_async.py` or an equivalent private module.
+- [x] Implement safe inline/executor iteration of codec operations.
+- [x] Use the existing offload threshold.
+- [x] Use a sentinel helper around `next()` for executor calls.
+- [x] Handle cancellation without racing codec cleanup against a worker.
+- [x] Migrate `compress_chunks()` to `GzipEncoder`.
+- [x] Migrate `decompress_chunks()` to `GzipDecoder`.
+- [x] Preserve `bytes`-subclass acceptance in async iterable sources, but
       normalize each accepted subclass to an exact raw-buffer snapshot before
       starting the codec operation.
-- [ ] Migrate `_scan_gzip()`, `inspect()`, and `verify()` to `GzipDecoder`.
-- [ ] Remove `_IncrementalGzipEncoder`.
-- [ ] Remove `_IncrementalGzipDecoder`.
-- [ ] Preserve source iterator validation and close semantics.
-- [ ] Preserve pull-driven behavior: do not request another source item until current output is consumed.
-- [ ] Preserve error precedence when source cleanup fails.
-- [ ] Inspection must discard decompressed payload immediately rather than retaining it.
+- [x] Migrate `_scan_gzip()`, `inspect()`, and `verify()` to `GzipDecoder`.
+- [x] Remove `_IncrementalGzipEncoder`.
+- [x] Remove `_IncrementalGzipDecoder`.
+- [x] Preserve source iterator validation and close semantics.
+- [x] Preserve pull-driven behavior: do not request another source item until current output is consumed.
+- [x] Preserve error precedence when source cleanup fails.
+- [x] Inspection must discard decompressed payload immediately rather than retaining it.
 
 #### Required tests
 
-- [ ] existing streaming and encoder suites;
-- [ ] existing inspection and CLI suites;
-- [ ] large feed/decode operations use the executor;
-- [ ] small operations remain inline;
-- [ ] cancellation during executor work poisons the stream operation;
-- [ ] an abandoned async iterator poisons its codec;
-- [ ] concurrent async advancement produces the documented error;
-- [ ] no eager source consumption;
-- [ ] simple and hostile `bytes` subclasses in compression and decompression
+- [x] existing streaming and encoder suites;
+- [x] existing inspection and CLI suites;
+- [x] large feed/decode operations use the executor;
+- [x] small operations remain inline;
+- [x] cancellation during executor work poisons the stream operation;
+- [x] an abandoned async iterator poisons its codec;
+- [x] concurrent async advancement produces the documented error;
+- [x] no eager source consumption;
+- [x] simple and hostile `bytes` subclasses in compression and decompression
       sources preserve acceptance while using raw-buffer snapshot semantics;
-- [ ] source `aclose()` on success, error, and early exit;
-- [ ] source exception remains primary over cleanup exception;
-- [ ] memory regression test for highly compressible input;
-- [ ] member metadata and offsets remain identical.
+- [x] source `aclose()` on success, error, and early exit;
+- [x] source exception remains primary over cleanup exception;
+- [x] memory regression test for highly compressible input;
+- [x] member metadata and offsets remain identical.
 
 #### Exit criteria
 
-- [ ] `_streaming.py` and `_inspection.py` contain no independent gzip codec state machine.
-- [ ] Streaming output and source-pull behavior match 1.11.
-- [ ] Inspection and verification use the same decoder users can import.
-- [ ] Cancellation tests demonstrate no codec reuse after a worker race.
+- [x] `_streaming.py` and `_inspection.py` contain no independent gzip codec state machine.
+- [x] Streaming output and source-pull behavior match 1.11.
+- [x] Inspection and verification use the same decoder users can import.
+- [x] Cancellation tests demonstrate no codec reuse after a worker race.
 
 Suggested commit title:
 

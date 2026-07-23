@@ -9,8 +9,8 @@ import zlib
 import pytest
 
 import aiogzip
-from aiogzip import _engine
-from aiogzip._streaming import _IncrementalGzipEncoder
+from aiogzip import GzipEncoder, _engine
+from aiogzip._codec_async import _drive_operation
 
 
 def _encoder(**overrides):
@@ -23,16 +23,20 @@ def _encoder(**overrides):
         "output_chunk_size": 64,
     }
     options.update(overrides)
-    return _IncrementalGzipEncoder(**options)
+    return GzipEncoder(**options)
 
 
 async def _encode(values, **overrides):
     encoder = _encoder(**overrides)
-    output = list(encoder.start())
+    output = [chunk async for chunk in _drive_operation(encoder.start())]
     for value in values:
-        async for chunk in encoder.feed(value):
+        async for chunk in _drive_operation(
+            encoder.feed(value),
+            workload=value,
+            offload_first_only=True,
+        ):
             output.append(chunk)
-    async for chunk in encoder.finish():
+    async for chunk in _drive_operation(encoder.finish()):
         output.append(chunk)
     return encoder, output
 
@@ -160,19 +164,26 @@ class TestIncrementalGzipEncoder:
 
     async def test_cancelled_offload_makes_encoder_unusable(self, monkeypatch):
         started = asyncio.Event()
+        release = asyncio.Event()
 
         async def blocked_offload(method, data):
             started.set()
-            await asyncio.Event().wait()
+            await release.wait()
+            return method(data)
 
         monkeypatch.setattr(_engine, "run_zlib_in_thread", blocked_offload)
         encoder = _encoder()
         list(encoder.start())
         payload = os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1)
-        feed = encoder.feed(payload)
+        feed = _drive_operation(
+            encoder.feed(payload), workload=payload, offload_first_only=True
+        )
         task = asyncio.create_task(feed.__anext__())
         await started.wait()
         task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        release.set()
 
         with pytest.raises(asyncio.CancelledError):
             await task
@@ -194,7 +205,7 @@ class TestIncrementalGzipEncoder:
         list(encoder.start())
 
         with pytest.raises(OSError, match="Error compressing data"):
-            async for _ in encoder.feed(b"payload"):
+            async for _ in _drive_operation(encoder.feed(b"payload")):
                 pass
         with pytest.raises(OSError, match="unusable"):
             encoder.feed(b"more")
@@ -214,7 +225,7 @@ class TestIncrementalGzipEncoder:
         list(encoder.start())
 
         with pytest.raises(OSError, match="Unexpected error during compression"):
-            async for _ in encoder.feed(b"payload"):
+            async for _ in _drive_operation(encoder.feed(b"payload")):
                 pass
 
     @pytest.mark.parametrize(
@@ -244,14 +255,14 @@ class TestIncrementalGzipEncoder:
         list(encoder.start())
 
         with pytest.raises(OSError, match=message):
-            async for _ in encoder.finish():
+            async for _ in _drive_operation(encoder.finish()):
                 pass
-        assert encoder._failed
+        assert encoder._unusable
 
     async def test_abandoned_feed_makes_encoder_unusable(self):
         encoder = _encoder(output_chunk_size=1)
         list(encoder.start())
-        feed = encoder.feed(os.urandom(300000))
+        feed = _drive_operation(encoder.feed(os.urandom(300000)))
 
         assert await feed.__anext__()
         await feed.aclose()
@@ -262,23 +273,23 @@ class TestIncrementalGzipEncoder:
     async def test_abandoned_finalization_is_rejected(self):
         encoder = _encoder(output_chunk_size=1)
         list(encoder.start())
-        async for _ in encoder.feed(b"payload"):
+        async for _ in _drive_operation(encoder.feed(b"payload")):
             pass
-        finalization = encoder.finish()
+        finalization = _drive_operation(encoder.finish())
 
         assert await finalization.__anext__()
         await finalization.aclose()
 
-        assert encoder._failed
-        with pytest.raises(ValueError, match="already finalized"):
+        assert encoder._unusable
+        with pytest.raises(OSError, match="unusable"):
             encoder.finish()
 
     async def test_finalizes_exactly_once_and_rejects_later_feeds(self):
         encoder = _encoder()
         list(encoder.start())
-        async for _ in encoder.feed(b"payload"):
+        async for _ in _drive_operation(encoder.feed(b"payload")):
             pass
-        output = [chunk async for chunk in encoder.finish()]
+        output = [chunk async for chunk in _drive_operation(encoder.finish())]
 
         assert output
         with pytest.raises(ValueError, match="already finalized"):
@@ -288,27 +299,32 @@ class TestIncrementalGzipEncoder:
 
     async def test_concurrent_advancement_is_rejected(self, monkeypatch):
         started = asyncio.Event()
+        release = asyncio.Event()
 
         async def blocked_offload(method, data):
             started.set()
-            await asyncio.Event().wait()
+            await release.wait()
+            return method(data)
 
         monkeypatch.setattr(_engine, "run_zlib_in_thread", blocked_offload)
         encoder = _encoder()
         list(encoder.start())
-        first_feed = encoder.feed(os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1))
+        payload = os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1)
+        first_feed = _drive_operation(
+            encoder.feed(payload), workload=payload, offload_first_only=True
+        )
         first = asyncio.create_task(first_feed.__anext__())
         await started.wait()
 
-        second_feed = encoder.feed(b"second")
-        with pytest.raises(RuntimeError, match="concurrently"):
-            await second_feed.__anext__()
+        with pytest.raises(RuntimeError, match="active operation"):
+            encoder.feed(b"second")
 
-        finalization = encoder.finish()
-        with pytest.raises(RuntimeError, match="concurrently"):
-            await finalization.__anext__()
+        with pytest.raises(RuntimeError, match="active operation"):
+            encoder.finish()
 
         first.cancel()
+        await asyncio.sleep(0)
+        release.set()
         with pytest.raises(asyncio.CancelledError):
             await first
 
@@ -378,6 +394,6 @@ class TestIncrementalGzipEncoder:
         list(encoder.start())
         encoder._input_size = 2**32 + 5
 
-        output = [chunk async for chunk in encoder.finish()]
+        output = [chunk async for chunk in _drive_operation(encoder.finish())]
 
         assert struct.unpack("<I", b"".join(output)[-4:])[0] == 5

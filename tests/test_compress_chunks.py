@@ -94,6 +94,24 @@ class TestCompressChunks:
 
         assert gzip.decompress(b"".join(output)) == b"subclass payload"
 
+    async def test_hostile_bytes_subclass_uses_raw_buffer_snapshot(self):
+        class Hostile(bytes):
+            def __bytes__(self):
+                raise AssertionError("__bytes__ must not run")
+
+            def __len__(self):
+                raise AssertionError("__len__ must not run")
+
+            def __iter__(self):
+                raise AssertionError("__iter__ must not run")
+
+            def __getitem__(self, key):
+                raise AssertionError("__getitem__ must not run")
+
+        output = await _collect(_items([Hostile(b"raw payload")]), mtime=0)
+
+        assert gzip.decompress(b"".join(output)) == b"raw payload"
+
     @pytest.mark.parametrize("output_chunk_size", [1, 2, 9, 10, 17, 65536])
     async def test_output_chunk_size_is_a_strict_bound(self, output_chunk_size):
         payload = os.urandom(300000)
@@ -251,13 +269,14 @@ class TestCompressChunks:
         with pytest.raises(TypeError, match="source items must be bytes"):
             await _collect(_items([invalid]), mtime=0)
 
-    async def test_strict_size_rejects_synthetic_overflow(self):
+    async def test_strict_size_ignores_bytes_subclass_len_override(self):
         class HugeBytes(bytes):
             def __len__(self):
                 return 2**32
 
-        with pytest.raises(OSError, match="4 GiB limit"):
-            await _collect(_items([HugeBytes(b"x")]), mtime=0, strict_size=True)
+        output = await _collect(_items([HugeBytes(b"x")]), mtime=0, strict_size=True)
+
+        assert gzip.decompress(b"".join(output)) == b"x"
 
     async def test_source_failure_before_payload_emits_no_trailer(self):
         expected = LookupError("source failed")
@@ -361,14 +380,16 @@ class TestCompressChunks:
 
     async def test_cancellation_during_offloaded_compression(self, monkeypatch):
         started = asyncio.Event()
-        cancelled = asyncio.Event()
+        release = asyncio.Event()
+        completed = asyncio.Event()
 
         async def blocked_offload(method, data):
             started.set()
             try:
-                await asyncio.Event().wait()
+                await release.wait()
+                return method(data)
             finally:
-                cancelled.set()
+                completed.set()
 
         monkeypatch.setattr(_engine, "run_zlib_in_thread", blocked_offload)
         payload = os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1)
@@ -377,10 +398,13 @@ class TestCompressChunks:
         task = asyncio.create_task(stream.__anext__())
         await started.wait()
         task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        release.set()
 
         with pytest.raises(asyncio.CancelledError):
             await task
-        assert cancelled.is_set()
+        assert completed.is_set()
         with pytest.raises(StopAsyncIteration):
             await stream.__anext__()
 
