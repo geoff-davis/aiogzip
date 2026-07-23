@@ -21,7 +21,8 @@ iteration remains faster with synchronous `gzip`. See
 pip install aiogzip
 ```
 
-Python 3.8 through 3.14 are supported by the 1.x release line.
+The 2.0 alpha series requires Python 3.11 or newer. Python 3.8 through 3.10
+users should remain on the latest compatible 1.x release.
 
 ## Text-mode quickstart
 
@@ -242,8 +243,8 @@ for benchmarks and tuning guidance.
 
 ## Development and contributing
 
-The 1.x line is the last to support Python 3.8 and 3.9; aiogzip 2.0 will
-require Python 3.11+. Older interpreters will continue to resolve the latest
+The 1.x line is the last to support Python 3.8 through 3.10. aiogzip 2.0
+requires Python 3.11+. Older interpreters continue to resolve the latest
 compatible 1.x release from PyPI.
 
 See the [contributing guide](https://geoff-davis.github.io/aiogzip/contributing/)

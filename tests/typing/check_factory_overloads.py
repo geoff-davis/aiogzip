@@ -7,9 +7,7 @@ type by mode.
 """
 
 from pathlib import Path
-from typing import AsyncIterator, Union
-
-from typing_extensions import assert_type
+from typing import AsyncIterator, Union, assert_type
 
 from aiogzip import (
     AsyncGzipBinaryFile,

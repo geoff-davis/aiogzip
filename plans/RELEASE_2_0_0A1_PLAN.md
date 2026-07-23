@@ -802,50 +802,50 @@ before WP0 environment changes.
       `3f23eadb524c8dba840c4fd855ad5acf84486048`.
 - [x] Capture the release-gating baseline before any environment change and add
       `plans/benchmarks/v1.11.0-baseline.md` with the fields in section 0.
-- [ ] Change `.codexrc` from the retired `pre-commit` command to:
+- [x] Change `.codexrc` from the retired `pre-commit` command to:
 
   ```json
   ["uv", "run", "prek", "run", "--all-files"]
   ```
 
-- [ ] Keep the test command in `.codexrc`; optionally add the existing coverage floor if command latency remains acceptable.
-- [ ] Set `__version__` to `2.0.0a1.dev0`.
-- [ ] Set `requires-python = ">=3.11"`.
-- [ ] Change the development-status classifier to `3 - Alpha`.
-- [ ] Remove Python 3.8, 3.9, and 3.10 classifiers.
-- [ ] Set Ruff’s target to `py311`.
-- [ ] Set mypy’s configured Python version to 3.11 or later.
-- [ ] Remove the `tomli` dependency branch for Python below 3.11.
-- [ ] Audit `typing_extensions`; retain it only where tests or supported typing behavior still require it.
-- [ ] Set the uv development environment floor to 3.11.
-- [ ] Remove the Python 3.8 compatibility CI step and the corresponding pre-commit hook.
-- [ ] Delete `scripts/check_py38_compat.py` if nothing else uses it.
-- [ ] Change the Linux CI matrix to Python 3.11–3.14.
-- [ ] Keep representative Windows and macOS coverage; use an actively supported matrix version already available in CI.
-- [ ] Update comments in `pyproject.toml`, CI, `CLAUDE.md`, contributing docs, and README that describe the 1.x floor.
-- [ ] Update `SECURITY.md` so the supported-version table distinguishes the latest stable 1.x line from the 2.0 alpha series and does not leave the stale 1.8.x-only entry in place.
-- [ ] Regenerate `uv.lock`.
-- [ ] Add an Unreleased changelog entry for the Python 3.11 floor and alpha development line.
+- [x] Keep the test command in `.codexrc`; optionally add the existing coverage floor if command latency remains acceptable.
+- [x] Set `__version__` to `2.0.0a1.dev0`.
+- [x] Set `requires-python = ">=3.11"`.
+- [x] Change the development-status classifier to `3 - Alpha`.
+- [x] Remove Python 3.8, 3.9, and 3.10 classifiers.
+- [x] Set Ruff’s target to `py311`.
+- [x] Set mypy’s configured Python version to 3.11 or later.
+- [x] Remove the `tomli` dependency branch for Python below 3.11.
+- [x] Audit `typing_extensions`; retain it only where tests or supported typing behavior still require it.
+- [x] Set the uv development environment floor to 3.11.
+- [x] Remove the Python 3.8 compatibility CI step and the corresponding pre-commit hook.
+- [x] Delete `scripts/check_py38_compat.py` if nothing else uses it.
+- [x] Change the Linux CI matrix to Python 3.11–3.14.
+- [x] Keep representative Windows and macOS coverage; use an actively supported matrix version already available in CI.
+- [x] Update comments in `pyproject.toml`, CI, `CLAUDE.md`, contributing docs, and README that describe the 1.x floor.
+- [x] Update `SECURITY.md` so the supported-version table distinguishes the latest stable 1.x line from the 2.0 alpha series and does not leave the stale 1.8.x-only entry in place.
+- [x] Regenerate `uv.lock`.
+- [x] Add an Unreleased changelog entry for the Python 3.11 floor and alpha development line.
 - [ ] Update the changelog comparison-link definitions for `2.0.0a1` and the new `[Unreleased]` range when the version is finalized.
-- [ ] Verify package metadata rejects installation on Python 3.10.
+- [x] Verify package metadata rejects installation on Python 3.10.
 
 #### Tests
 
-- [ ] Existing suite passes on Python 3.11.
-- [ ] CI configuration contains no 3.8–3.10 legs.
-- [ ] `python -m pip install .` under Python 3.10 fails because of package metadata, not a syntax crash.
-- [ ] Version-sync tests pass with `2.0.0a1.dev0`.
-- [ ] `uv run prek run --all-files` works from a clean checkout.
+- [x] Existing suite passes on Python 3.11.
+- [x] CI configuration contains no 3.8–3.10 legs.
+- [x] `python -m pip install .` under Python 3.10 fails because of package metadata, not a syntax crash.
+- [x] Version-sync tests pass with `2.0.0a1.dev0`.
+- [x] `uv run prek run --all-files` works from a clean checkout.
 
 #### Exit criteria
 
-- [ ] Tooling instructions and `.codexrc` agree.
-- [ ] The benchmark baseline is locked to the exact published release and was
+- [x] Tooling instructions and `.codexrc` agree.
+- [x] The benchmark baseline is locked to the exact published release and was
       captured before the environment changed.
-- [ ] Main is clearly a 2.0 development line.
-- [ ] The support policy accurately describes which 1.x and 2.0 prerelease lines receive fixes.
-- [ ] No functional gzip behavior has changed.
-- [ ] Maintainer has a documented branch-protection update to perform if required-check contexts changed.
+- [x] Main is clearly a 2.0 development line.
+- [x] The support policy accurately describes which 1.x and 2.0 prerelease lines receive fixes.
+- [x] No functional gzip behavior has changed.
+- [x] Maintainer has a documented branch-protection update to perform if required-check contexts changed.
 
 Suggested commit title:
 

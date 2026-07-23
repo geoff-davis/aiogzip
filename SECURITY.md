@@ -6,8 +6,9 @@ Security fixes are released on top of the latest release line:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.8.x   | :white_check_mark: |
-| < 1.8   | :x:                |
+| 2.0 alpha series | :white_check_mark: |
+| Latest 1.x release | :white_check_mark: |
+| Older 1.x releases | :x: |
 
 ## Reporting a Vulnerability
 

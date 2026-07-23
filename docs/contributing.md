@@ -2,6 +2,9 @@
 
 Contributions are welcome! This project uses `flit_core` for packaging and modern tooling for quality assurance.
 
+Development and the 2.0 release line require Python 3.11 or newer. The 1.x
+maintenance branch retains compatibility with older supported interpreters.
+
 ## Development Setup
 
 1. **Clone the repository**:

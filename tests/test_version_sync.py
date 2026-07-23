@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 import importlib
+import tomllib
 from pathlib import Path
 
 import aiogzip
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover -- Python <3.11 fallback
-    import tomli as tomllib  # type: ignore[no-redef]
 
 
 def test_version_consistency():

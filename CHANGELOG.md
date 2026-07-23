@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Began the 2.0 alpha development line as `2.0.0a1.dev0`. aiogzip 2.0
+  requires Python 3.11 or newer; Python 3.8 through 3.10 users should remain
+  on the latest 1.x release.
+
 ## [1.11.0] - 2026-07-19
 
 ### Documentation

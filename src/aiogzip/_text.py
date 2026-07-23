@@ -266,8 +266,9 @@ class AsyncGzipTextFile:
         # ('' look-ahead, '\r\n'), which keep the per-line buffer-scan path.
         if newline in self._FAST_READLINE_NEWLINES:
             self._line_term: Optional[str] = "\r" if newline == "\r" else "\n"
-            # Unsubscripted re.Pattern: re.Pattern[str] is not subscriptable at
-            # runtime on Python 3.8, and an attribute annotation is evaluated.
+            # Keep this annotation unsubscripted because the compiled-pattern
+            # type is an implementation detail and gains nothing from a more
+            # specific runtime annotation here.
             self._line_split_re: Optional[re.Pattern] = (
                 _LINE_RE_CR if newline == "\r" else _LINE_RE_LF
             )
