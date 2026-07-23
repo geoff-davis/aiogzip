@@ -986,38 +986,38 @@ Create `aiogzip.codec` by extracting and hardening the existing incremental enco
 
 #### Tasks
 
-- [ ] Add `src/aiogzip/codec.py`.
-- [ ] Implement the public API in section 6.
-- [ ] Reuse shared validation and gzip framing helpers.
-- [ ] Add the shared `_snapshot_bytes_input` helper specified in D6 and use it
+- [x] Add `src/aiogzip/codec.py`.
+- [x] Implement the public API in section 6.
+- [x] Reuse shared validation and gzip framing helpers.
+- [x] Add the shared `_snapshot_bytes_input` helper specified in D6 and use it
       for both encoder and decoder `feed()` calls before operation reservation.
-- [ ] Preserve exact `bytes` as the no-copy path; normalize `bytes` subclasses
+- [x] Preserve exact `bytes` as the no-copy path; normalize `bytes` subclasses
       from raw buffer contents into exact `bytes`; reject mutable and non-`bytes`
       buffers at the codec boundary.
-- [ ] Do not invoke subclass overrides such as `__bytes__`, `__len__`,
+- [x] Do not invoke subclass overrides such as `__bytes__`, `__len__`,
       `__iter__`, or `__getitem__` while snapshotting or accounting input.
-- [ ] Route `output_chunk_size`, `compresslevel`, `mtime`,
+- [x] Route `output_chunk_size`, `compresslevel`, `mtime`,
       `original_filename`, and `max_decompressed_size` through the exact shared
       validators named in D15.
-- [ ] Keep all methods synchronous.
-- [ ] Implement the explicit operation-ownership model with a codec-owned token
+- [x] Keep all methods synchronous.
+- [x] Implement the explicit operation-ownership model with a codec-owned token
       independent of the operation object's reachability.
-- [ ] Ensure operation finalization or garbage collection has no observable
+- [x] Ensure operation finalization or garbage collection has no observable
       state-changing side effects.
-- [ ] Add `GzipEncoder.flush()` using `Z_SYNC_FLUSH`.
-- [ ] Ensure output is lazily sliced to `output_chunk_size`.
-- [ ] Ensure decoder output is bounded during expansion, not after materialization.
-- [ ] Enforce the cumulative decompressed-size limit before emitting an over-limit byte.
-- [ ] Preserve gzip header safety limits.
-- [ ] Parse and validate optional metadata fields and FHCRC.
-- [ ] Validate CRC and ISIZE.
-- [ ] Handle concatenated members and NUL padding.
-- [ ] Preserve empty-stream behavior.
-- [ ] Preserve statistics after successful `finish()`.
-- [ ] Make `discard()` idempotent.
-- [ ] Add `GzipEncoder` and `GzipDecoder` to package-root exports and `__all__`.
-- [ ] Add module and class docstrings suitable for mkdocstrings.
-- [ ] Do not migrate async wrappers in this work package unless needed for an isolated integration test.
+- [x] Add `GzipEncoder.flush()` using `Z_SYNC_FLUSH`.
+- [x] Ensure output is lazily sliced to `output_chunk_size`.
+- [x] Ensure decoder output is bounded during expansion, not after materialization.
+- [x] Enforce the cumulative decompressed-size limit before emitting an over-limit byte.
+- [x] Preserve gzip header safety limits.
+- [x] Parse and validate optional metadata fields and FHCRC.
+- [x] Validate CRC and ISIZE.
+- [x] Handle concatenated members and NUL padding.
+- [x] Preserve empty-stream behavior.
+- [x] Preserve statistics after successful `finish()`.
+- [x] Make `discard()` idempotent.
+- [x] Add `GzipEncoder` and `GzipDecoder` to package-root exports and `__all__`.
+- [x] Add module and class docstrings suitable for mkdocstrings.
+- [x] Do not migrate async wrappers in this work package unless needed for an isolated integration test.
 
 #### New test modules
 
@@ -1033,90 +1033,90 @@ tests/test_codec_typing.py
 
 #### Encoder tests
 
-- [ ] default constructor and validation;
-- [ ] `output_chunk_size` parity: reject `bool` and `float`, reject zero and
+- [x] default constructor and validation;
+- [x] `output_chunk_size` parity: reject `bool` and `float`, reject zero and
       negatives, accept 128 MiB, and reject values above 128 MiB;
-- [ ] `mtime` parity: `None`, integer boundaries, positive float truncation,
+- [x] `mtime` parity: `None`, integer boundaries, positive float truncation,
       negative fractions, and normalized uint32 overflow;
-- [ ] exact header fields for deterministic metadata;
-- [ ] filename encoding and rejection rules;
-- [ ] one-member round trip through `gzip.decompress`;
-- [ ] empty member;
-- [ ] arbitrary payload and feed boundaries;
-- [ ] exact `bytes` input uses the no-copy snapshot path;
-- [ ] a simple `bytes` subclass is accepted and normalized to exact `bytes`;
-- [ ] a hostile `bytes` subclass overriding `__bytes__`, `__len__`, iteration,
+- [x] exact header fields for deterministic metadata;
+- [x] filename encoding and rejection rules;
+- [x] one-member round trip through `gzip.decompress`;
+- [x] empty member;
+- [x] arbitrary payload and feed boundaries;
+- [x] exact `bytes` input uses the no-copy snapshot path;
+- [x] a simple `bytes` subclass is accepted and normalized to exact `bytes`;
+- [x] a hostile `bytes` subclass overriding `__bytes__`, `__len__`, iteration,
       and indexing is consumed according to its raw underlying buffer only;
-- [ ] `bytearray`, `memoryview`, and other non-`bytes` buffers raise `TypeError`;
-- [ ] output bound for header, body, flush output, final bytes, and trailer;
-- [ ] `Z_SYNC_FLUSH` output remains resumable;
-- [ ] multiple flushes;
-- [ ] strict ISIZE boundary without allocating 4 GiB;
-- [ ] stdlib and fast-compression selection;
-- [ ] engine errors become `OSError`;
-- [ ] start/feed/flush/finish state transitions;
-- [ ] concurrent operation rejection;
-- [ ] an unadvanced dropped operation keeps the codec reserved under
+- [x] `bytearray`, `memoryview`, and other non-`bytes` buffers raise `TypeError`;
+- [x] output bound for header, body, flush output, final bytes, and trailer;
+- [x] `Z_SYNC_FLUSH` output remains resumable;
+- [x] multiple flushes;
+- [x] strict ISIZE boundary without allocating 4 GiB;
+- [x] stdlib and fast-compression selection;
+- [x] engine errors become `OSError`;
+- [x] start/feed/flush/finish state transitions;
+- [x] concurrent operation rejection;
+- [x] an unadvanced dropped operation keeps the codec reserved under
       `gc.disable()` and after an explicit collection attempt;
-- [ ] a partially advanced dropped operation has the same deterministic result;
-- [ ] early operation close poisons the codec;
-- [ ] call-time validation does not poison untouched state;
-- [ ] after `discard()`, advancing a retained unadvanced or partially advanced
+- [x] a partially advanced dropped operation has the same deterministic result;
+- [x] early operation close poisons the codec;
+- [x] call-time validation does not poison untouched state;
+- [x] after `discard()`, advancing a retained unadvanced or partially advanced
       operation raises `RuntimeError`, emits nothing, and changes no state;
-- [ ] closing an already-invalidated retained operation is idempotent;
-- [ ] stats after finish;
-- [ ] discard idempotence.
+- [x] closing an already-invalidated retained operation is idempotent;
+- [x] stats after finish;
+- [x] discard idempotence.
 
 #### Decoder tests
 
-- [ ] stdlib-generated input;
-- [ ] exact `bytes`, simple `bytes` subclass, hostile `bytes` subclass, and
+- [x] stdlib-generated input;
+- [x] exact `bytes`, simple `bytes` subclass, hostile `bytes` subclass, and
       mutable/non-`bytes` rejection cases matching the encoder contract;
-- [ ] constructor validation parity for `output_chunk_size` and
+- [x] constructor validation parity for `output_chunk_size` and
       `max_decompressed_size`;
-- [ ] encoder-generated input;
-- [ ] every-byte and randomized input splits;
-- [ ] highly compressible input with a strict output bound;
-- [ ] multiple concatenated members;
-- [ ] empty members;
-- [ ] NUL padding between and after members;
-- [ ] metadata-heavy headers;
-- [ ] FHCRC;
-- [ ] CRC mismatch;
-- [ ] ISIZE mismatch;
-- [ ] malformed magic, method, flags, extra fields, and unterminated strings;
-- [ ] truncated header/body/trailer;
-- [ ] trailing non-NUL junk;
-- [ ] zero-byte input;
-- [ ] cumulative limit exactly at, one below, and one above the boundary;
-- [ ] no over-limit output escapes;
-- [ ] metadata collection on and off;
-- [ ] offsets and compressed sizes;
-- [ ] state transitions, repeated `finish()`, and `feed()` after successful
+- [x] encoder-generated input;
+- [x] every-byte and randomized input splits;
+- [x] highly compressible input with a strict output bound;
+- [x] multiple concatenated members;
+- [x] empty members;
+- [x] NUL padding between and after members;
+- [x] metadata-heavy headers;
+- [x] FHCRC;
+- [x] CRC mismatch;
+- [x] ISIZE mismatch;
+- [x] malformed magic, method, flags, extra fields, and unterminated strings;
+- [x] truncated header/body/trailer;
+- [x] trailing non-NUL junk;
+- [x] zero-byte input;
+- [x] cumulative limit exactly at, one below, and one above the boundary;
+- [x] no over-limit output escapes;
+- [x] metadata collection on and off;
+- [x] offsets and compressed sizes;
+- [x] state transitions, repeated `finish()`, and `feed()` after successful
       `finish()` raising `ValueError` even for `b""`;
-- [ ] concurrent operation rejection;
-- [ ] dropped-operation behavior under `gc.disable()`;
-- [ ] early operation close poisons the codec;
-- [ ] after `discard()`, advancing a retained unadvanced or partially advanced
+- [x] concurrent operation rejection;
+- [x] dropped-operation behavior under `gc.disable()`;
+- [x] early operation close poisons the codec;
+- [x] after `discard()`, advancing a retained unadvanced or partially advanced
       operation raises `RuntimeError`, emits nothing, and changes no state;
-- [ ] closing an already-invalidated retained operation is idempotent;
-- [ ] stats after finish;
-- [ ] discard idempotence.
+- [x] closing an already-invalidated retained operation is idempotent;
+- [x] stats after finish;
+- [x] discard idempotence.
 
 #### Purity tests
 
-- [ ] `aiogzip.codec` imports and operates in synchronous code with no running event loop.
-- [ ] An AST/import test prevents `asyncio` and `aiofiles` imports in `codec.py`.
-- [ ] No public codec method is a coroutine function or async generator function.
-- [ ] Public type-check examples pass.
-- [ ] A thread-safety documentation test or doc-example assertion makes clear
+- [x] `aiogzip.codec` imports and operates in synchronous code with no running event loop.
+- [x] An AST/import test prevents `asyncio` and `aiofiles` imports in `codec.py`.
+- [x] No public codec method is a coroutine function or async generator function.
+- [x] Public type-check examples pass.
+- [x] A thread-safety documentation test or doc-example assertion makes clear
       that operation ownership is not a synchronization guarantee.
 
 #### Exit criteria
 
-- [ ] The public codec is complete and documented at the API-docstring level.
-- [ ] It is not yet used by every wrapper, but its behavior matches the pinned contract.
-- [ ] New codec code has meaningful branch coverage; do not rely only on the repository-wide 85% floor.
+- [x] The public codec is complete and documented at the API-docstring level.
+- [x] It is not yet used by every wrapper, but its behavior matches the pinned contract.
+- [x] New codec code has meaningful branch coverage; do not rely only on the repository-wide 85% floor.
 
 Suggested commit title:
 
