@@ -218,7 +218,7 @@ class TestEdgeCasesAndErrors:
                 return b""
 
         async with AsyncGzipBinaryFile(p, "wb") as f:
-            f._engine = MockCompressor()
+            f._encoder._engine = MockCompressor()
             with pytest.raises(OSError, match="Error compressing data"):
                 await f.write(b"data")
 
@@ -239,7 +239,7 @@ class TestEdgeCasesAndErrors:
                 return b""
 
         async with AsyncGzipBinaryFile(p, "wb") as f:
-            f._engine = MockCompressor()
+            f._encoder._engine = MockCompressor()
             await f.write(b"data")
             with pytest.raises(OSError, match="Error flushing compressed data"):
                 await f.flush()

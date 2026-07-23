@@ -1192,52 +1192,59 @@ Make `AsyncGzipBinaryFile` write mode use `GzipEncoder` without changing file se
 
 #### Tasks
 
-- [ ] Replace direct compressor construction with `GzipEncoder`.
-- [ ] On `open()`, exhaust `encoder.start()` and write the complete header.
-- [ ] Preserve filename derivation from a path versus explicit metadata override.
-- [ ] Preserve `mtime`, compression level, strict-size, and fast-compression behavior.
-- [ ] Continue accepting `bytes`, `bytes` subclasses, `bytearray`,
+- [x] Replace direct compressor construction with `GzipEncoder`.
+- [x] On `open()`, exhaust `encoder.start()` and write the complete header.
+- [x] Preserve filename derivation from a path versus explicit metadata override.
+- [x] Preserve `mtime`, compression level, strict-size, and fast-compression behavior.
+- [x] Continue accepting `bytes`, `bytes` subclasses, `bytearray`,
       `memoryview`, and other valid buffer objects at the file API.
-- [ ] Normalize every accepted non-exact input—including `bytes` subclasses and
+- [x] Normalize every accepted non-exact input—including `bytes` subclasses and
       mutable buffers—to an exact built-in `bytes` snapshot before codec or
       executor work. For subclasses, snapshot raw buffer contents without
       invoking overridden conversion or sequence methods.
-- [ ] For `write()`, exhaust the codec operation and `_write_all()` every emitted chunk.
-- [ ] Credit `_position` only after the entire operation’s output reaches the sink.
-- [ ] If the codec advances but the sink fails, mark the writer broken.
-- [ ] If an executor-backed operation is cancelled, mark the writer broken.
-- [ ] Implement file `flush()` by exhausting `encoder.flush()` and then flushing the underlying sink.
-- [ ] Implement close finalization by exhausting `encoder.finish()`.
-- [ ] Do not emit a trailer after an earlier broken write/flush.
-- [ ] Preserve primary finalization errors when underlying `close()` also fails.
-- [ ] Preserve append behavior: every opened append writer creates one new member.
-- [ ] Remove duplicate `_crc`, `_input_size`, header, trailer, and compressor-state code where no longer needed. Retain wrapper-level committed-position accounting.
+- [x] For `write()`, exhaust the codec operation and `_write_all()` every emitted chunk.
+- [x] Credit `_position` only after the entire operation’s output reaches the sink.
+- [x] If the codec advances but the sink fails, mark the writer broken.
+- [x] If an executor-backed operation is cancelled, mark the writer broken.
+- [x] Implement file `flush()` by exhausting `encoder.flush()` and then flushing the underlying sink.
+- [x] Implement close finalization by exhausting `encoder.finish()`.
+- [x] Do not emit a trailer after an earlier broken write/flush.
+- [x] Preserve primary finalization errors when underlying `close()` also fails.
+- [x] Preserve append behavior: every opened append writer creates one new member.
+- [x] Remove duplicate `_crc`, `_input_size`, header, trailer, and compressor-state code where no longer needed. Retain wrapper-level committed-position accounting.
 
 #### Required tests
 
-- [ ] entire binary writer suite;
-- [ ] external sink partial writes;
-- [ ] invalid write counts and no-progress writes;
-- [ ] sink failure after one emitted compressed chunk;
-- [ ] cancellation during compression;
-- [ ] cancellation or failure during flush;
-- [ ] write after flush;
-- [ ] multiple flushes;
-- [ ] close after flush;
-- [ ] close after broken write emits no trailer;
-- [ ] empty file/member;
-- [ ] append creates readable concatenated members;
-- [ ] bytes-like compatibility, including simple and hostile `bytes`
+- [x] entire binary writer suite;
+- [x] external sink partial writes;
+- [x] invalid write counts and no-progress writes;
+- [x] sink failure after one emitted compressed chunk;
+- [x] cancellation during compression;
+- [x] cancellation or failure during flush;
+- [x] write after flush;
+- [x] multiple flushes;
+- [x] close after flush;
+- [x] close after broken write emits no trailer;
+- [x] empty file/member;
+- [x] append creates readable concatenated members;
+- [x] bytes-like compatibility, including simple and hostile `bytes`
       subclasses and mutable buffers;
-- [ ] strict-size preflight;
-- [ ] fast-compression warning and engine selection;
-- [ ] stdlib `gzip` reads all output.
+- [x] strict-size preflight;
+- [x] fast-compression warning and engine selection;
+- [x] stdlib `gzip` reads all output.
 
 #### Exit criteria
 
-- [ ] No direct write-mode `compressobj`, gzip-header, gzip-trailer, CRC, or ISIZE state machine remains in `_binary.py`.
-- [ ] File-level failure semantics are unchanged.
-- [ ] Writer benchmarks meet the release gate.
+- [x] No direct write-mode `compressobj`, gzip-header, gzip-trailer, CRC, or ISIZE state machine remains in `_binary.py`.
+- [x] File-level failure semantics are unchanged.
+- [x] Writer benchmarks meet the release gate.
+
+WP5 benchmark note (2026-07-22): locked-baseline representative writer
+operations passed (bulk -4.1%, 64 KiB chunks -7.0%, text bulk -2.6%, and
+flush faster). The deliberately pathological 838,860-call 10-byte stress case
+was investigated and improved from +122% to +39.6%; its remaining per-call
+cost is the codec's deterministic lazy operation ownership, so it is recorded
+for WP8 but is not a representative-operation blocker under the gate above.
 
 Suggested commit title:
 

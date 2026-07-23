@@ -29,8 +29,8 @@ class TestHighPriorityEdgeCases:
         f = AsyncGzipBinaryFile(temp_file, "wb")
         await f.__aenter__()
 
-        # Replace engine with our mock
-        f._engine = MockEngine()
+        # Replace the encoder's raw engine with our mock.
+        f._encoder._engine = MockEngine()
 
         with pytest.raises(OSError, match="Unexpected error during compression"):
             await f.write(b"test data")
@@ -129,7 +129,7 @@ class TestHighPriorityEdgeCases:
 
         # Replace engine with our mock
         mock_engine = MockEngine()
-        f._engine = mock_engine
+        f._encoder._engine = mock_engine
 
         with pytest.raises(OSError, match="Unexpected error during flush"):
             await f.flush()
@@ -587,9 +587,9 @@ class TestMediumPriorityEdgeCases:
         with pytest.raises(OSError, match="simulated disk full"):
             await f.write(payload)
 
-        # Accounting must still be at zero: nothing reached the file.
-        assert f._crc == 0
-        assert f._input_size == 0
+        # The codec advances before yielding compressed output, but the file
+        # wrapper must not expose that input as committed to the failed sink.
+        assert f._encoder.input_size == len(payload)
         assert await f.tell() == 0
 
         # The stream should be marked broken so a follow-up write does
@@ -770,13 +770,13 @@ class TestMediumPriorityEdgeCases:
         from aiogzip import _binary
 
         calls = []
-        original = _binary._run_zlib_in_thread
+        original = _binary._engine.run_zlib_in_thread
 
         async def tracking(method, data):
             calls.append(len(data))
             return await original(method, data)
 
-        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+        with patch.object(_binary._engine, "run_zlib_in_thread", tracking):
             payload = _os.urandom(2 * 1024 * 1024)  # Above threshold.
             async with AsyncGzipBinaryFile(temp_file, "wb") as f:
                 await f.write(payload)
@@ -795,7 +795,7 @@ class TestMediumPriorityEdgeCases:
             calls.append(len(data))
             return method(data)
 
-        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+        with patch.object(_binary._engine, "run_zlib_in_thread", tracking):
             async with AsyncGzipBinaryFile(temp_file, "wb") as f:
                 await f.write(b"small payload")
         # Small payloads must stay inline to avoid executor overhead.
@@ -865,25 +865,25 @@ class TestMediumPriorityEdgeCases:
         )
 
     async def test_strict_size_rejects_write_past_4gib(self, temp_file):
-        """With strict_size=True, a write that would push _input_size past
+        """With strict_size=True, a write that would push input_size past
         the gzip ISIZE field's 4 GiB cap must raise rather than silently
         emit a truncated-looking trailer."""
         async with AsyncGzipBinaryFile(temp_file, "wb", strict_size=True) as f:
             # Pre-seed the accumulator just below the ISIZE limit. A real
             # caller would have reached this via actual writes; simulating
             # it keeps the test cheap.
-            f._input_size = 0xFFFFFFFF - 2
+            f._encoder._input_size = 0xFFFFFFFF - 2
             with pytest.raises(OSError, match="4 GiB"):
                 await f.write(b"abcdef")
 
     async def test_strict_size_at_limit_ok(self, temp_file):
         """A write that lands exactly on the 4 GiB boundary is allowed."""
         async with AsyncGzipBinaryFile(temp_file, "wb", strict_size=True) as f:
-            f._input_size = 0xFFFFFFFF - 3
-            # Exactly three bytes leaves _input_size == 0xFFFFFFFF, which
+            f._encoder._input_size = 0xFFFFFFFF - 3
+            # Exactly three bytes leaves input_size == 0xFFFFFFFF, which
             # still fits the ISIZE field.
             await f.write(b"abc")
-            assert f._input_size == 0xFFFFFFFF
+            assert f._encoder.input_size == 0xFFFFFFFF
 
     async def test_text_cookie_rejected_by_different_instance(self, temp_file):
         """A tell() cookie from one AsyncGzipTextFile must not be accepted
@@ -943,7 +943,7 @@ class TestMediumPriorityEdgeCases:
         """Default behaviour (strict_size=False) still silently wraps to
         match gzip.open() so we do not break existing callers."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
-            f._input_size = 0xFFFFFFFE
+            f._encoder._input_size = 0xFFFFFFFE
             # Should not raise.
             await f.write(b"abcdef")
 
@@ -986,11 +986,11 @@ class TestMediumPriorityEdgeCases:
         payload = b"x" * 1024
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(payload)
-            # Pre-close: internal _crc must be the same uint32 value
+            # Pre-close: the codec CRC must be the same uint32 value
             # that zlib.crc32 returns for the same bytes.
             expected = zlib.crc32(payload) & 0xFFFFFFFF
-            assert f._crc == expected
-            assert 0 <= f._crc <= 0xFFFFFFFF
+            assert f._encoder.crc32 == expected
+            assert 0 <= f._encoder.crc32 <= 0xFFFFFFFF
 
 
 class TestLowPriorityEdgeCases:
@@ -1157,7 +1157,7 @@ class TestLowPriorityEdgeCases:
 
         f = AsyncGzipBinaryFile(temp_file, "wb")
         await f.__aenter__()
-        f._engine = MockEngine()
+        f._encoder._engine = MockEngine()
 
         with pytest.raises(OSError, match="Error compressing data"):
             await f.write(b"test")
@@ -1187,7 +1187,7 @@ class TestLowPriorityEdgeCases:
         f = AsyncGzipBinaryFile(temp_file, "wb")
         await f.__aenter__()
         await f.write(b"test")
-        f._engine = MockEngine()
+        f._encoder._engine = MockEngine()
 
         with pytest.raises(OSError, match="Error flushing compressed data"):
             await f.flush()
@@ -1296,21 +1296,28 @@ class TestWriteCancellationDuringOffload:
 
         from aiogzip import _binary
 
+        started = asyncio.Event()
         release = asyncio.Event()
 
         async def blocking_offload(method, data):
-            await release.wait()  # park until cancelled
+            started.set()
+            await release.wait()
             return method(data)
 
-        monkeypatch.setattr(_binary, "_run_zlib_in_thread", blocking_offload)
+        monkeypatch.setattr(_binary._engine, "run_zlib_in_thread", blocking_offload)
 
         payload = os.urandom(512 * 1024)  # above the offload threshold
         f = AsyncGzipBinaryFile(temp_file, "wb")
         await f.__aenter__()
         try:
             task = asyncio.ensure_future(f.write(payload))
-            await asyncio.sleep(0)  # let the write reach the offload await
+            await started.wait()
             task.cancel()
+            # Cancellation waits for the executor-backed codec step to stop
+            # mutating shared state before the encoder is discarded.
+            await asyncio.sleep(0)
+            assert not task.done()
+            release.set()
             with pytest.raises(asyncio.CancelledError):
                 await task
 

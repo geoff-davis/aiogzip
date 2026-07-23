@@ -53,13 +53,10 @@ def _snapshot_bytes_input(data: bytes) -> bytes:
 class _Operation(Iterator[bytes]):
     """Single-use iterator tied to a codec-owned reservation token."""
 
-    __slots__ = ("_advancing", "_closed", "_iterator", "_owner", "_token")
+    __slots__ = ("_advancing", "_closed", "_iterator", "_owner")
 
-    def __init__(
-        self, owner: _CodecBase, token: object, iterator: Iterator[bytes]
-    ) -> None:
+    def __init__(self, owner: _CodecBase, iterator: Iterator[bytes]) -> None:
         self._owner = owner
-        self._token = token
         self._iterator = iterator
         self._advancing = False
         self._closed = False
@@ -74,7 +71,7 @@ class _Operation(Iterator[bytes]):
             raise StopIteration
         if self._advancing:
             raise RuntimeError("gzip codec operation cannot be advanced reentrantly")
-        if self._owner._active_token is not self._token:
+        if self._owner._active_token is not self:
             raise RuntimeError("gzip codec operation is no longer active")
 
         self._advancing = True
@@ -82,11 +79,11 @@ class _Operation(Iterator[bytes]):
             output = next(self._iterator)
         except StopIteration:
             self._closed = True
-            self._owner._operation_succeeded(self._token)
+            self._owner._operation_succeeded(self)
             raise
         except BaseException:
             self._closed = True
-            self._owner._operation_failed(self._token)
+            self._owner._operation_failed(self)
             raise
         finally:
             self._advancing = False
@@ -101,7 +98,7 @@ class _Operation(Iterator[bytes]):
         iterator = self._iterator
         self._iterator = iter(())
         if not invalidated:
-            self._owner._operation_failed(self._token)
+            self._owner._operation_failed(self)
         close = getattr(iterator, "close", None)
         if callable(close):
             close()
@@ -126,9 +123,9 @@ class _CodecBase:
             raise OSError(f"gzip {name} is unusable after a prior failure")
 
     def _reserve(self, iterator: Iterator[bytes]) -> Iterator[bytes]:
-        token = object()
-        self._active_token = token
-        return _Operation(self, token, iterator)
+        operation = _Operation(self, iterator)
+        self._active_token = operation
+        return operation
 
     def _operation_succeeded(self, token: object) -> None:
         if self._active_token is token:
@@ -271,7 +268,9 @@ class GzipEncoder(_CodecBase):
             raise OSError(f"Unexpected error during compression: {error}") from error
         self._crc = _engine.crc32(data, self._crc) & 0xFFFFFFFF
         self._input_size += len(data)
-        yield from _output_chunks(compressed, self._output_chunk_size)
+        if compressed:
+            for offset in range(0, len(compressed), self._output_chunk_size):
+                yield compressed[offset : offset + self._output_chunk_size]
 
     def flush(self) -> Iterator[bytes]:
         """Perform a non-finalizing ``Z_SYNC_FLUSH`` operation."""

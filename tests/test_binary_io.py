@@ -117,6 +117,61 @@ class TestAsyncGzipBinaryFile:
         async with AsyncGzipBinaryFile(temp_file, "rb") as f:
             assert await f.read() == b"subclass payload"
 
+    async def test_binary_accepts_hostile_bytes_subclass(self, temp_file):
+        """Subclass hooks cannot alter or observe the immutable codec snapshot."""
+
+        class Hostile(bytes):
+            def __bytes__(self):
+                raise AssertionError("__bytes__ must not run")
+
+            def __len__(self):
+                raise AssertionError("__len__ must not run")
+
+            def __getitem__(self, key):
+                raise AssertionError("__getitem__ must not run")
+
+            def __iter__(self):
+                raise AssertionError("__iter__ must not run")
+
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            assert await f.write(Hostile(b"raw subclass bytes")) == 18
+
+        with gzip.open(temp_file, "rb") as f:
+            assert f.read() == b"raw subclass bytes"
+
+    async def test_mutable_write_input_is_snapshotted_before_offload(
+        self, temp_file, monkeypatch
+    ):
+        """Caller mutation cannot race executor-backed compression."""
+        import asyncio
+
+        from aiogzip import _engine
+
+        started = asyncio.Event()
+        release = asyncio.Event()
+        original = _engine.run_zlib_in_thread
+
+        async def delayed(method, data):
+            started.set()
+            await release.wait()
+            return await original(method, data)
+
+        monkeypatch.setattr(_engine, "run_zlib_in_thread", delayed)
+        source = bytearray(os.urandom(512 * 1024))
+        expected = bytes(source)
+
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        await f.open()
+        task = asyncio.create_task(f.write(source))
+        await started.wait()
+        source[:] = b"x" * len(source)
+        release.set()
+        assert await task == len(expected)
+        await f.close()
+
+        with gzip.open(temp_file, "rb") as raw:
+            assert raw.read() == expected
+
     async def test_binary_accepts_noncontiguous_and_multibyte_buffers(self, temp_file):
         """write() must coerce buffer-protocol inputs that are not already a
         flat, single-byte, contiguous view.
