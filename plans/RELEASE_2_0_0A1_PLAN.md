@@ -941,34 +941,34 @@ Create the internal engine adapter that makes a portable synchronous decoder pos
 
 #### Tasks
 
-- [ ] Add a private normalized raw-inflate step abstraction in `_engine.py` or a focused private module.
-- [ ] Centralize every read of engine-specific post-call attributes.
-- [ ] Return explicit `consumed`, `output`, and `eof` information to callers.
-- [ ] Track pending input in the caller rather than handing engine-owned tail objects around the package.
-- [ ] Add no-progress detection.
-- [ ] Preserve engine-error wrapping.
-- [ ] Preserve stdlib/zlib-ng selection behavior.
-- [ ] Do not expose the adapter publicly.
-- [ ] Do not add a new runtime dependency.
+- [x] Add a private normalized raw-inflate step abstraction in `_engine.py` or a focused private module.
+- [x] Centralize every read of engine-specific post-call attributes.
+- [x] Return explicit `consumed`, `output`, and `eof` information to callers.
+- [x] Track pending input in the caller rather than handing engine-owned tail objects around the package.
+- [x] Add no-progress detection.
+- [x] Preserve engine-error wrapping.
+- [x] Preserve stdlib/zlib-ng selection behavior.
+- [x] Do not expose the adapter publicly.
+- [x] Do not add a new runtime dependency.
 
 #### Required tests
 
-- [ ] stdlib adapter conformance;
-- [ ] zlib-ng adapter conformance when installed;
-- [ ] forced-stdlib behavior while zlib-ng is installed;
-- [ ] member EOF with trailer bytes in the same input span;
-- [ ] member EOF followed immediately by another member;
-- [ ] bounded output requiring repeated steps over one input span;
-- [ ] fake non-aliasing engine variants;
-- [ ] malformed payload error normalization;
-- [ ] no-progress guard;
-- [ ] property test over payload sizes and input splits.
+- [x] stdlib adapter conformance;
+- [x] zlib-ng adapter conformance when installed;
+- [x] forced-stdlib behavior while zlib-ng is installed;
+- [x] member EOF with trailer bytes in the same input span;
+- [x] member EOF followed immediately by another member;
+- [x] bounded output requiring repeated steps over one input span;
+- [x] fake non-aliasing engine variants;
+- [x] malformed payload error normalization;
+- [x] no-progress guard;
+- [x] property test over payload sizes and input splits.
 
 #### Exit criteria
 
-- [ ] Search confirms no decoder outside the adapter reads both `unused_data` and `unconsumed_tail` to infer consumption.
-- [ ] All adapter variants identify the exact same member/trailer boundary.
-- [ ] Existing high-level behavior is unchanged at this stage.
+- [x] Search confirms no decoder outside the adapter reads both `unused_data` and `unconsumed_tail` to infer consumption.
+- [x] All adapter variants identify the exact same member/trailer boundary.
+- [x] Existing high-level behavior is unchanged at this stage.
 
 Suggested commit title:
 

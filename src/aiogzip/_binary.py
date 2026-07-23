@@ -7,7 +7,17 @@ import os
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, NoReturn, Optional, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    List,
+    NoReturn,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import aiofiles
 
@@ -43,7 +53,10 @@ from ._common import (
 _ZLIB_OFFLOAD_THRESHOLD = _engine.ZLIB_OFFLOAD_THRESHOLD
 
 
-async def _run_zlib_in_thread(method: Callable[[bytes], bytes], data: bytes) -> bytes:
+_T = TypeVar("_T")
+
+
+async def _run_zlib_in_thread(method: Callable[[bytes], _T], data: bytes) -> _T:
     """Run a zlib compress/decompress call in the default executor.
 
     Kept as a module-level coroutine so tests can substitute it and so the
@@ -1107,42 +1120,20 @@ class AsyncGzipBinaryFile:
         # Decompress the chunk
         pieces = []
         try:
-            if self._max_decompressed_size is None:
-                if len(compressed_chunk) >= _ZLIB_OFFLOAD_THRESHOLD:
-                    decompressed = await self._run_decompress_in_thread(
-                        self._engine.decompress, compressed_chunk
-                    )
-                else:
-                    decompressed = self._engine.decompress(compressed_chunk)
-                if decompressed:
-                    self._account_decompressed(len(decompressed))
-                    pieces.append(decompressed)
-            else:
-                pieces.extend(await self._decompress_payload_limited(compressed_chunk))
+            decompressed, unused = await self._decompress_payload(compressed_chunk)
+            pieces.extend(decompressed)
 
             # Handle multi-member gzip archives (created by append mode).
             # CPython's gzip reader ignores zero padding between/after members,
             # so strip NUL bytes before attempting to parse another member.
-            unused = self._engine.unused_data
             while unused:
                 unused = unused.lstrip(b"\x00")
                 if not unused:
                     break
 
                 self._engine = _engine.decompressobj(GZIP_WBITS)
-                if self._max_decompressed_size is None:
-                    if len(unused) >= _ZLIB_OFFLOAD_THRESHOLD:
-                        decompressed = await self._run_decompress_in_thread(
-                            self._engine.decompress, unused
-                        )
-                    else:
-                        decompressed = self._engine.decompress(unused)
-                    if decompressed:
-                        self._account_decompressed(len(decompressed))
-                        pieces.append(decompressed)
-                else:
-                    pieces.extend(await self._decompress_payload_limited(unused))
-                unused = self._engine.unused_data
+                decompressed, unused = await self._decompress_payload(unused)
+                pieces.extend(decompressed)
         except _engine.ZLIB_ERRORS as e:
             raise gzip.BadGzipFile(f"Error decompressing gzip data: {e}") from e
         except OSError:
@@ -1153,41 +1144,41 @@ class AsyncGzipBinaryFile:
             raise OSError(f"Unexpected error during decompression: {e}") from e
         return pieces
 
-    async def _decompress_payload_limited(self, compressed: bytes) -> List[bytes]:
-        """Inflate one compressed span without exceeding the configured cap.
+    async def _decompress_payload(self, compressed: bytes) -> tuple[List[bytes], bytes]:
+        """Inflate one span and return output plus bytes retained after EOF.
 
-        Zlib receives the remaining allowance plus one byte: that extra byte lets
-        us detect an over-limit stream without first materializing its full
-        expansion. ``unconsumed_tail`` is replayed until the input is drained or
-        the cap trips. The unlimited hot path stays inline in ``_decompress_next``
-        so readers that do not request a safety cap pay no extra coroutine call.
+        When a decompression limit is configured, the engine receives the
+        remaining allowance plus one byte. That extra byte detects an
+        over-limit stream without materializing its full expansion. Consumption
+        is supplied exclusively by the engine adapter, including member EOF.
         """
         cap = self._max_decompressed_size
-        assert cap is not None
-
         pieces: List[bytes] = []
         pending = compressed
         while pending:
-            remaining = cap - self._decompressed_total
-            max_length = remaining + 1
-            decompress = partial(self._engine.decompress, max_length=max_length)
+            max_length = 0
+            if cap is not None:
+                remaining = cap - self._decompressed_total
+                max_length = remaining + 1
+            inflate = partial(
+                _engine.inflate_step,
+                self._engine,
+                max_length=max_length,
+            )
             if len(pending) >= _ZLIB_OFFLOAD_THRESHOLD:
-                decompressed = await self._run_decompress_in_thread(decompress, pending)
+                step = await self._run_decompress_in_thread(inflate, pending)
             else:
-                decompressed = decompress(pending)
+                step = inflate(pending)
 
-            if decompressed:
-                self._account_decompressed(len(decompressed))
-                pieces.append(decompressed)
+            if step.output:
+                self._account_decompressed(len(step.output))
+                pieces.append(step.output)
 
-            tail = self._engine.unconsumed_tail
-            if not tail:
-                break
-            if len(tail) == len(pending) and tail == pending and not decompressed:
-                raise OSError("gzip decompressor made no progress")
-            pending = tail
+            pending = pending[step.consumed :]
+            if step.eof:
+                return pieces, pending
 
-        return pieces
+        return pieces, b""
 
     def _check_read_usable(self) -> None:
         """Reject access after cancellation may have advanced the decompressor."""
@@ -1198,8 +1189,8 @@ class AsyncGzipBinaryFile:
             )
 
     async def _run_decompress_in_thread(
-        self, method: Callable[[bytes], bytes], data: bytes
-    ) -> bytes:
+        self, method: Callable[[bytes], _T], data: bytes
+    ) -> _T:
         """Offload decompression and poison state if the await is cancelled."""
         try:
             return await _run_zlib_in_thread(method, data)

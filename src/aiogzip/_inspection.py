@@ -6,7 +6,7 @@ import struct
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, List, Optional, Tuple, Union, cast
+from typing import Any, AsyncIterator, List, Optional, Tuple, Union
 
 import aiofiles
 
@@ -221,12 +221,16 @@ class _IncrementalGzipDecoder:
         remaining = limit - self._uncompressed_size
         return min(self._output_chunk_size, remaining + 1)
 
-    async def _inflate(self, data: bytes) -> bytes:
-        decompress = partial(self._engine.decompress, max_length=self._output_limit())
+    async def _inflate(self, data: bytes) -> _engine._InflateStep:
+        inflate = partial(
+            _engine.inflate_step,
+            self._engine,
+            max_length=self._output_limit(),
+        )
         try:
             if len(data) >= _engine.ZLIB_OFFLOAD_THRESHOLD:
-                return await _engine.run_zlib_in_thread(decompress, data)
-            return cast(bytes, decompress(data))
+                return await _engine.run_zlib_in_thread(inflate, data)
+            return inflate(data)
         except asyncio.CancelledError:
             self._failed = True
             self._engine = None
@@ -317,22 +321,15 @@ class _IncrementalGzipDecoder:
                     if not self._pending:
                         break
                     payload = bytes(self._pending)
-                    output = await self._inflate(payload)
-                    if self._engine.eof:
-                        remaining = self._engine.unused_data
-                    else:
-                        remaining = self._engine.unconsumed_tail
-                    consumed = len(payload) - len(remaining)
-                    if consumed:
-                        self._consume(consumed)
-                    if output:
-                        self._account_output(output)
-                        yield output
-                    if self._engine.eof:
+                    step = await self._inflate(payload)
+                    if step.consumed:
+                        self._consume(step.consumed)
+                    if step.output:
+                        self._account_output(step.output)
+                        yield step.output
+                    if step.eof:
                         self._state = "trailer"
                         continue
-                    if not consumed and not output:
-                        break
                     continue
 
                 if self._state == "trailer":
