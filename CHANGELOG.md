@@ -4,11 +4,53 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0a1] - 2026-07-22
+
+### Added
+
+- Public synchronous `GzipEncoder` and `GzipDecoder` sans-I/O state machines
+  for transport-independent, bounded gzip encoding and decoding. The classes
+  support metadata, concatenated members, NUL padding, CRC/ISIZE validation,
+  cumulative decompression limits, optional zlib-ng, and validated member
+  metadata without performing I/O or executor offload.
+- Deterministic lazy-operation ownership: every codec operation reserves its
+  instance until exhausted, explicit partial close poisons the instance, and
+  `discard()` irreversibly releases abandoned state without relying on garbage
+  collection.
+- A synchronous codec guide and architecture decision covering lifecycle,
+  integrity timing, immutable input snapshots, constructor validation, thread
+  safety, async-wrapper responsibilities, and the provisional alpha contract.
+- Cross-surface property tests comparing codec, async iterable, inspection,
+  verification, binary-file, and standard-library gzip behavior over
+  randomized multi-member streams and input boundaries.
+
 ### Changed
 
-- Began the 2.0 alpha development line as `2.0.0a1.dev0`. aiogzip 2.0
-  requires Python 3.11 or newer; Python 3.8 through 3.10 users should remain
-  on the latest 1.x release.
+- aiogzip 2.0 now requires Python 3.11 or newer. Python 3.8 through 3.10
+  environments continue resolving the latest compatible 1.x release.
+- Binary file reads and writes, async-iterable streaming, inspection, and
+  verification now share the same codec-owned gzip framing, raw DEFLATE,
+  member traversal, CRC/ISIZE accounting, metadata, and limit validation.
+- Async wrappers now concentrate on transport, backpressure, executor policy,
+  cancellation, and cleanup. Large codec steps may still be offloaded, and a
+  cancelled wrapper waits for active worker work before discarding state.
+- Public codec input accepts exact `bytes` without copying and snapshots a
+  `bytes` subclass from its raw immutable buffer. Mutable/general buffers are
+  rejected by the codec; the established binary file writer continues to
+  accept and snapshot buffer-protocol inputs.
+
+### Security
+
+- Unified decompression keeps strict per-chunk output bounds and never emits a
+  byte beyond `max_decompressed_size`. Full stream integrity is established
+  only after decoder `finish()` or complete async-iterator exhaustion.
+
+### Compatibility
+
+- The `GzipEncoder` and `GzipDecoder` surface is provisional during the 2.0
+  alpha series. Established high-level asyncio callers require no API changes.
+- Raw DEFLATE, AnyIO/Trio abstractions, indexed seeking, and ISA-L remain out
+  of scope for this alpha.
 
 ## [1.11.0] - 2026-07-19
 
@@ -611,3 +653,6 @@ All notable changes to this project will be documented in this file.
 - Make `AsyncGzipTextFile.write()` report the number of characters written instead of encoded byte counts.
 - Normalize iteration errors from `AsyncGzipBinaryFile` to `TypeError`, matching the standard file API.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
+
+[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a1...HEAD
+[2.0.0a1]: https://github.com/geoff-davis/aiogzip/compare/v1.11.0...v2.0.0a1

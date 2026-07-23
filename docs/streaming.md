@@ -6,6 +6,11 @@ Paths and file objects belong with `open()`, `read()`, `write()`, `inspect()`,
 or `verify()`; the chunk APIs are deliberately limited to asynchronous
 iterables.
 
+These are asynchronous transport wrappers, distinct from the synchronous
+[`GzipEncoder` and `GzipDecoder`](codec.md) state machines. The wrappers own
+async-source cleanup, cancellation, backpressure, and optional executor
+offload; the codec owns gzip framing and validation and performs no I/O.
+
 ## Decompressing
 
 ```python
@@ -50,6 +55,11 @@ This differs intentionally from streaming compression, where an empty payload
 must still produce a valid empty gzip member.
 
 ## Integrity validation
+
+> **Warning — exhaust the iterator to establish integrity.** Decompression
+> integrity is not established merely because payload bytes were yielded.
+> Consume the async iterator to normal completion so the final trailer and
+> stream ending are validated.
 
 The iterator validates gzip headers, optional header CRCs, deflate data,
 per-member CRC-32 values, trailer `ISIZE` values, concatenated members, and

@@ -36,6 +36,26 @@ class TestAsyncGzipBinaryFile:
             remaining_data = await f.read()
             assert remaining_data == sample_data[10:]
 
+    @pytest.mark.parametrize(
+        ("chunk_size", "expected_output_size"),
+        [
+            (17, AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE),
+            (512 * 1024, 512 * 1024),
+        ],
+    )
+    async def test_codec_output_granularity_keeps_tuned_floor(
+        self, temp_file, chunk_size, expected_output_size
+    ):
+        async with AsyncGzipBinaryFile(temp_file, "wb") as stream:
+            await stream.write(b"payload")
+
+        async with AsyncGzipBinaryFile(
+            temp_file, "rb", chunk_size=chunk_size
+        ) as stream:
+            assert stream._decoder is not None
+            assert stream._decoder._output_chunk_size == expected_output_size
+            assert await stream.read() == b"payload"
+
     async def test_binary_read_negative_size_returns_all(self, temp_file, sample_data):
         """Negative size arguments should read the entire remaining stream."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:

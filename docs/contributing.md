@@ -79,13 +79,29 @@ documents the comparison methodology and focused categories.
 
 Core implementation is split across focused modules in `src/aiogzip`:
 
+- `codec.py`: the only production gzip state machine; owns framing, raw
+  DEFLATE, CRC/ISIZE, members, padding, metadata, and limits
+- `_engine.py`: normalized engine selection and input-consumption accounting
 - `_common.py`: shared constants, validation helpers, and protocols
-- `_binary.py`: `AsyncGzipBinaryFile` implementation
+- `_binary.py`: `AsyncGzipBinaryFile` transport and buffering
+- `_streaming.py`, `_inspection.py`: thin async drivers around the codec
 - `_text.py`: `AsyncGzipTextFile` implementation
 - `__init__.py`: public API exports, recommended `open()` entry point, and the
   compatibility `AsyncGzipFile` factory
 
-When adding new internals, prefer one of the focused modules and keep `__init__.py` as the stable public API surface.
+Do not add gzip framing, trailer, CRC/ISIZE, raw-engine, or member-loop logic to
+a transport wrapper. Codec operations are lazy: a wrapper must exhaust or
+explicitly close each returned iterator before another state change, preserve
+the primary error during cleanup, and avoid reading ahead from an async source.
+The codec itself performs no I/O and no executor offload; wrappers own those
+policies.
+
+Development and CI target Python 3.11 through 3.14. Code in the 2.0 line may
+use Python 3.11 syntax, while compatibility fixes for older interpreters belong
+on the `1.x` maintenance branch.
+
+When adding new internals, prefer one of the focused modules and keep
+`__init__.py` as the stable public API surface.
 
 ## Documentation
 

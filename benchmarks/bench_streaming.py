@@ -136,6 +136,92 @@ class StreamingBenchmarks(BenchmarkBase):
             engine=aiogzip.engine_info().compression,
         )
 
+    def _measure_direct_codecs(self):
+        """Record informational direct-codec and equivalent stdlib timings."""
+        output_chunk_size = 256 * 1024
+
+        start = time.perf_counter()
+        stdlib_encoded = gzip.compress(self.payload, compresslevel=6, mtime=0)
+        stdlib_encode_duration = time.perf_counter() - start
+        self.add_result(
+            "stdlib gzip.compress reference",
+            "streaming",
+            stdlib_encode_duration,
+            input_bytes=len(self.payload),
+            compressed_bytes=len(stdlib_encoded),
+            informational=True,
+        )
+
+        encoder = aiogzip.GzipEncoder(
+            compresslevel=6,
+            mtime=0,
+            output_chunk_size=output_chunk_size,
+        )
+        encoded = bytearray()
+        encode_chunk_sizes = []
+        start = time.perf_counter()
+        for chunk in encoder.start():
+            encoded.extend(chunk)
+            encode_chunk_sizes.append(len(chunk))
+        for chunk in encoder.feed(self.payload):
+            encoded.extend(chunk)
+            encode_chunk_sizes.append(len(chunk))
+        for chunk in encoder.finish():
+            encoded.extend(chunk)
+            encode_chunk_sizes.append(len(chunk))
+        codec_encode_duration = time.perf_counter() - start
+        assert gzip.decompress(encoded) == self.payload
+        assert max(encode_chunk_sizes, default=0) <= output_chunk_size
+        self.add_result(
+            "sans-I/O codec encode (informational)",
+            "streaming",
+            codec_encode_duration,
+            input_bytes=len(self.payload),
+            compressed_bytes=len(encoded),
+            output_chunks=len(encode_chunk_sizes),
+            stdlib_reference_seconds=stdlib_encode_duration,
+            informational=True,
+            engine=aiogzip.engine_info().compression,
+        )
+
+        start = time.perf_counter()
+        stdlib_decoded = gzip.decompress(self.compressed)
+        stdlib_decode_duration = time.perf_counter() - start
+        assert stdlib_decoded == self.payload
+        self.add_result(
+            "stdlib gzip.decompress reference",
+            "streaming",
+            stdlib_decode_duration,
+            input_bytes=len(self.compressed),
+            output_bytes=len(stdlib_decoded),
+            informational=True,
+        )
+
+        decoder = aiogzip.GzipDecoder(output_chunk_size=output_chunk_size)
+        decoded = bytearray()
+        decode_chunk_sizes = []
+        start = time.perf_counter()
+        for chunk in decoder.feed(self.compressed):
+            decoded.extend(chunk)
+            decode_chunk_sizes.append(len(chunk))
+        for chunk in decoder.finish():
+            decoded.extend(chunk)
+            decode_chunk_sizes.append(len(chunk))
+        codec_decode_duration = time.perf_counter() - start
+        assert decoded == self.payload
+        assert max(decode_chunk_sizes, default=0) <= output_chunk_size
+        self.add_result(
+            "sans-I/O codec decode (informational)",
+            "streaming",
+            codec_decode_duration,
+            input_bytes=len(self.compressed),
+            output_bytes=len(decoded),
+            output_chunks=len(decode_chunk_sizes),
+            stdlib_reference_seconds=stdlib_decode_duration,
+            informational=True,
+            engine=aiogzip.engine_info().decompression,
+        )
+
     async def _measure_memory(self, name, operation):
         tracemalloc.start()
         start = time.perf_counter()
@@ -182,6 +268,7 @@ class StreamingBenchmarks(BenchmarkBase):
 
     async def run_all(self):
         """Benchmark both iterable codecs and their file-API baselines."""
+        self._measure_direct_codecs()
         await self._measure_stream(64 * 1024, 64 * 1024)
         await self._measure_stream(512 * 1024, 256 * 1024)
         await self._measure_file_reader()

@@ -826,7 +826,7 @@ before WP0 environment changes.
 - [x] Update `SECURITY.md` so the supported-version table distinguishes the latest stable 1.x line from the 2.0 alpha series and does not leave the stale 1.8.x-only entry in place.
 - [x] Regenerate `uv.lock`.
 - [x] Add an Unreleased changelog entry for the Python 3.11 floor and alpha development line.
-- [ ] Update the changelog comparison-link definitions for `2.0.0a1` and the new `[Unreleased]` range when the version is finalized.
+- [x] Update the changelog comparison-link definitions for `2.0.0a1` and the new `[Unreleased]` range when the version is finalized.
 - [x] Verify package metadata rejects installation on Python 3.10.
 
 #### Tests
@@ -1388,39 +1388,39 @@ Make the alpha understandable, measurable, and publishable.
 
 #### Documentation tasks
 
-- [ ] Add `docs/codec.md`.
-- [ ] Add the page to `mkdocs.yml`.
-- [ ] Add the codec classes to `docs/api.md`.
-- [ ] Update `docs/streaming.md` to distinguish the sync codec from async iterable wrappers.
-- [ ] Update `docs/errors.md` with operation-abandonment, finalization, corruption, and size-limit behavior.
-- [ ] Update `docs/migration.md` with:
+- [x] Add `docs/codec.md`.
+- [x] Add the page to `mkdocs.yml`.
+- [x] Add the codec classes to `docs/api.md`.
+- [x] Update `docs/streaming.md` to distinguish the sync codec from async iterable wrappers.
+- [x] Update `docs/errors.md` with operation-abandonment, finalization, corruption, and size-limit behavior.
+- [x] Update `docs/migration.md` with:
   - Python 3.11 requirement;
   - installation behavior for users remaining on 1.x;
   - the new codec API;
   - the provisional alpha compatibility statement;
   - no change required for ordinary asyncio callers.
-- [ ] Update README with a concise synchronous codec example.
-- [ ] Update `CLAUDE.md` and contributing guidance for the new architecture and Python floor.
-- [ ] Complete the ADR.
-- [ ] Add a prominent warning that decompression integrity is not established until `finish()` or full iterator exhaustion.
-- [ ] Explain operation ownership and why returned iterators must be exhausted.
-- [ ] Document the deterministic dropped-iterator contract: ignoring an operation
+- [x] Update README with a concise synchronous codec example.
+- [x] Update `CLAUDE.md` and contributing guidance for the new architecture and Python floor.
+- [x] Complete the ADR.
+- [x] Add a prominent warning that decompression integrity is not established until `finish()` or full iterator exhaustion.
+- [x] Explain operation ownership and why returned iterators must be exhausted.
+- [x] Document the deterministic dropped-iterator contract: ignoring an operation
       leaves the codec reserved, the next operation raises `RuntimeError`
       regardless of GC timing, and `discard()` is the only cleanup once the
       iterator is unreachable.
-- [ ] Explain that codec `feed()` accepts `bytes` subclasses but snapshots them
+- [x] Explain that codec `feed()` accepts `bytes` subclasses but snapshots them
       to exact built-in `bytes`, while mutable/non-`bytes` buffers are rejected;
       include the raw-buffer rationale and both copy costs.
-- [ ] State that codec instances and their operation iterators are not
+- [x] State that codec instances and their operation iterators are not
       thread-safe: use one thread at a time or external locking around the full
       operation lifecycle.
-- [ ] Document constructor validation parity, including float `mtime`
+- [x] Document constructor validation parity, including float `mtime`
       truncation, uint32 bounds, and the 128 MiB `output_chunk_size` ceiling.
-- [ ] Document that decoder `feed()` and repeated `finish()` after successful
+- [x] Document that decoder `feed()` and repeated `finish()` after successful
       completion raise `ValueError`.
-- [ ] Explain that the codec performs no I/O and no executor offload.
-- [ ] Explain that async wrappers may offload large codec steps.
-- [ ] State that raw DEFLATE and AnyIO are not part of this alpha.
+- [x] Explain that the codec performs no I/O and no executor offload.
+- [x] Explain that async wrappers may offload large codec steps.
+- [x] State that raw DEFLATE and AnyIO are not part of this alpha.
 
 #### Benchmark tasks
 
@@ -1473,19 +1473,19 @@ Rules:
 
 #### Packaging tasks
 
-- [ ] Update the package description/keywords if needed to mention the sans-I/O codec without overstating performance.
-- [ ] Keep `aiofiles` as a core dependency for the existing high-level API.
-- [ ] Verify `codec.py` and `_metadata.py` are included in wheel and sdist.
-- [ ] Verify `py.typed` remains included.
-- [ ] Set `__version__ = "2.0.0a1"` in the release commit.
-- [ ] Move changelog entries from Unreleased into:
+- [x] Update the package description/keywords if needed to mention the sans-I/O codec without overstating performance.
+- [x] Keep `aiofiles` as a core dependency for the existing high-level API.
+- [x] Verify `codec.py` and `_metadata.py` are included in wheel and sdist.
+- [x] Verify `py.typed` remains included.
+- [x] Set `__version__ = "2.0.0a1"` in the release commit.
+- [x] Move changelog entries from Unreleased into:
 
   ```markdown
   ## [2.0.0a1] - YYYY-MM-DD
   ```
 
-- [ ] Keep the development-status classifier at Alpha.
-- [ ] Build and inspect artifacts:
+- [x] Keep the development-status classifier at Alpha.
+- [x] Build and inspect artifacts:
 
   ```bash
   rm -rf dist build
@@ -1494,17 +1494,24 @@ Rules:
   tar tzf dist/*.tar.gz
   ```
 
-- [ ] Install the wheel into a clean Python 3.11 environment and run smoke tests.
-- [ ] Confirm Python 3.10 installation is rejected by metadata.
-- [ ] Run `mkdocs build --strict`.
+- [x] Install the wheel into a clean Python 3.11 environment and run smoke tests.
+- [x] Confirm Python 3.10 installation is rejected by metadata.
+- [x] Run `mkdocs build --strict`.
 
 #### Exit criteria
 
-- [ ] Docs describe both happy paths and lifecycle hazards.
-- [ ] Benchmark results satisfy the gate.
-- [ ] Wheel and sdist contain all expected files.
-- [ ] Version, tag candidate, changelog, and package metadata agree.
-- [ ] All release checks in section 10 pass.
+- [x] Docs describe both happy paths and lifecycle hazards.
+- [x] Benchmark results satisfy the gate.
+- [x] Wheel and sdist contain all expected files.
+- [x] Version, tag candidate, changelog, and package metadata agree.
+- [x] All non-maintainer release checks in section 10 pass.
+
+WP8 verification note (2026-07-22): the full suite passed locally on Linux
+under Python 3.11, 3.12, 3.13, and 3.14. Python 3.12 passed both forced-stdlib
+and zlib-ng coverage runs at 92.70% and 92.48%. The clean Python 3.11 wheel
+smoke test and Python 3.10 metadata rejection passed. Windows and macOS remain
+covered by the configured CI matrix; the explicitly maintainer-only repository,
+tag, publication, and issue-tracking actions below remain unchecked.
 
 Suggested commit title:
 
@@ -1567,81 +1574,81 @@ Every item is mandatory unless explicitly marked as a maintainer-only action.
 
 ### Correctness
 
-- [ ] All existing behavior tests pass.
-- [ ] All new codec tests pass.
-- [ ] Hypothesis tests pass under stdlib and representative fast-engine configurations.
-- [ ] Stdlib `gzip` reads encoder and file-writer output.
-- [ ] aiogzip reads stdlib-created gzip streams.
-- [ ] Concatenated members, padding, metadata, CRC, and ISIZE behave consistently across all entry points.
-- [ ] No byte beyond `max_decompressed_size` is emitted.
-- [ ] `finish()` detects incomplete streams.
-- [ ] Decoder `feed()` and repeated `finish()` after successful completion raise
+- [x] All existing behavior tests pass.
+- [x] All new codec tests pass.
+- [x] Hypothesis tests pass under stdlib and representative fast-engine configurations.
+- [x] Stdlib `gzip` reads encoder and file-writer output.
+- [x] aiogzip reads stdlib-created gzip streams.
+- [x] Concatenated members, padding, metadata, CRC, and ISIZE behave consistently across all entry points.
+- [x] No byte beyond `max_decompressed_size` is emitted.
+- [x] `finish()` detects incomplete streams.
+- [x] Decoder `feed()` and repeated `finish()` after successful completion raise
       `ValueError`.
-- [ ] Codec constructor validation matches the established file API for
+- [x] Codec constructor validation matches the established file API for
       `mtime`, `output_chunk_size`, compression level, original filename, and
       decompression limits.
 
 ### Architecture
 
-- [ ] `aiogzip.codec` has no async or I/O dependency.
-- [ ] There is one gzip state machine.
-- [ ] Async wrappers own offload and cancellation.
-- [ ] Engine-specific tail semantics are isolated.
-- [ ] No direct decompression-member loop remains in `_binary.py`, `_streaming.py`, or `_inspection.py`.
-- [ ] No direct write-mode gzip framing remains in `_binary.py`.
+- [x] `aiogzip.codec` has no async or I/O dependency.
+- [x] There is one gzip state machine.
+- [x] Async wrappers own offload and cancellation.
+- [x] Engine-specific tail semantics are isolated.
+- [x] No direct decompression-member loop remains in `_binary.py`, `_streaming.py`, or `_inspection.py`.
+- [x] No direct write-mode gzip framing remains in `_binary.py`.
 
 ### Lifecycle and cancellation
 
-- [ ] Operation concurrency is rejected.
-- [ ] Dropping an unadvanced or partially advanced operation leaves the codec
+- [x] Operation concurrency is rejected.
+- [x] Dropping an unadvanced or partially advanced operation leaves the codec
       reserved and makes the next state-changing call raise `RuntimeError`
       deterministically with GC enabled or disabled.
-- [ ] No operation finalizer mutates codec state or releases ownership.
-- [ ] Partial operation close makes codec state unusable.
-- [ ] Async early exit closes source iterators.
-- [ ] Cancellation during executor work does not permit state reuse.
-- [ ] Broken writers do not emit a valid-looking trailer.
-- [ ] Cleanup errors do not replace primary operation errors.
+- [x] No operation finalizer mutates codec state or releases ownership.
+- [x] Partial operation close makes codec state unusable.
+- [x] Async early exit closes source iterators.
+- [x] Cancellation during executor work does not permit state reuse.
+- [x] Broken writers do not emit a valid-looking trailer.
+- [x] Cleanup errors do not replace primary operation errors.
 
 ### Quality
 
-- [ ] `uv run prek run --all-files`.
-- [ ] Ruff lint and format checks.
-- [ ] mypy.
-- [ ] ty.
-- [ ] Full coverage suite at or above 85%.
-- [ ] Strict documentation build.
-- [ ] Codec thread-safety, immutable-input and `bytes`-subclass snapshot
+- [x] `uv run prek run --all-files`.
+- [x] Ruff lint and format checks.
+- [x] mypy.
+- [x] ty.
+- [x] Full coverage suite at or above 85%.
+- [x] Strict documentation build.
+- [x] Codec thread-safety, immutable-input and `bytes`-subclass snapshot
       rationale, dropped-iterator behavior, terminal decoder behavior, and
       constructor limits are documented.
-- [ ] No unexpected warnings.
-- [ ] Public export tests updated.
-- [ ] Version-sync tests updated.
+- [x] No unexpected project warnings.
+- [x] Public export tests updated.
+- [x] Version-sync tests updated.
 
 ### Performance and memory
 
-- [ ] `plans/benchmarks/v1.11.0-baseline.md` identifies the exact published
+- [x] `plans/benchmarks/v1.11.0-baseline.md` identifies the exact published
       commit and the pre-WP0 environment.
-- [ ] Primary representative operations with valid locked `v1.11.0` baselines
+- [x] Primary representative operations with valid locked `v1.11.0` baselines
       are within 5% or investigated.
-- [ ] No unapproved repeatable regression over 10% in a comparable,
+- [x] No unapproved repeatable regression over 10% in a comparable,
       baseline-backed high-level operation.
-- [ ] New codec-only microbenchmarks without a `v1.11.0` equivalent are labeled
+- [x] New codec-only microbenchmarks without a `v1.11.0` equivalent are labeled
       informational and are excluded from the 5%/10% release gates.
-- [ ] Strict output bounds remain intact.
-- [ ] Highly compressible streaming input remains within the existing memory ceiling.
-- [ ] No background task or unbounded queue has been introduced.
+- [x] Strict output bounds remain intact.
+- [x] Highly compressible streaming input remains within the existing memory ceiling.
+- [x] No background task or unbounded queue has been introduced.
 
 ### Packaging
 
-- [ ] `requires-python >=3.11`.
-- [ ] Alpha classifier.
-- [ ] `__version__ == 2.0.0a1`.
-- [ ] Changelog release date and version.
-- [ ] Wheel and sdist build.
-- [ ] `twine check` passes.
-- [ ] Clean-wheel smoke test passes.
-- [ ] Docs and source files are present in sdist as intended.
+- [x] `requires-python >=3.11`.
+- [x] Alpha classifier.
+- [x] `__version__ == 2.0.0a1`.
+- [x] Changelog release date and version.
+- [x] Wheel and sdist build.
+- [x] `twine check` passes.
+- [x] Clean-wheel smoke test passes.
+- [x] Docs and source files are present in sdist as intended.
 
 ### Maintainer-only repository checks
 

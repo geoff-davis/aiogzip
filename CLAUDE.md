@@ -57,6 +57,27 @@ must be installed — `uv run prek install` handles it via
 - Always add tests for new features
 - Document edge cases with descriptive test names
 
+## Gzip Architecture
+
+`src/aiogzip/codec.py` is the single production gzip state machine. It owns
+RFC 1952 framing, raw DEFLATE engine state, CRC/ISIZE accounting, member
+traversal, padding, metadata, and decompression limits. `_binary.py`,
+`_streaming.py`, and `_inspection.py` are transport wrappers and must not grow
+their own gzip framing or member loops.
+
+The public `GzipEncoder` and `GzipDecoder` are synchronous sans-I/O codecs.
+Their state-changing methods return lazy reserved operations. Exhaust or
+explicitly close every operation; never depend on iterator finalizers, eagerly
+materialize an operation before producing output, or read the next source item
+while the current operation still has output. Async wrappers own executor
+offload, cancellation, source/sink cleanup, and backpressure.
+
+Codec input is deliberately stricter than file `write()`: exact `bytes` is
+zero-copy, a `bytes` subclass is snapshotted to exact `bytes`, and mutable or
+general buffers are rejected. Codec instances and operation iterators are not
+thread-safe. Preserve these ownership and immutable-input boundaries when
+changing the architecture.
+
 ### Test Organization
 
 Tests are organized by priority:
@@ -195,16 +216,13 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **1.11.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
-  work adds `iter_batches(hint)` batched line iteration, corrective TypeErrors
-  for `with`/`for` misuse, a `python -m aiogzip {inspect,verify}` CLI, an
-  `EngineInfo.crc32` field, and new docs (gzip.open migration, error taxonomy,
-  ISA-L ADR, S3/fsspec recipe). Prior releases added package-level `open()`,
-  whole-file helpers, engine diagnostics, gzip inspection and verification,
-  bounded async-iterable compression/decompression, and per-platform codec
-  selection; the benchmark documentation reflects 2026-07-16 reference runs.
+- **2.0.0a1 (current)** - Requires Python 3.11+ and adds the public synchronous
+  sans-I/O `GzipEncoder` and `GzipDecoder`. File, iterable-streaming, inspection,
+  and verification paths now share that one gzip state machine. The codec API
+  remains provisional through the alpha series; established asyncio APIs keep
+  their compatibility contract.
 
 ---
 
-**Last Updated:** 2026-07-09
+**Last Updated:** 2026-07-22
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!

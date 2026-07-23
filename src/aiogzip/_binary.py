@@ -281,13 +281,20 @@ class AsyncGzipBinaryFile:
                         ),
                         fast_compress=self._fast_compress,
                         strict_size=self._strict_size,
-                        output_chunk_size=self._chunk_size,
+                        output_chunk_size=max(
+                            self._chunk_size, self.DEFAULT_CHUNK_SIZE
+                        ),
                     )
                 for header_chunk in self._encoder.start():
                     await self._write_all(header_chunk)
             else:  # read mode
                 self._decoder = GzipDecoder(
-                    output_chunk_size=self._chunk_size,
+                    # ``chunk_size`` governs transport reads and write
+                    # batching. Preserve the codec's tuned bounded-output
+                    # floor so tiny compatibility-test read sizes do not turn
+                    # a large inflate result into thousands of Python
+                    # operations.
+                    output_chunk_size=max(self._chunk_size, self.DEFAULT_CHUNK_SIZE),
                     max_decompressed_size=self._max_decompressed_size,
                 )
                 self._eof = False
@@ -1052,7 +1059,10 @@ class AsyncGzipBinaryFile:
             # that all accepted members and trailers were complete.
             self._eof = True
             try:
-                return [piece async for piece in _drive_operation(decoder.finish())]
+                pieces = []
+                for piece in decoder.finish():
+                    pieces.append(piece)
+                return pieces
             except asyncio.CancelledError:
                 self._read_broken = True
                 decoder.discard()
@@ -1071,22 +1081,26 @@ class AsyncGzipBinaryFile:
                 ) from error
 
         try:
+            operation = decoder.feed(compressed_chunk)
+            if len(compressed_chunk) <= _ZLIB_OFFLOAD_THRESHOLD:
+                # Match the writer's cheap path: avoid an async-generator
+                # transition for codec work that is intentionally staying on
+                # the event-loop thread. Fully exhaust the lazy operation
+                # before returning any pieces to the read buffer.
+                pieces = []
+                for piece in operation:
+                    pieces.append(piece)
+                return pieces
             return [
                 piece
                 async for piece in _drive_operation(
-                    decoder.feed(compressed_chunk),
-                    # The threshold is calibrated as the largest inline
-                    # workload; only larger file chunks pay the thread hop.
-                    workload=(
-                        compressed_chunk
-                        if len(compressed_chunk) > _ZLIB_OFFLOAD_THRESHOLD
-                        else b""
-                    ),
+                    operation,
+                    workload=compressed_chunk,
                     # File input and decoder output share the same bound, so
                     # one offloaded inflate step covers the CPU-heavy work for
                     # a typical source chunk. Exhaustion bookkeeping stays
                     # inline, avoiding a second executor hop per file read.
-                    offload_first_only=(self._chunk_size <= _ZLIB_OFFLOAD_THRESHOLD),
+                    offload_first_only=True,
                 )
             ]
         except asyncio.CancelledError:
@@ -1160,7 +1174,7 @@ class AsyncGzipBinaryFile:
         if self._decoder is not None:
             self._decoder.discard()
         self._decoder = GzipDecoder(
-            output_chunk_size=self._chunk_size,
+            output_chunk_size=max(self._chunk_size, self.DEFAULT_CHUNK_SIZE),
             max_decompressed_size=self._max_decompressed_size,
         )
         del self._buffer[:]

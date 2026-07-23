@@ -79,6 +79,26 @@ the consumer exits early. See the
 [async-iterable streaming guide](https://geoff-davis.github.io/aiogzip/streaming/)
 for backpressure, limits, cancellation, metadata, and lifecycle behavior.
 
+For synchronous custom transports, the provisional 2.0 alpha codec performs
+gzip framing and validation without I/O or executor offload:
+
+```python
+import aiogzip
+
+encoder = aiogzip.GzipEncoder(mtime=0)
+wire = b"".join(encoder.start())
+wire += b"".join(encoder.feed(b"payload"))
+wire += b"".join(encoder.finish())
+
+decoder = aiogzip.GzipDecoder()
+payload = b"".join(decoder.feed(wire)) + b"".join(decoder.finish())
+```
+
+Every returned operation iterator must be exhausted before the next codec
+call. Decoder integrity is established only after `finish()` is exhausted.
+See the [synchronous codec guide](https://geoff-davis.github.io/aiogzip/codec/)
+for ownership, limits, immutable inputs, and thread-safety details.
+
 See the [recipes](https://geoff-davis.github.io/aiogzip/recipes/) for JSON
 Lines, untrusted input, reproducible output, append mode, seeking,
 cancellation recovery, and external async streams.
@@ -95,6 +115,7 @@ cancellation recovery, and external async streams.
 - Bounded decompression and rewind-cache controls for untrusted or
   non-seekable input.
 - Pull-driven compression and decompression for `AsyncIterable[bytes]` sources.
+- A synchronous sans-I/O gzip codec for custom transports.
 - Optional zlib-ng acceleration without a required runtime dependency.
 - Verified tarfile-style access patterns and `aiocsv` workflows.
 
@@ -188,18 +209,18 @@ compression level 6 for both writers, and median timings from repeated runs.
 On a representative Python 3.12 Linux run, the direct I/O cases used 8 MiB
 inputs and the concurrency case used ten 1 MiB files:
 
-- overlapping ten files with simulated 10 ms latency was about 6.6-7.3x
+- overlapping ten files with simulated 10 ms latency was about 6.4-6.9x
   faster than processing them sequentially with `gzip`;
-- optional zlib-ng made a highly compressible bulk `read(-1)` about 5.3x
+- optional zlib-ng made a highly compressible bulk `read(-1)` about 14.5x
   faster than `gzip`, and stdlib zlib finished slightly ahead (~1.08x);
 - an LF-only universal-newline fast path made the representative zlib-ng bulk
-  text read about 1.8x faster than `gzip` (the stdlib engine narrowed to
-  about 1.2x slower);
-- bounded `readlines()` batches brought an 8 MiB JSONL read-and-parse
-  workload slightly ahead of `gzip` on both engines (~1.03-1.05x faster),
-  about 9-14% faster than direct iteration;
+  text read about 1.9x faster than `gzip` (the stdlib engine was about 1.25x
+  slower);
+- bounded `readlines()` batches brought an 8 MiB JSONL read-and-parse workload
+  to parity with `gzip` on both engines and about 9-14% faster than direct
+  iteration;
 - equal-level bulk text writes were at parity; and
-- direct single-file JSONL iteration remained about 1.4-1.8x slower than
+- direct single-file JSONL iteration remained about 1.5-1.8x slower than
   `gzip` because each line crosses an async-iterator boundary — batch with
   `readlines(hint)` when that path is hot.
 

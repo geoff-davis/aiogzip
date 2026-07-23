@@ -8,12 +8,12 @@ dynamic = ["version"]
 authors = [
   { name="Geoff Davis", email="geoff@keksi.ai" },
 ]
-description = "Asynchronous gzip file reading and writing for Python asyncio — aiofiles-style API, streaming text/binary modes, decompression-bomb guards, optional zlib-ng acceleration."
+description = "Async gzip file I/O and a synchronous sans-I/O codec for Python, with bounded streaming, integrity checks, and optional zlib-ng acceleration."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
-keywords = ["gzip", "async", "asyncio", "compression", "decompression", "aiofiles", "zlib", "zlib-ng", "file-io"]
+keywords = ["gzip", "async", "asyncio", "sans-io", "codec", "compression", "decompression", "aiofiles", "zlib", "zlib-ng", "file-io"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
