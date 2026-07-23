@@ -10,6 +10,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+import aiogzip.codec as codec_module
 from aiogzip import AsyncGzipBinaryFile, GzipDecoder, GzipEncoder
 
 
@@ -139,6 +140,23 @@ def test_metadata_collection_is_opt_in():
 
     assert decoder.member_count == 1
     assert decoder.members == ()
+
+
+@pytest.mark.parametrize("optional_flag", [0x08, 0x10])
+def test_completed_optional_header_over_safety_limit_is_rejected(
+    monkeypatch, optional_flag
+):
+    monkeypatch.setattr(codec_module, "_MAX_CHUNK_SIZE", 16)
+    header = (
+        b"\x1f\x8b\x08"
+        + bytes([optional_flag])
+        + b"\x00\x00\x00\x00\x00\xff"
+        + b"1234567\x00"
+    )
+    decoder = GzipDecoder()
+
+    with pytest.raises(gzip.BadGzipFile, match="header exceeds"):
+        list(decoder.feed(header))
 
 
 def test_simple_and_hostile_bytes_subclasses_use_raw_buffer():

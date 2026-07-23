@@ -26,7 +26,6 @@ from ._common import (
     WithAsyncReadWrite,
     WithAsyncWrite,
     _check_can_open,
-    _derive_header_filename,
     _format_file_repr,
     _normalize_mtime,
     _parse_mode_tokens,
@@ -43,7 +42,7 @@ from .codec import GzipDecoder, GzipEncoder
 # (~50-100µs thread hop + wake-up) otherwise costs more than the CPU
 # work it offloads. Calibrated against incompressible data: below 256
 # KiB, decompressing a single chunk is faster than the hop, so the
-# event-loop benefit does not pay for itself. Above it, the CPU work
+# event-loop benefit does not pay for itself. At or above it, the CPU work
 # dominates and the hop is amortised.
 _ZLIB_OFFLOAD_THRESHOLD = _engine.ZLIB_OFFLOAD_THRESHOLD
 
@@ -265,6 +264,10 @@ class AsyncGzipBinaryFile:
 
             # Initialize compression/decompression engine based on mode
             if self._writing_mode:
+                header_filename = self._header_filename_override
+                if header_filename is None and self._filename is not None:
+                    header_filename = os.fspath(self._filename)
+
                 # __init__ already emits the established file-boundary warning
                 # when fast compression is unavailable. Avoid duplicating it
                 # when the codec performs its own direct-use warning.
@@ -276,9 +279,7 @@ class AsyncGzipBinaryFile:
                     self._encoder = GzipEncoder(
                         compresslevel=self._compresslevel,
                         mtime=self._header_mtime,
-                        original_filename=_derive_header_filename(
-                            self._header_filename_override, self._filename
-                        ),
+                        original_filename=header_filename,
                         fast_compress=self._fast_compress,
                         strict_size=self._strict_size,
                         output_chunk_size=max(
@@ -1082,7 +1083,7 @@ class AsyncGzipBinaryFile:
 
         try:
             operation = decoder.feed(compressed_chunk)
-            if len(compressed_chunk) <= _ZLIB_OFFLOAD_THRESHOLD:
+            if len(compressed_chunk) < _ZLIB_OFFLOAD_THRESHOLD:
                 # Match the writer's cheap path: avoid an async-generator
                 # transition for codec work that is intentionally staying on
                 # the event-loop thread. Fully exhaust the lazy operation

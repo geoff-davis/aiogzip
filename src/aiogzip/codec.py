@@ -579,6 +579,10 @@ class GzipDecoder(_CodecBase):
                             "gzip header exceeds the 128 MiB safety limit"
                         )
                     break
+                if parsed.size > _MAX_CHUNK_SIZE:
+                    raise gzip.BadGzipFile(
+                        "gzip header exceeds the 128 MiB safety limit"
+                    )
                 self._member_offset = self._consumed_size
                 self._header = parsed
                 self._consume(parsed.size)

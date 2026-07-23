@@ -808,6 +808,32 @@ class TestMediumPriorityEdgeCases:
         assert got == payload
         assert calls, "large decompress should have been offloaded"
 
+    async def test_threshold_sized_decompress_is_offloaded(self, temp_file):
+        """A default-sized compressed read should take the executor path."""
+        import gzip as _gzip
+        import os as _os
+        from unittest.mock import patch
+
+        from aiogzip import _binary
+
+        payload = _os.urandom(2 * _binary._ZLIB_OFFLOAD_THRESHOLD)
+        with _gzip.open(temp_file, "wb") as fh:
+            fh.write(payload)
+
+        calls = []
+        original = _binary._engine.run_zlib_in_thread
+
+        async def tracking(method, data):
+            calls.append(len(data))
+            return await original(method, data)
+
+        with patch.object(_binary._engine, "run_zlib_in_thread", tracking):
+            async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+                got = await f.read()
+
+        assert got == payload
+        assert _binary._ZLIB_OFFLOAD_THRESHOLD in calls
+
     async def test_large_subsequent_member_offloaded_to_executor(self, temp_file):
         """A large second member, surfaced as unused_data after the first
         member ends, must also be offloaded to the executor rather than

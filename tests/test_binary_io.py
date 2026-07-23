@@ -268,6 +268,26 @@ class TestAsyncGzipBinaryFile:
         assert header["filename"] == b"dataset"
         assert abs(header["mtime"] - int(time.time())) < 10
 
+    @pytest.mark.parametrize(
+        ("target_name", "original_filename", "expected_filename"),
+        [
+            ("archive.gz.gz", None, b"archive.gz"),
+            ("archive.gz", "report.gz.gz", b"report.gz"),
+        ],
+    )
+    async def test_binary_header_strips_only_one_gzip_suffix(
+        self, tmp_path, target_name, original_filename, expected_filename
+    ):
+        """The codec should normalize path-derived and explicit names once."""
+        target = tmp_path / target_name
+        async with AsyncGzipBinaryFile(
+            target, "wb", original_filename=original_filename
+        ) as f:
+            await f.write(b"x")
+
+        header = parse_gzip_header_bytes(target)
+        assert header["filename"] == expected_filename
+
     async def test_text_custom_header_metadata(self, tmp_path):
         """Text writer should forward metadata options to the binary layer."""
         target = tmp_path / "text_meta.gz"
