@@ -86,6 +86,14 @@ class TestCompressChunks:
         assert gzip.decompress(b"".join(output)) == b"".join(values)
         assert all(0 < len(chunk) <= 31 for chunk in output)
 
+    async def test_simple_bytes_subclass_source_item_is_accepted(self):
+        class Payload(bytes):
+            pass
+
+        output = await _collect(_items([Payload(b"subclass payload")]), mtime=0)
+
+        assert gzip.decompress(b"".join(output)) == b"subclass payload"
+
     @pytest.mark.parametrize("output_chunk_size", [1, 2, 9, 10, 17, 65536])
     async def test_output_chunk_size_is_a_strict_bound(self, output_chunk_size):
         payload = os.urandom(300000)

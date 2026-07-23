@@ -147,6 +147,14 @@ class TestDecompressChunks:
         assert b"".join(output) == b"".join(payloads)
         assert all(0 < len(chunk) <= 7 for chunk in output)
 
+    async def test_simple_bytes_subclass_source_item_is_accepted(self):
+        class Compressed(bytes):
+            pass
+
+        compressed = Compressed(gzip.compress(b"subclass payload", mtime=0))
+
+        assert b"".join(await _collect(_items([compressed]))) == b"subclass payload"
+
     async def test_metadata_heavy_header_split_bytewise(self):
         payload = b"metadata payload" * 100
         compressed = _metadata_member(payload)

@@ -57,3 +57,15 @@ def test_key_re_exports_are_stable():
     assert verify is aiogzip.verify
     assert decompress_chunks is aiogzip.decompress_chunks
     assert compress_chunks is aiogzip.compress_chunks
+
+
+def test_metadata_types_keep_private_inspection_aliases():
+    """Moving result types must preserve identity at every existing path."""
+    from aiogzip import _inspection, _metadata
+
+    assert aiogzip.GzipMemberInfo is _metadata.GzipMemberInfo
+    assert aiogzip.GzipInfo is _metadata.GzipInfo
+    assert aiogzip.VerificationResult is _metadata.VerificationResult
+    assert _inspection.GzipMemberInfo is _metadata.GzipMemberInfo
+    assert _inspection.GzipInfo is _metadata.GzipInfo
+    assert _inspection.VerificationResult is _metadata.VerificationResult

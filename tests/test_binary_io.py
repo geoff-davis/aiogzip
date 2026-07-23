@@ -105,6 +105,18 @@ class TestAsyncGzipBinaryFile:
         async with AsyncGzipBinaryFile(temp_file, "rb") as f:
             assert await f.read() == b"abcdef"
 
+    async def test_binary_accepts_simple_bytes_subclass(self, temp_file):
+        """The established file boundary treats a bytes subclass as bytes."""
+
+        class Payload(bytes):
+            pass
+
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            assert await f.write(Payload(b"subclass payload")) == 16
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.read() == b"subclass payload"
+
     async def test_binary_accepts_noncontiguous_and_multibyte_buffers(self, temp_file):
         """write() must coerce buffer-protocol inputs that are not already a
         flat, single-byte, contiguous view.

@@ -25,55 +25,13 @@ from ._common import (
     _validate_filename,
     _validate_optional_positive_int,
 )
+from ._metadata import GzipInfo, GzipMemberInfo, VerificationResult
+
+__all__ = ["GzipInfo", "GzipMemberInfo", "VerificationResult"]
 
 _RESERVED_FLAGS = 0xE0
 _Filename = Union[str, bytes, Path, None]
 _ReadFileObj = Optional[Union[WithAsyncRead, WithAsyncReadWrite]]
-
-
-@dataclass(frozen=True)
-class GzipMemberInfo:
-    """Validated metadata and sizes for one gzip member.
-
-    ``mtime`` preserves the literal unsigned header value, including zero.
-    Filename and comment fields are decoded one-to-one with Latin-1; absent
-    fields are ``None``, while present empty fields are empty strings.
-    """
-
-    index: int
-    compressed_offset: int
-    compressed_size: int
-    uncompressed_size: int
-    mtime: int
-    original_filename: Optional[str]
-    comment: Optional[str]
-    extra: Optional[bytes]
-    flags: int
-    crc32: int
-    trailer_isize: int
-
-
-@dataclass(frozen=True)
-class GzipInfo:
-    """Aggregate information for a completely validated gzip stream."""
-
-    members: Tuple[GzipMemberInfo, ...]
-    compressed_size: int
-    uncompressed_size: int
-
-    @property
-    def member_count(self) -> int:
-        """Return the number of gzip members in stream order."""
-        return len(self.members)
-
-
-@dataclass(frozen=True)
-class VerificationResult:
-    """Aggregate counts returned after successful integrity verification."""
-
-    member_count: int
-    compressed_size: int
-    uncompressed_size: int
 
 
 @dataclass(frozen=True)

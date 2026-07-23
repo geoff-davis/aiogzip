@@ -863,13 +863,13 @@ Pin down the behavior the refactor must preserve and eliminate the impending imp
 
 #### Tasks
 
-- [ ] Add missing characterization tests before moving codec code.
-- [ ] Move `GzipMemberInfo`, `GzipInfo`, and `VerificationResult` to `_metadata.py`.
-- [ ] Import those names back into `_inspection.py`.
-- [ ] Preserve package-root exports and identity.
-- [ ] Add tests that old private lookup paths still resolve as module attributes.
-- [ ] Add the next repository ADR, recommended filename `docs/adr-sans-io-codec.md`.
-- [ ] Record the fixed decisions from sections 5–7 in the ADR, including:
+- [x] Add missing characterization tests before moving codec code.
+- [x] Move `GzipMemberInfo`, `GzipInfo`, and `VerificationResult` to `_metadata.py`.
+- [x] Import those names back into `_inspection.py`.
+- [x] Preserve package-root exports and identity.
+- [x] Add tests that old private lookup paths still resolve as module attributes.
+- [x] Add the next repository ADR, recommended filename `docs/adr-sans-io-codec.md`.
+- [x] Record the fixed decisions from sections 5–7 in the ADR, including:
   - the lazy-iterator ownership model and deterministic dropped-iterator rule;
   - the immutable-input `feed()` rule, `bytes`-subclass normalization,
     snapshot-semantics rationale, and copy tradeoffs;
@@ -877,53 +877,53 @@ Pin down the behavior the refactor must preserve and eliminate the impending imp
   - the explicit non-thread-safe contract; and
   - the bounded pull-style fallback described in section 15 if alpha feedback
     rejects iterator ownership.
-- [ ] Do not add the public codec implementation in this package unless it is a behavior-neutral skeleton.
+- [x] Do not add the public codec implementation in this package unless it is a behavior-neutral skeleton.
 
 #### Characterization coverage to add or confirm
 
 Encoder/file writer:
 
-- [ ] header is written before payload;
-- [ ] append creates a new member;
-- [ ] bytes-like file writes remain accepted;
-- [ ] simple `bytes` subclasses remain accepted anywhere the current API
+- [x] header is written before payload;
+- [x] append creates a new member;
+- [x] bytes-like file writes remain accepted;
+- [x] simple `bytes` subclasses remain accepted anywhere the current API
       accepts `bytes`; characterize acceptance separately from the hardened
       raw-buffer snapshot semantics introduced in WP3;
-- [ ] `flush()` is non-finalizing and writing can continue afterward;
-- [ ] failed or cancelled writes poison the writer;
-- [ ] a broken writer does not emit a misleading trailer;
-- [ ] strict-size failure occurs before the engine advances;
-- [ ] default and fast-engine selection behavior is preserved.
+- [x] `flush()` is non-finalizing and writing can continue afterward;
+- [x] failed or cancelled writes poison the writer;
+- [x] a broken writer does not emit a misleading trailer;
+- [x] strict-size failure occurs before the engine advances;
+- [x] default and fast-engine selection behavior is preserved.
 
 Decoder/file reader:
 
-- [ ] zero-byte source behavior;
-- [ ] arbitrary compressed chunk boundaries;
-- [ ] concatenated members;
-- [ ] NUL padding;
-- [ ] trailing junk rejection;
-- [ ] truncated header/body/trailer;
-- [ ] CRC and ISIZE failures;
-- [ ] `mtime` availability timing;
-- [ ] bounded output and cumulative size limit;
-- [ ] rewind and backward seek reset the read-pass limit;
-- [ ] cancellation poisons executor-backed reads;
-- [ ] external file-object close ownership.
+- [x] zero-byte source behavior;
+- [x] arbitrary compressed chunk boundaries;
+- [x] concatenated members;
+- [x] NUL padding;
+- [x] trailing junk rejection;
+- [x] truncated header/body/trailer;
+- [x] CRC and ISIZE failures;
+- [x] `mtime` availability timing;
+- [x] bounded output and cumulative size limit;
+- [x] rewind and backward seek reset the read-pass limit;
+- [x] cancellation poisons executor-backed reads;
+- [x] external file-object close ownership.
 
 Streaming and inspection:
 
-- [ ] no source read-ahead;
-- [ ] early consumer exit closes the source iterator;
-- [ ] source exceptions remain primary;
-- [ ] complete validation occurs only at iterator exhaustion;
-- [ ] output chunks obey the strict bound;
-- [ ] completed-member offsets and sizes remain correct.
+- [x] no source read-ahead;
+- [x] early consumer exit closes the source iterator;
+- [x] source exceptions remain primary;
+- [x] complete validation occurs only at iterator exhaustion;
+- [x] output chunks obey the strict bound;
+- [x] completed-member offsets and sizes remain correct.
 
 #### Exit criteria
 
-- [ ] Moving result types causes no public behavior change.
-- [ ] The contract tests fail if the later codec refactor drops an existing safety or lifecycle behavior.
-- [ ] The ADR is reviewed before the public API is exposed.
+- [x] Moving result types causes no public behavior change.
+- [x] The contract tests fail if the later codec refactor drops an existing safety or lifecycle behavior.
+- [x] The ADR is reviewed before the public API is exposed.
 
 Suggested commit title:
 
