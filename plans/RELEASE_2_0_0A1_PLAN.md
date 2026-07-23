@@ -1262,63 +1262,71 @@ Make all binary read modes use `GzipDecoder`. This is the highest-risk package.
 
 #### Tasks
 
-- [ ] Replace direct `decompressobj(GZIP_WBITS)` state with `GzipDecoder`.
-- [ ] Feed compressed source chunks through the async codec driver.
-- [ ] On underlying EOF, exhaust `decoder.finish()` exactly once.
-- [ ] Preserve the zero-byte-file behavior.
-- [ ] Preserve `_decompress_next()`’s list-of-pieces optimization for `read(-1)` if it remains beneficial.
-- [ ] Preserve bounded buffering for partial reads.
-- [ ] Preserve `read`, `read1`, `readinto`, `readinto1`, `peek`, `readline`, `readlines`, iteration, and tarfile-style access behavior.
-- [ ] Preserve cumulative `max_decompressed_size` behavior for a read pass.
-- [ ] Preserve multi-member and NUL-padding behavior through the codec.
-- [ ] Preserve error mapping and useful context.
-- [ ] Preserve `.mtime` availability. It is acceptable to retain the small existing header-mtime probe in the file wrapper solely for early property compatibility; it must not become a second decompression state machine.
-- [ ] On rewind/backward seek, instantiate a fresh decoder and reset the per-pass counters and buffered output.
-- [ ] Preserve non-seekable replay-cache semantics and limits.
-- [ ] Preserve broken-reader behavior after executor cancellation.
-- [ ] Ensure a worker still running after cancellation cannot race with a newly created decoder.
-- [ ] Remove duplicate member-loop, `unused_data`, `unconsumed_tail`, and finalization logic from `_binary.py`.
-- [ ] Keep forward seek implemented by consuming decompressed bytes; do not add indexing.
+- [x] Replace direct `decompressobj(GZIP_WBITS)` state with `GzipDecoder`.
+- [x] Feed compressed source chunks through the async codec driver.
+- [x] On underlying EOF, exhaust `decoder.finish()` exactly once.
+- [x] Preserve the zero-byte-file behavior.
+- [x] Preserve `_decompress_next()`’s list-of-pieces optimization for `read(-1)` if it remains beneficial.
+- [x] Preserve bounded buffering for partial reads.
+- [x] Preserve `read`, `read1`, `readinto`, `readinto1`, `peek`, `readline`, `readlines`, iteration, and tarfile-style access behavior.
+- [x] Preserve cumulative `max_decompressed_size` behavior for a read pass.
+- [x] Preserve multi-member and NUL-padding behavior through the codec.
+- [x] Preserve error mapping and useful context.
+- [x] Preserve `.mtime` availability. It is acceptable to retain the small existing header-mtime probe in the file wrapper solely for early property compatibility; it must not become a second decompression state machine.
+- [x] On rewind/backward seek, instantiate a fresh decoder and reset the per-pass counters and buffered output.
+- [x] Preserve non-seekable replay-cache semantics and limits.
+- [x] Preserve broken-reader behavior after executor cancellation.
+- [x] Ensure a worker still running after cancellation cannot race with a newly created decoder.
+- [x] Remove duplicate member-loop, `unused_data`, `unconsumed_tail`, and finalization logic from `_binary.py`.
+- [x] Keep forward seek implemented by consuming decompressed bytes; do not add indexing.
 
 #### Required tests
 
 Run the complete suite, with special attention to:
 
-- [ ] binary partial-read tests;
-- [ ] read-all fast path;
-- [ ] read buffer compaction;
-- [ ] read1/readinto1 limits;
-- [ ] peek non-advancement;
-- [ ] line boundary handling;
-- [ ] tarfile integration;
-- [ ] concatenated members;
-- [ ] zero padding;
-- [ ] corruption and truncation;
-- [ ] decompression bomb guard;
-- [ ] exact-limit behavior;
-- [ ] seek from start/current/end;
-- [ ] backward seek replay;
-- [ ] rewind;
-- [ ] non-seekable sources and cache cap;
-- [ ] `.mtime`;
-- [ ] external async sources;
-- [ ] cancellation and reopen guidance;
-- [ ] text-mode suite, because it depends on binary reads;
-- [ ] aiocsv integration.
+- [x] binary partial-read tests;
+- [x] read-all fast path;
+- [x] read buffer compaction;
+- [x] read1/readinto1 limits;
+- [x] peek non-advancement;
+- [x] line boundary handling;
+- [x] tarfile integration;
+- [x] concatenated members;
+- [x] zero padding;
+- [x] corruption and truncation;
+- [x] decompression bomb guard;
+- [x] exact-limit behavior;
+- [x] seek from start/current/end;
+- [x] backward seek replay;
+- [x] rewind;
+- [x] non-seekable sources and cache cap;
+- [x] `.mtime`;
+- [x] external async sources;
+- [x] cancellation and reopen guidance;
+- [x] text-mode suite, because it depends on binary reads;
+- [x] aiocsv integration.
 
 Add parity/property tests:
 
-- [ ] generate payloads and member groupings with Hypothesis;
-- [ ] compare full output with `gzip.decompress`;
-- [ ] compare a sequence of reads/seeks with `gzip.GzipFile` where semantics overlap;
-- [ ] run the same fixture through `GzipDecoder`, `decompress_chunks`, `inspect`, `verify`, and `AsyncGzipBinaryFile`.
+- [x] generate payloads and member groupings with Hypothesis;
+- [x] compare full output with `gzip.decompress`;
+- [x] compare a sequence of reads/seeks with `gzip.GzipFile` where semantics overlap;
+- [x] run the same fixture through `GzipDecoder`, `decompress_chunks`, `inspect`, `verify`, and `AsyncGzipBinaryFile`.
 
 #### Exit criteria
 
-- [ ] `_binary.py` no longer performs direct gzip decompression or member traversal.
-- [ ] All high-level and text tests pass unchanged except deliberate Python-floor adjustments.
-- [ ] Reader memory and throughput meet the release gate.
-- [ ] The only remaining header parser duplication is a documented, read-only mtime compatibility probe if still required.
+- [x] `_binary.py` no longer performs direct gzip decompression or member traversal.
+- [x] All high-level and text tests pass unchanged except deliberate Python-floor adjustments.
+- [x] Reader memory and throughput meet the release gate.
+- [x] The only remaining header parser duplication is a documented, read-only mtime compatibility probe if still required.
+
+WP6 benchmark note (2026-07-22): the bounded-work hint restored the binary file
+reader to the locked 3.99 ms baseline (4 ms candidate), and full-read peak
+Python memory improved from 21.397 MiB to 16.01 MiB. The representative
+512/256 KiB `decompress_chunks` case remained 10 ms versus the locked 6.62 ms
+baseline after improving from 20 ms. The maintainer explicitly accepted this
+CRC/ISIZE-validation and bounded-output correctness/memory tradeoff on
+2026-07-22, as permitted by the release gate.
 
 Suggested commit title:
 

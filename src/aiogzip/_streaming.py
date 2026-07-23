@@ -59,7 +59,14 @@ async def _decompress_chunks_impl(
             if not snapshot:
                 continue
             async for output in _drive_operation(
-                decoder.feed(snapshot), workload=snapshot
+                decoder.feed(snapshot),
+                workload=snapshot,
+                # After the first step, each remaining inflate is bounded by
+                # output_chunk_size. Keep threshold-sized work inline and
+                # avoid an executor round-trip merely to observe exhaustion.
+                offload_first_only=(
+                    output_chunk_size <= _engine.ZLIB_OFFLOAD_THRESHOLD
+                ),
             ):
                 yield output
 

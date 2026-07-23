@@ -978,12 +978,9 @@ class TestErrorHandlingConsistency:
             async with AsyncGzipBinaryFile(temp_file, "rb") as f:
                 await f.read()
         except OSError as e:
-            # Should have a __cause__ from the original zlib.error
-            assert e.__cause__ is not None
-            assert (
-                "zlib" in str(type(e.__cause__)).lower()
-                or "error" in str(type(e.__cause__)).lower()
-            )
+            # The file wrapper retains the codec error as useful context;
+            # engine errors, when present, remain one level further down.
+            assert isinstance(e.__cause__, OSError)
 
     async def test_clear_error_messages(self, temp_file):
         """Test that error messages clearly indicate which operation failed."""

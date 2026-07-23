@@ -44,22 +44,14 @@ class TestHighPriorityEdgeCases:
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"test data")
 
-        class MockEngine:
-            """Mock decompression engine that raises unexpected error."""
-
-            def decompress(self, data):
-                raise RuntimeError("Unexpected decompress error")
-
-            @property
-            def unused_data(self):
-                return b""
-
-        # Now read with mocked decompressor
+        # Now read with a mocked codec inflate step.
         f = AsyncGzipBinaryFile(temp_file, "rb")
         await f.__aenter__()
 
-        # Replace engine with our mock
-        f._engine = MockEngine()
+        def fail_inflate(data):
+            raise RuntimeError("Unexpected decompress error")
+
+        f._decoder._inflate = fail_inflate
 
         with pytest.raises(OSError, match="Unexpected error during decompression"):
             await f.read()
@@ -74,29 +66,17 @@ class TestHighPriorityEdgeCases:
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"test data")
 
-        class MockEngine:
-            """Mock decompression engine that raises error on flush."""
-
-            def __init__(self):
-                self._called_decompress = False
-
-            def decompress(self, data):
-                self._called_decompress = True
-                # First call works, subsequent calls fail
-                return b""
-
-            def flush(self):
-                raise zlib.error("Finalization error")
-
-            @property
-            def unused_data(self):
-                return b""
-
         f = AsyncGzipBinaryFile(temp_file, "rb")
         await f.__aenter__()
 
-        # Replace engine after opening
-        f._engine = MockEngine()
+        def fail_finish():
+            def operation():
+                raise zlib.error("Finalization error")
+                yield b""  # pragma: no cover
+
+            return operation()
+
+        f._decoder.finish = fail_finish
 
         with pytest.raises(OSError, match="Error finalizing gzip decompression"):
             await f.read()
@@ -814,13 +794,13 @@ class TestMediumPriorityEdgeCases:
             fh.write(payload)
 
         calls = []
-        original = _binary._run_zlib_in_thread
+        original = _binary._engine.run_zlib_in_thread
 
         async def tracking(method, data):
             calls.append(len(data))
             return await original(method, data)
 
-        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+        with patch.object(_binary._engine, "run_zlib_in_thread", tracking):
             async with AsyncGzipBinaryFile(
                 temp_file, "rb", chunk_size=_binary._ZLIB_OFFLOAD_THRESHOLD * 2
             ) as f:
@@ -846,7 +826,7 @@ class TestMediumPriorityEdgeCases:
             fh.write(_gzip.compress(large))
 
         calls = []
-        original = _binary._run_zlib_in_thread
+        original = _binary._engine.run_zlib_in_thread
 
         async def tracking(method, data):
             calls.append(len(data))
@@ -854,7 +834,7 @@ class TestMediumPriorityEdgeCases:
 
         # A chunk_size large enough to read both members in one read, so the
         # second member arrives as unused_data on the first decompressor.
-        with patch.object(_binary, "_run_zlib_in_thread", tracking):
+        with patch.object(_binary._engine, "run_zlib_in_thread", tracking):
             async with AsyncGzipBinaryFile(
                 temp_file, "rb", chunk_size=8 * 1024 * 1024
             ) as f:
@@ -1344,12 +1324,14 @@ class TestReadCancellationDuringOffload:
             raw.write(payload)
 
         started = asyncio.Event()
+        release = asyncio.Event()
 
         async def blocking_offload(method, data):
             started.set()
-            await asyncio.Event().wait()
+            await release.wait()
+            return method(data)
 
-        monkeypatch.setattr(_binary, "_run_zlib_in_thread", blocking_offload)
+        monkeypatch.setattr(_binary._engine, "run_zlib_in_thread", blocking_offload)
         cap = len(payload) * 2 if use_cap else None
         f = AsyncGzipBinaryFile(
             temp_file,
@@ -1362,6 +1344,9 @@ class TestReadCancellationDuringOffload:
             task = asyncio.ensure_future(f.read())
             await started.wait()
             task.cancel()
+            await asyncio.sleep(0)
+            assert not task.done()
+            release.set()
             with pytest.raises(asyncio.CancelledError):
                 await task
 

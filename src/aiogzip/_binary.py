@@ -5,16 +5,13 @@ import gzip
 import io
 import os
 import warnings
-from functools import partial
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
     Iterable,
     List,
     NoReturn,
     Optional,
-    TypeVar,
     Union,
     cast,
 )
@@ -25,11 +22,9 @@ from . import _engine
 from ._codec_async import _drive_operation
 from ._common import (
     _MAX_CHUNK_SIZE,
-    GZIP_WBITS,
     WithAsyncRead,
     WithAsyncReadWrite,
     WithAsyncWrite,
-    ZlibEngine,
     _check_can_open,
     _derive_header_filename,
     _format_file_repr,
@@ -42,7 +37,7 @@ from ._common import (
     _validate_optional_positive_int,
     _validate_original_filename,
 )
-from .codec import GzipEncoder
+from .codec import GzipDecoder, GzipEncoder
 
 # Inputs smaller than this run zlib inline — the executor round-trip
 # (~50-100µs thread hop + wake-up) otherwise costs more than the CPU
@@ -53,18 +48,16 @@ from .codec import GzipEncoder
 _ZLIB_OFFLOAD_THRESHOLD = _engine.ZLIB_OFFLOAD_THRESHOLD
 
 
-_T = TypeVar("_T")
-
-
-async def _run_zlib_in_thread(method: Callable[[bytes], _T], data: bytes) -> _T:
-    """Run a zlib compress/decompress call in the default executor.
-
-    Kept as a module-level coroutine so tests can substitute it and so the
-    compress and decompress sites share one dispatch point. zlib releases
-    the GIL internally, so offloading large chunks keeps the event loop
-    responsive during CPU-bound work.
-    """
-    return await _engine.run_zlib_in_thread(method, data)
+def _decompression_error_message(error: gzip.BadGzipFile) -> str:
+    """Preserve the file API's error prefix around richer codec context."""
+    detail = str(error)
+    if detail.startswith("CRC check failed"):
+        detail = f"incorrect data check ({detail})"
+    elif detail.startswith("ISIZE check failed"):
+        detail = f"incorrect length check ({detail})"
+    elif "ended before" in detail and "truncated" not in detail:
+        detail = f"truncated or incomplete stream ({detail})"
+    return f"Error decompressing gzip data: {detail}"
 
 
 class AsyncGzipBinaryFile:
@@ -120,8 +113,8 @@ class AsyncGzipBinaryFile:
         "_closefd",
         "_file_mode",
         "_file",
-        "_engine",
         "_encoder",
+        "_decoder",
         "_buffer",
         "_buffer_offset",
         "_is_closed",
@@ -138,10 +131,8 @@ class AsyncGzipBinaryFile:
         "_write_broken",
         "_read_broken",
         "_max_decompressed_size",
-        "_decompressed_total",
         "_strict_size",
         "_fast_compress",
-        "_saw_compressed_data",
     )
 
     # 256 KiB balances bulk-read throughput against per-file memory. Below it
@@ -220,8 +211,8 @@ class AsyncGzipBinaryFile:
             self._file_mode += "+"
 
         self._file: Any = None
-        self._engine: ZlibEngine = None
         self._encoder: Optional[GzipEncoder] = None
+        self._decoder: Optional[GzipDecoder] = None
         self._buffer = bytearray()  # Use bytearray for efficient buffer growth
         self._buffer_offset: int = 0  # Offset to the start of valid data in _buffer
         self._is_closed: bool = False
@@ -238,9 +229,7 @@ class AsyncGzipBinaryFile:
         self._write_broken: bool = False
         self._read_broken: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
-        self._decompressed_total: int = 0
         self._strict_size: bool = bool(strict_size)
-        self._saw_compressed_data: bool = False
 
     async def open(self) -> "AsyncGzipBinaryFile":
         """Open the file for I/O and return ``self``.
@@ -297,13 +286,16 @@ class AsyncGzipBinaryFile:
                 for header_chunk in self._encoder.start():
                     await self._write_all(header_chunk)
             else:  # read mode
-                self._engine = _engine.decompressobj(GZIP_WBITS)
+                self._decoder = GzipDecoder(
+                    output_chunk_size=self._chunk_size,
+                    max_decompressed_size=self._max_decompressed_size,
+                )
+                self._eof = False
                 self._position = 0
                 self._mtime = None
                 self._header_probe_buffer.clear()
                 self._compressed_cache.clear()
                 self._replay_offset = None
-                self._saw_compressed_data = False
                 self._underlying_seekable = await self._probe_underlying_seekable()
                 self._cache_rewindable_reads = not self._underlying_seekable
 
@@ -1027,10 +1019,10 @@ class AsyncGzipBinaryFile:
     async def _decompress_next(self) -> List[bytes]:
         """Read the next compressed chunk and return its decompressed pieces.
 
-        This is the shared decompression core. It advances EOF state, parses
-        the gzip header mtime, walks multi-member archives (created by append
-        mode), performs end-of-stream finalization/validation, and enforces
-        ``max_decompressed_size``.
+        This is the shared file/codec bridge. It advances EOF state, retains
+        the small compatibility-only gzip-header mtime probe, and delegates
+        member traversal, finalization, validation, and output limits to the
+        public decoder.
 
         Each decompressor call already returns a fresh ``bytes`` object, so the
         pieces are handed back as-is: ``read(-1)`` appends them straight to its
@@ -1042,9 +1034,9 @@ class AsyncGzipBinaryFile:
             return []
 
         compressed_chunk = await self._read_compressed_chunk()
-
-        if compressed_chunk:
-            self._saw_compressed_data = True
+        decoder = self._decoder
+        if decoder is None:
+            raise RuntimeError("gzip reader decoder is not initialized")
 
         if self._mtime is None and compressed_chunk:
             self._header_probe_buffer.extend(compressed_chunk)
@@ -1056,94 +1048,60 @@ class AsyncGzipBinaryFile:
                 self._header_probe_buffer.clear()
 
         if not compressed_chunk:
-            # End of file - flush any remaining data from decompressor
+            # Underlying EOF is the one point at which the decoder can prove
+            # that all accepted members and trailers were complete.
             self._eof = True
             try:
-                remaining = self._engine.flush()
-            except _engine.ZLIB_ERRORS as e:
+                return [piece async for piece in _drive_operation(decoder.finish())]
+            except asyncio.CancelledError:
+                self._read_broken = True
+                decoder.discard()
+                raise
+            except gzip.BadGzipFile as error:
+                raise gzip.BadGzipFile(_decompression_error_message(error)) from error
+            except _engine.ZLIB_ERRORS as error:
                 raise gzip.BadGzipFile(
-                    f"Error finalizing gzip decompression: {e}"
-                ) from e
-            pieces: List[bytes] = []
-            if remaining:
-                self._account_decompressed(len(remaining))
-                pieces.append(remaining)
-            # After the underlying file is drained, the decompressor must
-            # have consumed a complete gzip member — otherwise the file
-            # was truncated mid-stream and silently ignoring that would
-            # hand the caller a partial read with no indication. A file
-            # that never yielded any compressed bytes is not truncated:
-            # gzip.open() reads a zero-byte file as empty, so we do too.
-            if self._saw_compressed_data and not getattr(self._engine, "eof", True):
-                raise gzip.BadGzipFile(
-                    "Error decompressing gzip data: stream ended before "
-                    "the member trailer was read; the file is truncated "
-                    "or incomplete"
-                )
-            return pieces
+                    f"Error finalizing gzip decompression: {error}"
+                ) from error
+            except OSError:
+                raise
+            except Exception as error:
+                raise OSError(
+                    f"Unexpected error during decompression finalization: {error}"
+                ) from error
 
-        # Decompress the chunk
-        pieces = []
         try:
-            decompressed, unused = await self._decompress_payload(compressed_chunk)
-            pieces.extend(decompressed)
-
-            # Handle multi-member gzip archives (created by append mode).
-            # CPython's gzip reader ignores zero padding between/after members,
-            # so strip NUL bytes before attempting to parse another member.
-            while unused:
-                unused = unused.lstrip(b"\x00")
-                if not unused:
-                    break
-
-                self._engine = _engine.decompressobj(GZIP_WBITS)
-                decompressed, unused = await self._decompress_payload(unused)
-                pieces.extend(decompressed)
-        except _engine.ZLIB_ERRORS as e:
-            raise gzip.BadGzipFile(f"Error decompressing gzip data: {e}") from e
-        except OSError:
-            # Preserve OSErrors raised deliberately by helpers (e.g., the
-            # max_decompressed_size guard) instead of re-wrapping them.
+            return [
+                piece
+                async for piece in _drive_operation(
+                    decoder.feed(compressed_chunk),
+                    # The threshold is calibrated as the largest inline
+                    # workload; only larger file chunks pay the thread hop.
+                    workload=(
+                        compressed_chunk
+                        if len(compressed_chunk) > _ZLIB_OFFLOAD_THRESHOLD
+                        else b""
+                    ),
+                    # File input and decoder output share the same bound, so
+                    # one offloaded inflate step covers the CPU-heavy work for
+                    # a typical source chunk. Exhaustion bookkeeping stays
+                    # inline, avoiding a second executor hop per file read.
+                    offload_first_only=(self._chunk_size <= _ZLIB_OFFLOAD_THRESHOLD),
+                )
+            ]
+        except asyncio.CancelledError:
+            # The driver waits for the executor worker to finish before it
+            # closes the operation. Only then is it safe to discard the shared
+            # decoder and expose cancellation to a caller that may reopen.
+            self._read_broken = True
+            decoder.discard()
             raise
-        except Exception as e:
-            raise OSError(f"Unexpected error during decompression: {e}") from e
-        return pieces
-
-    async def _decompress_payload(self, compressed: bytes) -> tuple[List[bytes], bytes]:
-        """Inflate one span and return output plus bytes retained after EOF.
-
-        When a decompression limit is configured, the engine receives the
-        remaining allowance plus one byte. That extra byte detects an
-        over-limit stream without materializing its full expansion. Consumption
-        is supplied exclusively by the engine adapter, including member EOF.
-        """
-        cap = self._max_decompressed_size
-        pieces: List[bytes] = []
-        pending = compressed
-        while pending:
-            max_length = 0
-            if cap is not None:
-                remaining = cap - self._decompressed_total
-                max_length = remaining + 1
-            inflate = partial(
-                _engine.inflate_step,
-                self._engine,
-                max_length=max_length,
-            )
-            if len(pending) >= _ZLIB_OFFLOAD_THRESHOLD:
-                step = await self._run_decompress_in_thread(inflate, pending)
-            else:
-                step = inflate(pending)
-
-            if step.output:
-                self._account_decompressed(len(step.output))
-                pieces.append(step.output)
-
-            pending = pending[step.consumed :]
-            if step.eof:
-                return pieces, pending
-
-        return pieces, b""
+        except gzip.BadGzipFile as error:
+            raise gzip.BadGzipFile(_decompression_error_message(error)) from error
+        except OSError:
+            raise
+        except Exception as error:
+            raise OSError(f"Unexpected error during decompression: {error}") from error
 
     def _check_read_usable(self) -> None:
         """Reject access after cancellation may have advanced the decompressor."""
@@ -1152,18 +1110,6 @@ class AsyncGzipBinaryFile:
                 "read stream is broken after cancelled decompression; "
                 "close and reopen the gzip file"
             )
-
-    async def _run_decompress_in_thread(
-        self, method: Callable[[bytes], _T], data: bytes
-    ) -> _T:
-        """Offload decompression and poison state if the await is cancelled."""
-        try:
-            return await _run_zlib_in_thread(method, data)
-        except asyncio.CancelledError:
-            # Cancelling the await cannot stop an already-running executor call.
-            # It may still advance the shared engine after control returns here.
-            self._read_broken = True
-            raise
 
     async def _fill_buffer(self) -> None:
         """Decompress the next compressed chunk into the read buffer.
@@ -1174,22 +1120,6 @@ class AsyncGzipBinaryFile:
         """
         for piece in await self._decompress_next():
             self._buffer.extend(piece)
-
-    def _account_decompressed(self, n: int) -> None:
-        """Track total decompressed output and enforce max_decompressed_size.
-
-        Raises OSError once the cap is exceeded so a decompression bomb can
-        be aborted before consuming unbounded memory.
-        """
-        if not n:
-            return
-        self._decompressed_total += n
-        cap = self._max_decompressed_size
-        if cap is not None and self._decompressed_total > cap:
-            raise OSError(
-                f"decompressed output exceeded max_decompressed_size "
-                f"({self._decompressed_total} > {cap} bytes)"
-            )
 
     async def _consume_bytes(self, amount: int) -> None:
         """Advance the read position by consuming bytes without returning them."""
@@ -1227,13 +1157,16 @@ class AsyncGzipBinaryFile:
             self._replay_offset = 0
         else:
             raise OSError("Underlying file is not seekable")
-        self._engine = _engine.decompressobj(GZIP_WBITS)
+        if self._decoder is not None:
+            self._decoder.discard()
+        self._decoder = GzipDecoder(
+            output_chunk_size=self._chunk_size,
+            max_decompressed_size=self._max_decompressed_size,
+        )
         del self._buffer[:]
         self._buffer_offset = 0
         self._eof = False
         self._position = 0
-        self._decompressed_total = 0
-        self._saw_compressed_data = False
 
     async def _probe_underlying_seekable(self) -> bool:
         """Return whether the underlying file should be rewound with seek()."""
@@ -1308,6 +1241,10 @@ class AsyncGzipBinaryFile:
         self._encoder = None
         if encoder is not None:
             encoder.discard()
+        decoder = self._decoder
+        self._decoder = None
+        if decoder is not None:
+            decoder.discard()
         if file is None or not owns_file:
             return
 
@@ -1410,6 +1347,8 @@ class AsyncGzipBinaryFile:
             if self._writing_mode and self._write_broken and self._encoder is not None:
                 # A torn member must never receive a seemingly valid trailer.
                 self._encoder.discard()
+            if not self._writing_mode and self._decoder is not None:
+                self._decoder.discard()
             if close_file is not None:
                 # Close only if we own it or closefd=True. Preserve a prior
                 # final-write exception if close() also fails.
