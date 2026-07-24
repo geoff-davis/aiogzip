@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Documentation
+
+- The documentation site is now versioned with mike. Each minor line
+  publishes to its own directory (`1.11`, `2.0`, ...); stable releases from
+  `main` move the `latest` alias (the site default), pre-releases publish
+  under the `dev` alias, and maintenance branches republish their own line
+  without touching aliases. Deep links into the previous single-version site
+  now resolve via the versioned paths.
+
 ## [2.0.0a1] - 2026-07-22
 
 ### Added
