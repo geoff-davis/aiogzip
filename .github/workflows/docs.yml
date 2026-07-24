@@ -4,14 +4,17 @@ on:
   push:
     branches:
       - main
+      - 1.x
+  workflow_dispatch:
 
 permissions:
   contents: write
 
-# gh-deploy force-pushes gh-pages; never run two deploys concurrently.
+# mike appends commits to gh-pages; queue deploys so two runs never
+# interleave their commit/push sequences.
 concurrency:
   group: ${{ github.workflow }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -38,6 +41,28 @@ jobs:
           restore-keys: |
             mkdocs-material-
 
-      - run: pip install .[docs]
+      - run: pip install .[docs] mike
 
-      - run: mkdocs gh-deploy --force
+      - name: Fetch existing versioned docs
+        # actions/checkout restricts the fetch refspec to the triggering
+        # ref, so name the local branch explicitly for mike to build on.
+        run: git fetch --depth=1 origin gh-pages:gh-pages || true
+
+      - name: Deploy versioned docs
+        # Docs versions are one directory per minor line (1.11, 2.0, ...).
+        # main owns the moving aliases: stable releases take `latest` (the
+        # site default), pre-releases take `dev`. Maintenance branches
+        # (1.x) republish their minor line without touching aliases —
+        # existing aliases stay attached, so a 1.11 patch keeps updating
+        # `latest` for as long as `latest` still points at 1.11.
+        run: |
+          VERSION="$(python -c 'import aiogzip; print(aiogzip.__version__)')"
+          DOCS_VERSION="${VERSION%.*}"
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            mike deploy --push --title "$VERSION" "$DOCS_VERSION"
+          elif echo "$VERSION" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
+            mike deploy --push --update-aliases --title "$VERSION" "$DOCS_VERSION" latest
+            mike set-default --push latest
+          else
+            mike deploy --push --update-aliases --title "$VERSION" "$DOCS_VERSION" dev
+          fi
