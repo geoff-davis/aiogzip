@@ -98,25 +98,16 @@ class TestDecompressChunks:
             def __init__(self, **kwargs):
                 pass
 
-            async def _empty(self):
-                if False:
-                    yield b""
-
             def feed(self, data):
-                return self._empty()
-
-            async def _final(self):
-                yield b"final output"
+                return iter(())
 
             def finish(self):
-                return self._final()
+                return iter((b"final output",))
 
             def discard(self):
                 pass
 
-        monkeypatch.setattr(
-            streaming_module, "_IncrementalGzipDecoder", FinalOutputDecoder
-        )
+        monkeypatch.setattr(streaming_module, "GzipDecoder", FinalOutputDecoder)
 
         output = await _collect(_items([]))
 
@@ -146,6 +137,32 @@ class TestDecompressChunks:
 
         assert b"".join(output) == b"".join(payloads)
         assert all(0 < len(chunk) <= 7 for chunk in output)
+
+    async def test_simple_bytes_subclass_source_item_is_accepted(self):
+        class Compressed(bytes):
+            pass
+
+        compressed = Compressed(gzip.compress(b"subclass payload", mtime=0))
+
+        assert b"".join(await _collect(_items([compressed]))) == b"subclass payload"
+
+    async def test_hostile_bytes_subclass_uses_raw_buffer_snapshot(self):
+        class Hostile(bytes):
+            def __bytes__(self):
+                raise AssertionError("__bytes__ must not run")
+
+            def __len__(self):
+                raise AssertionError("__len__ must not run")
+
+            def __iter__(self):
+                raise AssertionError("__iter__ must not run")
+
+            def __getitem__(self, key):
+                raise AssertionError("__getitem__ must not run")
+
+        wire = gzip.compress(b"raw payload", mtime=0)
+
+        assert b"".join(await _collect(_items([Hostile(wire)]))) == b"raw payload"
 
     async def test_metadata_heavy_header_split_bytewise(self):
         payload = b"metadata payload" * 100
@@ -388,24 +405,29 @@ class TestDecompressChunks:
             os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1024), mtime=0
         )
         started = asyncio.Event()
-        cancelled = asyncio.Event()
+        release = asyncio.Event()
+        completed = asyncio.Event()
 
         async def blocked_offload(method, data):
             started.set()
             try:
-                await asyncio.Event().wait()
+                await release.wait()
+                return method(data)
             finally:
-                cancelled.set()
+                completed.set()
 
         monkeypatch.setattr(_engine, "run_zlib_in_thread", blocked_offload)
         stream = aiogzip.decompress_chunks(_items([compressed]))
         task = asyncio.create_task(stream.__anext__())
         await started.wait()
         task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        release.set()
 
         with pytest.raises(asyncio.CancelledError):
             await task
-        assert cancelled.is_set()
+        assert completed.is_set()
 
     async def test_cancellation_after_output_has_been_yielded(self):
         payload = b"output before cancellation"

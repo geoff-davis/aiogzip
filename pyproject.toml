@@ -8,19 +8,16 @@ dynamic = ["version"]
 authors = [
   { name="Geoff Davis", email="geoff@keksi.ai" },
 ]
-description = "Asynchronous gzip file reading and writing for Python asyncio — aiofiles-style API, streaming text/binary modes, decompression-bomb guards, optional zlib-ng acceleration."
+description = "Async gzip file I/O and a synchronous sans-I/O codec for Python, with bounded streaming, integrity checks, and optional zlib-ng acceleration."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
-keywords = ["gzip", "async", "asyncio", "compression", "decompression", "aiofiles", "zlib", "zlib-ng", "file-io"]
+keywords = ["gzip", "async", "asyncio", "sans-io", "codec", "compression", "decompression", "aiofiles", "zlib", "zlib-ng", "file-io"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -45,19 +42,17 @@ docs = [
     "mkdocs-material>=9.5.0",
     "mkdocstrings[python]>=0.24.0",
 ]
-# What the CI test matrix installs. mypy, types-aiofiles and
-# typing_extensions live here (not in dev) because test_factory_typing.py
-# shells out to `mypy --strict`; dropping them would silently skip that test.
+# What the CI test matrix installs. mypy and types-aiofiles live here (not in
+# dev) because test_factory_typing.py shells out to `mypy --strict`; dropping
+# them would silently skip that test.
 test = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24",
     "pytest-cov>=4.0.0",
     "hypothesis>=6.0.0",
     "psutil",
-    "tomli; python_version < \"3.11\"",
     "mypy>=1.0.0",
     "types-aiofiles",
-    "typing_extensions",
 ]
 dev = [
     "aiogzip[test]",
@@ -75,13 +70,9 @@ Changelog = "https://github.com/geoff-davis/aiogzip/blob/main/CHANGELOG.md"
 "Bug Tracker" = "https://github.com/geoff-davis/aiogzip/issues"
 
 [tool.uv]
-# The lockfile pins the dev environment only (CI installs unpinned via pip
-# across 3.8-3.14), and dev machines run modern Python. Restricting the lock
-# to >= 3.10 drops the marker-gated 3.8/3.9 branches, whose urllib3/wheel
-# pins are frozen at versions with known CVEs (the fixes dropped old
-# Pythons). To test on 3.8/3.9 locally, use pip/pyenv (see CLAUDE.md), not
-# `uv run --python 3.8`. Remove when 3.8/3.9 support is dropped in 2.0.
-environments = ["python_full_version >= '3.10'"]
+# The lockfile pins the development environment only; CI deliberately installs
+# unpinned dependencies. Keep local resolution aligned with the 2.0 floor.
+environments = ["python_full_version >= '3.11'"]
 
 [tool.flit.sdist]
 include = [
@@ -96,7 +87,7 @@ include = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py38"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = [
@@ -107,17 +98,21 @@ select = [
     "B",   # flake8-bugbear
     "UP",  # pyupgrade
 ]
-ignore = ["E501"]  # Line too long (handled by formatter usually, but good to ignore)
+ignore = [
+    "E501",  # Line too long (handled by formatter usually, but good to ignore)
+    # Raising the target to Python 3.11 must not turn WP0 into a repository-wide
+    # annotation/import rewrite. Touched code may modernize deliberately.
+    "UP006",
+    "UP007",
+    "UP035",
+    "UP045",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "src/aiogzip/__init__.py" = ["E402"]
 
 [tool.mypy]
-# Newer mypy releases keep dropping support for older python_version values
-# (1.15 dropped 3.8; later releases dropped 3.9 — "must be 3.10 or higher").
-# This only sets the type-checking semantics; the real 3.8 floor is enforced
-# by the test matrix and the pre-commit `python38-compat` hook (PEP 585/604).
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

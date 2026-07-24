@@ -12,9 +12,9 @@ import aiofiles
 import pytest
 
 import aiogzip
-from aiogzip import GzipInfo, GzipMemberInfo, VerificationResult, _engine
+from aiogzip import GzipDecoder, GzipInfo, GzipMemberInfo, VerificationResult, _engine
 from aiogzip import _inspection as inspection_module
-from aiogzip._inspection import _IncrementalGzipDecoder
+from aiogzip._codec_async import _drive_operation
 
 
 def _gzip_member(
@@ -57,16 +57,16 @@ def _gzip_member(
 
 
 async def _decode(raw, *, input_chunk_size, output_chunk_size=64, limit=None):
-    decoder = _IncrementalGzipDecoder(
+    decoder = GzipDecoder(
         max_decompressed_size=limit,
         output_chunk_size=output_chunk_size,
         collect_member_info=True,
     )
     output = []
     for offset in range(0, len(raw), input_chunk_size):
-        async for piece in decoder.feed(raw[offset : offset + input_chunk_size]):
+        for piece in decoder.feed(raw[offset : offset + input_chunk_size]):
             output.append(piece)
-    async for piece in decoder.finish():
+    for piece in decoder.finish():
         output.append(piece)
     return decoder, output
 
@@ -176,16 +176,16 @@ class TestIncrementalGzipDecoder:
         assert decoder.members[0].uncompressed_size == len(payload)
 
     async def test_metadata_collection_can_be_disabled(self):
-        decoder = _IncrementalGzipDecoder(
+        decoder = GzipDecoder(
             max_decompressed_size=None,
             output_chunk_size=1024,
             collect_member_info=False,
         )
         raw = _gzip_member(b"one") + _gzip_member(b"two")
 
-        async for _ in decoder.feed(raw):
+        for _ in decoder.feed(raw):
             pass
-        async for _ in decoder.finish():
+        for _ in decoder.finish():
             pass
 
         assert decoder.members == ()
@@ -233,22 +233,33 @@ class TestIncrementalGzipDecoder:
 
     async def test_cancelled_offload_discards_decoder(self, monkeypatch):
         raw = _gzip_member(os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1024))
-        decoder = _IncrementalGzipDecoder(
+        decoder = GzipDecoder(
             max_decompressed_size=None,
             output_chunk_size=1024,
             collect_member_info=False,
         )
 
-        async def cancel_offload(method, data):
-            raise asyncio.CancelledError
+        started = asyncio.Event()
+        release = asyncio.Event()
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", cancel_offload)
+        async def controlled_offload(method, data):
+            started.set()
+            await release.wait()
+            return method(data)
+
+        monkeypatch.setattr(_engine, "run_zlib_in_thread", controlled_offload)
+        stream = _drive_operation(decoder.feed(raw), workload=raw)
+        task = asyncio.create_task(stream.__anext__())
+        await started.wait()
+        task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        release.set()
 
         with pytest.raises(asyncio.CancelledError):
-            async for _ in decoder.feed(raw):
-                pass
+            await task
         with pytest.raises(OSError, match="unusable"):
-            decoder.feed(b"")
+            decoder.finish()
 
 
 class AsyncBytesReader:

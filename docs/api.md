@@ -13,11 +13,14 @@
 - `VerificationResult` and `verify` — lightweight aggregate counts after complete integrity verification
 - `decompress_chunks` — pull-driven decompression from an `AsyncIterable[bytes]` with bounded output chunks
 - `compress_chunks` — one-member gzip compression from an `AsyncIterable[bytes]` with bounded output chunks
+- `GzipEncoder` and `GzipDecoder` — synchronous sans-I/O state machines for
+  transport-independent, bounded gzip encoding and decoding
 - `WithAsyncRead`, `WithAsyncWrite`, `WithAsyncReadWrite` — runtime-checkable protocols describing the async file objects accepted via `fileobj=`
 - `ZlibEngine` — type alias for zlib compressor/decompressor objects (currently `Any`; the concrete C types are not exposed in type stubs)
 - `GZIP_WBITS`, `GZIP_METHOD_DEFLATE`, `GZIP_OS_UNKNOWN`, and the `GZIP_FLAG_FNAME` / `GZIP_FLAG_FHCRC` / `GZIP_FLAG_FEXTRA` / `GZIP_FLAG_FCOMMENT` header-flag constants — useful when inspecting gzip headers alongside this library
 - `__version__`
 
+The synchronous codec is implemented in the public `aiogzip.codec` module.
 Implementation internals live in `aiogzip._common`, `aiogzip._binary`,
 `aiogzip._text`, `aiogzip._inspection`, and `aiogzip._streaming`. Treat those
 modules as private and unstable.
@@ -40,6 +43,37 @@ await aiogzip.write("copy.bin.gz", data, mtime=0)
 
 Both helpers operate in binary mode and load the entire uncompressed payload
 into memory. Use `open()` for streaming large files.
+
+## Synchronous codec
+
+Use `GzipEncoder` and `GzipDecoder` when an application owns a synchronous or
+custom transport and needs aiogzip's framing, concatenated-member traversal,
+integrity validation, and output limits without any I/O or executor policy.
+Each state-changing call returns a lazy iterator that must be exhausted before
+another operation begins.
+
+```python
+import aiogzip
+
+encoder = aiogzip.GzipEncoder(mtime=0)
+wire = b"".join(encoder.start())
+wire += b"".join(encoder.feed(b"payload"))
+wire += b"".join(encoder.finish())
+
+decoder = aiogzip.GzipDecoder()
+payload = b"".join(decoder.feed(wire)) + b"".join(decoder.finish())
+```
+
+> **Warning:** Decoder output can precede its trailer. Integrity is established
+> only after the operation returned by `finish()` is exhausted.
+
+The codec API is provisional during the 2.0 alpha series. See the
+[synchronous codec guide](codec.md) for constructor validation, immutable
+input snapshots, lifecycle hazards, thread safety, and error behavior.
+
+::: aiogzip.codec.GzipEncoder
+
+::: aiogzip.codec.GzipDecoder
 
 ## Engine diagnostics
 

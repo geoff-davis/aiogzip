@@ -36,6 +36,26 @@ class TestAsyncGzipBinaryFile:
             remaining_data = await f.read()
             assert remaining_data == sample_data[10:]
 
+    @pytest.mark.parametrize(
+        ("chunk_size", "expected_output_size"),
+        [
+            (17, AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE),
+            (512 * 1024, 512 * 1024),
+        ],
+    )
+    async def test_codec_output_granularity_keeps_tuned_floor(
+        self, temp_file, chunk_size, expected_output_size
+    ):
+        async with AsyncGzipBinaryFile(temp_file, "wb") as stream:
+            await stream.write(b"payload")
+
+        async with AsyncGzipBinaryFile(
+            temp_file, "rb", chunk_size=chunk_size
+        ) as stream:
+            assert stream._decoder is not None
+            assert stream._decoder._output_chunk_size == expected_output_size
+            assert await stream.read() == b"payload"
+
     async def test_binary_read_negative_size_returns_all(self, temp_file, sample_data):
         """Negative size arguments should read the entire remaining stream."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
@@ -104,6 +124,73 @@ class TestAsyncGzipBinaryFile:
 
         async with AsyncGzipBinaryFile(temp_file, "rb") as f:
             assert await f.read() == b"abcdef"
+
+    async def test_binary_accepts_simple_bytes_subclass(self, temp_file):
+        """The established file boundary treats a bytes subclass as bytes."""
+
+        class Payload(bytes):
+            pass
+
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            assert await f.write(Payload(b"subclass payload")) == 16
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.read() == b"subclass payload"
+
+    async def test_binary_accepts_hostile_bytes_subclass(self, temp_file):
+        """Subclass hooks cannot alter or observe the immutable codec snapshot."""
+
+        class Hostile(bytes):
+            def __bytes__(self):
+                raise AssertionError("__bytes__ must not run")
+
+            def __len__(self):
+                raise AssertionError("__len__ must not run")
+
+            def __getitem__(self, key):
+                raise AssertionError("__getitem__ must not run")
+
+            def __iter__(self):
+                raise AssertionError("__iter__ must not run")
+
+        async with AsyncGzipBinaryFile(temp_file, "wb") as f:
+            assert await f.write(Hostile(b"raw subclass bytes")) == 18
+
+        with gzip.open(temp_file, "rb") as f:
+            assert f.read() == b"raw subclass bytes"
+
+    async def test_mutable_write_input_is_snapshotted_before_offload(
+        self, temp_file, monkeypatch
+    ):
+        """Caller mutation cannot race executor-backed compression."""
+        import asyncio
+
+        from aiogzip import _engine
+
+        started = asyncio.Event()
+        release = asyncio.Event()
+        original = _engine.run_zlib_in_thread
+
+        async def delayed(method, data):
+            started.set()
+            await release.wait()
+            return await original(method, data)
+
+        monkeypatch.setattr(_engine, "run_zlib_in_thread", delayed)
+        source = bytearray(os.urandom(512 * 1024))
+        expected = bytes(source)
+
+        f = AsyncGzipBinaryFile(temp_file, "wb")
+        await f.open()
+        task = asyncio.create_task(f.write(source))
+        await started.wait()
+        source[:] = b"x" * len(source)
+        release.set()
+        assert await task == len(expected)
+        await f.close()
+
+        with gzip.open(temp_file, "rb") as raw:
+            assert raw.read() == expected
 
     async def test_binary_accepts_noncontiguous_and_multibyte_buffers(self, temp_file):
         """write() must coerce buffer-protocol inputs that are not already a
@@ -180,6 +267,26 @@ class TestAsyncGzipBinaryFile:
         header = parse_gzip_header_bytes(target)
         assert header["filename"] == b"dataset"
         assert abs(header["mtime"] - int(time.time())) < 10
+
+    @pytest.mark.parametrize(
+        ("target_name", "original_filename", "expected_filename"),
+        [
+            ("archive.gz.gz", None, b"archive.gz"),
+            ("archive.gz", "report.gz.gz", b"report.gz"),
+        ],
+    )
+    async def test_binary_header_strips_only_one_gzip_suffix(
+        self, tmp_path, target_name, original_filename, expected_filename
+    ):
+        """The codec should normalize path-derived and explicit names once."""
+        target = tmp_path / target_name
+        async with AsyncGzipBinaryFile(
+            target, "wb", original_filename=original_filename
+        ) as f:
+            await f.write(b"x")
+
+        header = parse_gzip_header_bytes(target)
+        assert header["filename"] == expected_filename
 
     async def test_text_custom_header_metadata(self, tmp_path):
         """Text writer should forward metadata options to the binary layer."""
@@ -395,8 +502,7 @@ class TestAsyncGzipBinaryFile:
         }
         # write_bytes (not write_text) so "\n" is never translated to
         # os.linesep on Windows; the on-disk bytes and info.size then match
-        # the literal contents on every platform. (write_text's newline=
-        # parameter is Python 3.10+, so it cannot be used here.)
+        # the literal contents on every platform.
         file1.write_bytes(contents["inner1.txt"].encode("utf-8"))
         file2.write_bytes(contents["inner2.txt"].encode("utf-8"))
         with tarfile.open(tar_path, "w:gz") as tar:

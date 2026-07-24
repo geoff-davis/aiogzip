@@ -91,6 +91,80 @@ class TestFileobjSupport:
             await f.write(b"more")
         await f.close()
 
+    async def test_sink_failure_after_one_codec_chunk_keeps_position_uncommitted(self):
+        class FailAfterOneDataChunk:
+            def __init__(self):
+                self.buffer = bytearray()
+                self.calls = 0
+                self.fail_on_call = None
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls == self.fail_on_call:
+                    raise OSError("second codec chunk failed")
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                pass
+
+        writer = FailAfterOneDataChunk()
+        f = AsyncGzipBinaryFile(
+            None,
+            "wb",
+            fileobj=writer,
+            closefd=False,
+            chunk_size=1024,
+        )
+        await f.open()
+        header_size = len(writer.buffer)
+        writer.fail_on_call = writer.calls + 2
+
+        with pytest.raises(OSError, match="second codec chunk failed"):
+            await f.write(os.urandom(512 * 1024))
+
+        assert len(writer.buffer) >= header_size + 1024
+        assert await f.tell() == 0
+        assert f._write_broken is True
+        size_before_close = len(writer.buffer)
+        await f.close()
+        assert len(writer.buffer) == size_before_close
+
+    async def test_cancelled_underlying_flush_breaks_member_without_trailer(self):
+        import asyncio
+
+        class BlockingFlushWriter:
+            def __init__(self):
+                self.buffer = bytearray()
+                self.flush_started = asyncio.Event()
+
+            async def write(self, data):
+                self.buffer.extend(data)
+                return len(data)
+
+            async def flush(self):
+                self.flush_started.set()
+                await asyncio.Event().wait()
+
+            async def close(self):
+                pass
+
+        writer = BlockingFlushWriter()
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False)
+        await f.open()
+        await f.write(b"pending data")
+
+        task = asyncio.create_task(f.flush())
+        await writer.flush_started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert f._write_broken is True
+        size_before_close = len(writer.buffer)
+        await f.close()
+        assert len(writer.buffer) == size_before_close
+
     @pytest.mark.parametrize("invalid_count", [None, -1, True, 1000])
     async def test_invalid_write_count_fails_open(self, invalid_count):
         class InvalidWriter:

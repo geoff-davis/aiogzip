@@ -19,7 +19,7 @@ import os
 import sys
 import zlib
 from dataclasses import dataclass
-from typing import Any, Callable, Tuple, Type
+from typing import Any, Callable, Tuple, Type, TypeVar
 
 from ._common import ZlibEngine
 
@@ -49,7 +49,10 @@ _HAVE_ZNG = _zng is not None and not _FORCE_STDLIB
 ZLIB_OFFLOAD_THRESHOLD = 256 * 1024
 
 
-async def run_zlib_in_thread(method: Callable[[bytes], bytes], data: bytes) -> bytes:
+_T = TypeVar("_T")
+
+
+async def run_zlib_in_thread(method: Callable[[bytes], _T], data: bytes) -> _T:
     """Run one codec call in the event loop's default executor."""
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, method, data)
@@ -64,6 +67,89 @@ class EngineInfo:
     # Defaulted so third-party code constructing EngineInfo positionally
     # (it is public) keeps working; engine_info() always fills it in.
     crc32: str = "stdlib-zlib"
+
+
+@dataclass(frozen=True, slots=True)
+class _InflateStep:
+    """One engine-neutral raw or gzip inflate step."""
+
+    output: bytes
+    consumed: int
+    eof: bool
+
+
+def _merged_retained_size(data: bytes, first: bytes, second: bytes) -> int:
+    """Return the suffix length represented by two engine leftover fields.
+
+    Known zlib engines duplicate post-EOF bytes in both fields. Other engines
+    may use only one field, split the suffix, or expose overlapping fragments.
+    Resolve those representations here so callers only reason about counts.
+    """
+
+    def current_span(fragment: bytes) -> bytes:
+        if len(fragment) <= len(data):
+            return fragment
+        if not fragment.endswith(data):
+            raise RuntimeError("inflate engine returned input not present in its span")
+        return data
+
+    first = current_span(first)
+    second = current_span(second)
+
+    if not first:
+        if not data.endswith(second):
+            raise RuntimeError("inflate engine returned input not present in its span")
+        return len(second)
+    if not second:
+        if not data.endswith(first):
+            raise RuntimeError("inflate engine returned input not present in its span")
+        return len(first)
+    if first == second:
+        if not data.endswith(first):
+            raise RuntimeError("inflate engine returned input not present in its span")
+        return len(first)
+
+    candidates: set[int] = set()
+    for left, right in ((first, second), (second, first)):
+        maximum_overlap = min(len(left), len(right))
+        for overlap in range(maximum_overlap, -1, -1):
+            if left[len(left) - overlap :] != right[:overlap]:
+                continue
+            merged = left + right[overlap:]
+            if data.endswith(merged):
+                candidates.add(len(merged))
+                break
+    if candidates:
+        return max(candidates)
+
+    raise RuntimeError("inflate engine returned irreconcilable leftover input")
+
+
+def inflate_step(
+    engine: ZlibEngine, data: bytes, *, max_length: int = 0
+) -> _InflateStep:
+    """Inflate one span and normalize engine-specific consumption details."""
+    if max_length:
+        output = engine.decompress(data, max_length=max_length)
+    else:
+        output = engine.decompress(data)
+    eof = bool(getattr(engine, "eof", False))
+    unused = bytes(getattr(engine, "unused_data", b""))
+    tail = bytes(getattr(engine, "unconsumed_tail", b""))
+
+    if eof:
+        retained = _merged_retained_size(data, unused, tail)
+    else:
+        if not data.endswith(tail):
+            raise RuntimeError("inflate engine returned a non-suffix unconsumed tail")
+        retained = len(tail)
+
+    consumed = len(data) - retained
+    if not 0 <= consumed <= len(data):
+        raise RuntimeError("inflate engine reported invalid input consumption")
+    if data and not consumed and not output and not eof:
+        raise OSError("gzip decompressor made no progress")
+    return _InflateStep(output=output, consumed=consumed, eof=eof)
 
 
 # Errors raised by the deflate engines. zlib-ng's (and isal's) error type is

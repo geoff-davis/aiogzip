@@ -1,5 +1,5 @@
 site_name: aiogzip
-site_description: Asynchronous gzip file reader/writer with aiocsv support.
+site_description: Async gzip I/O and a synchronous sans-I/O gzip codec for Python.
 site_url: https://geoff-davis.github.io/aiogzip/
 
 repo_name: geoff-davis/aiogzip
@@ -60,8 +60,10 @@ nav:
   - Examples: examples.md
   - Recipes: recipes.md
   - Async-iterable streaming: streaming.md
+  - Synchronous codec: codec.md
   - Performance: performance.md
   - Error handling: errors.md
   - API Reference: api.md
+  - Design decisions (sans-I/O codec): adr-sans-io-codec.md
   - Design decisions (ISA-L): adr-isal.md
   - Contributing: contributing.md

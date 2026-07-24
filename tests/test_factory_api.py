@@ -132,7 +132,7 @@ class TestAsyncGzipFile:
         gz_file = AsyncGzipFile("test.gz", "rb")
         assert isinstance(gz_file, AsyncGzipBinaryFile)
         assert gz_file._file is None  # pyrefly: ignore
-        assert gz_file._engine is None  # pyrefly: ignore
+        assert gz_file._decoder is None  # pyrefly: ignore
         assert gz_file._buffer == b""  # pyrefly: ignore
         assert gz_file._is_closed is False
         assert gz_file._eof is False  # pyrefly: ignore

@@ -23,7 +23,13 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from aiogzip import AsyncGzipBinaryFile
+from aiogzip import (
+    AsyncGzipBinaryFile,
+    GzipDecoder,
+    decompress_chunks,
+    inspect,
+    verify,
+)
 
 # Modest example budgets keep CI fast while still exploring a wide space.
 MAX_EXAMPLES = 200
@@ -109,6 +115,30 @@ def _run(coro):
 async def _aio_read_all(path, chunk_size):
     async with AsyncGzipBinaryFile(path, "rb", chunk_size=chunk_size) as g:
         return await g.read()
+
+
+async def _async_parts(raw, split):
+    for offset in range(0, len(raw), split):
+        yield raw[offset : offset + split]
+
+
+async def _check_unified_surfaces(path, raw, expected, member_count, split):
+    streamed = b"".join(
+        [
+            piece
+            async for piece in decompress_chunks(
+                _async_parts(raw, split), output_chunk_size=split
+            )
+        ]
+    )
+    async with AsyncGzipBinaryFile(path, "rb", chunk_size=split) as stream:
+        file_output = await stream.read()
+    info = await inspect(path, chunk_size=split)
+    verification = await verify(path, chunk_size=split)
+
+    assert streamed == file_output == expected
+    assert info.member_count == verification.member_count == member_count
+    assert info.uncompressed_size == verification.uncompressed_size == len(expected)
 
 
 # --------------------------------------------------------------------------- #
@@ -197,6 +227,27 @@ def test_read_patterns_match_stdlib(members, chunk_size, data):
     path = _write_tmp(raw)
     try:
         _run(_check_pattern(path, chunk_size, pattern, params))
+    finally:
+        os.unlink(path)
+
+
+@settings(max_examples=100, deadline=None, suppress_health_check=_SUPPRESSED)
+@given(members=_members, split=st.integers(min_value=1, max_value=1024))
+def test_all_decoder_surfaces_share_member_and_output_semantics(members, split):
+    """Every public decoder surface agrees on randomized member groupings."""
+    raw, _ = _build_raw(members)
+    expected = gzip.decompress(raw)
+
+    decoder = GzipDecoder(output_chunk_size=split)
+    codec_output = bytearray()
+    for offset in range(0, len(raw), split):
+        codec_output.extend(b"".join(decoder.feed(raw[offset : offset + split])))
+    codec_output.extend(b"".join(decoder.finish()))
+    assert bytes(codec_output) == expected
+
+    path = _write_tmp(raw)
+    try:
+        _run(_check_unified_surfaces(path, raw, expected, len(members), split))
     finally:
         os.unlink(path)
 

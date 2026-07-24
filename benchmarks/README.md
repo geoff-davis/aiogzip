@@ -85,6 +85,18 @@ Fine-grained performance measurements:
 - Small write operations (1000 x 120 bytes)
 - Binary readline stress case (200KB line, 17-byte chunks)
 
+### 8. 🔄 Streaming and sans-I/O codec (`bench_streaming.py`)
+
+- Direct synchronous `GzipEncoder` and `GzipDecoder` encode/decode
+- Equivalent `gzip.compress` and `gzip.decompress` reference timings
+- Async `compress_chunks` and `decompress_chunks` at representative boundaries
+- Binary file reader/writer comparisons
+- Highly compressible streaming and full-read peak Python memory
+
+The direct codec cases are labeled informational. aiogzip 1.11.0 had no public
+sans-I/O codec, so those absolute timings and their same-run stdlib references
+do not participate in the release regression thresholds.
+
 ## Running Benchmarks
 
 ### Command Line Options

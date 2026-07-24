@@ -7,8 +7,10 @@ line size, storage latency, and how much concurrency the application can use.
 
 ## Benchmark Summary
 
-The table below is from representative Linux x86-64 runs on Python 3.12.12
-on 2026-07-16 at commit `ec931cd`.
+The table below is from the 2.0.0a1 release-candidate Linux x86-64 runs on
+Python 3.12.12 on 2026-07-22. Full environment metadata, locked v1.11.0
+comparisons, and absolute sans-I/O codec results are in the
+[candidate benchmark record](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a1-candidate.md).
 Each result is the median of at least five runs. Direct I/O uses 8 MiB of
 uncompressed input; the concurrency case uses ten 1 MiB files plus simulated
 latency. Read comparisons use the exact same deterministic gzip bytes, and
@@ -19,12 +21,12 @@ or data.
 | Workload | aiogzip (stdlib) vs `gzip` | aiogzip (zlib-ng) vs `gzip` |
 | --- | ---: | ---: |
 | Bulk text write, level 6 | parity (~1.01x slower) | parity (~1.02x slower) |
-| Bulk LF-only text read | ~1.24x slower | ~1.82x faster |
-| Tuned JSONL line iteration | ~1.81x slower | ~1.41x slower |
-| Tuned JSONL read and parse | ~1.17x slower | ~1.12x slower |
-| JSONL batched `readlines()` and parse | ~1.05x faster | ~1.03x faster |
-| Highly compressible bulk `read(-1)` | ~1.08x faster | ~5.25x faster |
-| Ten files with simulated 10 ms latency | ~6.62x faster | ~7.25x faster |
+| Bulk LF-only text read | ~1.25x slower | ~1.90x faster |
+| Tuned JSONL line iteration | ~1.79x slower | ~1.53x slower |
+| Tuned JSONL read and parse | parity (~1.01x faster) | ~1.09x slower |
+| JSONL batched `readlines()` and parse | parity | parity (~1.01x slower) |
+| Highly compressible bulk `read(-1)` | ~1.08x faster | ~14.5x faster |
+| Ten files with simulated 10 ms latency | ~6.4x faster | ~6.9x faster |
 
 Run the suite on the target workload before making a capacity or latency
 decision:
@@ -51,13 +53,13 @@ faster than aiogzip 1.6's previous per-line scanning implementation. It should
 not be interpreted as a 1.3x advantage over stdlib `gzip`.
 
 For batch-oriented reads, `readlines(hint)` avoids awaiting that per-line path.
-In the current 100,000-line microbenchmark, `readlines()` took about 7.5 ms
-versus 24.5 ms for a `readline()` loop, roughly 3.3x faster. Batched line
+In the current 100,000-line stdlib-engine microbenchmark, `readlines()` took
+about 8.9 ms versus 25.8 ms for a `readline()` loop, roughly 2.9x faster. Batched line
 splitting also uses C-level `str.splitlines()` when a cheap probe confirms the
 region contains only standard newlines. On the representative 8 MiB JSONL
 fixture, parsing 1 MiB groups was about 9-14% faster than direct `async for`
-and finished slightly ahead of synchronous `gzip` on both engines (~1.05x with
-stdlib zlib, ~1.03x with zlib-ng). This optimization does not change direct
+and finished at parity with synchronous `gzip` on both engines. This
+optimization does not change direct
 async-iteration performance.
 
 Default universal-newline reads also have a common LF-only fast path. It scans
@@ -108,7 +110,7 @@ pip install "aiogzip[fast]"
 - **Decompression** uses zlib-ng automatically whenever it is installed. Its
   output is **byte-identical** to stdlib `zlib`, so this is transparent. In the
   representative runs above it changed bulk LF-only text reading from slower
-  than `gzip` to faster, and made highly compressible bulk `read(-1)` about 5x
+than `gzip` to faster, and made highly compressible bulk `read(-1)` about 14x
   faster. Gains depend strongly on the data and access pattern.
 - **CRC-32 checksums** also use zlib-ng's SIMD implementation when it is
   installed, except on macOS where Apple's hardware-accelerated stdlib zlib is
@@ -152,6 +154,14 @@ event-loop task a turn. Larger codec calls are offloaded, trading a thread hop
 for event-loop responsiveness. Measure with source chunk sizes representative
 of the real producer rather than selecting solely from synthetic throughput.
 
+The synchronous `GzipEncoder` and `GzipDecoder` never offload. Their direct
+8 MiB release measurements are informational because v1.11.0 had no public
+codec equivalent. `GzipEncoder` measured 120.77 ms beside a 118.56 ms
+`gzip.compress` reference. Bounded `GzipDecoder` measured 15.05 ms beside an
+unbounded 2.24 ms `gzip.decompress` reference; the latter performs framing and
+integrity work in C and materializes the whole result, so it is context rather
+than an equivalent pull API.
+
 ### 1. Choose the Right Chunk Size
 
 The default `chunk_size` is 256 KiB. Values must be positive and no larger than
@@ -159,7 +169,9 @@ The default `chunk_size` is 256 KiB. Values must be positive and no larger than
 
 - **Increase it** (e.g., `512*1024` or `1024*1024`) for large-file throughput if you have memory to spare.
 - **Decrease it** (e.g., `64*1024`) if you are memory constrained and keeping many files open at once.
-- The default also sits at the threshold above which CPU-bound `zlib` work is offloaded to a thread, so the default already benefits from decompression offload.
+- Async wrappers may offload sufficiently large codec steps; the exact
+  threshold behavior is an implementation detail and the synchronous codec
+  itself never uses an executor.
 - If you push chunk sizes into the multi-megabyte range, budget the extra memory per open file to avoid accidental OOMs.
 
 ```python

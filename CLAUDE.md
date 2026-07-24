@@ -27,14 +27,12 @@ uv sync --all-extras
 
 The lockfile pins development only — CI deliberately installs unpinned
 (`uv pip install --system`, which resolves fresh from PyPI and never reads
-`uv.lock`) so new dependency releases are exercised across 3.8-3.14 before
-users hit them. Dependabot's `uv` ecosystem keeps `uv.lock` current.
+`uv.lock`) so new dependency releases are exercised across Python 3.11-3.14
+before users hit them. Dependabot's `uv` ecosystem keeps `uv.lock` current.
 
-The lockfile also only resolves for Python >= 3.10
-(`tool.uv.environments` in pyproject.toml): the 3.8/3.9 branches carried
-urllib3/wheel pins frozen on known CVEs because the fixes dropped old
-Pythons. `uv sync`/`uv run` under 3.8/3.9 is therefore refused — for a
-local old-Python check use pip/pyenv (see the 3.8 checklist below).
+The lockfile resolves for Python 3.11 and newer, matching the 2.0 package
+metadata. Compatibility fixes for older interpreters belong on the `1.x`
+maintenance branch.
 
 Why this matters: a stale checkout here once produced a full package review
 and a 21-commit branch built on v1.7.0 while origin was already at v1.8.0 —
@@ -51,92 +49,34 @@ must be installed — `uv run prek install` handles it via
 `default_install_hook_types`, but run it once on each machine/clone. Intentionally-behind pushes:
 `SKIP=check-branch-fresh git push`. The hook fails open when offline.
 
-## Python 3.8 Compatibility Checklist
-
-**IMPORTANT:** This library supports Python 3.8+. Always check for PEP 585 compatibility before committing!
-
-### Type Hints - Python 3.8 Compatibility
-
-Python 3.8 does NOT support PEP 585 (using built-in types for generics). Always use `typing` module imports:
-
-#### ❌ DON'T (Python 3.9+ only)
-
-```python
-def function() -> tuple[int, int]:
-    pass
-
-def function() -> list[str]:
-    pass
-
-def function() -> dict[str, int]:
-    pass
-```
-
-#### ✅ DO (Python 3.8+ compatible)
-
-```python
-from typing import Tuple, List, Dict
-
-def function() -> Tuple[int, int]:
-    pass
-
-def function() -> List[str]:
-    pass
-
-def function() -> Dict[str, int]:
-    pass
-```
-
-### Pre-commit Checklist
-
-Before committing code changes, verify:
-
-1. **Type hints compatibility:**
-
-   ```bash
-   grep -r "tuple\[" src/
-   grep -r "list\[" src/
-   grep -r "dict\[" src/
-   grep -r "set\[" src/
-   grep -r "PathLike\[" src/
-   ```
-
-   All should return no results! Use `Tuple`, `List`, `Dict`, `Set` from `typing` instead.
-   For PathLike, use plain `os.PathLike` (not `os.PathLike[str]`).
-
-2. **Run tests locally:**
-
-   ```bash
-   pytest --cov --cov-report=term-missing
-   ```
-
-   Ensure all 850+ tests pass with good coverage.
-
-3. **Check imports:**
-
-   ```python
-   from typing import Tuple, List, Dict, Set, Optional, Union, Any
-   ```
-
-   Make sure these are imported if used.
-
-4. **Test with Python 3.8 (optional but recommended):**
-
-   The `python38-compat` prek hook (`scripts/check_py38_compat.py`)
-   catches syntax-level incompatibilities. For a runtime check with pyenv:
-
-   ```bash
-   pyenv install 3.8.18  # One-time setup
-   pyenv exec python3.8 -c "import aiogzip"  # Quick import test
-   ```
-
 ## Test Coverage Best Practices
 
-- **Current coverage:** ~92% (850+ tests)
+- **Current coverage:** ~93% (1,300+ tests)
 - **Target:** Maintain or improve coverage. CI enforces a floor via
   `--cov-fail-under=85`.
 - Always add tests for new features
 - Document edge cases with descriptive test names
+
+## Gzip Architecture
+
+`src/aiogzip/codec.py` is the single production gzip state machine. It owns
+RFC 1952 framing, raw DEFLATE engine state, CRC/ISIZE accounting, member
+traversal, padding, metadata, and decompression limits. `_binary.py`,
+`_streaming.py`, and `_inspection.py` are transport wrappers and must not grow
+their own gzip framing or member loops.
+
+The public `GzipEncoder` and `GzipDecoder` are synchronous sans-I/O codecs.
+Their state-changing methods return lazy reserved operations. Exhaust or
+explicitly close every operation; never depend on iterator finalizers, eagerly
+materialize an operation before producing output, or read the next source item
+while the current operation still has output. Async wrappers own executor
+offload, cancellation, source/sink cleanup, and backpressure.
+
+Codec input is deliberately stricter than file `write()`: exact `bytes` is
+zero-copy, a `bytes` subclass is snapshotted to exact `bytes`, and mutable or
+general buffers are rejected. Codec instances and operation iterators are not
+thread-safe. Preserve these ownership and immutable-input boundaries when
+changing the architecture.
 
 ### Test Organization
 
@@ -217,7 +157,7 @@ Notes:
 
 ## CI/CD Notes
 
-The project uses GitHub Actions which tests against Python 3.8 through 3.14.
+The project uses GitHub Actions which tests against Python 3.11 through 3.14.
 Linux runs the full version sweep; Windows and macOS each run one version to
 guard platform-specific paths (e.g. `os.linesep` newline translation).
 
@@ -232,33 +172,22 @@ unnoticed instead). Update via
 `gh api -X PUT repos/geoff-davis/aiogzip/branches/main/protection`.
 
 The test matrix installs the `[test]` extra (not `[dev]`, which adds
-lint-only tooling). mypy/types-aiofiles/typing_extensions belong to
-`[test]` because `test_factory_typing.py` shells out to `mypy --strict`
-and silently skips when mypy is absent.
+lint-only tooling). mypy and types-aiofiles belong to `[test]` because
+`test_factory_typing.py` shells out to `mypy --strict` and silently skips
+when mypy is absent.
 
 `astral-sh/setup-uv` publishes no moving major tag from v8 on — pin the
 exact version (e.g. `@v8.3.0`); a bare `@v8` fails to resolve. Dependabot's
 github-actions ecosystem keeps the pin current.
 
-**Any Python 3.9+ only syntax will fail CI!**
-
-Common causes of CI failures:
-
-- PEP 585 type hints (most common)
-- PEP 604 union operator (`X | Y` instead of `Union[X, Y]`)
-- Match statements (Python 3.10+)
-- Dictionary merge operators (`|` for dicts, Python 3.9+)
+Code in the 2.0 line may use Python 3.11 syntax. Avoid broad syntax-only
+modernization of untouched modules; keep changes focused and reviewable.
 
 ## Useful Commands
 
 ```bash
 # Run tests with coverage
 pytest --cov --cov-report=term-missing --cov-report=html
-
-# Check for Python 3.8 incompatibilities
-grep -rn "tuple\[" src/
-grep -rn "list\[" src/
-grep -rn "dict\[" src/
 
 # Run specific test class
 pytest tests/test_aiogzip.py::TestNewlineHandlingBugs -v
@@ -287,16 +216,13 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **1.11.0 (current)** - See `CHANGELOG.md` for the full release history. Recent
-  work adds `iter_batches(hint)` batched line iteration, corrective TypeErrors
-  for `with`/`for` misuse, a `python -m aiogzip {inspect,verify}` CLI, an
-  `EngineInfo.crc32` field, and new docs (gzip.open migration, error taxonomy,
-  ISA-L ADR, S3/fsspec recipe). Prior releases added package-level `open()`,
-  whole-file helpers, engine diagnostics, gzip inspection and verification,
-  bounded async-iterable compression/decompression, and per-platform codec
-  selection; the benchmark documentation reflects 2026-07-16 reference runs.
+- **2.0.0a1 (current)** - Requires Python 3.11+ and adds the public synchronous
+  sans-I/O `GzipEncoder` and `GzipDecoder`. File, iterable-streaming, inspection,
+  and verification paths now share that one gzip state machine. The codec API
+  remains provisional through the alpha series; established asyncio APIs keep
+  their compatibility contract.
 
 ---
 
-**Last Updated:** 2026-07-09
+**Last Updated:** 2026-07-22
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
