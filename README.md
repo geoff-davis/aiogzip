@@ -238,7 +238,7 @@ When CPU-bound per-line processing permits it, repeated
 with fewer async transitions than `async for`; the hint is an approximate
 decoded-character target, not a hard memory limit.
 
-Install the optional codec with:
+Install the optional zlib-ng engine with:
 
 ```bash
 pip install "aiogzip[fast]"

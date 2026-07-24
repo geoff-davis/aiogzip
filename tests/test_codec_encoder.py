@@ -3,6 +3,7 @@
 import gzip
 import inspect
 import struct
+import zlib
 
 import pytest
 from hypothesis import given
@@ -180,6 +181,19 @@ def test_all_output_chunks_obey_strict_bound_across_flush_and_finish():
     assert chunks
     assert all(0 < len(chunk) <= 3 for chunk in chunks)
     assert gzip.decompress(b"".join(chunks)) == b"payload" * 100 + b"after flush"
+
+
+def test_sync_flush_makes_input_recoverable_before_finish():
+    payload = b"sync-flush payload" * 100
+    encoder = GzipEncoder(mtime=0)
+    wire = b"".join(encoder.start())
+    wire += b"".join(encoder.feed(payload))
+    wire += b"".join(encoder.flush())
+
+    decoder = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
+    assert decoder.decompress(wire) == payload
+    assert not decoder.eof
+    encoder.discard()
 
 
 def test_strict_size_fails_before_engine_advances():

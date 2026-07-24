@@ -27,6 +27,8 @@ def test_encoder_requires_start_and_transitions_once():
     list(encoder.finish())
     with pytest.raises(ValueError, match="already finalized"):
         encoder.finish()
+    with pytest.raises(ValueError, match="already finalized"):
+        encoder.flush()
 
 
 @pytest.mark.parametrize("kind", ["encoder", "decoder"])

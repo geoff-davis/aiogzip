@@ -11,7 +11,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 import aiogzip.codec as codec_module
-from aiogzip import AsyncGzipBinaryFile, GzipDecoder, GzipEncoder
+from aiogzip import AsyncGzipBinaryFile, GzipDecoder, GzipEncoder, _engine
 
 
 def _decode(parts, **options):
@@ -263,8 +263,9 @@ def test_invalid_deflate_payload_is_normalized_and_poisons_decoder():
     wire = b"\x1f\x8b\x08\x00" + b"\x00" * 6 + b"\xff" * 16 + b"\x00" * 8
     decoder = GzipDecoder()
 
-    with pytest.raises(gzip.BadGzipFile, match="Error decompressing"):
+    with pytest.raises(gzip.BadGzipFile, match="Error decompressing") as exc_info:
         list(decoder.feed(wire))
+    assert isinstance(exc_info.value.__cause__, _engine.ZLIB_ERRORS)
     with pytest.raises(OSError, match="unusable"):
         decoder.finish()
 

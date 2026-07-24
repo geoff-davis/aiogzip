@@ -67,6 +67,13 @@ plain.extend(b"".join(decoder.finish()))
 assert decoder.finished
 ```
 
+Input boundaries are arbitrary for correctness, but they are not
+performance-neutral. For predictable memory and copy costs, pass
+transport-sized compressed chunks as they arrive instead of one complete
+large archive to a single `feed()` call. `AsyncGzipBinaryFile` reads according
+to its configured `chunk_size`; callers of `decompress_chunks()` control the
+size of each source item.
+
 > **Warning — integrity is established only at normal completion.** `feed()`
 > may emit payload before the corresponding CRC-32 and `ISIZE` trailer arrives.
 > Decompression integrity is not established until the iterator returned by
