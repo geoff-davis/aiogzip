@@ -64,6 +64,36 @@ class _InputQueue:
         span = self._spans[0]
         return span.data[span.start]
 
+    @property
+    def head_size(self) -> int:
+        """Number of bytes in the first contiguous span."""
+        if not self._spans:
+            return 0
+        return len(self._spans[0])
+
+    def peek_span(self, max_bytes: int) -> memoryview:
+        """Return a zero-copy view of the bounded first contiguous span."""
+        if max_bytes < 0:
+            raise ValueError("maximum byte count cannot be negative")
+        if not self._spans or max_bytes == 0:
+            return memoryview(b"")
+        span = self._spans[0]
+        end = min(span.start + max_bytes, span.end)
+        return memoryview(span.data)[span.start : end]
+
+    def find_in_head(self, value: int, max_bytes: int) -> int | None:
+        """Return the relative index of *value* in the bounded head span."""
+        if not 0 <= value <= 255:
+            raise ValueError("searched byte must be between 0 and 255")
+        if max_bytes < 0:
+            raise ValueError("maximum byte count cannot be negative")
+        if not self._spans or max_bytes == 0:
+            return None
+        span = self._spans[0]
+        end = min(span.start + max_bytes, span.end)
+        position = span.data.find(bytes((value,)), span.start, end)
+        return None if position < 0 else position - span.start
+
     def consume(self, size: int) -> None:
         """Consume exactly *size* queued bytes by advancing head offsets."""
         if size < 0:
@@ -117,30 +147,6 @@ class _InputQueue:
         if self._size < size:
             return None
         return self.take(size)
-
-    def to_bytes(self, max_bytes: int) -> bytes:
-        """Return a bounded prefix without consuming it during migration."""
-        if max_bytes < 0:
-            raise ValueError("maximum byte count cannot be negative")
-        size = min(max_bytes, self._size)
-        if not size:
-            return b""
-
-        first = self._spans[0]
-        if size <= len(first):
-            if size == len(first) and first.start == 0 and first.end == len(first.data):
-                return first.data
-            return first.data[first.start : first.start + size]
-
-        parts: list[bytes] = []
-        remaining = size
-        for span in self._spans:
-            amount = min(remaining, len(span))
-            parts.append(span.data[span.start : span.start + amount])
-            remaining -= amount
-            if not remaining:
-                break
-        return b"".join(parts)
 
     def pop_window(self, max_bytes: int) -> bytes:
         """Consume one non-empty contiguous window bounded by *max_bytes*."""

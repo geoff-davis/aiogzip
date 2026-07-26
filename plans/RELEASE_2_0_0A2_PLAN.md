@@ -1270,49 +1270,54 @@ Close the oversized-header allocation gap and make header processing linear acro
 
 #### Tasks
 
-- [ ] Add `_GzipHeaderParser` and `_ParsedHeader` in `_gzip_header.py`.
-- [ ] Move all fixed-header validation into the parser.
-- [ ] Maintain running header CRC incrementally.
-- [ ] Parse FEXTRA length and bytes incrementally.
-- [ ] Parse FNAME incrementally from the prior scan point.
-- [ ] Parse FCOMMENT incrementally from the prior scan point.
-- [ ] Validate FHCRC without reconstructing the complete header.
-- [ ] Allocate optional metadata buffers only when collection is enabled.
-- [ ] Count every header byte toward the safety limit.
-- [ ] Reject before accepting/copying the first byte beyond the limit.
-- [ ] Preserve Latin-1 decoding and optional `None` values.
-- [ ] Track whether a header has started for finish-time truncation errors.
-- [ ] Replace whole-buffer padding `lstrip` with cursor consumption.
-- [ ] Replace trailer slicing with exact queue reads.
-- [ ] Remove `_parse_header()` from `codec.py`.
-- [ ] Remove temporary whole-queue conversion helpers.
-- [ ] Keep member offsets and padding accounting compatible.
+- [x] Add `_GzipHeaderParser` and `_ParsedHeader` in `_gzip_header.py`.
+- [x] Move all fixed-header validation into the parser.
+- [x] Maintain running header CRC incrementally.
+- [x] Parse FEXTRA length and bytes incrementally.
+- [x] Parse FNAME incrementally from the prior scan point.
+- [x] Parse FCOMMENT incrementally from the prior scan point.
+- [x] Validate FHCRC without reconstructing the complete header.
+- [x] Allocate optional metadata buffers only when collection is enabled.
+- [x] Count every header byte toward the safety limit.
+- [x] Reject before accepting/copying the first byte beyond the limit.
+- [x] Preserve Latin-1 decoding and optional `None` values.
+- [x] Track whether a header has started for finish-time truncation errors.
+- [x] Replace whole-buffer padding `lstrip` with cursor consumption.
+- [x] Replace trailer slicing with exact queue reads.
+- [x] Remove `_parse_header()` from `codec.py`.
+- [x] Remove temporary whole-queue conversion helpers.
+- [x] Keep member offsets and padding accounting compatible.
 
 #### Required tests
 
-- [ ] every split point through the fixed ten-byte header;
-- [ ] every split point around FEXTRA length and payload;
-- [ ] every split point around FNAME/FCOMMENT terminators;
-- [ ] metadata enabled and disabled;
-- [ ] hostile near-limit names/comments;
-- [ ] exact-limit terminator accepted;
-- [ ] one-byte-over-limit rejected before body consumption;
-- [ ] valid body immediately after near-limit header;
-- [ ] FHCRC valid/invalid across all optional fields;
-- [ ] multiple members with large metadata;
-- [ ] padding split over many spans;
-- [ ] real 128 MiB boundary marked slow/release-only;
-- [ ] reduced injected limit in ordinary CI;
-- [ ] fragmented-header runtime grows approximately linearly in benchmark mode;
-- [ ] peak allocation gates.
+- [x] every split point through the fixed ten-byte header;
+- [x] every split point around FEXTRA length and payload;
+- [x] every split point around FNAME/FCOMMENT terminators;
+- [x] metadata enabled and disabled;
+- [x] hostile near-limit names/comments;
+- [x] exact-limit terminator accepted;
+- [x] one-byte-over-limit rejected before body consumption;
+- [x] valid body immediately after near-limit header;
+- [x] FHCRC valid/invalid across all optional fields;
+- [x] multiple members with large metadata;
+- [x] padding split over many spans;
+- [x] real 128 MiB boundary marked slow/release-only;
+- [x] reduced injected limit in ordinary CI;
+- [x] fragmented-header runtime grows approximately linearly in benchmark mode;
+- [x] peak allocation gates.
 
 #### Exit criteria
 
-- [ ] No header state calls `bytes()` or `lstrip()` on all pending data.
-- [ ] No parser rescan begins at byte zero after a partial feed.
-- [ ] The safety check precedes oversized temporary allocation.
-- [ ] Header and body data in the same span remain correctly separated.
-- [ ] All malformed-header behavior remains correctly typed.
+- [x] No header state calls `bytes()` or `lstrip()` on all pending data.
+- [x] No parser rescan begins at byte zero after a partial feed.
+- [x] The safety check precedes oversized temporary allocation.
+- [x] Header and body data in the same span remain correctly separated.
+- [x] All malformed-header behavior remains correctly typed.
+
+WP4 validation on the Apple M3 MacBook Air is recorded in
+`plans/benchmarks/v2.0.0a2-wp4-header-parser.md`. The implementation package is
+complete; the Framework Desktop rerun remains mandatory for the final release
+gate.
 
 #### Suggested commit
 

@@ -68,17 +68,24 @@ def test_exact_take_failure_does_not_consume_partial_input():
     assert len(queue) == 0
 
 
-def test_bounded_compatibility_view_does_not_consume():
+def test_head_inspection_is_bounded_zero_copy_and_does_not_consume():
     first = b"abc"
     queue = _InputQueue()
     queue.append(first)
     queue.append(b"def")
 
-    assert queue.to_bytes(3) is first
-    assert queue.to_bytes(5) == b"abcde"
+    view = queue.peek_span(2)
+
+    assert bytes(view) == b"ab"
+    assert view.obj is first
+    assert queue.head_size == 3
+    assert queue.find_in_head(ord("b"), 3) == 1
+    assert queue.find_in_head(ord("d"), 3) is None
     assert len(queue) == 6
     with pytest.raises(ValueError):
-        queue.to_bytes(-1)
+        queue.peek_span(-1)
+    with pytest.raises(ValueError):
+        queue.find_in_head(ord("a"), -1)
 
 
 def test_prepend_orders_retained_input_before_later_spans():
