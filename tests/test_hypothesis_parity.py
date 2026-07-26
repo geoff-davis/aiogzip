@@ -16,6 +16,7 @@ import asyncio
 import gzip
 import io
 import os
+import struct
 import tempfile
 import zlib
 
@@ -71,6 +72,25 @@ _members = st.lists(_member, min_size=1, max_size=4)
 
 _chunk_size = st.sampled_from(CHUNK_SIZES)
 
+_latin1_field = st.lists(
+    st.integers(min_value=1, max_value=255),
+    min_size=0,
+    max_size=16,
+).map(bytes)
+
+_rich_member = st.tuples(
+    st.binary(min_size=0, max_size=4096),
+    st.integers(min_value=0, max_value=9),
+    st.integers(min_value=0, max_value=16),
+    st.integers(min_value=0, max_value=2**32 - 1),
+    st.one_of(st.none(), st.binary(min_size=0, max_size=16)),
+    st.one_of(st.none(), _latin1_field),
+    st.one_of(st.none(), _latin1_field),
+    st.booleans(),
+)
+
+_rich_members = st.lists(_rich_member, min_size=0, max_size=5)
+
 
 # --------------------------------------------------------------------------- #
 # Helpers
@@ -95,6 +115,79 @@ def _build_raw(members):
         out += buf.getvalue()
         out += b"\x00" * pad
     return bytes(out), flg_offsets
+
+
+def _build_rich_raw(members):
+    """Build members with every optional header field and return their layout."""
+    out = bytearray()
+    layouts = []
+    for payload, level, pad, mtime, extra, filename, comment, header_crc in members:
+        flags = 0
+        if extra is not None:
+            flags |= 0x04
+        if filename is not None:
+            flags |= 0x08
+        if comment is not None:
+            flags |= 0x10
+        if header_crc:
+            flags |= 0x02
+
+        start = len(out)
+        header = bytearray(b"\x1f\x8b\x08")
+        header.append(flags)
+        header.extend(struct.pack("<I", mtime))
+        header.extend(b"\x00\xff")
+        extra_offset = None
+        if extra is not None:
+            header.extend(struct.pack("<H", len(extra)))
+            extra_offset = start + len(header)
+            header.extend(extra)
+        if filename is not None:
+            header.extend(filename + b"\x00")
+        if comment is not None:
+            header.extend(comment + b"\x00")
+        if header_crc:
+            header.extend(struct.pack("<H", zlib.crc32(header) & 0xFFFF))
+
+        compressor = zlib.compressobj(level, zlib.DEFLATED, -zlib.MAX_WBITS)
+        body = compressor.compress(payload) + compressor.flush()
+        body_offset = start + len(header)
+        trailer_offset = body_offset + len(body)
+        trailer = struct.pack(
+            "<II",
+            zlib.crc32(payload) & 0xFFFFFFFF,
+            len(payload) & 0xFFFFFFFF,
+        )
+        out.extend(header)
+        out.extend(body)
+        out.extend(trailer)
+        member_end = len(out)
+        padding_offset = member_end
+        out.extend(b"\x00" * pad)
+        layouts.append(
+            {
+                "start": start,
+                "size": member_end - start,
+                "body": body_offset,
+                "trailer": trailer_offset,
+                "extra": extra_offset,
+                "padding": padding_offset,
+                "flags": flags,
+            }
+        )
+    return bytes(out), layouts
+
+
+def _split_by_sizes(raw, sizes):
+    parts = []
+    offset = 0
+    index = 0
+    while offset < len(raw):
+        size = sizes[index % len(sizes)]
+        parts.append(raw[offset : offset + size])
+        offset += size
+        index += 1
+    return parts
 
 
 def _expected_len(members):
@@ -139,6 +232,138 @@ async def _check_unified_surfaces(path, raw, expected, member_count, split):
     assert streamed == file_output == expected
     assert info.member_count == verification.member_count == member_count
     assert info.uncompressed_size == verification.uncompressed_size == len(expected)
+
+
+async def _check_rich_surfaces(
+    path,
+    raw,
+    parts,
+    expected,
+    decoder,
+    layouts,
+    members,
+    output_chunk_size,
+):
+    async def source():
+        for part in parts:
+            yield part
+
+    streamed = b"".join(
+        [
+            piece
+            async for piece in decompress_chunks(
+                source(),
+                output_chunk_size=output_chunk_size,
+            )
+        ]
+    )
+    async with AsyncGzipBinaryFile(path, "rb", chunk_size=31) as stream:
+        file_output = await stream.read()
+    info = await inspect(path, chunk_size=23)
+    verification = await verify(path, chunk_size=29)
+
+    assert streamed == file_output == expected
+    assert info.members == decoder.members
+    assert info.member_count == verification.member_count == len(members)
+    assert info.compressed_size == verification.compressed_size == len(raw)
+    assert info.uncompressed_size == verification.uncompressed_size == len(expected)
+
+    for actual, layout, member in zip(
+        info.members,
+        layouts,
+        members,
+        strict=True,
+    ):
+        payload, _, _, mtime, extra, filename, comment, _ = member
+        assert actual.compressed_offset == layout["start"]
+        assert actual.compressed_size == layout["size"]
+        assert actual.uncompressed_size == len(payload)
+        assert actual.mtime == mtime
+        assert actual.original_filename == (
+            filename.decode("latin-1") if filename is not None else None
+        )
+        assert actual.comment == (
+            comment.decode("latin-1") if comment is not None else None
+        )
+        assert actual.extra == extra
+        assert actual.flags == layout["flags"]
+
+
+async def _assert_corrupt_async_surfaces(path, parts):
+    async def source():
+        for part in parts:
+            yield part
+
+    with pytest.raises(gzip.BadGzipFile) as streamed_error:
+        async for _ in decompress_chunks(source(), output_chunk_size=13):
+            pass
+    with pytest.raises(gzip.BadGzipFile) as file_error:
+        async with AsyncGzipBinaryFile(path, "rb", chunk_size=19) as stream:
+            await stream.read()
+    with pytest.raises(gzip.BadGzipFile) as inspection_error:
+        await inspect(path, chunk_size=17)
+    with pytest.raises(gzip.BadGzipFile) as verification_error:
+        await verify(path, chunk_size=11)
+    assert all(
+        str(error.value)
+        for error in (
+            streamed_error,
+            file_error,
+            inspection_error,
+            verification_error,
+        )
+    )
+
+
+async def _check_limit_async_surfaces(path, raw, limit, expected, should_succeed):
+    async def source():
+        for part in _split_by_sizes(raw, [1, 7, 31]):
+            yield part
+
+    streamed = bytearray()
+    if should_succeed:
+        async for piece in decompress_chunks(
+            source(),
+            output_chunk_size=13,
+            max_decompressed_size=limit,
+        ):
+            streamed.extend(piece)
+        assert bytes(streamed) == expected
+        async with AsyncGzipBinaryFile(
+            path,
+            "rb",
+            chunk_size=17,
+            max_decompressed_size=limit,
+        ) as stream:
+            assert await stream.read() == expected
+        assert (
+            await inspect(path, max_decompressed_size=limit)
+        ).uncompressed_size == len(expected)
+        assert (
+            await verify(path, max_decompressed_size=limit)
+        ).uncompressed_size == len(expected)
+        return
+
+    with pytest.raises(OSError, match="max_decompressed_size"):
+        async for piece in decompress_chunks(
+            source(),
+            output_chunk_size=13,
+            max_decompressed_size=limit,
+        ):
+            streamed.extend(piece)
+    assert bytes(streamed) == expected[:limit]
+    with pytest.raises(OSError, match="max_decompressed_size"):
+        async with AsyncGzipBinaryFile(
+            path,
+            "rb",
+            chunk_size=17,
+            max_decompressed_size=limit,
+        ) as stream:
+            await stream.read()
+    with pytest.raises(OSError, match="max_decompressed_size"):
+        await inspect(path, max_decompressed_size=limit)
+    with pytest.raises(OSError, match="max_decompressed_size"):
+        await verify(path, max_decompressed_size=limit)
 
 
 # --------------------------------------------------------------------------- #
@@ -252,6 +477,108 @@ def test_all_decoder_surfaces_share_member_and_output_semantics(members, split):
         os.unlink(path)
 
 
+@settings(max_examples=75, deadline=None, suppress_health_check=_SUPPRESSED)
+@given(
+    members=_rich_members,
+    source_sizes=st.lists(
+        st.integers(min_value=1, max_value=1024),
+        min_size=1,
+        max_size=8,
+    ),
+    output_chunk_size=st.sampled_from(CHUNK_SIZES),
+)
+def test_rich_archives_agree_across_every_decoder_surface(
+    members,
+    source_sizes,
+    output_chunk_size,
+):
+    """Random optional fields, padding, boundaries, and bounds stay unified."""
+    raw, layouts = _build_rich_raw(members)
+    expected = b"".join(member[0] for member in members)
+    assert gzip.decompress(raw) == expected
+    parts = _split_by_sizes(raw, source_sizes)
+
+    decoder = GzipDecoder(
+        output_chunk_size=output_chunk_size,
+        collect_member_info=True,
+    )
+    codec_chunks = []
+    for part in parts:
+        codec_chunks.extend(decoder.feed(part))
+    codec_chunks.extend(decoder.finish())
+
+    assert b"".join(codec_chunks) == expected
+    assert all(0 < len(chunk) <= output_chunk_size for chunk in codec_chunks)
+    path = _write_tmp(raw)
+    try:
+        _run(
+            _check_rich_surfaces(
+                path,
+                raw,
+                parts,
+                expected,
+                decoder,
+                layouts,
+                members,
+                output_chunk_size,
+            )
+        )
+    finally:
+        os.unlink(path)
+
+
+@settings(max_examples=40, deadline=None, suppress_health_check=_SUPPRESSED)
+@given(
+    payload=st.binary(min_size=2, max_size=8192),
+    source_sizes=st.lists(
+        st.integers(min_value=1, max_value=257),
+        min_size=1,
+        max_size=6,
+    ),
+    output_chunk_size=st.sampled_from(CHUNK_SIZES),
+)
+def test_exact_and_one_over_limits_agree_across_decoder_surfaces(
+    payload,
+    source_sizes,
+    output_chunk_size,
+):
+    raw = gzip.compress(payload, mtime=0)
+    path = _write_tmp(raw)
+    try:
+        for limit, should_succeed in (
+            (len(payload), True),
+            (len(payload) - 1, False),
+        ):
+            decoder = GzipDecoder(
+                output_chunk_size=output_chunk_size,
+                max_decompressed_size=limit,
+            )
+            codec_output = bytearray()
+            if should_succeed:
+                for part in _split_by_sizes(raw, source_sizes):
+                    codec_output.extend(b"".join(decoder.feed(part)))
+                codec_output.extend(b"".join(decoder.finish()))
+                assert bytes(codec_output) == payload
+            else:
+                with pytest.raises(OSError, match="max_decompressed_size"):
+                    for part in _split_by_sizes(raw, source_sizes):
+                        for piece in decoder.feed(part):
+                            codec_output.extend(piece)
+                assert bytes(codec_output) == payload[:limit]
+
+            _run(
+                _check_limit_async_surfaces(
+                    path,
+                    raw,
+                    limit,
+                    payload,
+                    should_succeed,
+                )
+            )
+    finally:
+        os.unlink(path)
+
+
 # --------------------------------------------------------------------------- #
 # Single-byte corruption parity
 # --------------------------------------------------------------------------- #
@@ -329,6 +656,76 @@ def test_single_byte_corruption_parity(members, pos, mask):
     else:
         # aiogzip decoded; it must agree with stdlib whenever stdlib also decoded.
         assert std_raised or aio_bytes == std_bytes
+
+
+_corruption_member = st.tuples(
+    st.binary(min_size=0, max_size=2048),
+    st.integers(min_value=0, max_value=9),
+    st.just(1),
+    st.integers(min_value=0, max_value=2**32 - 1),
+    st.binary(min_size=1, max_size=16),
+    st.one_of(st.none(), _latin1_field),
+    st.one_of(st.none(), _latin1_field),
+    st.just(True),
+)
+
+
+@settings(max_examples=60, deadline=None, suppress_health_check=_SUPPRESSED)
+@given(
+    first=_corruption_member,
+    second=_rich_member,
+    region=st.sampled_from(["fixed", "optional", "body", "trailer", "boundary"]),
+    source_sizes=st.lists(
+        st.integers(min_value=1, max_value=127),
+        min_size=1,
+        max_size=5,
+    ),
+)
+def test_structural_corruption_fails_across_every_decoder_surface(
+    first,
+    second,
+    region,
+    source_sizes,
+):
+    built, layouts = _build_rich_raw([first, second])
+    corrupt = bytearray(built)
+    first_layout = layouts[0]
+
+    if region == "fixed":
+        corrupt[first_layout["start"]] = 0
+    elif region == "optional":
+        extra_offset = first_layout["extra"]
+        assert extra_offset is not None
+        corrupt[extra_offset - 2 : extra_offset] = b"\xff\xff"
+    elif region == "body":
+        body_offset = first_layout["body"]
+        corrupt[body_offset] = (corrupt[body_offset] & 0xF8) | 0x07
+    elif region == "trailer":
+        corrupt[first_layout["trailer"]] ^= 1
+    else:
+        corrupt[first_layout["padding"]] = 1
+
+    damaged = bytes(corrupt)
+    with pytest.raises((OSError, EOFError, zlib.error)):
+        gzip.decompress(damaged)
+
+    decoder = GzipDecoder(output_chunk_size=13)
+    with pytest.raises(gzip.BadGzipFile) as caught:
+        for part in _split_by_sizes(damaged, source_sizes):
+            list(decoder.feed(part))
+        list(decoder.finish())
+    assert str(caught.value)
+
+    path = _write_tmp(damaged)
+    try:
+        _run(
+            _assert_corrupt_async_surfaces(
+                path,
+                _split_by_sizes(damaged, source_sizes),
+            )
+        )
+    finally:
+        os.unlink(path)
 
 
 if __name__ == "__main__":  # pragma: no cover

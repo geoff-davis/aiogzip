@@ -165,6 +165,41 @@ class TestFileobjSupport:
         await f.close()
         assert len(writer.buffer) == size_before_close
 
+    async def test_cancelled_sink_write_breaks_member_without_trailer(self):
+        import asyncio
+
+        class BlockingDataWriter:
+            def __init__(self):
+                self.buffer = bytearray()
+                self.calls = 0
+                self.write_started = asyncio.Event()
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls > 1:
+                    self.write_started.set()
+                    await asyncio.Event().wait()
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                pass
+
+        writer = BlockingDataWriter()
+        f = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False, mtime=0)
+        await f.open()
+        header = bytes(writer.buffer)
+        task = asyncio.create_task(f.write(os.urandom(512 * 1024)))
+        await writer.write_started.wait()
+
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert f._write_broken is True
+        await f.close()
+        assert bytes(writer.buffer) == header
+
     @pytest.mark.parametrize("invalid_count", [None, -1, True, 1000])
     async def test_invalid_write_count_fails_open(self, invalid_count):
         class InvalidWriter:

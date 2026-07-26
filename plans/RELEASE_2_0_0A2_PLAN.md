@@ -1537,28 +1537,37 @@ Prove that the optimized decoder remains the one shared source of gzip truth acr
 
 #### Tasks
 
-- [ ] Run and extend cross-surface property tests.
-- [ ] Generate randomized zero-to-five-member archives.
-- [ ] Include empty members, random metadata, padding, arbitrary source splits, and output bounds.
-- [ ] Compare direct codec, async iterable, binary file, inspect, verify, and stdlib behavior.
-- [ ] Corrupt fixed headers, optional fields, bodies, trailers, and inter-member boundaries.
-- [ ] Exercise exact and one-over decompression limits.
-- [ ] Exercise backward seek and rewind after the data-model change.
-- [ ] Exercise non-seekable rewind caching.
-- [ ] Exercise append members and deterministic output.
-- [ ] Exercise cancellation at header, body, output-block, trailer, and sink-write points.
-- [ ] Exercise partial operation close with queued spans and pending output.
-- [ ] Run with stdlib forced while zlib-ng is installed.
-- [ ] Run with zlib-ng active.
-- [ ] Run a repeated stress loop to detect retained spans or output blocks after completion.
+- [x] Run and extend cross-surface property tests.
+- [x] Generate randomized zero-to-five-member archives.
+- [x] Include empty members, random metadata, padding, arbitrary source splits, and output bounds.
+- [x] Compare direct codec, async iterable, binary file, inspect, verify, and stdlib behavior.
+- [x] Corrupt fixed headers, optional fields, bodies, trailers, and inter-member boundaries.
+- [x] Exercise exact and one-over decompression limits.
+- [x] Exercise backward seek and rewind after the data-model change.
+- [x] Exercise non-seekable rewind caching.
+- [x] Exercise append members and deterministic output.
+- [x] Exercise cancellation at header, body, output-block, trailer, and sink-write points.
+- [x] Exercise partial operation close with queued spans and pending output.
+- [x] Run with stdlib forced while zlib-ng is installed.
+- [x] Run with zlib-ng active.
+- [x] Run a repeated stress loop to detect retained spans or output blocks after completion.
 
 #### Exit criteria
 
-- [ ] No surface has a private gzip parser or integrity implementation.
-- [ ] Randomized valid archives agree across surfaces.
-- [ ] Randomized corrupt archives fail with compatible classes and context.
-- [ ] Seeking and rewind behavior is unchanged.
-- [ ] No persistent memory growth is observed across repeated decoder instances.
+- [x] No surface has a private gzip parser or integrity implementation.
+- [x] Randomized valid archives agree across surfaces.
+- [x] Randomized corrupt archives fail with compatible classes and context.
+- [x] Seeking and rewind behavior is unchanged.
+- [x] No persistent memory growth is observed across repeated decoder instances.
+
+WP8 validation completed on the Apple M3 MacBook Air. The active zlib-ng suite
+ran 1,657 tests with one skip; forced stdlib ran 1,624 tests with one skip,
+plus all 33 isolated engine-reload tests. The added properties cover 175
+randomized rich-archive, limit, and targeted-corruption examples per engine.
+The completion stress test ran 250 decoder instances under `tracemalloc` and
+retained neither codec instances nor more than its bounded allocation
+allowance. No performance release gate was evaluated; the Framework Desktop
+rerun remains open.
 
 #### Suggested commit
 

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import gc
 import gzip
 import hashlib
 import struct
+import tracemalloc
+import weakref
 import zlib
 from typing import Any
 
@@ -300,3 +303,36 @@ def test_internal_output_never_exceeds_private_batch(monkeypatch):
     assert engines
     assert max(engines[0].output_lengths) <= batch
     assert all(0 < length <= batch for length in engines[0].max_lengths)
+
+
+def test_completed_decoder_stress_retains_no_instances_spans_or_output_blocks():
+    payload = _payload(32 * 1024)
+    wire = gzip.compress(payload, mtime=0)
+    decoder_refs = []
+    gc.collect()
+    tracemalloc.start()
+    baseline, _ = tracemalloc.get_traced_memory()
+
+    try:
+        for _ in range(250):
+            decoder = GzipDecoder(output_chunk_size=31)
+            feed_operation = decoder.feed(wire)
+            output = b"".join(feed_operation)
+            finish_operation = decoder.finish()
+            output += b"".join(finish_operation)
+
+            assert output == payload
+            assert len(decoder._pending) == 0
+            assert decoder._inflate_input is None
+            assert len(decoder._output) == 0
+            assert decoder._engine is None
+            decoder_refs.append(weakref.ref(decoder))
+            del feed_operation, finish_operation, decoder
+
+        gc.collect()
+        retained, _ = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert all(reference() is None for reference in decoder_refs)
+    assert retained - baseline < 512 * 1024
