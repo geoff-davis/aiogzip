@@ -42,7 +42,7 @@ def test_eof_retains_trailer_from_same_span(selected_engine):
     assert step.output == payload
     assert step.consumed == len(raw)
     assert step.eof
-    assert (raw + trailer)[step.consumed :] == trailer
+    assert step.retained == trailer
 
 
 def test_eof_retains_an_immediately_following_member(selected_engine):
@@ -57,8 +57,8 @@ def test_eof_retains_an_immediately_following_member(selected_engine):
         output=first_payload,
         consumed=len(first),
         eof=True,
+        retained=second,
     )
-    assert (first + second)[step.consumed :] == second
 
 
 def test_bounded_output_repeats_over_one_input_span(selected_engine):
@@ -70,7 +70,7 @@ def test_bounded_output_repeats_over_one_input_span(selected_engine):
     for _ in range(len(payload) + 10):
         step = _engine.inflate_step(engine, pending, max_length=17)
         output.extend(step.output)
-        pending = pending[step.consumed :]
+        pending = step.retained
         if step.eof:
             break
     else:  # pragma: no cover - protects the test itself from hanging
@@ -87,8 +87,9 @@ def test_bounded_output_repeats_over_one_input_span(selected_engine):
         (b"", b"TRAILER"),
         (b"TRAI", b"LER"),
         (b"TRAILER", b"TRAILER"),
+        (b"TRAILER", b"AILER"),
     ],
-    ids=["unused-only", "tail-only", "split", "duplicated"],
+    ids=["unused-only", "tail-only", "split", "duplicated", "overlapping"],
 )
 def test_fake_engine_leftover_representations(unused, tail):
     class FakeEngine:
@@ -104,7 +105,12 @@ def test_fake_engine_leftover_representations(unused, tail):
 
     step = _engine.inflate_step(FakeEngine(), b"payloadTRAILER")
 
-    assert step == _engine._InflateStep(output=b"decoded", consumed=7, eof=True)
+    assert step == _engine._InflateStep(
+        output=b"decoded",
+        consumed=7,
+        eof=True,
+        retained=b"TRAILER",
+    )
 
 
 def test_fake_engine_ignores_leftovers_accumulated_before_current_span():
@@ -117,9 +123,47 @@ def test_fake_engine_ignores_leftovers_accumulated_before_current_span():
             self.unused_data += data
             return b""
 
-    step = _engine.inflate_step(FakeEngine(), b"new member")
+    data = b"new member"
+    step = _engine.inflate_step(FakeEngine(), data)
 
-    assert step == _engine._InflateStep(output=b"", consumed=0, eof=True)
+    assert step == _engine._InflateStep(
+        output=b"",
+        consumed=0,
+        eof=True,
+        retained=b"new member",
+    )
+    assert step.retained is data
+
+
+def test_equal_non_identical_leftovers_reuse_first_exact_object():
+    unused = bytes(bytearray(b"TRAILER"))
+    tail = bytes(bytearray(b"TRAILER"))
+    assert unused is not tail
+
+    class FakeEngine:
+        eof = True
+        unused_data = unused
+        unconsumed_tail = tail
+
+        def decompress(self, data, max_length=0):
+            return b"decoded"
+
+    step = _engine.inflate_step(FakeEngine(), b"payloadTRAILER")
+
+    assert step.retained is unused
+
+
+def test_irreconcilable_eof_leftovers_are_rejected():
+    class FakeEngine:
+        eof = True
+        unused_data = b"TRAI"
+        unconsumed_tail = b"wrong"
+
+        def decompress(self, data, max_length=0):
+            return b"decoded"
+
+    with pytest.raises(RuntimeError, match="irreconcilable"):
+        _engine.inflate_step(FakeEngine(), b"payloadTRAILER")
 
 
 def test_non_eof_unconsumed_suffix_is_counted():
@@ -135,7 +179,43 @@ def test_non_eof_unconsumed_suffix_is_counted():
         output=b"output",
         consumed=8,
         eof=False,
+        retained=b"tail",
     )
+
+
+def test_non_eof_non_suffix_tail_is_rejected():
+    class FakeEngine:
+        eof = False
+        unused_data = b""
+        unconsumed_tail = b"not a suffix"
+
+        def decompress(self, data, max_length=0):
+            return b"output"
+
+    with pytest.raises(RuntimeError, match="non-suffix"):
+        _engine.inflate_step(FakeEngine(), b"input")
+
+
+def test_output_allows_zero_consumption_without_false_no_progress():
+    data = b"pending"
+
+    class FakeEngine:
+        eof = False
+        unused_data = b""
+        unconsumed_tail = data
+
+        def decompress(self, supplied, max_length=0):
+            return b"output"
+
+    step = _engine.inflate_step(FakeEngine(), data)
+
+    assert step == _engine._InflateStep(
+        output=b"output",
+        consumed=0,
+        eof=False,
+        retained=data,
+    )
+    assert step.retained is data
 
 
 def test_no_progress_is_rejected():
@@ -175,7 +255,7 @@ def test_consumed_boundary_property(payload, trailing, input_chunk_size):
         step = _engine.inflate_step(engine, chunk)
         output.extend(step.output)
         if step.eof:
-            retained = chunk[step.consumed :] + wire[offset + len(chunk) :]
+            retained = step.retained + wire[offset + len(chunk) :]
             break
     else:  # pragma: no cover - raw deflate always reaches EOF
         pytest.fail("inflate adapter did not reach EOF")

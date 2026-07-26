@@ -1104,67 +1104,67 @@ Introduce and test the private primitives needed by the body rewrite without yet
 
 #### Tasks: `_codec_buffer.py`
 
-- [ ] Add `_Span` and `_InputQueue`.
-- [ ] Use `deque` or an equivalently O(1) head-removal structure.
-- [ ] Track total queued length explicitly.
-- [ ] Retain exact `bytes` spans without copying on append.
-- [ ] Implement partial head consumption by offset.
-- [ ] Release fully consumed spans promptly.
-- [ ] Implement bounded `take()`.
-- [ ] Implement exact-length `take_exact()` that returns `None` or an equivalent need-more signal without consuming partial data.
-- [ ] Implement bounded `pop_window()`.
-- [ ] Implement `prepend()` for normalized EOF-retained bytes.
-- [ ] Implement leading-byte inspection/consumption needed for padding.
-- [ ] Implement idempotent `clear()`.
-- [ ] Reject non-exact bytes at this internal boundary with an assertion or clear internal error.
-- [ ] Add an output-block cursor or equivalent offset helper; no front deletion.
+- [x] Add `_Span` and `_InputQueue`.
+- [x] Use `deque` or an equivalently O(1) head-removal structure.
+- [x] Track total queued length explicitly.
+- [x] Retain exact `bytes` spans without copying on append.
+- [x] Implement partial head consumption by offset.
+- [x] Release fully consumed spans promptly.
+- [x] Implement bounded `take()`.
+- [x] Implement exact-length `take_exact()` that returns `None` or an equivalent need-more signal without consuming partial data.
+- [x] Implement bounded `pop_window()`.
+- [x] Implement `prepend()` for normalized EOF-retained bytes.
+- [x] Implement leading-byte inspection/consumption needed for padding.
+- [x] Implement idempotent `clear()`.
+- [x] Reject non-exact bytes at this internal boundary with an assertion or clear internal error.
+- [x] Add an output-block cursor or equivalent offset helper; no front deletion.
 
 #### Tasks: `_engine.py`
 
-- [ ] Extend `_InflateStep` with normalized retained bytes.
-- [ ] Replace or extend `_merged_retained_size()` with a helper returning the normalized suffix.
-- [ ] Reuse an engine-provided exact retained object when valid rather than copying automatically.
-- [ ] Construct a merged bounded suffix only for split/overlap cases.
-- [ ] Preserve no-progress detection.
-- [ ] Preserve engine error normalization.
-- [ ] Keep consumed-count validation.
-- [ ] Do not change engine selection.
+- [x] Extend `_InflateStep` with normalized retained bytes.
+- [x] Replace or extend `_merged_retained_size()` with a helper returning the normalized suffix.
+- [x] Reuse an engine-provided exact retained object when valid rather than copying automatically.
+- [x] Construct a merged bounded suffix only for split/overlap cases.
+- [x] Preserve no-progress detection.
+- [x] Preserve engine error normalization.
+- [x] Keep consumed-count validation.
+- [x] Do not change engine selection.
 
 #### Required tests
 
 `test_codec_buffer.py`:
 
-- [ ] append and length;
-- [ ] exact-span zero-copy identity where observable internally;
-- [ ] partial consumption;
-- [ ] cross-span bounded take;
-- [ ] exact read success/failure without partial consumption;
-- [ ] prepend ordering;
-- [ ] repeated small spans;
-- [ ] clearing releases references;
-- [ ] no negative or over-consumption;
-- [ ] output cursor emits bounded slices and releases drained blocks.
+- [x] append and length;
+- [x] exact-span zero-copy identity where observable internally;
+- [x] partial consumption;
+- [x] cross-span bounded take;
+- [x] exact read success/failure without partial consumption;
+- [x] prepend ordering;
+- [x] repeated small spans;
+- [x] clearing releases references;
+- [x] no negative or over-consumption;
+- [x] output cursor emits bounded slices and releases drained blocks.
 
 Engine tests:
 
-- [ ] duplicated leftovers;
-- [ ] only `unused_data`;
-- [ ] only `unconsumed_tail`;
-- [ ] split suffix;
-- [ ] overlapping suffix;
-- [ ] equal non-identical objects;
-- [ ] irreconcilable fields;
-- [ ] too-long field ending in supplied data;
-- [ ] non-suffix tail;
-- [ ] consumed/output/no-progress combinations;
-- [ ] stdlib and zlib-ng real-engine smoke tests.
+- [x] duplicated leftovers;
+- [x] only `unused_data`;
+- [x] only `unconsumed_tail`;
+- [x] split suffix;
+- [x] overlapping suffix;
+- [x] equal non-identical objects;
+- [x] irreconcilable fields;
+- [x] too-long field ending in supplied data;
+- [x] non-suffix tail;
+- [x] consumed/output/no-progress combinations;
+- [x] stdlib and zlib-ng real-engine smoke tests.
 
 #### Exit criteria
 
-- [ ] New primitives are fully tested but not yet required by public code.
-- [ ] `_engine.inflate_step()` callers are updated compatibly or a temporary adapter keeps the repository green.
-- [ ] Fake non-aliasing engine coverage remains stronger than `a1`.
-- [ ] No asyncio dependency is moved yet unless needed solely to keep typing green; D14 belongs to WP5.
+- [x] New primitives are fully tested but not yet required by public code.
+- [x] `_engine.inflate_step()` callers are updated compatibly or a temporary adapter keeps the repository green.
+- [x] Fake non-aliasing engine coverage remains stronger than `a1`.
+- [x] No asyncio dependency is moved yet unless needed solely to keep typing green; D14 belongs to WP5.
 
 #### Suggested commit
 

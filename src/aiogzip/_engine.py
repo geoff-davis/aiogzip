@@ -76,14 +76,15 @@ class _InflateStep:
     output: bytes
     consumed: int
     eof: bool
+    retained: bytes
 
 
-def _merged_retained_size(data: bytes, first: bytes, second: bytes) -> int:
-    """Return the suffix length represented by two engine leftover fields.
+def _normalized_retained(data: bytes, first: bytes, second: bytes) -> bytes:
+    """Return the suffix represented by two engine leftover fields.
 
     Known zlib engines duplicate post-EOF bytes in both fields. Other engines
     may use only one field, split the suffix, or expose overlapping fragments.
-    Resolve those representations here so callers only reason about counts.
+    Resolve those representations here so callers receive one exact suffix.
     """
 
     def current_span(fragment: bytes) -> bytes:
@@ -99,17 +100,17 @@ def _merged_retained_size(data: bytes, first: bytes, second: bytes) -> int:
     if not first:
         if not data.endswith(second):
             raise RuntimeError("inflate engine returned input not present in its span")
-        return len(second)
+        return second
     if not second:
         if not data.endswith(first):
             raise RuntimeError("inflate engine returned input not present in its span")
-        return len(first)
+        return first
     if first == second:
         if not data.endswith(first):
             raise RuntimeError("inflate engine returned input not present in its span")
-        return len(first)
+        return first
 
-    candidates: set[int] = set()
+    candidates: set[bytes] = set()
     for left, right in ((first, second), (second, first)):
         maximum_overlap = min(len(left), len(right))
         for overlap in range(maximum_overlap, -1, -1):
@@ -117,10 +118,14 @@ def _merged_retained_size(data: bytes, first: bytes, second: bytes) -> int:
                 continue
             merged = left + right[overlap:]
             if data.endswith(merged):
-                candidates.add(len(merged))
+                candidates.add(merged)
                 break
     if candidates:
-        return max(candidates)
+        retained = max(candidates, key=len)
+        for existing in (first, second, data):
+            if existing == retained:
+                return existing
+        return retained
 
     raise RuntimeError("inflate engine returned irreconcilable leftover input")
 
@@ -138,18 +143,25 @@ def inflate_step(
     tail = bytes(getattr(engine, "unconsumed_tail", b""))
 
     if eof:
-        retained = _merged_retained_size(data, unused, tail)
+        retained = _normalized_retained(data, unused, tail)
     else:
+        if len(tail) > len(data) and tail.endswith(data):
+            tail = data
         if not data.endswith(tail):
             raise RuntimeError("inflate engine returned a non-suffix unconsumed tail")
-        retained = len(tail)
+        retained = tail
 
-    consumed = len(data) - retained
+    consumed = len(data) - len(retained)
     if not 0 <= consumed <= len(data):
         raise RuntimeError("inflate engine reported invalid input consumption")
     if data and not consumed and not output and not eof:
         raise OSError("gzip decompressor made no progress")
-    return _InflateStep(output=output, consumed=consumed, eof=eof)
+    return _InflateStep(
+        output=output,
+        consumed=consumed,
+        eof=eof,
+        retained=retained,
+    )
 
 
 # Errors raised by the deflate engines. zlib-ng's (and isal's) error type is
