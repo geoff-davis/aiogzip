@@ -1,0 +1,2112 @@
+{
+  "schema_version": 2,
+  "timestamp": 1785094162.3965828,
+  "categories": [
+    "io",
+    "scenarios",
+    "concurrency",
+    "streaming",
+    "regressions"
+  ],
+  "data_size_mb": 8,
+  "repeat": 5,
+  "regression_profile": "release",
+  "regression_mode": "all",
+  "source": {
+    "source_root": "/private/tmp/aiogzip-v1.11.0-regression",
+    "aiogzip_file": "/private/tmp/aiogzip-v1.11.0-regression/src/aiogzip/__init__.py",
+    "package_version": "1.11.0",
+    "target_commit": "3f23eadb524c8dba840c4fd855ad5acf84486048",
+    "target_describe": "v1.11.0",
+    "target_dirty": false
+  },
+  "environment": {
+    "source_root": "/private/tmp/aiogzip-v1.11.0-regression",
+    "aiogzip_file": "/private/tmp/aiogzip-v1.11.0-regression/src/aiogzip/__init__.py",
+    "package_version": "1.11.0",
+    "target_commit": "3f23eadb524c8dba840c4fd855ad5acf84486048",
+    "target_describe": "v1.11.0",
+    "target_dirty": false,
+    "environment_label": "Apple M3 MacBook Air (provisional; rerun on Framework Desktop)",
+    "runner_root": "/Users/geoff/Projects/personal/aiogzip",
+    "runner_commit": "80dd5917b21e75c1be2440467b58bb6bffb082b7",
+    "regression_harness_sha256": "6cb2d3a9709fd905cbc7871c4cb80f9ae848668378d7bd08aeb070aeed2a112d",
+    "python_implementation": "CPython",
+    "python_version": "3.12.8 (v3.12.8:2dc476bcb91, Dec  3 2024, 14:43:19) [Clang 13.0.0 (clang-1300.0.29.30)]",
+    "python_executable": "/Users/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "os_name": "Darwin",
+    "os_release": "25.5.0",
+    "kernel_version": "Darwin Kernel Version 25.5.0: Tue Jun  9 22:19:21 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8122",
+    "architecture": "arm64",
+    "libc": [
+      "",
+      ""
+    ],
+    "processor": "arm",
+    "cpu_count": 8,
+    "ram_bytes": 17179869184,
+    "filesystem_temp_root": "/var/folders/n2/mg9l_t791_q1ctmgyk14m3s80000gn/T",
+    "zlib_compile_version": "1.2.11",
+    "zlib_runtime_version": "1.2.12",
+    "zlib_ng_package_version": "1.0.0",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "stdlib-zlib",
+      "crc32": "stdlib-zlib"
+    },
+    "forced_engine": "stdlib",
+    "uv_version": "uv 0.11.32 (Homebrew 2026-07-23 aarch64-apple-darwin)",
+    "uv_lock_sha256": "b6a99e91044e80c4b9ef0fa99ca599e86dc95d6039cbcc15f3e358827394e248",
+    "cpu_affinity": "unavailable",
+    "cpu_governor": "unavailable on this platform",
+    "cpu_boost": "unavailable on this platform",
+    "system_load": [
+      2.5234375,
+      2.88232421875,
+      2.89453125
+    ],
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      700,
+      10,
+      10
+    ]
+  },
+  "results": [
+    {
+      "name": "Binary I/O (10-byte chunks, stress test)",
+      "category": "io",
+      "duration": 0.4709472079994157,
+      "duration_samples": [
+        0.47148766600003,
+        0.46693391700682696,
+        0.4714895419892855,
+        0.46772424998926,
+        0.4709472079994157
+      ],
+      "median_absolute_deviation": 0.0005423339898698032,
+      "duration_min": 0.46693391700682696,
+      "duration_max": 0.4714895419892855,
+      "metrics": {
+        "aiogzip_write": "0.466s",
+        "aiogzip_read": "0.005s",
+        "gzip_write": "0.304s",
+        "gzip_read": "0.003s",
+        "speedup": "1.53x slower",
+        "chunks_written": 838860,
+        "chunks_per_sec": "1800309",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Binary I/O (bulk, single write/read)",
+      "category": "io",
+      "duration": 0.12652758300828282,
+      "duration_samples": [
+        0.12592499898164533,
+        0.1269868750096066,
+        0.12652758300828282,
+        0.12539820799429435,
+        0.15864374999364372
+      ],
+      "median_absolute_deviation": 0.0006025840266374871,
+      "duration_min": 0.12539820799429435,
+      "duration_max": 0.15864374999364372,
+      "metrics": {
+        "aiogzip_write": "0.122s",
+        "aiogzip_read": "0.005s",
+        "gzip_write": "0.118s",
+        "gzip_read": "0.003s",
+        "speedup": "1.04x slower",
+        "aiogzip_throughput": "63.2 MB/s",
+        "gzip_throughput": "66.0 MB/s",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Binary I/O (64KB chunks, 128 chunks)",
+      "category": "io",
+      "duration": 0.1302459589933278,
+      "duration_samples": [
+        0.13014604200725444,
+        0.13577125000301749,
+        0.1300021250062855,
+        0.1302459589933278,
+        0.1313352080032928
+      ],
+      "median_absolute_deviation": 0.00024383398704230785,
+      "duration_min": 0.1300021250062855,
+      "duration_max": 0.13577125000301749,
+      "metrics": {
+        "aiogzip_write": "0.125s",
+        "aiogzip_read": "0.006s",
+        "gzip_write": "0.118s",
+        "gzip_read": "0.002s",
+        "speedup": "1.08x slower",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text write (bulk, compression level 6)",
+      "category": "io",
+      "duration": 0.18063579199952073,
+      "duration_samples": [
+        0.18135529098799452,
+        0.18204654200235382,
+        0.18063579199952073,
+        0.1801869170012651,
+        0.18046991700248327
+      ],
+      "median_absolute_deviation": 0.0004488749982556328,
+      "duration_min": 0.1801869170012651,
+      "duration_max": 0.18204654200235382,
+      "metrics": {
+        "aiogzip_time": "0.1806s",
+        "gzip_time": "0.1787s",
+        "speedup": "1.01x slower",
+        "aiogzip_throughput": "44.3 MB/s",
+        "gzip_throughput": "44.8 MB/s",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text read (bulk, identical fixture)",
+      "category": "io",
+      "duration": 0.006395124990376644,
+      "duration_samples": [
+        0.0061224999953992665,
+        0.006571291000000201,
+        0.006395124990376644,
+        0.006594416001462378,
+        0.005890291999094188
+      ],
+      "median_absolute_deviation": 0.00019929101108573377,
+      "duration_min": 0.005890291999094188,
+      "duration_max": 0.006594416001462378,
+      "metrics": {
+        "aiogzip_time": "0.0064s",
+        "gzip_time": "0.0050s",
+        "speedup": "1.27x slower",
+        "aiogzip_throughput": "1251.0 MB/s",
+        "gzip_throughput": "1591.0 MB/s",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text line iteration (default, identical fixture)",
+      "category": "io",
+      "duration": 0.022385624994058162,
+      "duration_samples": [
+        0.021784958997159265,
+        0.02263620799931232,
+        0.022210415991139598,
+        0.022385624994058162,
+        0.02256779199524317
+      ],
+      "median_absolute_deviation": 0.0001821670011850074,
+      "duration_min": 0.021784958997159265,
+      "duration_max": 0.02263620799931232,
+      "metrics": {
+        "aiogzip_time": "0.0224s",
+        "gzip_time": "0.0116s",
+        "speedup": "1.93x slower",
+        "aiogzip_lines_per_sec": "3298947",
+        "gzip_lines_per_sec": "6363550",
+        "lines": 73849,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text line iteration (tuned, identical fixture)",
+      "category": "io",
+      "duration": 0.02199562500754837,
+      "duration_samples": [
+        0.021916666999459267,
+        0.02199562500754837,
+        0.02236283299862407,
+        0.022947999997995794,
+        0.021859959000721574
+      ],
+      "median_absolute_deviation": 0.00013566600682679564,
+      "duration_min": 0.021859959000721574,
+      "duration_max": 0.022947999997995794,
+      "metrics": {
+        "aiogzip_time": "0.0220s",
+        "gzip_time": "0.0115s",
+        "speedup": "1.91x slower",
+        "aiogzip_lines_per_sec": "3357440",
+        "gzip_lines_per_sec": "6425680",
+        "lines": 73849,
+        "tuning": "newline=\"\\n\", chunk_size=512 KiB",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Flush operations (100 flushes)",
+      "category": "io",
+      "duration": 0.007239999991725199,
+      "duration_samples": [
+        0.007221666004625149,
+        0.007415374988340773,
+        0.0073307080019731075,
+        0.007239999991725199,
+        0.0067262499942444265
+      ],
+      "median_absolute_deviation": 9.070801024790853e-05,
+      "duration_min": 0.0067262499942444265,
+      "duration_max": 0.007415374988340773,
+      "metrics": {
+        "ops_per_sec": "13812",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Read-all isolated (compressible, read-only timing)",
+      "category": "io",
+      "duration": 0.0030746249976800755,
+      "duration_samples": [
+        0.0028553750016726553,
+        0.003121792004094459,
+        0.0031569589918944985,
+        0.0030746249976800755,
+        0.0028999579953961074
+      ],
+      "median_absolute_deviation": 8.2333994214423e-05,
+      "duration_min": 0.0028553750016726553,
+      "duration_max": 0.0031569589918944985,
+      "metrics": {
+        "aiogzip_read_best": "3.07ms",
+        "gzip_read_best": "3.04ms",
+        "aiogzip_throughput": "2601.9 MB/s",
+        "speedup": "1.01x slower",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text large reads (sized read + long line, O(n) accumulation)",
+      "category": "io",
+      "duration": 0.0048862499970709905,
+      "duration_samples": [
+        0.004855874998611398,
+        0.0050612500053830445,
+        0.005376542001613416,
+        0.004840541005250998,
+        0.0048862499970709905
+      ],
+      "median_absolute_deviation": 4.570899181999266e-05,
+      "duration_min": 0.004840541005250998,
+      "duration_max": 0.005376542001613416,
+      "metrics": {
+        "read_size_best": "4.89ms",
+        "readline_long_best": "5.05ms",
+        "read_size_throughput": "1637.2 Mchar/s",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "JSONL read and parse (identical fixture)",
+      "category": "scenarios",
+      "duration": 0.08574329200200737,
+      "duration_samples": [
+        0.08574329200200737,
+        0.08807045899447985,
+        0.0845721250079805,
+        0.08538608301023487,
+        0.08631712500937283
+      ],
+      "median_absolute_deviation": 0.0005738330073654652,
+      "duration_min": 0.0845721250079805,
+      "duration_max": 0.08807045899447985,
+      "metrics": {
+        "aiogzip_time": "0.0857s",
+        "gzip_time": "0.0753s",
+        "records": 73849,
+        "speedup": "1.14x slower",
+        "tuning": "newline=\"\\n\", chunk_size=512 KiB",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "JSONL batched readlines and parse (identical fixture)",
+      "category": "scenarios",
+      "duration": 0.07737529199221171,
+      "duration_samples": [
+        0.07737529199221171,
+        0.07813233399065211,
+        0.07678475001011975,
+        0.07882025001163129,
+        0.07674358299118467
+      ],
+      "median_absolute_deviation": 0.0006317090010270476,
+      "duration_min": 0.07674358299118467,
+      "duration_max": 0.07882025001163129,
+      "metrics": {
+        "aiogzip_time": "0.0774s",
+        "gzip_time": "0.0753s",
+        "records": 73849,
+        "speedup": "1.03x slower",
+        "tuning": "newline=\"\\n\", chunk_size=512 KiB, readlines=1 MiB",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Concurrent I/O (10 files, 10ms delay each)",
+      "category": "concurrency",
+      "duration": 0.04648258398810867,
+      "duration_samples": [
+        0.05272979200526606,
+        0.043992499995511025,
+        0.04648258398810867,
+        0.04550008400110528,
+        0.05127683399769012
+      ],
+      "median_absolute_deviation": 0.002490083992597647,
+      "duration_min": 0.043992499995511025,
+      "duration_max": 0.05272979200526606,
+      "metrics": {
+        "async_time": "0.046s",
+        "sync_time": "0.274s",
+        "speedup": "5.88x",
+        "delay_saved": "0.227s",
+        "async_efficiency": "22%",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Mixed operations (5 read/write)",
+      "category": "concurrency",
+      "duration": 0.016934166007558815,
+      "duration_samples": [
+        0.016934166007558815,
+        0.01737041599699296,
+        0.016525250000995584,
+        0.017735957997501828,
+        0.01636954100104049
+      ],
+      "median_absolute_deviation": 0.0004362499894341454,
+      "duration_min": 0.01636954100104049,
+      "duration_max": 0.017735957997501828,
+      "metrics": {
+        "async_time": "0.017s",
+        "sync_time": "0.031s",
+        "speedup": "1.83x",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "stdlib gzip.compress reference",
+      "category": "streaming",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target predates the public sans-I/O codec",
+        "informational": true,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "sans-I/O codec encode (informational)",
+      "category": "streaming",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target predates the public sans-I/O codec",
+        "informational": true,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "stdlib gzip.decompress reference",
+      "category": "streaming",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target predates the public sans-I/O codec",
+        "informational": true,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "sans-I/O codec decode (informational)",
+      "category": "streaming",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target predates the public sans-I/O codec",
+        "informational": true,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "decompress_chunks (64K in, 64K out)",
+      "category": "streaming",
+      "duration": 0.003460916006588377,
+      "duration_samples": [
+        0.0033987500064540654,
+        0.003479040999081917,
+        0.003296415990917012,
+        0.003694250000989996,
+        0.003460916006588377
+      ],
+      "median_absolute_deviation": 6.216600013431162e-05,
+      "duration_min": 0.003296415990917012,
+      "duration_max": 0.003694250000989996,
+      "metrics": {
+        "event_loop_ticks": 0,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "decompress_chunks (512K in, 256K out)",
+      "category": "streaming",
+      "duration": 0.0037691659963456914,
+      "duration_samples": [
+        0.0034037919976981357,
+        0.0032860000064829364,
+        0.003793875002884306,
+        0.0037691659963456914,
+        0.004110958005185239
+      ],
+      "median_absolute_deviation": 0.00034179200883954763,
+      "duration_min": 0.0032860000064829364,
+      "duration_max": 0.004110958005185239,
+      "metrics": {
+        "event_loop_ticks": 38,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "file reader (64K output)",
+      "category": "streaming",
+      "duration": 0.005184791996725835,
+      "duration_samples": [
+        0.004507207995629869,
+        0.00607154201134108,
+        0.005184791996725835,
+        0.005498290993273258,
+        0.004631250005331822
+      ],
+      "median_absolute_deviation": 0.0005535419913940132,
+      "duration_min": 0.004507207995629869,
+      "duration_max": 0.00607154201134108,
+      "metrics": {
+        "engine": "stdlib-zlib",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "decompress_chunks compressible peak",
+      "category": "streaming",
+      "duration": 0.003849291999358684,
+      "duration_samples": [
+        0.0040785000019241124,
+        0.003849291999358684,
+        0.003776542012928985,
+        0.003925166005501524,
+        0.00376454099023249
+      ],
+      "median_absolute_deviation": 7.587400614283979e-05,
+      "duration_min": 0.00376454099023249,
+      "duration_max": 0.0040785000019241124,
+      "metrics": {
+        "peak_python_mb": 0.24862098693847656,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "full read compressible peak",
+      "category": "streaming",
+      "duration": 0.0031028750090627,
+      "duration_samples": [
+        0.0029737089935224503,
+        0.0031028750090627,
+        0.0032505830022273585,
+        0.0032554170029470697,
+        0.0030415419896598905
+      ],
+      "median_absolute_deviation": 0.00012916601554024965,
+      "duration_min": 0.0029737089935224503,
+      "duration_max": 0.0032554170029470697,
+      "metrics": {
+        "peak_python_mb": 21.39749526977539,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "compress_chunks (64K in, 64K out)",
+      "category": "streaming",
+      "duration": 0.11968370901013259,
+      "duration_samples": [
+        0.11883629200747237,
+        0.12153612500696909,
+        0.12186929200834129,
+        0.11968370901013259,
+        0.11892079199606087
+      ],
+      "median_absolute_deviation": 0.0008474170026602224,
+      "duration_min": 0.11883629200747237,
+      "duration_max": 0.12186929200834129,
+      "metrics": {
+        "compressed_bytes": 8391186,
+        "event_loop_ticks": 0,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "compress_chunks (512K in, 256K out)",
+      "category": "streaming",
+      "duration": 0.12227520799206104,
+      "duration_samples": [
+        0.12242533400421962,
+        0.12227520799206104,
+        0.12210537499049678,
+        0.12240350000502076,
+        0.12192425000830553
+      ],
+      "median_absolute_deviation": 0.00015012601215858012,
+      "duration_min": 0.12192425000830553,
+      "duration_max": 0.12242533400421962,
+      "metrics": {
+        "compressed_bytes": 8391186,
+        "event_loop_ticks": 8854,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "file writer (64K input)",
+      "category": "streaming",
+      "duration": 0.12556024998775683,
+      "duration_samples": [
+        0.1261356250033714,
+        0.12556024998775683,
+        0.12338787499174941,
+        0.12504949999856763,
+        0.12581912500900216
+      ],
+      "median_absolute_deviation": 0.0005107499891892076,
+      "duration_min": 0.12338787499174941,
+      "duration_max": 0.1261356250033714,
+      "metrics": {
+        "compressed_bytes": 8391203,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "compress_chunks compressible peak",
+      "category": "streaming",
+      "duration": 0.018083375005517155,
+      "duration_samples": [
+        0.01810575000126846,
+        0.018083375005517155,
+        0.017862332999357022,
+        0.01822491700295359,
+        0.017795583000406623
+      ],
+      "median_absolute_deviation": 0.00014154199743643403,
+      "duration_min": 0.017795583000406623,
+      "duration_max": 0.01822491700295359,
+      "metrics": {
+        "peak_python_mb": 0.38678836822509766,
+        "compressed_bytes": 8176,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode incompressible 8MiB one-feed 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode incompressible 8MiB 256K-feeds 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode incompressible 16MiB one-feed 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode incompressible 16MiB 256K-feeds 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode incompressible 32MiB one-feed 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode incompressible 32MiB 256K-feeds 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode incompressible 64MiB one-feed 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode incompressible 64MiB 256K-feeds 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode compressible 8MiB one-feed 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode compressible 8MiB 256K-feeds 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode compressible 32MiB one-feed 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode compressible 32MiB 256K-feeds 256K-output",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "decompress_chunks 64K-in 64K-out",
+      "category": "regressions",
+      "duration": 0.010667833994375542,
+      "duration_samples": [
+        0.005108209006721154,
+        0.010967209003865719,
+        0.010763624988612719,
+        0.010667833994375542,
+        0.008608916992670856
+      ],
+      "median_absolute_deviation": 0.00029937500949017704,
+      "duration_min": 0.005108209006721154,
+      "duration_max": 0.010967209003865719,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 8388608,
+        "fixture_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+        "compressed_sha256": "24ed3f5ed4a14a3d22ccf67eef0f84f714d04d91779f546bf1536bf90f598ffe",
+        "output_bytes": 8388608,
+        "output_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+        "output_chunks": 129,
+        "max_output_chunk": 65516,
+        "engine": "stdlib-zlib",
+        "source_items": 129,
+        "source_min_bytes": 2578,
+        "source_max_bytes": 65536,
+        "source_total_bytes": 8391186,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "decompress_chunks 512K-in 256K-out",
+      "category": "regressions",
+      "duration": 0.006801415991503745,
+      "duration_samples": [
+        0.006644833003520034,
+        0.007790542003931478,
+        0.009448374999919906,
+        0.006801415991503745,
+        0.006610583994188346
+      ],
+      "median_absolute_deviation": 0.00019083199731539935,
+      "duration_min": 0.006610583994188346,
+      "duration_max": 0.009448374999919906,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 8388608,
+        "fixture_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+        "compressed_sha256": "24ed3f5ed4a14a3d22ccf67eef0f84f714d04d91779f546bf1536bf90f598ffe",
+        "output_bytes": 8388608,
+        "output_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+        "output_chunks": 33,
+        "max_output_chunk": 262144,
+        "engine": "stdlib-zlib",
+        "source_items": 17,
+        "source_min_bytes": 2578,
+        "source_max_bytes": 524288,
+        "source_total_bytes": 8391186,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "compress_chunks 64K-in 64K-out",
+      "category": "regressions",
+      "duration": 0.1191335000039544,
+      "duration_samples": [
+        0.1191335000039544,
+        0.12162208299560007,
+        0.11833516698970925,
+        0.1220581669913372,
+        0.11819962500885595
+      ],
+      "median_absolute_deviation": 0.0009338749950984493,
+      "duration_min": 0.11819962500885595,
+      "duration_max": 0.1220581669913372,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 8388608,
+        "fixture_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+        "compressed_bytes": 8391186,
+        "compressed_sha256": "7a47a89a1aff1b052d44b6736143edbc24bd19a6fa5d342d9c0c7d9f56358e3b",
+        "output_chunks": 258,
+        "engine": "stdlib-zlib",
+        "source_items": 128,
+        "source_min_bytes": 65536,
+        "source_max_bytes": 65536,
+        "source_total_bytes": 8388608,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "compress_chunks 512K-in 256K-out",
+      "category": "regressions",
+      "duration": 0.12520345799566712,
+      "duration_samples": [
+        0.1219292919995496,
+        0.12520345799566712,
+        0.1256299999949988,
+        0.12227970801177435,
+        0.12606216699350625
+      ],
+      "median_absolute_deviation": 0.0008587089978391305,
+      "duration_min": 0.1219292919995496,
+      "duration_max": 0.12606216699350625,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 8388608,
+        "fixture_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+        "compressed_bytes": 8391186,
+        "compressed_sha256": "7a47a89a1aff1b052d44b6736143edbc24bd19a6fa5d342d9c0c7d9f56358e3b",
+        "output_chunks": 50,
+        "engine": "stdlib-zlib",
+        "source_items": 16,
+        "source_min_bytes": 524288,
+        "source_max_bytes": 524288,
+        "source_total_bytes": 8388608,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct output bound 1 bytes",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct output bound 1024 bytes",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct output bound 65536 bytes",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct output bound 262144 bytes",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header filename 1048576 bytes one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header filename 1048576 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header comment 1048576 bytes one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header comment 1048576 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header filename 4194304 bytes one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header filename 4194304 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header comment 4194304 bytes one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header comment 4194304 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header filename 16777216 bytes one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header filename 16777216 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header comment 16777216 bytes one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header comment 16777216 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header filename 33554432 bytes one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header filename 33554432 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header comment 33554432 bytes one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header comment 33554432 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header filename 67108864 bytes one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header filename 67108864 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header comment 67108864 bytes one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "header comment 67108864 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "throughput",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode memory 8MiB one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "memory",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode memory 16MiB one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "memory",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode memory 32MiB one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "memory",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "direct decode memory 64MiB one-feed",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "memory",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "incomplete filename memory 33554432 bytes metadata-off",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "memory",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "incomplete filename memory 33554432 bytes metadata-on",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "memory",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "incomplete comment memory 33554432 bytes metadata-off",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "memory",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "incomplete comment memory 33554432 bytes metadata-on",
+      "category": "regressions",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "status": "skipped",
+        "reason": "target does not expose the 2.0 public codec",
+        "benchmark_mode": "memory",
+        "package_version": "1.11.0",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "async ticker baseline",
+      "category": "regressions",
+      "duration": 0.13474720799422357,
+      "duration_samples": [
+        0.13478370899974834,
+        0.1347663329943316,
+        0.13444720799452625,
+        0.13460849999682978,
+        0.13474720799422357
+      ],
+      "median_absolute_deviation": 3.6501005524769425e-05,
+      "duration_min": 0.13444720799452625,
+      "duration_max": 0.13478370899974834,
+      "metrics": {
+        "benchmark_mode": "ticker",
+        "ticker_count": 10000,
+        "ticker_gap_p50_seconds": 1.333300315309316e-05,
+        "ticker_gap_p95_seconds": 1.4334000297822058e-05,
+        "ticker_gap_p99_seconds": 1.795799471437931e-05,
+        "ticker_gap_max_seconds": 5.425000563263893e-05,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "async decode ticker 8MiB one-item",
+      "category": "regressions",
+      "duration": 0.024664083000971004,
+      "duration_samples": [
+        0.02334912499645725,
+        0.023418166994815692,
+        0.02647583300131373,
+        0.024664083000971004,
+        0.02639079101209063
+      ],
+      "median_absolute_deviation": 0.0013149580045137554,
+      "duration_min": 0.02334912499645725,
+      "duration_max": 0.02647583300131373,
+      "metrics": {
+        "benchmark_mode": "ticker",
+        "fixture_bytes": 8388608,
+        "fixture_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+        "compressed_sha256": "24ed3f5ed4a14a3d22ccf67eef0f84f714d04d91779f546bf1536bf90f598ffe",
+        "engine": "stdlib-zlib",
+        "ticker_count": 88,
+        "ticker_gap_p50_seconds": 0.00019845800125040114,
+        "ticker_gap_p95_seconds": 0.000899875012692064,
+        "ticker_gap_p99_seconds": 0.0018231670110253617,
+        "ticker_gap_max_seconds": 0.0018231670110253617,
+        "first_output_seconds": 0.0016541670047445223,
+        "output_bytes": 8388608,
+        "output_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+        "output_chunks": 32,
+        "max_output_chunk": 262144,
+        "source_items": 1,
+        "source_min_bytes": 8391186,
+        "source_max_bytes": 8391186,
+        "source_total_bytes": 8391186,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "async decode ticker 8MiB 256K-items",
+      "category": "regressions",
+      "duration": 0.007124332987586968,
+      "duration_samples": [
+        0.0057514999934937805,
+        0.00626725000620354,
+        0.008373250006115995,
+        0.007124332987586968,
+        0.007883291997131892
+      ],
+      "median_absolute_deviation": 0.000857082981383428,
+      "duration_min": 0.0057514999934937805,
+      "duration_max": 0.008373250006115995,
+      "metrics": {
+        "benchmark_mode": "ticker",
+        "fixture_bytes": 8388608,
+        "fixture_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+        "compressed_sha256": "24ed3f5ed4a14a3d22ccf67eef0f84f714d04d91779f546bf1536bf90f598ffe",
+        "engine": "stdlib-zlib",
+        "ticker_count": 72,
+        "ticker_gap_p50_seconds": 2.3999993572942913e-05,
+        "ticker_gap_p95_seconds": 0.00036824999551754445,
+        "ticker_gap_p99_seconds": 0.00039775000186637044,
+        "ticker_gap_max_seconds": 0.00039775000186637044,
+        "first_output_seconds": 6.741700053680688e-05,
+        "output_bytes": 8388608,
+        "output_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+        "output_chunks": 33,
+        "max_output_chunk": 262064,
+        "source_items": 33,
+        "source_min_bytes": 2578,
+        "source_max_bytes": 262144,
+        "source_total_bytes": 8391186,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "async decode ticker 16MiB one-item",
+      "category": "regressions",
+      "duration": 0.07620374999532942,
+      "duration_samples": [
+        0.08968104100495111,
+        0.07620374999532942,
+        0.07535787500091828,
+        0.07458966701233294,
+        0.0773784580087522
+      ],
+      "median_absolute_deviation": 0.0011747080134227872,
+      "duration_min": 0.07458966701233294,
+      "duration_max": 0.08968104100495111,
+      "metrics": {
+        "benchmark_mode": "ticker",
+        "fixture_bytes": 16777216,
+        "fixture_sha256": "fcda398e90aca585200f335db4e6945b244a2e009292aa0f3357af125d43f7a7",
+        "compressed_sha256": "fb72c8174e031d442c115b8eef113357b221fc71b17e299c444c2c8ddaebcc0d",
+        "engine": "stdlib-zlib",
+        "ticker_count": 175,
+        "ticker_gap_p50_seconds": 0.000311999989207834,
+        "ticker_gap_p95_seconds": 0.0014496670046355575,
+        "ticker_gap_p99_seconds": 0.001884957993752323,
+        "ticker_gap_max_seconds": 0.0028832499956479296,
+        "first_output_seconds": 0.003897916991263628,
+        "output_bytes": 16777216,
+        "output_sha256": "fcda398e90aca585200f335db4e6945b244a2e009292aa0f3357af125d43f7a7",
+        "output_chunks": 64,
+        "max_output_chunk": 262144,
+        "source_items": 1,
+        "source_min_bytes": 16782354,
+        "source_max_bytes": 16782354,
+        "source_total_bytes": 16782354,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "async decode ticker 16MiB 256K-items",
+      "category": "regressions",
+      "duration": 0.014710542003740557,
+      "duration_samples": [
+        0.011779458000091836,
+        0.015693374996772036,
+        0.014710542003740557,
+        0.01708337500167545,
+        0.014166791996103711
+      ],
+      "median_absolute_deviation": 0.0009828329930314794,
+      "duration_min": 0.011779458000091836,
+      "duration_max": 0.01708337500167545,
+      "metrics": {
+        "benchmark_mode": "ticker",
+        "fixture_bytes": 16777216,
+        "fixture_sha256": "fcda398e90aca585200f335db4e6945b244a2e009292aa0f3357af125d43f7a7",
+        "compressed_sha256": "fb72c8174e031d442c115b8eef113357b221fc71b17e299c444c2c8ddaebcc0d",
+        "engine": "stdlib-zlib",
+        "ticker_count": 158,
+        "ticker_gap_p50_seconds": 2.7458008844405413e-05,
+        "ticker_gap_p95_seconds": 0.0003106250078417361,
+        "ticker_gap_p99_seconds": 0.0004132920003030449,
+        "ticker_gap_max_seconds": 0.000773834006395191,
+        "first_output_seconds": 8.24590097181499e-05,
+        "output_bytes": 16777216,
+        "output_sha256": "fcda398e90aca585200f335db4e6945b244a2e009292aa0f3357af125d43f7a7",
+        "output_chunks": 65,
+        "max_output_chunk": 262064,
+        "source_items": 65,
+        "source_min_bytes": 5138,
+        "source_max_bytes": 262144,
+        "source_total_bytes": 16782354,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "async decode ticker 32MiB one-item",
+      "category": "regressions",
+      "duration": 0.2779205420083599,
+      "duration_samples": [
+        0.2812883329897886,
+        0.2779205420083599,
+        0.2786479589994997,
+        0.25537149999581743,
+        0.25108779199945275
+      ],
+      "median_absolute_deviation": 0.0033677909814286977,
+      "duration_min": 0.25108779199945275,
+      "duration_max": 0.2812883329897886,
+      "metrics": {
+        "benchmark_mode": "ticker",
+        "fixture_bytes": 33554432,
+        "fixture_sha256": "67fc11d48594c57beca2c4f3668325a202b706c1f869f29c8a885d3d59f9cedc",
+        "compressed_sha256": "077bafbd3ad16da32c9bc742884c2f864e0734c8bf0139ab84a5f75bd98e1002",
+        "engine": "stdlib-zlib",
+        "ticker_count": 352,
+        "ticker_gap_p50_seconds": 0.00036420799733605236,
+        "ticker_gap_p95_seconds": 0.0030877499957568944,
+        "ticker_gap_p99_seconds": 0.004180916002951562,
+        "ticker_gap_max_seconds": 0.0066797920007957146,
+        "first_output_seconds": 0.008921750006265938,
+        "output_bytes": 33554432,
+        "output_sha256": "67fc11d48594c57beca2c4f3668325a202b706c1f869f29c8a885d3d59f9cedc",
+        "output_chunks": 128,
+        "max_output_chunk": 262144,
+        "source_items": 1,
+        "source_min_bytes": 33564690,
+        "source_max_bytes": 33564690,
+        "source_total_bytes": 33564690,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "async decode ticker 32MiB 256K-items",
+      "category": "regressions",
+      "duration": 0.028557416997500695,
+      "duration_samples": [
+        0.02321379199565854,
+        0.026960707997204736,
+        0.028557416997500695,
+        0.03125345800071955,
+        0.03072058300313074
+      ],
+      "median_absolute_deviation": 0.002163166005630046,
+      "duration_min": 0.02321379199565854,
+      "duration_max": 0.03125345800071955,
+      "metrics": {
+        "benchmark_mode": "ticker",
+        "fixture_bytes": 33554432,
+        "fixture_sha256": "67fc11d48594c57beca2c4f3668325a202b706c1f869f29c8a885d3d59f9cedc",
+        "compressed_sha256": "077bafbd3ad16da32c9bc742884c2f864e0734c8bf0139ab84a5f75bd98e1002",
+        "engine": "stdlib-zlib",
+        "ticker_count": 301,
+        "ticker_gap_p50_seconds": 2.4082997697405517e-05,
+        "ticker_gap_p95_seconds": 0.00030033399525564164,
+        "ticker_gap_p99_seconds": 0.0005655410059262067,
+        "ticker_gap_max_seconds": 0.0010195829963777214,
+        "first_output_seconds": 9.416700049769133e-05,
+        "output_bytes": 33554432,
+        "output_sha256": "67fc11d48594c57beca2c4f3668325a202b706c1f869f29c8a885d3d59f9cedc",
+        "output_chunks": 129,
+        "max_output_chunk": 262069,
+        "source_items": 129,
+        "source_min_bytes": 10258,
+        "source_max_bytes": 262144,
+        "source_total_bytes": 33564690,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "async decode ticker 64MiB one-item",
+      "category": "regressions",
+      "duration": 1.02583283300919,
+      "duration_samples": [
+        1.0380949170066742,
+        1.02583283300919,
+        1.0993042920017615,
+        0.9954991249978775,
+        1.017425041005481
+      ],
+      "median_absolute_deviation": 0.012262083997484297,
+      "duration_min": 0.9954991249978775,
+      "duration_max": 1.0993042920017615,
+      "metrics": {
+        "benchmark_mode": "ticker",
+        "fixture_bytes": 67108864,
+        "fixture_sha256": "ae8c7eb4c8734f0b17d8480a58697a426a961ce404521a2e660fa5774b7e96e6",
+        "compressed_sha256": "6dc5052d19b75dfdf1431c963331d2766205c9de2eebc06ea2964305e267e843",
+        "engine": "stdlib-zlib",
+        "ticker_count": 671,
+        "ticker_gap_p50_seconds": 0.0005678750021615997,
+        "ticker_gap_p95_seconds": 0.005744875001255423,
+        "ticker_gap_p99_seconds": 0.00830524999764748,
+        "ticker_gap_max_seconds": 0.024731332989176735,
+        "first_output_seconds": 0.03047583300212864,
+        "output_bytes": 67108864,
+        "output_sha256": "ae8c7eb4c8734f0b17d8480a58697a426a961ce404521a2e660fa5774b7e96e6",
+        "output_chunks": 256,
+        "max_output_chunk": 262144,
+        "source_items": 1,
+        "source_min_bytes": 67129357,
+        "source_max_bytes": 67129357,
+        "source_total_bytes": 67129357,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "async decode ticker 64MiB 256K-items",
+      "category": "regressions",
+      "duration": 0.051900916994782165,
+      "duration_samples": [
+        0.050441208004485816,
+        0.053329125003074296,
+        0.051900916994782165,
+        0.05178954199072905,
+        0.06076733300869819
+      ],
+      "median_absolute_deviation": 0.0014282080082921311,
+      "duration_min": 0.050441208004485816,
+      "duration_max": 0.06076733300869819,
+      "metrics": {
+        "benchmark_mode": "ticker",
+        "fixture_bytes": 67108864,
+        "fixture_sha256": "ae8c7eb4c8734f0b17d8480a58697a426a961ce404521a2e660fa5774b7e96e6",
+        "compressed_sha256": "6dc5052d19b75dfdf1431c963331d2766205c9de2eebc06ea2964305e267e843",
+        "engine": "stdlib-zlib",
+        "ticker_count": 614,
+        "ticker_gap_p50_seconds": 2.2500011255033314e-05,
+        "ticker_gap_p95_seconds": 0.00026200000138487667,
+        "ticker_gap_p99_seconds": 0.00041554200288373977,
+        "ticker_gap_max_seconds": 0.0008843329997034743,
+        "first_output_seconds": 0.00012066699855495244,
+        "output_bytes": 67108864,
+        "output_sha256": "ae8c7eb4c8734f0b17d8480a58697a426a961ce404521a2e660fa5774b7e96e6",
+        "output_chunks": 257,
+        "max_output_chunk": 262069,
+        "source_items": 257,
+        "source_min_bytes": 20493,
+        "source_max_bytes": 262144,
+        "source_total_bytes": 67129357,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "async decode ticker empty-blocks 100000",
+      "category": "regressions",
+      "duration": 0.0007002079946687445,
+      "duration_samples": [
+        0.0007243750005727634,
+        0.0006944159977138042,
+        0.0006765420112060383,
+        0.0007097920024534687,
+        0.0007002079946687445
+      ],
+      "median_absolute_deviation": 9.584007784724236e-06,
+      "duration_min": 0.0006765420112060383,
+      "duration_max": 0.0007243750005727634,
+      "metrics": {
+        "benchmark_mode": "ticker",
+        "fixture_bytes": 26,
+        "fixture_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd",
+        "compressed_sha256": "c13d11159b282f8960b7d6807a6bb33628b36c3a9883498b9c4d77965dd88c33",
+        "empty_blocks": 100000,
+        "engine_decompress_calls": 1,
+        "progress_events": "unavailable through public API",
+        "engine": "stdlib-zlib",
+        "ticker_count": 45,
+        "ticker_gap_p50_seconds": 1.3333992683328688e-05,
+        "ticker_gap_p95_seconds": 2.058300015050918e-05,
+        "ticker_gap_p99_seconds": 0.00010158400982618332,
+        "ticker_gap_max_seconds": 0.00010158400982618332,
+        "first_output_seconds": 0.0006907499919179827,
+        "output_bytes": 26,
+        "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd",
+        "output_chunks": 1,
+        "max_output_chunk": 26,
+        "source_items": 1,
+        "source_min_bytes": 500054,
+        "source_max_bytes": 500054,
+        "source_total_bytes": 500054,
+        "suite_repeats": 5
+      }
+    }
+  ]
+}

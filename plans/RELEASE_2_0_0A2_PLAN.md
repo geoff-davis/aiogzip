@@ -77,22 +77,22 @@ The machine-readable JSON files must retain individual samples, not just medians
 
 The Markdown record must include:
 
-- [ ] exact source commits and worktree paths;
-- [ ] benchmark harness SHA-256;
-- [ ] fixture sizes and SHA-256 hashes;
-- [ ] Python implementation, complete version, and executable;
-- [ ] OS, kernel, architecture, libc, CPU, core count, RAM, and filesystem used for temporary files;
-- [ ] stdlib zlib compile-time and runtime versions;
-- [ ] zlib-ng package version and active engine selection;
-- [ ] `uv` version and `uv.lock` SHA-256;
-- [ ] CPU governor, boost state, affinity, system load, and other material machine conditions;
-- [ ] exact commands;
-- [ ] warm-up policy, repeat counts, garbage-collection policy, and fixture-generation policy;
-- [ ] all individual timing samples, medians, median absolute deviation, minimum, and maximum;
-- [ ] peak-memory method and values;
-- [ ] event-loop ticker method, baseline ticker gap, p50, p95, p99, and maximum gap;
-- [ ] output hashes and byte counts proving complete correct consumption;
-- [ ] any interrupted, discarded, or invalid runs.
+- [x] exact source commits and worktree paths;
+- [x] benchmark harness SHA-256;
+- [x] fixture sizes and SHA-256 hashes;
+- [x] Python implementation, complete version, and executable;
+- [x] OS, kernel, architecture, libc, CPU, core count, RAM, and filesystem used for temporary files;
+- [x] stdlib zlib compile-time and runtime versions;
+- [x] zlib-ng package version and active engine selection;
+- [x] `uv` version and `uv.lock` SHA-256;
+- [x] CPU governor, boost state, affinity, system load, and other material machine conditions;
+- [x] exact commands;
+- [x] warm-up policy, repeat counts, garbage-collection policy, and fixture-generation policy;
+- [x] all individual timing samples, medians, median absolute deviation, minimum, and maximum;
+- [x] peak-memory method and values;
+- [x] event-loop ticker method, baseline ticker gap, p50, p95, p99, and maximum gap;
+- [x] output hashes and byte counts proving complete correct consumption;
+- [x] any interrupted, discarded, or invalid runs.
 
 Do not manufacture baseline values from the earlier review or transpose measurements from another machine. If the intended release reference machine is unavailable, implementation may continue, but the release gate remains incomplete.
 
@@ -1007,12 +1007,12 @@ Create auditable measurements before production changes and establish the new de
 - [x] Add async ticker-gap collection as a separate benchmark mode.
 - [x] Add header and output-bound matrices.
 - [x] Document the category and commands in `benchmarks/README.md`.
-- [ ] Run the comparable historical high-level cases against exact `v1.11.0` with forced stdlib.
-- [ ] Run those supported cases against exact `v1.11.0` with zlib-ng active; record unsupported codec-only cases as explicit skips rather than synthetic zeros.
-- [ ] Run the full regression harness against exact `v2.0.0a1` with forced stdlib.
-- [ ] Run it against exact `v2.0.0a1` with zlib-ng active.
-- [ ] Run it against the expected `main` base before production changes under both engine selections.
-- [ ] Commit raw JSON and `v2.0.0a1-regression-baseline.md`.
+- [x] Run the comparable historical high-level cases against exact `v1.11.0` with forced stdlib.
+- [x] Run those supported cases against exact `v1.11.0` with zlib-ng active; record unsupported codec-only cases as explicit skips rather than synthetic zeros.
+- [x] Run the full regression harness against exact `v2.0.0a1` with forced stdlib.
+- [x] Run it against exact `v2.0.0a1` with zlib-ng active.
+- [x] Run it against the expected `main` base before production changes under both engine selections.
+- [x] Commit raw JSON and `v2.0.0a1-regression-baseline.md`.
 - [ ] Set `aiogzip.__version__` to `2.0.0a2.dev0` only after baseline capture.
 - [ ] Add an Unreleased changelog skeleton describing regression repair without claiming results.
 - [ ] Reconcile demonstrably completed `a1` post-release checklist items; do not mark unverifiable maintainer actions complete.
@@ -1030,10 +1030,10 @@ Also execute the exact detached-worktree commands recorded in the baseline docum
 
 #### Exit criteria
 
-- [ ] No `src/aiogzip/` production behavior changed before the baseline files were committed.
-- [ ] Exact `v1.11.0`, exact-tag `v2.0.0a1`, and starting-main raw samples are inspectable in Git.
-- [ ] Every benchmark verifies correctness.
-- [ ] The harness identifies the imported aiogzip source.
+- [x] No `src/aiogzip/` production behavior changed before the baseline files were committed.
+- [x] Exact `v1.11.0`, exact-tag `v2.0.0a1`, and starting-main raw samples are inspectable in Git.
+- [x] Every benchmark verifies correctness.
+- [x] The harness identifies the imported aiogzip source.
 - [ ] `main` reports `2.0.0a2.dev0` after the housekeeping commit.
 - [ ] The repository is green.
 
