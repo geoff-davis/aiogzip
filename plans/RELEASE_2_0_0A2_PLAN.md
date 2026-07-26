@@ -1735,35 +1735,39 @@ Cross at least representative combinations of:
 
 ### Correctness — hard blockers
 
-- [ ] All existing tests pass.
-- [ ] All new buffer, parser, ownership, and fairness tests pass.
-- [ ] stdlib and zlib-ng produce equivalent decoded bytes and member validation.
-- [ ] CRC, ISIZE, FHCRC, reserved flags, and trailing-data behavior remain correct.
-- [ ] concatenated members and padding remain correct.
-- [ ] output bounds and decompression limits remain strict.
-- [ ] cross-surface properties pass.
-- [ ] seeking, rewind, append, and deterministic output pass.
+- [x] All existing tests pass.
+- [x] All new buffer, parser, ownership, and fairness tests pass.
+- [x] stdlib and zlib-ng produce equivalent decoded bytes and member validation.
+- [x] CRC, ISIZE, FHCRC, reserved flags, and trailing-data behavior remain correct.
+- [x] concatenated members and padding remain correct.
+- [x] output bounds and decompression limits remain strict.
+- [x] cross-surface properties pass.
+- [x] seeking, rewind, append, and deterministic output pass.
 
 ### Architecture — hard blockers
 
-- [ ] No monolithic front-deleted compressed pending buffer remains in `GzipDecoder`.
-- [ ] No body step converts all pending compressed input to `bytes`.
-- [ ] No header step converts all pending input or calls whole-buffer `lstrip()`.
-- [ ] Engine retained data is normalized centrally.
-- [ ] Public output and internal output batch are separate.
-- [ ] Async policy is absent from `_engine.py`.
-- [ ] No duplicate gzip state machine is introduced.
-- [ ] No background producer or unbounded queue is introduced.
+- [x] No monolithic front-deleted compressed pending buffer remains in `GzipDecoder`.
+- [x] No body step converts all pending compressed input to `bytes`.
+- [x] No header step converts all pending input or calls whole-buffer `lstrip()`.
+- [x] Engine retained data is normalized centrally.
+- [x] Public output and internal output batch are separate.
+- [x] Async policy is absent from `_engine.py`.
+- [x] No duplicate gzip state machine is introduced.
+- [x] No background producer or unbounded queue is introduced.
 
 ### Lifecycle and cancellation — hard blockers
 
-- [ ] deterministic reservation remains GC-independent;
-- [ ] partial close poisons;
-- [ ] discard invalidates and promptly releases captured input;
-- [ ] retained invalidated operation raises `RuntimeError`;
-- [ ] worker completion precedes cleanup after cancellation;
-- [ ] no concurrent codec advancement is possible;
-- [ ] official examples type-check through `CodecOperation`.
+- [x] deterministic reservation remains GC-independent;
+- [x] partial close poisons;
+- [x] discard invalidates and promptly releases captured input;
+- [x] retained invalidated operation raises `RuntimeError`;
+- [x] worker completion precedes cleanup after cancellation;
+- [x] no concurrent codec advancement is possible;
+- [x] official examples type-check through `CodecOperation`.
+
+These correctness, architecture, and lifecycle gates passed locally under
+active zlib-ng and forced stdlib. The separate Python/OS release matrix remains
+open below; none of these checks closes a Framework performance gate.
 
 ### Performance — hard blockers
 
