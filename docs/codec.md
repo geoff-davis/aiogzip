@@ -70,9 +70,11 @@ assert decoder.finished
 Input boundaries are arbitrary for correctness, but they are not
 performance-neutral. For predictable memory and copy costs, pass
 transport-sized compressed chunks as they arrive instead of one complete
-large archive to a single `feed()` call. `AsyncGzipBinaryFile` reads according
-to its configured `chunk_size`; callers of `decompress_chunks()` control the
-size of each source item.
+large archive to a single `feed()` call. The span queue prevents a large source
+item from causing superlinear whole-suffix copies, but transport-sized items
+still bound snapshot lifetime and executor workload. `AsyncGzipBinaryFile`
+reads according to its configured `chunk_size`; callers of
+`decompress_chunks()` control the size of each source item.
 
 > **Warning — integrity is established only at normal completion.** `feed()`
 > may emit payload before the corresponding CRC-32 and `ISIZE` trailer arrives.
@@ -83,9 +85,11 @@ size of each source item.
 > validation succeeds.
 
 `max_decompressed_size` is a cumulative positive-integer limit. Every inflate
-step is bounded to the remaining allowance plus one byte, and no byte beyond
-the configured limit is emitted. Limit failures raise `OSError`; corrupt,
-truncated, or malformed gzip data raises `gzip.BadGzipFile`.
+step is bounded to the remaining allowance plus one probe byte. Every allowed
+byte is emitted before a later advancement raises `OSError` for the first byte
+over the limit. That probe byte is not yielded and is not included in
+`uncompressed_size`, CRC-32, or ISIZE accounting. Corrupt, truncated, or
+malformed gzip data raises `gzip.BadGzipFile`.
 
 Pass `collect_member_info=True` when member metadata is needed. After each
 member's trailer is validated, `members` gains a `GzipMemberInfo` entry and
@@ -118,6 +122,15 @@ Calls reserve the codec immediately, but engine work occurs as the returned
 operation iterator advances. Exhaust one operation before requesting another.
 This keeps output pull-driven and bounded without a producer task, background
 queue, or eager `list()` allocation.
+
+A decoder `feed()` snapshots and counts its complete argument at call time,
+but advancing the operation reads compressed input through bounded 256 KiB
+windows. Inflate output is produced in separate 256 KiB internal batches and
+then sliced to the caller's `output_chunk_size`. Consequently
+`compressed_size` can lead engine consumption during an active operation, and
+`uncompressed_size` can lead public delivery by at most the pending internal
+batch. These are accounting boundaries, not evidence that the complete input
+or output has been copied into a second contiguous buffer.
 
 Abandonment is deliberately deterministic:
 

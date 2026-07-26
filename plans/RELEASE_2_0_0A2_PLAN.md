@@ -1,6 +1,6 @@
 # aiogzip 2.0.0a2 Regression-Repair Release Plan
 
-> **Status:** Codex-ready implementation plan
+> **Status:** Implemented through WP8; WP9 Framework release gates open
 > **Target release:** `2.0.0a2`
 > **Repository destination:** `plans/RELEASE_2_0_0A2_PLAN.md`
 > **Primary objective:** remove the decoder performance and scheduler-latency regressions exposed by `2.0.0a1` without weakening gzip correctness, bounded output, lifecycle ownership, cancellation safety, or engine portability.
@@ -1585,24 +1585,24 @@ Produce an auditable `2.0.0a2` candidate only after all hard gates pass.
 
 #### Documentation tasks
 
-- [ ] Update `CHANGELOG.md` with measured, non-promotional wording.
-- [ ] Explain that `a2` replaces monolithic pending-input copying with bounded spans/windows.
-- [ ] Explain separate internal inflate batching and public output bounds.
-- [ ] Document the normalized limit behavior: all allowed bytes are emitted before the overflow error, and the probe byte is not counted.
-- [ ] State that source boundaries should no longer cause superlinear copying, while transport-sized items remain sensible.
-- [ ] Document bounded internal read-ahead/accounting during an active operation.
-- [ ] Document `CodecOperation` and `close()`.
-- [ ] Add safe lifecycle examples using `try/finally`.
-- [ ] Clarify `compressed_size` call-time semantics.
-- [ ] Update the codec ADR with the buffering decision and alternatives considered.
-- [ ] Record why wrapper-only rechunking and offload-every-step were rejected.
-- [ ] Record the chosen private window, batch, and checkpoint values with benchmark evidence.
-- [ ] Update performance guidance with one-item and transport-item results.
-- [ ] Do not claim a tiny-write regression was fixed unless the gate data supports it.
+- [x] Update `CHANGELOG.md` with measured, non-promotional wording.
+- [x] Explain that `a2` replaces monolithic pending-input copying with bounded spans/windows.
+- [x] Explain separate internal inflate batching and public output bounds.
+- [x] Document the normalized limit behavior: all allowed bytes are emitted before the overflow error, and the probe byte is not counted.
+- [x] State that source boundaries should no longer cause superlinear copying, while transport-sized items remain sensible.
+- [x] Document bounded internal read-ahead/accounting during an active operation.
+- [x] Document `CodecOperation` and `close()`.
+- [x] Add safe lifecycle examples using `try/finally`.
+- [x] Clarify `compressed_size` call-time semantics.
+- [x] Update the codec ADR with the buffering decision and alternatives considered.
+- [x] Record why wrapper-only rechunking and offload-every-step were rejected.
+- [x] Record the chosen private window, batch, and checkpoint values with benchmark evidence.
+- [x] Update performance guidance with one-item and transport-item results.
+- [x] Do not claim a tiny-write regression was fixed unless the gate data supports it.
 
 #### Final benchmark tasks
 
-- [ ] Freeze production code before final benchmark capture.
+- [x] Freeze production code before final benchmark capture.
 - [ ] Run the complete historical suite under forced stdlib with five or more repeats.
 - [ ] Run the complete historical suite with zlib-ng active with three or more repeats.
 - [ ] Run the complete regression category with release matrix and five or more repeats.
@@ -1617,6 +1617,12 @@ Produce an auditable `2.0.0a2` candidate only after all hard gates pass.
 - [ ] Include engine-call counts.
 - [ ] Include fixture and source hashes.
 - [ ] Include any accepted non-blocking tiny-write disposition.
+
+Production code is frozen at `c71d6db`; WP8 and the WP9 documentation changes
+do not modify `src/aiogzip/`. The exact Framework Desktop commands and
+attestation checks are consolidated in
+`plans/benchmarks/v2.0.0a2-framework-rerun.md`. Final benchmark items remain
+open because M3 results cannot substitute for the release-reference capture.
 
 #### Quality and packaging tasks
 

@@ -6,9 +6,49 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Work in progress for `2.0.0a2`: repair the decoder buffering, tiny-output
-  inflation, fragmented-header, and async scheduler regressions identified in
-  `2.0.0a1` while preserving its correctness and lifecycle contracts.
+- Replaced the decoder's monolithic pending-input buffer with immutable spans
+  and bounded 256 KiB engine windows. A large `feed()` no longer rebuilds and
+  front-deletes the complete unconsumed suffix for every inflate step.
+- Decoupled the 256 KiB internal inflate batch from public
+  `output_chunk_size`. One-byte public output no longer causes one engine call
+  per byte; a cursor drains each internal output block into bounded public
+  chunks.
+- Parsed fixed and optional gzip headers incrementally, including FEXTRA,
+  FNAME, FCOMMENT, and FHCRC. Fragmented fields are consumed once and the
+  128 MiB safety limit is checked before accepting an over-limit byte.
+- Added bounded cooperative checkpoints to long inline decoder drains,
+  including valid DEFLATE sequences that consume input without producing
+  output. Cancellation still waits for an active worker before cleanup.
+
+### Added
+
+- Public `CodecOperation`, the typed closeable iterator returned by
+  `GzipEncoder` and `GzipDecoder` state changes.
+
+### Changed
+
+- `CodecOperation.close()` remains idempotent. Explicit codec `discard()` now
+  invalidates a retained operation and promptly releases its captured input as
+  well as codec-owned state.
+- Decompression limits emit and account every allowed byte before a later
+  advancement rejects the first probe byte. The probe byte is neither yielded
+  nor included in `uncompressed_size` or CRC/ISIZE accounting.
+- Async scheduling policy now lives outside the synchronous engine adapter.
+  The codec remains free of event-loop and executor dependencies.
+
+### Performance
+
+- Provisional Apple M3 MacBook Air measurements put the 8 MiB
+  `decompress_chunks()` 512/256 KiB case at 4.885 ms with stdlib and 4.764 ms
+  with zlib-ng, respectively 28.2% and 34.6% below same-machine `v1.11.0`
+  medians. A 32 MiB one-item source recorded maximum event-loop gaps of
+  1.063 ms and 0.873 ms. These are implementation evidence, not final release
+  numbers; the complete candidate and both historical references must be
+  rerun on the Framework Desktop before release.
+- The 10-byte write diagnostic remains roughly 117-122% slower than
+  `v1.11.0` on the M3, while staying within 3.1% of `2.0.0a1`. Buffering writes
+  across API calls could reduce that overhead but would change sink-error
+  timing, so it remains deferred rather than being described as fixed.
 
 ### Documentation
 

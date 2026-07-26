@@ -28,6 +28,45 @@ or data.
 | Highly compressible bulk `read(-1)` | ~1.08x faster | ~14.5x faster |
 | Ten files with simulated 10 ms latency | ~6.4x faster | ~6.9x faster |
 
+### Provisional 2.0.0a2 decoder evidence
+
+The final `2.0.0a2` table is intentionally not published yet. The values below
+were measured on an Apple M3 MacBook Air while selecting the implementation;
+release-reference results must be recaptured on the Framework Desktop using
+the committed candidate and both locked historical revisions.
+
+| Engine | 8 MiB stream, 64/64 KiB | 8 MiB stream, 512/256 KiB | 32 MiB one item | 32 MiB 256 KiB items |
+| --- | ---: | ---: | ---: | ---: |
+| stdlib | 3.975 ms | 4.885 ms | 22.259 ms | 30.211 ms |
+| zlib-ng | 3.978 ms | 4.764 ms | 15.034 ms | 30.609 ms |
+
+The isolated streaming measurements put the 512/256 KiB case 28.2% below the
+same-machine `v1.11.0` stdlib median and 34.6% below its zlib-ng median. For
+the one-item 32 MiB scheduler case, maximum observed ticker gaps were 1.063 ms
+with stdlib and 0.873 ms with zlib-ng. These values support the bounded-window
+and scheduler choices; they are not portable speed claims.
+
+The decoder now consumes immutable queued spans through 256 KiB compressed
+windows and inflates into separate 256 KiB internal output blocks. Public
+`output_chunk_size` controls only emitted slices, so a one-byte public bound
+does not trigger one inflate call per byte. A complete archive supplied in one
+source item no longer incurs repeated whole-suffix copying. Transport-sized
+source items remain sensible because they bound snapshot lifetime, executor
+work, and per-source backpressure.
+
+The diagnostic 10-byte write case remains about 117-122% slower than
+`v1.11.0` in the provisional M3 runs, although it stays within 3.1% of
+`2.0.0a1`. The remaining cost is one deterministic codec operation per
+accepted write. Buffering across writes is deferred because it would change
+when compression and sink errors surface.
+
+See the committed
+[buffer tuning](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-wp3-buffer-tuning.md),
+[scheduler](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-wp5-scheduler.md),
+and
+[compression analysis](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-compression-analysis.md)
+records for commands, samples, dispersion, and fixture hashes.
+
 Run the suite on the target workload before making a capacity or latency
 decision:
 
