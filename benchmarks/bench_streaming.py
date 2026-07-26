@@ -138,6 +138,22 @@ class StreamingBenchmarks(BenchmarkBase):
 
     def _measure_direct_codecs(self):
         """Record informational direct-codec and equivalent stdlib timings."""
+        if not hasattr(aiogzip, "GzipEncoder") or not hasattr(aiogzip, "GzipDecoder"):
+            for name in (
+                "stdlib gzip.compress reference",
+                "sans-I/O codec encode (informational)",
+                "stdlib gzip.decompress reference",
+                "sans-I/O codec decode (informational)",
+            ):
+                self.add_result(
+                    name,
+                    "streaming",
+                    0.0,
+                    status="skipped",
+                    reason="target predates the public sans-I/O codec",
+                    informational=True,
+                )
+            return
         output_chunk_size = 256 * 1024
 
         start = time.perf_counter()

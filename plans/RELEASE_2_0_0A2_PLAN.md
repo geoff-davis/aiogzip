@@ -35,10 +35,10 @@ git cat-file -e 3f23eadb524c8dba840c4fd855ad5acf84486048^{commit}
 
 Preflight rules:
 
-- [ ] The working tree is clean before the first implementation commit.
-- [ ] `v2.0.0a1^{commit}` resolves to `920004672bbb5e76fb2088358d1cb7051290576d`.
-- [ ] `v1.11.0^{commit}` resolves to `3f23eadb524c8dba840c4fd855ad5acf84486048`.
-- [ ] `HEAD` resolves to `072ea60e309ac0fda64f12897455deac0557bfc5`.
+- [x] The working tree is clean before the first implementation commit.
+- [x] `v2.0.0a1^{commit}` resolves to `920004672bbb5e76fb2088358d1cb7051290576d`.
+- [x] `v1.11.0^{commit}` resolves to `3f23eadb524c8dba840c4fd855ad5acf84486048`.
+- [x] `HEAD` resolves to `072ea60e309ac0fda64f12897455deac0557bfc5`.
 - [ ] If `main` has advanced, stop and report the new commits and affected files. Do not silently rebase this plan, guess that the new commits are harmless, or change the locked SHA in an implementation commit.
 - [ ] If the maintainer intentionally updates the base, update this section in a standalone reviewed plan commit before implementation resumes.
 
@@ -993,20 +993,20 @@ Create auditable measurements before production changes and establish the new de
 
 #### Tasks
 
-- [ ] Add this plan at `plans/RELEASE_2_0_0A2_PLAN.md`.
-- [ ] Verify all SHAs in section 0.
-- [ ] Verify that `.codexrc`, `AGENTS.md`, and `.pre-commit-config.yaml` remain aligned on `uv run prek run --all-files`, and that `scripts/check_py38_compat.py` remains absent; make no tooling edit when the locked-base state is already correct.
-- [ ] Add `benchmarks/bench_codec_regressions.py`.
-- [ ] Register the `regressions` category in `benchmarks/run_benchmarks.py`.
-- [ ] Add `--regression-profile {quick,release}` without changing the existing meaning of the global `--quick` option. Reject the profile flag when the regressions category is not selected.
-- [ ] Extend benchmark JSON output to retain individual samples and median absolute deviation without breaking existing consumers.
-- [ ] Add `--source-root PATH` and source-root verification so benchmark runs cannot accidentally import the current checkout instead of the requested worktree.
-- [ ] Run target imports in a clean subprocess when necessary so an already imported editable checkout cannot contaminate a historical run.
-- [ ] Record the resolved source root, `aiogzip.__file__`, package version, and target commit in JSON.
-- [ ] Add deterministic fixture hashing and output-digest validation.
-- [ ] Add async ticker-gap collection as a separate benchmark mode.
-- [ ] Add header and output-bound matrices.
-- [ ] Document the category and commands in `benchmarks/README.md`.
+- [x] Add this plan at `plans/RELEASE_2_0_0A2_PLAN.md`.
+- [x] Verify all SHAs in section 0.
+- [x] Verify that `.codexrc`, `AGENTS.md`, and `.pre-commit-config.yaml` remain aligned on `uv run prek run --all-files`, and that `scripts/check_py38_compat.py` remains absent; make no tooling edit when the locked-base state is already correct.
+- [x] Add `benchmarks/bench_codec_regressions.py`.
+- [x] Register the `regressions` category in `benchmarks/run_benchmarks.py`.
+- [x] Add `--regression-profile {quick,release}` without changing the existing meaning of the global `--quick` option. Reject the profile flag when the regressions category is not selected.
+- [x] Extend benchmark JSON output to retain individual samples and median absolute deviation without breaking existing consumers.
+- [x] Add `--source-root PATH` and source-root verification so benchmark runs cannot accidentally import the current checkout instead of the requested worktree.
+- [x] Run target imports in a clean subprocess when necessary so an already imported editable checkout cannot contaminate a historical run.
+- [x] Record the resolved source root, `aiogzip.__file__`, package version, and target commit in JSON.
+- [x] Add deterministic fixture hashing and output-digest validation.
+- [x] Add async ticker-gap collection as a separate benchmark mode.
+- [x] Add header and output-bound matrices.
+- [x] Document the category and commands in `benchmarks/README.md`.
 - [ ] Run the comparable historical high-level cases against exact `v1.11.0` with forced stdlib.
 - [ ] Run those supported cases against exact `v1.11.0` with zlib-ng active; record unsupported codec-only cases as explicit skips rather than synthetic zeros.
 - [ ] Run the full regression harness against exact `v2.0.0a1` with forced stdlib.
