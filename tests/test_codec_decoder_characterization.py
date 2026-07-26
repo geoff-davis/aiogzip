@@ -234,7 +234,7 @@ def test_compressed_size_is_accounted_when_feed_returns():
     operation = decoder.feed(wire)
 
     assert decoder.compressed_size == len(wire)
-    assert decoder._pending == b""
+    assert len(decoder._pending) == 0
     operation.close()
     with pytest.raises(OSError, match="unusable"):
         decoder.finish()
@@ -248,12 +248,12 @@ def test_decoder_reentrant_advancement_fails_at_inner_call():
     operation_holder = {}
     caught = []
 
-    def reentrant_inflate(data):
+    def reentrant_inflate(data, max_length):
         try:
             next(operation_holder["operation"])
         except RuntimeError as error:
             caught.append(str(error))
-        return original_inflate(data)
+        return original_inflate(data, max_length)
 
     decoder._inflate = reentrant_inflate
     operation = decoder.feed(wire)

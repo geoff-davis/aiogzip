@@ -68,6 +68,19 @@ def test_exact_take_failure_does_not_consume_partial_input():
     assert len(queue) == 0
 
 
+def test_bounded_compatibility_view_does_not_consume():
+    first = b"abc"
+    queue = _InputQueue()
+    queue.append(first)
+    queue.append(b"def")
+
+    assert queue.to_bytes(3) is first
+    assert queue.to_bytes(5) == b"abcde"
+    assert len(queue) == 6
+    with pytest.raises(ValueError):
+        queue.to_bytes(-1)
+
+
 def test_prepend_orders_retained_input_before_later_spans():
     queue = _InputQueue()
     later = b"later"

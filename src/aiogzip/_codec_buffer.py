@@ -118,6 +118,30 @@ class _InputQueue:
             return None
         return self.take(size)
 
+    def to_bytes(self, max_bytes: int) -> bytes:
+        """Return a bounded prefix without consuming it during migration."""
+        if max_bytes < 0:
+            raise ValueError("maximum byte count cannot be negative")
+        size = min(max_bytes, self._size)
+        if not size:
+            return b""
+
+        first = self._spans[0]
+        if size <= len(first):
+            if size == len(first) and first.start == 0 and first.end == len(first.data):
+                return first.data
+            return first.data[first.start : first.start + size]
+
+        parts: list[bytes] = []
+        remaining = size
+        for span in self._spans:
+            amount = min(remaining, len(span))
+            parts.append(span.data[span.start : span.start + amount])
+            remaining -= amount
+            if not remaining:
+                break
+        return b"".join(parts)
+
     def pop_window(self, max_bytes: int) -> bytes:
         """Consume one non-empty contiguous window bounded by *max_bytes*."""
         if max_bytes <= 0:

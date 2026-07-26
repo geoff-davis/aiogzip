@@ -1182,26 +1182,26 @@ Remove the superlinear body-copy path and decouple engine batches from public em
 
 #### Tasks
 
-- [ ] Replace `GzipDecoder._pending: bytearray` with `_InputQueue`.
-- [ ] Add a bounded active inflate-input field.
-- [ ] Add a bounded internal output-block field and offset.
-- [ ] Add an EOF-after-output marker so trailer transition waits until the output block is drained.
-- [ ] Append accepted snapshots as immutable spans on first operation advancement.
-- [ ] Immediately clear the generator-local feed snapshot after queue ownership is established; the active operation must not keep a second stale reference to a large feed solely through its frame locals.
-- [ ] Pull at most `_INFLATE_INPUT_WINDOW` for one engine input window.
-- [ ] Pass only that bounded window to `_engine.inflate_step()`.
-- [ ] Increment compressed-consumption accounting by `step.consumed`, not by popped-window size.
-- [ ] Retain non-EOF `step.retained` as the next body input.
-- [ ] Prepend EOF `step.retained` for trailer parsing.
-- [ ] Store `step.output` as one internal block.
-- [ ] Split it into chunks no larger than `output_chunk_size` by offset.
-- [ ] Do not front-delete output bytes.
-- [ ] Avoid another engine call until the current output block is drained.
-- [ ] Implement exact-limit and one-byte overflow probing as a separate post-limit engine step; never place allowed bytes and the probe byte in the same stored output block.
-- [ ] Preserve CRC, ISIZE, member size, and total uncompressed accounting.
-- [ ] Preserve body error context including member index and compressed offset.
-- [ ] Clear active input/output references on failure and discard.
-- [ ] Keep a temporary bounded header adapter only if required; it must be removed in WP4.
+- [x] Replace `GzipDecoder._pending: bytearray` with `_InputQueue`.
+- [x] Add a bounded active inflate-input field.
+- [x] Add a bounded internal output-block field and offset.
+- [x] Add an EOF-after-output marker so trailer transition waits until the output block is drained.
+- [x] Append accepted snapshots as immutable spans on first operation advancement.
+- [x] Immediately clear the generator-local feed snapshot after queue ownership is established; the active operation must not keep a second stale reference to a large feed solely through its frame locals.
+- [x] Pull at most `_INFLATE_INPUT_WINDOW` for one engine input window.
+- [x] Pass only that bounded window to `_engine.inflate_step()`.
+- [x] Increment compressed-consumption accounting by `step.consumed`, not by popped-window size.
+- [x] Retain non-EOF `step.retained` as the next body input.
+- [x] Prepend EOF `step.retained` for trailer parsing.
+- [x] Store `step.output` as one internal block.
+- [x] Split it into chunks no larger than `output_chunk_size` by offset.
+- [x] Do not front-delete output bytes.
+- [x] Avoid another engine call until the current output block is drained.
+- [x] Implement exact-limit and one-byte overflow probing as a separate post-limit engine step; never place allowed bytes and the probe byte in the same stored output block.
+- [x] Preserve CRC, ISIZE, member size, and total uncompressed accounting.
+- [x] Preserve body error context including member index and compressed offset.
+- [x] Clear active input/output references on failure and discard.
+- [x] Keep a temporary bounded header adapter only if required; it must be removed in WP4.
 
 #### Forbidden implementation shortcuts
 
@@ -1215,40 +1215,44 @@ Remove the superlinear body-copy path and decouple engine batches from public em
 
 #### Required deterministic tests
 
-- [ ] one large feed equals 1-byte, 1 KiB, 64 KiB, and 256 KiB feed boundaries;
-- [ ] maximum yielded chunk for all public output bounds;
-- [ ] counting engine proves tiny public chunks do not multiply inflate calls;
-- [ ] retained non-EOF input is replayed exactly once in order;
-- [ ] EOF retained trailer bytes are parsed before later queued spans;
-- [ ] one window containing end of member 1 and all of member 2 works;
-- [ ] output block with EOF drains before trailer validation;
-- [ ] close/discard while output remains poisons/releases correctly;
-- [ ] exact decompression limit emits every allowed byte, then rejects the first extra byte on a later advancement without accounting or yielding it;
-- [ ] a fake engine returning output with zero consumed input can make bounded progress;
-- [ ] a fake engine returning neither output nor consumption raises no-progress error;
-- [ ] engine call input length never exceeds the selected private window;
-- [ ] internal output length never exceeds the selected private batch bound.
+- [x] one large feed equals 1-byte, 1 KiB, 64 KiB, and 256 KiB feed boundaries;
+- [x] maximum yielded chunk for all public output bounds;
+- [x] counting engine proves tiny public chunks do not multiply inflate calls;
+- [x] retained non-EOF input is replayed exactly once in order;
+- [x] EOF retained trailer bytes are parsed before later queued spans;
+- [x] one window containing end of member 1 and all of member 2 works;
+- [x] output block with EOF drains before trailer validation;
+- [x] close/discard while output remains poisons/releases correctly;
+- [x] exact decompression limit emits every allowed byte, then rejects the first extra byte on a later advancement without accounting or yielding it;
+- [x] a fake engine returning output with zero consumed input can make bounded progress;
+- [x] a fake engine returning neither output nor consumption raises no-progress error;
+- [x] engine call input length never exceeds the selected private window;
+- [x] internal output length never exceeds the selected private batch bound.
 
 #### Interim benchmark gate
 
 Before WP4:
 
-- [ ] Compare private input-window candidates of 64 KiB, 256 KiB, and 512 KiB on the direct scaling and 512/256 KiB streaming cases under both engines.
-- [ ] Compare private output-batch candidates of 64 KiB, 256 KiB, 512 KiB, and 1 MiB under both engines, including tiny public output and decompression-limit cases.
-- [ ] Record the tuning table in the PR notes or a committed benchmark analysis; do not leave an undocumented temporary benchmark switch in production.
-- [ ] Run the direct large-feed and existing streaming benchmarks on stdlib.
-- [ ] The 32 and 64 MiB one-feed cases meet the hard scaling ratios.
-- [ ] The 512/256 KiB `decompress_chunks()` result is within +10% of `v1.11.0`.
-- [ ] Tiny-output engine-call count is fixed.
-- [ ] If these miss, stop and profile before header work. Do not hope WP4 will repair a body-path miss.
+- [x] Compare private input-window candidates of 64 KiB, 256 KiB, and 512 KiB on the direct scaling and 512/256 KiB streaming cases under both engines.
+- [x] Compare private output-batch candidates of 64 KiB, 256 KiB, 512 KiB, and 1 MiB under both engines, including tiny public output and decompression-limit cases.
+- [x] Record the tuning table in the PR notes or a committed benchmark analysis; do not leave an undocumented temporary benchmark switch in production.
+- [x] Run the direct large-feed and existing streaming benchmarks on stdlib.
+- [x] The 32 and 64 MiB one-feed cases meet the hard scaling ratios.
+- [x] The 512/256 KiB `decompress_chunks()` result is within +10% of `v1.11.0`.
+- [x] Tiny-output engine-call count is fixed.
+- [x] If these miss, stop and profile before header work. Do not hope WP4 will repair a body-path miss.
+
+The WP3 interim measurements are provisional Apple M3 MacBook Air results.
+The Framework Desktop rerun remains an incomplete release gate; see
+`plans/benchmarks/v2.0.0a2-wp3-buffer-tuning.md`.
 
 #### Exit criteria
 
-- [ ] The monolithic body suffix is never copied or shifted per yielded output.
-- [ ] All characterization and cross-surface tests pass.
-- [ ] Both engines pass focused codec tests.
-- [ ] Interim hard performance gates pass.
-- [ ] No public API changed.
+- [x] The monolithic body suffix is never copied or shifted per yielded output.
+- [x] All characterization and cross-surface tests pass.
+- [x] Both engines pass focused codec tests.
+- [x] Interim hard performance gates pass.
+- [x] No public API changed.
 
 #### Suggested commit
 
