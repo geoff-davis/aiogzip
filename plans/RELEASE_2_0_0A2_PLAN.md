@@ -1644,6 +1644,14 @@ open because M3 results cannot substitute for the release-reference capture.
 - [ ] Confirm no benchmark fixtures or oversized raw files accidentally entered the distribution.
 - [ ] Confirm package import contains no benchmark dependency.
 
+Provisional M3 correctness and packaging preflight is recorded in
+`plans/benchmarks/v2.0.0a2-local-validation.md`. Coverage exceeded 92.8% under
+both engine selections, the real header-limit selection passed, provisional
+artifacts passed Twine and metadata inspection, and clean Python 3.11/3.14
+wheel smokes passed with active zlib-ng and forced stdlib. These checkboxes
+remain open because the plan requires the quality and packaging matrix to be
+rerun from the post-Framework release candidate.
+
 #### Release-preparation tasks
 
 Only after all gates pass:
