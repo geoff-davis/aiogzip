@@ -439,20 +439,25 @@ class RegressionsBenchmarks(BenchmarkBase):
         for size_mib in self.profile.header_sizes_mib:
             field_size = 64 * _KIB if self.profile_name == "quick" else size_mib * _MIB
             for field_name in ("filename", "comment"):
+                boundaries = (
+                    ("one-feed", field_size + _MIB),
+                    ("64K-feeds", 64 * _KIB),
+                )
+                if not self.has_public_codec:
+                    for boundary_name, _ in boundaries:
+                        self._skip_codec(
+                            f"header {field_name} {field_size} bytes {boundary_name}",
+                            "throughput",
+                        )
+                    continue
                 field = _deterministic_bytes(
                     field_size, label=f"header:{field_name}:{field_size}".encode()
                 ).replace(b"\x00", b"x")
                 kwargs = {field_name: field}
                 wire = _custom_gzip(header_crc=True, **kwargs)
                 expected = _sha256(b"header benchmark payload")
-                for boundary in (len(wire) + 1, 64 * _KIB):
-                    name = (
-                        f"header {field_name} {field_size} bytes "
-                        f"{'one-feed' if boundary > len(wire) else '64K-feeds'}"
-                    )
-                    if not self.has_public_codec:
-                        self._skip_codec(name, "throughput")
-                        continue
+                for boundary_name, boundary in boundaries:
+                    name = f"header {field_name} {field_size} bytes {boundary_name}"
                     items = _split_exact(wire, boundary)
                     start = time.perf_counter()
                     output_bytes, digest, _, maximum = _digest_direct(
@@ -471,6 +476,8 @@ class RegressionsBenchmarks(BenchmarkBase):
                         header_field_bytes=field_size,
                         header_crc=True,
                         collect_member_info=False,
+                        fixture_bytes=len(wire),
+                        fixture_sha256=_sha256(wire),
                         output_bytes=output_bytes,
                         output_sha256=digest,
                         engine=aiogzip.engine_info().decompression,
@@ -514,6 +521,14 @@ class RegressionsBenchmarks(BenchmarkBase):
 
         field_size = 64 * _KIB if self.profile_name == "quick" else 32 * _MIB
         for field_name, flag in (("filename", 0x08), ("comment", 0x10)):
+            if not self.has_public_codec:
+                for collect_metadata in (False, True):
+                    self._skip_codec(
+                        f"incomplete {field_name} memory {field_size} bytes "
+                        f"metadata-{'on' if collect_metadata else 'off'}",
+                        "memory",
+                    )
+                continue
             field = b"x" * field_size
             incomplete = b"\x1f\x8b\x08" + bytes([flag]) + b"\x00" * 6 + field
             items = _split_exact(incomplete, 64 * _KIB)
@@ -522,9 +537,6 @@ class RegressionsBenchmarks(BenchmarkBase):
                     f"incomplete {field_name} memory {field_size} bytes "
                     f"metadata-{'on' if collect_metadata else 'off'}"
                 )
-                if not self.has_public_codec:
-                    self._skip_codec(name, "memory")
-                    continue
                 decoder = aiogzip.GzipDecoder(
                     output_chunk_size=_OUTPUT_BOUND,
                     collect_member_info=collect_metadata,
@@ -553,6 +565,8 @@ class RegressionsBenchmarks(BenchmarkBase):
                     header_field=field_name,
                     header_field_bytes=field_size,
                     collect_member_info=collect_metadata,
+                    fixture_bytes=len(incomplete),
+                    fixture_sha256=_sha256(incomplete),
                     peak_python_bytes=peak,
                     engine=aiogzip.engine_info().decompression,
                     **_source_metrics(items),

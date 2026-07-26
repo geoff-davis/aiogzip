@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import asyncio
+import gc
 import hashlib
 import importlib
 import importlib.metadata
@@ -167,7 +168,9 @@ def configure_source_root(source_root: Path) -> dict[str, Any]:
     }
 
 
-def collect_environment(source_identity: dict[str, Any]) -> dict[str, Any]:
+def collect_environment(
+    source_identity: dict[str, Any], *, environment_label: str | None = None
+) -> dict[str, Any]:
     """Collect the reproducibility metadata shared by every result file."""
     try:
         import psutil
@@ -206,6 +209,7 @@ def collect_environment(source_identity: dict[str, Any]) -> dict[str, Any]:
         runner_commit = None
     return {
         **source_identity,
+        "environment_label": environment_label,
         "runner_root": str(runner_root),
         "runner_commit": runner_commit,
         "regression_harness_sha256": _file_sha256(harness_path),
@@ -235,6 +239,8 @@ def collect_environment(source_identity: dict[str, Any]) -> dict[str, Any]:
         "cpu_governor": "unavailable on this platform",
         "cpu_boost": "unavailable on this platform",
         "system_load": list(os.getloadavg()) if hasattr(os, "getloadavg") else None,
+        "garbage_collection_enabled": gc.isenabled(),
+        "garbage_collection_thresholds": list(gc.get_threshold()),
     }
 
 
@@ -279,6 +285,10 @@ async def main():
         choices=("throughput", "memory", "ticker", "all"),
         help="Select an isolated regression measurement mode (default: throughput)",
     )
+    parser.add_argument(
+        "--environment-label",
+        help="Human-readable benchmark machine/purpose label stored in JSON",
+    )
 
     args = parser.parse_args()
 
@@ -314,7 +324,9 @@ async def main():
             source_identity = configure_source_root(args.source_root)
         except (ValueError, RuntimeError, subprocess.CalledProcessError) as error:
             parser.error(str(error))
-        environment = collect_environment(source_identity)
+        environment = collect_environment(
+            source_identity, environment_label=args.environment_label
+        )
 
     # Run benchmarks
     all_results = []

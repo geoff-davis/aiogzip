@@ -165,6 +165,8 @@ Options:
                        Select the regression matrix size
   --regression-mode {throughput,memory,ticker,all}
                        Keep timing, allocation, and ticker runs distinct
+  --environment-label TEXT
+                       Record the benchmark machine and purpose in JSON
 ```
 
 Each category runs three times by default. Reported durations are medians, and

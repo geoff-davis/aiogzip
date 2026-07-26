@@ -65,6 +65,8 @@ def test_benchmark_result_json_retains_raw_samples_and_mad():
 
     assert serialized["duration_samples"] == [1.0, 2.0, 5.0]
     assert serialized["median_absolute_deviation"] == 1.0
+    assert serialized["duration_min"] == 1.0
+    assert serialized["duration_max"] == 5.0
 
 
 def test_median_results_preserves_first_run_order():

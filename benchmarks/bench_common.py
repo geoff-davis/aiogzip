@@ -43,12 +43,15 @@ class BenchmarkResults:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
+        samples = self.duration_samples or [self.duration]
         return {
             "name": self.name,
             "category": self.category,
             "duration": self.duration,
-            "duration_samples": self.duration_samples or [self.duration],
+            "duration_samples": samples,
             "median_absolute_deviation": self.median_absolute_deviation,
+            "duration_min": min(samples),
+            "duration_max": max(samples),
             "metrics": self.metrics,
         }
 
