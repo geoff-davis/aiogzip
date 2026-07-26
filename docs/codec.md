@@ -12,7 +12,7 @@ The codec API is provisional throughout the 2.0 alpha series. Ordinary
 ## Encoding one member
 
 One encoder creates exactly one complete gzip member. Each state-changing call
-returns a lazy iterator that must be exhausted before the next call:
+returns a lazy `CodecOperation` that must be exhausted before the next call:
 
 ```python
 from aiogzip import GzipEncoder
@@ -96,6 +96,22 @@ After successful completion, another decoder `feed()` or `finish()` raises
 `ValueError`. Repeated encoder finalization and invalid method ordering also
 raise `ValueError`; create a new codec for another stream.
 
+## Counter timing
+
+The counters reflect different commitment boundaries:
+
+- `GzipEncoder.input_size` and `crc32` change when a `feed()` operation
+  advances far enough to pass its complete snapshot through the compression
+  engine. Calling `feed()` without advancing its operation does not change
+  them.
+- `GzipDecoder.compressed_size` changes when `feed()` returns, after its input
+  has been validated and snapshotted but before the operation advances.
+- `GzipDecoder.uncompressed_size` changes as inflate steps complete. Internal
+  output is accounted before its bounded public chunks are yielded, so the
+  counter can temporarily lead the bytes already consumed by the caller.
+- `member_count` and `members` change only after a complete member trailer has
+  been validated.
+
 ## Lazy operations and ownership
 
 Calls reserve the codec immediately, but engine work occurs as the returned
@@ -111,12 +127,31 @@ Abandonment is deliberately deterministic:
   garbage collection has run;
 - explicitly closing a partially consumed operation makes the codec unusable;
 - no iterator finalizer releases ownership or mutates codec state; and
-- if an abandoned operation is unreachable, `discard()` is the only cleanup.
-  It permanently invalidates the codec and releases its retained state.
+- `discard()` permanently invalidates the codec and any retained operation,
+  immediately releasing the operation's captured input and codec state.
 
 When an operation is still reachable, exhaust it if the stream should remain
-usable. Otherwise close the operation and discard the codec. `discard()` is
-idempotent, but it is not a reset; construct a new instance to continue.
+usable. Otherwise call its idempotent `close()` method. A `try`/`finally`
+ensures an exception or early return cannot leave the codec reserved:
+
+```python
+import aiogzip
+
+
+def decode_chunk(decoder: aiogzip.GzipDecoder, chunk: bytes) -> bytes:
+    operation: aiogzip.CodecOperation = decoder.feed(chunk)
+    try:
+        return b"".join(operation)
+    finally:
+        operation.close()
+```
+
+Calling `close()` after exhaustion has no effect. Calling it earlier releases
+the operation and makes the codec unusable. If the caller no longer retains
+the operation, use the codec's idempotent `discard()` method; it invalidates
+active work and promptly releases both the captured operation input and codec
+state. Neither method resets the codec, so construct a new instance to
+continue.
 
 Codec instances and their operation iterators are **not thread-safe**. Use an
 instance from one thread at a time, or hold an external lock around the entire

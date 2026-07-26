@@ -1470,20 +1470,20 @@ Make the documented `close()` contract type-correct and release captured resourc
 
 #### Tasks
 
-- [ ] Add public `CodecOperation` protocol.
-- [ ] Export it from `aiogzip.codec`.
-- [ ] Export it from package root and `__all__`.
-- [ ] Update `start()`, `feed()`, `flush()`, and `finish()` annotations.
-- [ ] Update private reservation annotations and make the private async-driver protocol extend public `CodecOperation` while retaining its private raw-advance member.
-- [ ] Remove cleanup `getattr()` where direct typed invocation is valid.
-- [ ] Add private `_Operation._invalidate()` or equivalent.
-- [ ] Make `discard()` invalidate the active operation before dropping its token.
-- [ ] Release the underlying generator/iterator reference during invalidation.
-- [ ] Preserve retained invalidated iterator `RuntimeError` behavior.
-- [ ] Preserve idempotent close.
-- [ ] Preserve no-finalizer rule.
-- [ ] Update API docs and examples.
-- [ ] Clarify compressed and uncompressed counter timing.
+- [x] Add public `CodecOperation` protocol.
+- [x] Export it from `aiogzip.codec`.
+- [x] Export it from package root and `__all__`.
+- [x] Update `start()`, `feed()`, `flush()`, and `finish()` annotations.
+- [x] Update private reservation annotations and make the private async-driver protocol extend public `CodecOperation` while retaining its private raw-advance member.
+- [x] Remove cleanup `getattr()` where direct typed invocation is valid.
+- [x] Add private `_Operation._invalidate()` or equivalent.
+- [x] Make `discard()` invalidate the active operation before dropping its token.
+- [x] Release the underlying generator/iterator reference during invalidation.
+- [x] Preserve retained invalidated iterator `RuntimeError` behavior.
+- [x] Preserve idempotent close.
+- [x] Preserve no-finalizer rule.
+- [x] Update API docs and examples.
+- [x] Clarify compressed and uncompressed counter timing.
 
 #### Type tests
 
@@ -1499,20 +1499,27 @@ Also prove that an ordinary `Iterator[bytes]` is not incorrectly promised to hav
 
 #### Runtime tests
 
-- [ ] `discard()` releases a large unadvanced feed snapshot even while the operation object remains reachable;
-- [ ] advancing that operation raises `RuntimeError`;
-- [ ] closing it is idempotent;
-- [ ] no engine method runs after invalidation;
-- [ ] operation ownership tests still pass with `gc.disable()`;
-- [ ] public import and `__all__` tests pass;
-- [ ] generated docs show `close()`.
+- [x] `discard()` releases a large unadvanced feed snapshot even while the operation object remains reachable;
+- [x] advancing that operation raises `RuntimeError`;
+- [x] closing it is idempotent;
+- [x] no engine method runs after invalidation;
+- [x] operation ownership tests still pass with `gc.disable()`;
+- [x] public import and `__all__` tests pass;
+- [x] generated docs show `close()`.
 
 #### Exit criteria
 
-- [ ] Official lifecycle examples type-check without ignores.
-- [ ] No return annotation remains merely `Iterator[bytes]` where cleanup is supported.
-- [ ] Explicit discard promptly drops captured input.
-- [ ] Runtime semantics remain compatible.
+- [x] Official lifecycle examples type-check without ignores.
+- [x] No return annotation remains merely `Iterator[bytes]` where cleanup is supported.
+- [x] Explicit discard promptly drops captured input.
+- [x] Runtime semantics remain compatible.
+
+WP7 validation completed on the Apple M3 MacBook Air: active zlib-ng ran
+1,652 tests with one skip; forced stdlib ran 1,619 tests with one skip, plus
+all 33 isolated engine-reload tests. Strict mypy and `ty` accepted the public
+lifecycle example and rejected `close()` on an ordinary `Iterator[bytes]`.
+A strict documentation build exposed `CodecOperation.close()`. No benchmark
+gate was evaluated in WP7; the Framework Desktop release rerun remains open.
 
 #### Suggested commit
 

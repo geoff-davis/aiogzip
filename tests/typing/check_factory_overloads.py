@@ -7,12 +7,13 @@ type by mode.
 """
 
 from pathlib import Path
-from typing import AsyncIterator, Iterator, Union, assert_type
+from typing import AsyncIterator, Union, assert_type
 
 from aiogzip import (
     AsyncGzipBinaryFile,
     AsyncGzipFile,
     AsyncGzipTextFile,
+    CodecOperation,
     EngineInfo,
     GzipDecoder,
     GzipEncoder,
@@ -124,9 +125,9 @@ def _check_streaming_functions() -> None:
 def _check_codec_types() -> None:
     encoder = GzipEncoder(mtime=0)
     decoder = GzipDecoder()
-    assert_type(encoder.start(), Iterator[bytes])
-    assert_type(encoder.feed(b"payload"), Iterator[bytes])
-    assert_type(encoder.flush(), Iterator[bytes])
-    assert_type(encoder.finish(), Iterator[bytes])
-    assert_type(decoder.feed(b"compressed"), Iterator[bytes])
-    assert_type(decoder.finish(), Iterator[bytes])
+    assert_type(encoder.start(), CodecOperation)
+    assert_type(encoder.feed(b"payload"), CodecOperation)
+    assert_type(encoder.flush(), CodecOperation)
+    assert_type(encoder.finish(), CodecOperation)
+    assert_type(decoder.feed(b"compressed"), CodecOperation)
+    assert_type(decoder.finish(), CodecOperation)

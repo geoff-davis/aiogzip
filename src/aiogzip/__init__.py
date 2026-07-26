@@ -27,7 +27,7 @@ from ._inspection import (
 )
 from ._streaming import _compress_chunks, _decompress_chunks
 from ._text import AsyncGzipTextFile
-from .codec import GzipDecoder, GzipEncoder
+from .codec import CodecOperation, GzipDecoder, GzipEncoder
 
 __version__ = "2.0.0a2.dev0"
 
@@ -455,6 +455,7 @@ __all__ = [
     "AsyncGzipBinaryFile",
     "AsyncGzipFile",
     "AsyncGzipTextFile",
+    "CodecOperation",
     "EngineInfo",
     "GzipInfo",
     "GzipDecoder",

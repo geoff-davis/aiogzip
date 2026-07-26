@@ -13,9 +13,9 @@ from __future__ import annotations
 import gzip
 import struct
 import warnings
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, cast
 
 from . import _engine
 from ._codec_buffer import _InputQueue, _OutputCursor
@@ -34,7 +34,7 @@ from ._common import (
 from ._gzip_header import _GzipHeaderParser, _ParsedHeader
 from ._metadata import GzipMemberInfo
 
-__all__ = ["GzipDecoder", "GzipEncoder"]
+__all__ = ["CodecOperation", "GzipDecoder", "GzipEncoder"]
 
 _INFLATE_INPUT_WINDOW = 256 * 1024
 _INFLATE_OUTPUT_BATCH = 256 * 1024
@@ -47,12 +47,26 @@ class _CodecProgress:
     compressed_bytes: int
 
 
-class _AsyncDrivableOperation(Iterator[bytes], Protocol):
+class CodecOperation(Iterator[bytes], Protocol):
+    """A lazy codec operation with deterministic abandonment cleanup.
+
+    Exhaust the operation to complete it. Calling :meth:`close` before
+    exhaustion releases captured work and makes the owning codec unusable;
+    closing an exhausted or already closed operation has no effect.
+    """
+
+    def close(self) -> None:
+        """Release this operation, abandoning its codec if still incomplete."""
+        ...
+
+
+class _AsyncDrivableOperation(CodecOperation, Protocol):
     """Private operation surface used by the cooperative async driver."""
 
-    def close(self) -> None: ...
-
     def _advance_raw(self) -> bytes | _CodecProgress: ...
+
+
+_CodecIterator = Generator[bytes | _CodecProgress, None, None]
 
 
 def _snapshot_bytes_input(data: bytes) -> bytes:
@@ -67,17 +81,18 @@ def _snapshot_bytes_input(data: bytes) -> bytes:
 class _Operation(Iterator[bytes]):
     """Single-use iterator tied to a codec-owned reservation token."""
 
-    __slots__ = ("_advancing", "_closed", "_iterator", "_owner")
+    __slots__ = ("_advancing", "_closed", "_invalidated", "_iterator", "_owner")
 
     def __init__(
         self,
         owner: _CodecBase,
-        iterator: Iterator[bytes | _CodecProgress],
+        iterator: _CodecIterator,
     ) -> None:
         self._owner = owner
         self._iterator = iterator
         self._advancing = False
         self._closed = False
+        self._invalidated = False
 
     def __iter__(self) -> _Operation:
         return self
@@ -90,7 +105,7 @@ class _Operation(Iterator[bytes]):
 
     def _advance_raw(self) -> bytes | _CodecProgress:
         """Return exactly one internal byte or progress event."""
-        if self._owner._discarded:
+        if self._invalidated or self._owner._discarded:
             raise RuntimeError("gzip codec operation was invalidated by discard()")
         if self._closed:
             raise StopIteration
@@ -114,25 +129,35 @@ class _Operation(Iterator[bytes]):
             self._advancing = False
         return output
 
+    def _invalidate(self) -> None:
+        """Release captured work while preserving invalid-operation behavior."""
+        if self._invalidated:
+            return
+        self._invalidated = True
+        self._closed = True
+        iterator = self._iterator
+        self._iterator = _empty_codec_iterator()
+        iterator.close()
+
     def close(self) -> None:
         """Close this operation, poisoning its codec unless already invalid."""
         if self._closed:
             return
-        invalidated = self._owner._discarded
         self._closed = True
         iterator = self._iterator
-        self._iterator = iter(())
-        if not invalidated:
-            self._owner._operation_failed(self)
-        close = getattr(iterator, "close", None)
-        if callable(close):
-            close()
+        self._iterator = _empty_codec_iterator()
+        self._owner._operation_failed(self)
+        iterator.close()
+
+
+def _empty_codec_iterator() -> _CodecIterator:
+    yield from ()
 
 
 class _CodecBase:
     """Shared deterministic operation ownership."""
 
-    _active_token: object | None
+    _active_token: _Operation | None
     _discarded: bool
     _unusable: bool
 
@@ -149,8 +174,8 @@ class _CodecBase:
 
     def _reserve(
         self,
-        iterator: Iterator[bytes | _CodecProgress],
-    ) -> _AsyncDrivableOperation:
+        iterator: _CodecIterator,
+    ) -> CodecOperation:
         operation = _Operation(self, iterator)
         self._active_token = operation
         return operation
@@ -174,6 +199,9 @@ class _CodecBase:
             return
         self._discarded = True
         self._unusable = True
+        operation = self._active_token
+        if operation is not None:
+            operation._invalidate()
         self._active_token = None
         self._release_state()
 
@@ -233,12 +261,12 @@ class GzipEncoder(_CodecBase):
 
     @property
     def input_size(self) -> int:
-        """Number of uncompressed bytes committed to this member."""
+        """Uncompressed bytes committed by advancing feed operations."""
         return self._input_size
 
     @property
     def crc32(self) -> int:
-        """Running CRC-32 of committed uncompressed input."""
+        """CRC-32 of input committed by advancing feed operations."""
         return self._crc
 
     @property
@@ -259,19 +287,19 @@ class GzipEncoder(_CodecBase):
         if self._finished:
             raise ValueError("gzip encoder is already finalized")
 
-    def start(self) -> Iterator[bytes]:
+    def start(self) -> CodecOperation:
         """Start the member and lazily emit its gzip header exactly once."""
         self._check_encoder_available()
         if self._started:
             raise ValueError("gzip encoder is already started")
         return self._reserve(self._start())
 
-    def _start(self) -> Iterator[bytes]:
+    def _start(self) -> _CodecIterator:
         header = _build_gzip_header(self._filename, self._mtime, self._compresslevel)
         self._started = True
         yield from _output_chunks(header, self._output_chunk_size)
 
-    def feed(self, data: bytes) -> Iterator[bytes]:
+    def feed(self, data: bytes) -> CodecOperation:
         """Consume one immutable input snapshot and emit compressed chunks."""
         self._check_encoder_available()
         if not self._started:
@@ -300,9 +328,9 @@ class GzipEncoder(_CodecBase):
                 f"{0xFFFFFFFF}); drop strict_size to allow ISIZE "
                 f"truncation or split the payload into multiple members"
             )
-        return self._reserve(self._feed(snapshot))
+        return cast(_AsyncDrivableOperation, self._reserve(self._feed(snapshot)))
 
-    def _feed(self, data: bytes) -> Iterator[bytes]:
+    def _feed(self, data: bytes) -> _CodecIterator:
         try:
             compressed = self._engine.compress(data)
         except _engine.ZLIB_ERRORS as error:
@@ -315,14 +343,14 @@ class GzipEncoder(_CodecBase):
             for offset in range(0, len(compressed), self._output_chunk_size):
                 yield compressed[offset : offset + self._output_chunk_size]
 
-    def flush(self) -> Iterator[bytes]:
+    def flush(self) -> CodecOperation:
         """Perform a non-finalizing ``Z_SYNC_FLUSH`` operation."""
         self._check_encoder_available()
         if not self._started:
             raise ValueError("gzip encoder must be started before flushing")
         return self._reserve(self._flush())
 
-    def _flush(self) -> Iterator[bytes]:
+    def _flush(self) -> _CodecIterator:
         try:
             output = self._engine.flush(_engine.Z_SYNC_FLUSH)
         except _engine.ZLIB_ERRORS as error:
@@ -333,14 +361,14 @@ class GzipEncoder(_CodecBase):
             ) from error
         yield from _output_chunks(output, self._output_chunk_size)
 
-    def finish(self) -> Iterator[bytes]:
+    def finish(self) -> CodecOperation:
         """Finalize DEFLATE and lazily emit the gzip trailer exactly once."""
         self._check_encoder_available()
         if not self._started:
             raise ValueError("gzip encoder must be started before finalizing")
         return self._reserve(self._finish())
 
-    def _finish(self) -> Iterator[bytes]:
+    def _finish(self) -> _CodecIterator:
         try:
             remaining = self._engine.flush()
         except _engine.ZLIB_ERRORS as error:
@@ -411,12 +439,12 @@ class GzipDecoder(_CodecBase):
 
     @property
     def compressed_size(self) -> int:
-        """Number of compressed bytes accepted by :meth:`feed`."""
+        """Compressed bytes snapshotted by calls to :meth:`feed`."""
         return self._compressed_size
 
     @property
     def uncompressed_size(self) -> int:
-        """Number of decompressed bytes accounted by the decoder."""
+        """Decompressed bytes accounted during operation advancement."""
         return self._uncompressed_size
 
     @property
@@ -445,7 +473,7 @@ class GzipDecoder(_CodecBase):
         if self._finished:
             raise ValueError("gzip decoder is already finalized")
 
-    def feed(self, data: bytes) -> Iterator[bytes]:
+    def feed(self, data: bytes) -> CodecOperation:
         """Accept compressed bytes and lazily emit bounded decoded output."""
         self._check_decoder_available()
         snapshot = _snapshot_bytes_input(data)
@@ -453,12 +481,12 @@ class GzipDecoder(_CodecBase):
         self._compressed_size += len(snapshot)
         return operation
 
-    def _feed(self, data: bytes) -> Iterator[bytes | _CodecProgress]:
+    def _feed(self, data: bytes) -> _CodecIterator:
         self._pending.append(data)
         data = b""
         yield from self._process(finalizing=False)
 
-    def finish(self) -> Iterator[bytes]:
+    def finish(self) -> CodecOperation:
         """Prove that all accepted input forms a complete valid gzip stream."""
         self._check_decoder_available()
         return self._reserve(self._process(finalizing=True))
@@ -538,7 +566,7 @@ class GzipDecoder(_CodecBase):
         self._state = "header"
         self._allow_padding = True
 
-    def _process(self, *, finalizing: bool) -> Iterator[bytes | _CodecProgress]:
+    def _process(self, *, finalizing: bool) -> _CodecIterator:
         while True:
             output = self._output.pop(self._output_chunk_size)
             if output is not None:
