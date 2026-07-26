@@ -10,6 +10,7 @@ import pytest
 
 import aiogzip
 from aiogzip import GzipEncoder, _engine
+from aiogzip import _codec_async as async_module
 from aiogzip._codec_async import _drive_operation
 
 
@@ -33,7 +34,6 @@ async def _encode(values, **overrides):
         async for chunk in _drive_operation(
             encoder.feed(value),
             workload=value,
-            offload_first_only=True,
         ):
             output.append(chunk)
     async for chunk in _drive_operation(encoder.finish()):
@@ -154,8 +154,8 @@ class TestIncrementalGzipEncoder:
             calls.append(len(data))
             return method(data)
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", recording_offload)
-        payload = os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1)
+        monkeypatch.setattr(async_module, "_run_in_thread", recording_offload)
+        payload = os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1)
 
         _, output = await _encode([payload])
 
@@ -171,13 +171,11 @@ class TestIncrementalGzipEncoder:
             await release.wait()
             return method(data)
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", blocked_offload)
+        monkeypatch.setattr(async_module, "_run_in_thread", blocked_offload)
         encoder = _encoder()
         list(encoder.start())
-        payload = os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1)
-        feed = _drive_operation(
-            encoder.feed(payload), workload=payload, offload_first_only=True
-        )
+        payload = os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1)
+        feed = _drive_operation(encoder.feed(payload), workload=payload)
         task = asyncio.create_task(feed.__anext__())
         await started.wait()
         task.cancel()
@@ -306,13 +304,11 @@ class TestIncrementalGzipEncoder:
             await release.wait()
             return method(data)
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", blocked_offload)
+        monkeypatch.setattr(async_module, "_run_in_thread", blocked_offload)
         encoder = _encoder()
         list(encoder.start())
-        payload = os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1)
-        first_feed = _drive_operation(
-            encoder.feed(payload), workload=payload, offload_first_only=True
-        )
+        payload = os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1)
+        first_feed = _drive_operation(encoder.feed(payload), workload=payload)
         first = asyncio.create_task(first_feed.__anext__())
         await started.wait()
 

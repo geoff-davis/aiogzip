@@ -19,7 +19,7 @@ from typing import (
 import aiofiles
 
 from . import _engine
-from ._codec_async import _drive_operation
+from ._codec_async import _ZLIB_OFFLOAD_THRESHOLD, _drive_operation
 from ._common import (
     _MAX_CHUNK_SIZE,
     WithAsyncRead,
@@ -36,15 +36,7 @@ from ._common import (
     _validate_optional_positive_int,
     _validate_original_filename,
 )
-from .codec import GzipDecoder, GzipEncoder
-
-# Inputs smaller than this run zlib inline — the executor round-trip
-# (~50-100µs thread hop + wake-up) otherwise costs more than the CPU
-# work it offloads. Calibrated against incompressible data: below 256
-# KiB, decompressing a single chunk is faster than the hop, so the
-# event-loop benefit does not pay for itself. At or above it, the CPU work
-# dominates and the hop is amortised.
-_ZLIB_OFFLOAD_THRESHOLD = _engine.ZLIB_OFFLOAD_THRESHOLD
+from .codec import GzipDecoder, GzipEncoder, _AsyncDrivableOperation
 
 
 def _decompression_error_message(error: gzip.BadGzipFile) -> str:
@@ -873,9 +865,8 @@ class AsyncGzipBinaryFile:
         try:
             if length >= _ZLIB_OFFLOAD_THRESHOLD:
                 async for compressed in _drive_operation(
-                    operation,
+                    cast(_AsyncDrivableOperation, operation),
                     workload=payload,
-                    offload_first_only=True,
                 ):
                     await self._write_all(compressed)
             else:
@@ -1083,25 +1074,11 @@ class AsyncGzipBinaryFile:
 
         try:
             operation = decoder.feed(compressed_chunk)
-            if len(compressed_chunk) < _ZLIB_OFFLOAD_THRESHOLD:
-                # Match the writer's cheap path: avoid an async-generator
-                # transition for codec work that is intentionally staying on
-                # the event-loop thread. Fully exhaust the lazy operation
-                # before returning any pieces to the read buffer.
-                pieces = []
-                for piece in operation:
-                    pieces.append(piece)
-                return pieces
             return [
                 piece
                 async for piece in _drive_operation(
-                    operation,
+                    cast(_AsyncDrivableOperation, operation),
                     workload=compressed_chunk,
-                    # File input and decoder output share the same bound, so
-                    # one offloaded inflate step covers the CPU-heavy work for
-                    # a typical source chunk. Exhaustion bookkeeping stays
-                    # inline, avoiding a second executor hop per file read.
-                    offload_first_only=True,
                 )
             ]
         except asyncio.CancelledError:

@@ -14,6 +14,8 @@ import gzip
 import struct
 import warnings
 from collections.abc import Iterator
+from dataclasses import dataclass
+from typing import Protocol
 
 from . import _engine
 from ._codec_buffer import _InputQueue, _OutputCursor
@@ -38,6 +40,21 @@ _INFLATE_INPUT_WINDOW = 256 * 1024
 _INFLATE_OUTPUT_BATCH = 256 * 1024
 
 
+@dataclass(frozen=True, slots=True)
+class _CodecProgress:
+    """One no-output inflate step exposed only to the private async driver."""
+
+    compressed_bytes: int
+
+
+class _AsyncDrivableOperation(Iterator[bytes], Protocol):
+    """Private operation surface used by the cooperative async driver."""
+
+    def close(self) -> None: ...
+
+    def _advance_raw(self) -> bytes | _CodecProgress: ...
+
+
 def _snapshot_bytes_input(data: bytes) -> bytes:
     """Return an exact immutable bytes snapshot without invoking overrides."""
     if type(data) is bytes:
@@ -52,7 +69,11 @@ class _Operation(Iterator[bytes]):
 
     __slots__ = ("_advancing", "_closed", "_iterator", "_owner")
 
-    def __init__(self, owner: _CodecBase, iterator: Iterator[bytes]) -> None:
+    def __init__(
+        self,
+        owner: _CodecBase,
+        iterator: Iterator[bytes | _CodecProgress],
+    ) -> None:
         self._owner = owner
         self._iterator = iterator
         self._advancing = False
@@ -62,6 +83,13 @@ class _Operation(Iterator[bytes]):
         return self
 
     def __next__(self) -> bytes:
+        while True:
+            output = self._advance_raw()
+            if isinstance(output, bytes):
+                return output
+
+    def _advance_raw(self) -> bytes | _CodecProgress:
+        """Return exactly one internal byte or progress event."""
         if self._owner._discarded:
             raise RuntimeError("gzip codec operation was invalidated by discard()")
         if self._closed:
@@ -119,7 +147,10 @@ class _CodecBase:
         if self._unusable:
             raise OSError(f"gzip {name} is unusable after a prior failure")
 
-    def _reserve(self, iterator: Iterator[bytes]) -> Iterator[bytes]:
+    def _reserve(
+        self,
+        iterator: Iterator[bytes | _CodecProgress],
+    ) -> _AsyncDrivableOperation:
         operation = _Operation(self, iterator)
         self._active_token = operation
         return operation
@@ -407,7 +438,7 @@ class GzipDecoder(_CodecBase):
         self._compressed_size += len(snapshot)
         return operation
 
-    def _feed(self, data: bytes) -> Iterator[bytes]:
+    def _feed(self, data: bytes) -> Iterator[bytes | _CodecProgress]:
         self._pending.append(data)
         data = b""
         yield from self._process(finalizing=False)
@@ -492,7 +523,7 @@ class GzipDecoder(_CodecBase):
         self._state = "header"
         self._allow_padding = True
 
-    def _process(self, *, finalizing: bool) -> Iterator[bytes]:
+    def _process(self, *, finalizing: bool) -> Iterator[bytes | _CodecProgress]:
         while True:
             output = self._output.pop(self._output_chunk_size)
             if output is not None:
@@ -554,6 +585,8 @@ class GzipDecoder(_CodecBase):
                         self._eof_after_output = True
                     else:
                         self._state = "trailer"
+                if not step.output and step.consumed:
+                    yield _CodecProgress(step.consumed)
                 continue
 
             if self._state == "trailer":

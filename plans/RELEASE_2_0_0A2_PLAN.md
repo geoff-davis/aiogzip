@@ -1335,59 +1335,59 @@ Make the bounded synchronous work visible as responsive asyncio behavior while p
 
 #### Tasks
 
-- [ ] Move executor helper code and `asyncio` imports out of `_engine.py`.
-- [ ] Keep `_engine.py` importable without async scheduling policy.
-- [ ] Add a private `_AsyncDrivableOperation` protocol or equivalent covering byte iteration, `close()`, and the raw-advance capability; do not export it and do not publish `CodecOperation` before WP7.
-- [ ] Update `_drive_operation()` to accept that private protocol.
-- [ ] Add a private progress event for a no-output inflate step; keep it out of the future public `CodecOperation`, `__all__`, documentation, and public iteration.
-- [ ] Make ordinary `_Operation.__next__()` swallow private progress events while a private async-only advancement returns at most one raw byte/progress/completion event.
-- [ ] Preserve first-step offload based on accepted workload size.
-- [ ] Track inline output bytes, inline yielded-chunk count, no-output compressed bytes, and consecutive no-output steps.
-- [ ] Add cooperative checkpoints at the private thresholds.
-- [ ] Reset the relevant counters after visible output, executor hops, and checkpoints.
-- [ ] Do not checkpoint after each chunk or each ordinary engine call.
-- [ ] Do not offload output-only block slicing.
-- [ ] Preserve wait-for-worker-before-close/discard on cancellation.
-- [ ] Preserve exception precedence when cancellation and codec failure coincide.
-- [ ] Verify binary writer and decoder driver call sites.
-- [ ] Verify streaming, inspection, and verification call sites.
+- [x] Move executor helper code and `asyncio` imports out of `_engine.py`.
+- [x] Keep `_engine.py` importable without async scheduling policy.
+- [x] Add a private `_AsyncDrivableOperation` protocol or equivalent covering byte iteration, `close()`, and the raw-advance capability; do not export it and do not publish `CodecOperation` before WP7.
+- [x] Update `_drive_operation()` to accept that private protocol.
+- [x] Add a private progress event for a no-output inflate step; keep it out of the future public `CodecOperation`, `__all__`, documentation, and public iteration.
+- [x] Make ordinary `_Operation.__next__()` swallow private progress events while a private async-only advancement returns at most one raw byte/progress/completion event.
+- [x] Preserve first-step offload based on accepted workload size.
+- [x] Track inline output bytes, inline yielded-chunk count, no-output compressed bytes, and consecutive no-output steps.
+- [x] Add cooperative checkpoints at the private thresholds.
+- [x] Reset the relevant counters after visible output, executor hops, and checkpoints.
+- [x] Do not checkpoint after each chunk or each ordinary engine call.
+- [x] Do not offload output-only block slicing.
+- [x] Preserve wait-for-worker-before-close/discard on cancellation.
+- [x] Preserve exception precedence when cancellation and codec failure coincide.
+- [x] Verify binary writer and decoder driver call sites.
+- [x] Verify streaming, inspection, and verification call sites.
 
 #### Required tests
 
-- [ ] a controlled synchronous operation yielding many immediately ready chunks gives a sibling ticker progress;
-- [ ] checkpoint happens by byte threshold;
-- [ ] checkpoint happens by chunk-count threshold;
-- [ ] a fake engine consuming repeated bounded windows without output produces private progress and gives a sibling ticker progress by the no-output byte or step threshold;
-- [ ] public synchronous iteration over that operation exposes only `bytes`, never the private progress event or an empty scheduling chunk;
-- [ ] one private async advancement performs at most one inflate call;
-- [ ] a modest valid empty-block DEFLATE fixture agrees with stdlib gzip and completes without scheduler starvation;
-- [ ] no checkpoint occurs before any applicable threshold;
-- [ ] visible output resets the consecutive no-output counters;
-- [ ] executor hop resets checkpoint accounting;
-- [ ] cancellation after a private progress event preserves normal close/discard poisoning semantics;
-- [ ] cancellation during worker advancement waits for worker completion;
-- [ ] operation is closed/discarded exactly once;
-- [ ] codec state is not mutated concurrently from event loop and worker;
-- [ ] output ordering and chunk bounds are unchanged;
-- [ ] no empty chunks are introduced;
-- [ ] async generator early close preserves cleanup semantics.
+- [x] a controlled synchronous operation yielding many immediately ready chunks gives a sibling ticker progress;
+- [x] checkpoint happens by byte threshold;
+- [x] checkpoint happens by chunk-count threshold;
+- [x] a fake engine consuming repeated bounded windows without output produces private progress and gives a sibling ticker progress by the no-output byte or step threshold;
+- [x] public synchronous iteration over that operation exposes only `bytes`, never the private progress event or an empty scheduling chunk;
+- [x] one private async advancement performs at most one inflate call;
+- [x] a modest valid empty-block DEFLATE fixture agrees with stdlib gzip and completes without scheduler starvation;
+- [x] no checkpoint occurs before any applicable threshold;
+- [x] visible output resets the consecutive no-output counters;
+- [x] executor hop resets checkpoint accounting;
+- [x] cancellation after a private progress event preserves normal close/discard poisoning semantics;
+- [x] cancellation during worker advancement waits for worker completion;
+- [x] operation is closed/discarded exactly once;
+- [x] codec state is not mutated concurrently from event loop and worker;
+- [x] output ordering and chunk bounds are unchanged;
+- [x] no empty chunks are introduced;
+- [x] async generator early close preserves cleanup semantics.
 
 #### Benchmark validation
 
-- [ ] Run scheduler-gap matrix on exact `a1` and candidate in the same session.
-- [ ] Run the adversarial no-output scheduler case and record progress-event/engine-call counts separately from representative throughput.
-- [ ] Meet the 32 MiB maximum-gap hard gate.
-- [ ] Confirm the no-output case makes bounded cooperative progress and emits no empty public chunks.
-- [ ] Run high-level throughput benchmarks after adding checkpoints.
-- [ ] If fairness thresholds cause a >5% throughput regression, tune them using recorded evidence; do not remove checkpoints.
-- [ ] Record final private thresholds.
+- [x] Run scheduler-gap matrix on exact `a1` and candidate in the same session.
+- [x] Run the adversarial no-output scheduler case and record progress-event/engine-call counts separately from representative throughput.
+- [x] Meet the 32 MiB maximum-gap hard gate.
+- [x] Confirm the no-output case makes bounded cooperative progress and emits no empty public chunks.
+- [x] Run high-level throughput benchmarks after adding checkpoints.
+- [x] If fairness thresholds cause a >5% throughput regression, tune them using recorded evidence; do not remove checkpoints.
+- [x] Record final private thresholds.
 
 #### Exit criteria
 
-- [ ] Scheduler gap and throughput gates both pass.
-- [ ] Cancellation tests pass repeatedly under forced stdlib and active zlib-ng.
-- [ ] `_engine.py` has no asyncio import or executor helper.
-- [ ] No background task or queue exists.
+- [x] Scheduler gap and throughput gates both pass.
+- [x] Cancellation tests pass repeatedly under forced stdlib and active zlib-ng.
+- [x] `_engine.py` has no asyncio import or executor helper.
+- [x] No background task or queue exists.
 
 #### Suggested commit
 

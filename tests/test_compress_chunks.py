@@ -11,6 +11,7 @@ import zlib
 import pytest
 
 import aiogzip
+from aiogzip import _codec_async as async_module
 from aiogzip import _engine
 
 
@@ -224,8 +225,8 @@ class TestCompressChunks:
             calls.append(len(data))
             return method(data)
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", recording_offload)
-        payload = os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1)
+        monkeypatch.setattr(async_module, "_run_in_thread", recording_offload)
+        payload = os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1)
 
         output = await _collect(_items([payload]), mtime=0)
 
@@ -391,8 +392,8 @@ class TestCompressChunks:
             finally:
                 completed.set()
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", blocked_offload)
-        payload = os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1)
+        monkeypatch.setattr(async_module, "_run_in_thread", blocked_offload)
+        payload = os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1)
         stream = aiogzip.compress_chunks(_items([payload]), mtime=0)
         assert await stream.__anext__()
         task = asyncio.create_task(stream.__anext__())

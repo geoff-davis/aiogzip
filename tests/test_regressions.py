@@ -8,6 +8,7 @@ import pytest
 from aiogzip import (
     AsyncGzipBinaryFile,
     AsyncGzipTextFile,
+    _codec_async,
 )
 
 
@@ -750,13 +751,13 @@ class TestMediumPriorityEdgeCases:
         from aiogzip import _binary
 
         calls = []
-        original = _binary._engine.run_zlib_in_thread
+        original = _codec_async._run_in_thread
 
         async def tracking(method, data):
             calls.append(len(data))
             return await original(method, data)
 
-        with patch.object(_binary._engine, "run_zlib_in_thread", tracking):
+        with patch.object(_codec_async, "_run_in_thread", tracking):
             payload = _os.urandom(2 * 1024 * 1024)  # Above threshold.
             async with AsyncGzipBinaryFile(temp_file, "wb") as f:
                 await f.write(payload)
@@ -767,15 +768,13 @@ class TestMediumPriorityEdgeCases:
         """Tiny writes should not pay the executor round-trip cost."""
         from unittest.mock import patch
 
-        from aiogzip import _binary
-
         calls = []
 
         async def tracking(method, data):
             calls.append(len(data))
             return method(data)
 
-        with patch.object(_binary._engine, "run_zlib_in_thread", tracking):
+        with patch.object(_codec_async, "_run_in_thread", tracking):
             async with AsyncGzipBinaryFile(temp_file, "wb") as f:
                 await f.write(b"small payload")
         # Small payloads must stay inline to avoid executor overhead.
@@ -794,13 +793,13 @@ class TestMediumPriorityEdgeCases:
             fh.write(payload)
 
         calls = []
-        original = _binary._engine.run_zlib_in_thread
+        original = _codec_async._run_in_thread
 
         async def tracking(method, data):
             calls.append(len(data))
             return await original(method, data)
 
-        with patch.object(_binary._engine, "run_zlib_in_thread", tracking):
+        with patch.object(_codec_async, "_run_in_thread", tracking):
             async with AsyncGzipBinaryFile(
                 temp_file, "rb", chunk_size=_binary._ZLIB_OFFLOAD_THRESHOLD * 2
             ) as f:
@@ -821,13 +820,13 @@ class TestMediumPriorityEdgeCases:
             fh.write(payload)
 
         calls = []
-        original = _binary._engine.run_zlib_in_thread
+        original = _codec_async._run_in_thread
 
         async def tracking(method, data):
             calls.append(len(data))
             return await original(method, data)
 
-        with patch.object(_binary._engine, "run_zlib_in_thread", tracking):
+        with patch.object(_codec_async, "_run_in_thread", tracking):
             async with AsyncGzipBinaryFile(temp_file, "rb") as f:
                 got = await f.read()
 
@@ -852,7 +851,7 @@ class TestMediumPriorityEdgeCases:
             fh.write(_gzip.compress(large))
 
         calls = []
-        original = _binary._engine.run_zlib_in_thread
+        original = _codec_async._run_in_thread
 
         async def tracking(method, data):
             calls.append(len(data))
@@ -860,7 +859,7 @@ class TestMediumPriorityEdgeCases:
 
         # A chunk_size large enough to read both members in one read, so the
         # second member arrives as unused_data on the first decompressor.
-        with patch.object(_binary._engine, "run_zlib_in_thread", tracking):
+        with patch.object(_codec_async, "_run_in_thread", tracking):
             async with AsyncGzipBinaryFile(
                 temp_file, "rb", chunk_size=8 * 1024 * 1024
             ) as f:
@@ -1300,8 +1299,6 @@ class TestWriteCancellationDuringOffload:
     ):
         import asyncio
 
-        from aiogzip import _binary
-
         started = asyncio.Event()
         release = asyncio.Event()
 
@@ -1310,7 +1307,7 @@ class TestWriteCancellationDuringOffload:
             await release.wait()
             return method(data)
 
-        monkeypatch.setattr(_binary._engine, "run_zlib_in_thread", blocking_offload)
+        monkeypatch.setattr(_codec_async, "_run_in_thread", blocking_offload)
 
         payload = os.urandom(512 * 1024)  # above the offload threshold
         f = AsyncGzipBinaryFile(temp_file, "wb")
@@ -1343,8 +1340,6 @@ class TestReadCancellationDuringOffload:
         import asyncio
         import gzip
 
-        from aiogzip import _binary
-
         payload = os.urandom(512 * 1024)
         with gzip.open(temp_file, "wb") as raw:
             raw.write(payload)
@@ -1357,7 +1352,7 @@ class TestReadCancellationDuringOffload:
             await release.wait()
             return method(data)
 
-        monkeypatch.setattr(_binary._engine, "run_zlib_in_thread", blocking_offload)
+        monkeypatch.setattr(_codec_async, "_run_in_thread", blocking_offload)
         cap = len(payload) * 2 if use_cap else None
         f = AsyncGzipBinaryFile(
             temp_file,

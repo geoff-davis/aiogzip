@@ -12,7 +12,8 @@ import aiofiles
 import pytest
 
 import aiogzip
-from aiogzip import GzipDecoder, GzipInfo, GzipMemberInfo, VerificationResult, _engine
+from aiogzip import GzipDecoder, GzipInfo, GzipMemberInfo, VerificationResult
+from aiogzip import _codec_async as async_module
 from aiogzip import _inspection as inspection_module
 from aiogzip._codec_async import _drive_operation
 
@@ -232,7 +233,7 @@ class TestIncrementalGzipDecoder:
             await _decode(raw, input_chunk_size=2)
 
     async def test_cancelled_offload_discards_decoder(self, monkeypatch):
-        raw = _gzip_member(os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1024))
+        raw = _gzip_member(os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1024))
         decoder = GzipDecoder(
             max_decompressed_size=None,
             output_chunk_size=1024,
@@ -247,7 +248,7 @@ class TestIncrementalGzipDecoder:
             await release.wait()
             return method(data)
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", controlled_offload)
+        monkeypatch.setattr(async_module, "_run_in_thread", controlled_offload)
         stream = _drive_operation(decoder.feed(raw), workload=raw)
         task = asyncio.create_task(stream.__anext__())
         await started.wait()

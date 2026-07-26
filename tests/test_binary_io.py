@@ -165,18 +165,18 @@ class TestAsyncGzipBinaryFile:
         """Caller mutation cannot race executor-backed compression."""
         import asyncio
 
-        from aiogzip import _engine
+        from aiogzip import _codec_async
 
         started = asyncio.Event()
         release = asyncio.Event()
-        original = _engine.run_zlib_in_thread
+        original = _codec_async._run_in_thread
 
         async def delayed(method, data):
             started.set()
             await release.wait()
             return await original(method, data)
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", delayed)
+        monkeypatch.setattr(_codec_async, "_run_in_thread", delayed)
         source = bytearray(os.urandom(512 * 1024))
         expected = bytes(source)
 
