@@ -1057,23 +1057,23 @@ Add focused characterization around state transitions and edge cases most likely
 
 #### Tasks
 
-- [ ] Inventory existing codec, streaming, binary, inspection, verification, and property tests covering decoder behavior.
-- [ ] Add missing cases without changing production code.
-- [ ] Pin zero-member finish.
-- [ ] Pin empty feeds at header, body, trailer, and post-member padding boundaries.
-- [ ] Pin concatenated empty and non-empty members.
-- [ ] Pin FEXTRA, FNAME, FCOMMENT, FHCRC, combinations, and split boundaries.
-- [ ] Pin reserved flags and unknown compression method failures.
-- [ ] Pin exactly seven trailer bytes followed by finish.
-- [ ] Pin CRC and ISIZE failures after payload emission.
-- [ ] Pin permitted trailing NUL padding and invalid non-zero trailing data.
-- [ ] Pin member compressed offsets with and without padding.
-- [ ] Pin `collect_member_info=False` not retaining optional metadata.
-- [ ] Pin `max_decompressed_size` at limit-1, exact limit, and limit+1 for tiny and large output bounds.
-- [ ] Pin `compressed_size` call-time accounting for an unadvanced operation.
-- [ ] Pin operation drop, partial close, discard, retained invalidated iterator, reentrancy, and `gc.disable()` behavior.
-- [ ] Pin cancellation while the first operation advancement is running in an executor.
-- [ ] Pin cross-surface results for randomized source boundaries.
+- [x] Inventory existing codec, streaming, binary, inspection, verification, and property tests covering decoder behavior.
+- [x] Add missing cases without changing production code.
+- [x] Pin zero-member finish.
+- [x] Pin empty feeds at header, body, trailer, and post-member padding boundaries.
+- [x] Pin concatenated empty and non-empty members.
+- [x] Pin FEXTRA, FNAME, FCOMMENT, FHCRC, combinations, and split boundaries.
+- [x] Pin reserved flags and unknown compression method failures.
+- [x] Pin exactly seven trailer bytes followed by finish.
+- [x] Pin CRC and ISIZE failures after payload emission.
+- [x] Pin permitted trailing NUL padding and invalid non-zero trailing data.
+- [x] Pin member compressed offsets with and without padding.
+- [x] Pin `collect_member_info=False` not retaining optional metadata.
+- [x] Pin `max_decompressed_size` at limit-1, exact limit, and limit+1 for tiny and large output bounds.
+- [x] Pin `compressed_size` call-time accounting for an unadvanced operation.
+- [x] Pin operation drop, partial close, discard, retained invalidated iterator, reentrancy, and `gc.disable()` behavior.
+- [x] Pin cancellation while the first operation advancement is running in an executor.
+- [x] Pin cross-surface results for randomized source boundaries.
 
 #### Required test technique
 
@@ -1083,10 +1083,10 @@ Where error messages are already asserted, preserve exact text. Otherwise assert
 
 #### Exit criteria
 
-- [ ] Tests pass unchanged against the pre-refactor production code.
-- [ ] The characterization suite fails under deliberate local mutations to CRC, trailer, member transition, and ownership behavior.
-- [ ] No performance fix has begun.
-- [ ] Checklist changes are in the same commit.
+- [x] Tests pass unchanged against the pre-refactor production code.
+- [x] The characterization suite fails under deliberate local mutations to CRC, trailer, member transition, and ownership behavior.
+- [x] No performance fix has begun.
+- [x] Checklist changes are in the same commit.
 
 #### Suggested commit
 
