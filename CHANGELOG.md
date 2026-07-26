@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Work in progress for `2.0.0a2`: repair the decoder buffering, tiny-output
+  inflation, fragmented-header, and async scheduler regressions identified in
+  `2.0.0a1` while preserving its correctness and lifecycle contracts.
+
 ### Documentation
 
 - The documentation site is now versioned with mike. Each minor line

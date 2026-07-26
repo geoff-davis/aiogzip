@@ -1013,9 +1013,9 @@ Create auditable measurements before production changes and establish the new de
 - [x] Run it against exact `v2.0.0a1` with zlib-ng active.
 - [x] Run it against the expected `main` base before production changes under both engine selections.
 - [x] Commit raw JSON and `v2.0.0a1-regression-baseline.md`.
-- [ ] Set `aiogzip.__version__` to `2.0.0a2.dev0` only after baseline capture.
-- [ ] Add an Unreleased changelog skeleton describing regression repair without claiming results.
-- [ ] Reconcile demonstrably completed `a1` post-release checklist items; do not mark unverifiable maintainer actions complete.
+- [x] Set `aiogzip.__version__` to `2.0.0a2.dev0` only after baseline capture.
+- [x] Add an Unreleased changelog skeleton describing regression repair without claiming results.
+- [x] Reconcile demonstrably completed `a1` post-release checklist items; do not mark unverifiable maintainer actions complete.
 
 #### Validation
 
@@ -1034,8 +1034,8 @@ Also execute the exact detached-worktree commands recorded in the baseline docum
 - [x] Exact `v1.11.0`, exact-tag `v2.0.0a1`, and starting-main raw samples are inspectable in Git.
 - [x] Every benchmark verifies correctness.
 - [x] The harness identifies the imported aiogzip source.
-- [ ] `main` reports `2.0.0a2.dev0` after the housekeeping commit.
-- [ ] The repository is green.
+- [x] `main` reports `2.0.0a2.dev0` after the housekeeping commit.
+- [x] The repository is green.
 
 #### Suggested commits
 
