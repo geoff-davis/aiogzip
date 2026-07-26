@@ -1405,11 +1405,11 @@ Recover safe compression-side overhead where evidence supports it and document w
 
 #### Measurement tasks
 
-- [ ] Re-run 64/64 and 512/256 compression cases with at least nine repeats if the initial delta exceeds 5%.
-- [ ] Re-run the 10-byte write diagnostic under identical conditions.
-- [ ] Profile separately with stdlib and zlib-ng compression where applicable.
-- [ ] Attribute time to input normalization, operation allocation, `__next__`, engine compression, CRC, output slicing, async driver, sink writes, and event-loop overhead.
-- [ ] Record profile commands and summaries in `plans/benchmarks/v2.0.0a2-compression-analysis.md`.
+- [x] Re-run 64/64 and 512/256 compression cases with at least nine repeats if the initial delta exceeds 5%.
+- [x] Re-run the 10-byte write diagnostic under identical conditions.
+- [x] Profile separately with stdlib and zlib-ng compression where applicable.
+- [x] Attribute time to input normalization, operation allocation, `__next__`, engine compression, CRC, output slicing, async driver, sink writes, and event-loop overhead.
+- [x] Record profile commands and summaries in `plans/benchmarks/v2.0.0a2-compression-analysis.md`.
 
 #### Permitted optimization areas
 
@@ -1432,17 +1432,17 @@ Recover safe compression-side overhead where evidence supports it and document w
 
 #### Acceptance
 
-- [ ] 512/256 compression meets the +10% hard gate and targets +5%.
-- [ ] 64/64 compression remains within gate.
-- [ ] Tiny-write stress is no worse than `a1` by more than 10%.
-- [ ] Any code optimization has focused tests and before/after profile evidence.
-- [ ] If no safe tiny-write improvement exists, the retained overhead and deferred buffered-writer option are documented without claiming the regression is fixed.
+- [x] 512/256 compression meets the +10% hard gate and targets +5%.
+- [x] 64/64 compression remains within gate.
+- [x] Tiny-write stress is no worse than `a1` by more than 10%.
+- [x] Any code optimization has focused tests and before/after profile evidence.
+- [x] If no safe tiny-write improvement exists, the retained overhead and deferred buffered-writer option are documented without claiming the regression is fixed.
 
 #### Exit criteria
 
-- [ ] Representative compression is within the release gate.
-- [ ] Diagnostic tiny-write behavior has an evidence-based disposition.
-- [ ] Ownership and error timing remain unchanged.
+- [x] Representative compression is within the release gate.
+- [x] Diagnostic tiny-write behavior has an evidence-based disposition.
+- [x] Ownership and error timing remain unchanged.
 
 #### Suggested commit
 

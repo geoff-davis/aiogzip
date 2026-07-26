@@ -287,6 +287,21 @@ class GzipEncoder(_CodecBase):
             )
         return self._reserve(self._feed(snapshot))
 
+    def _feed_snapshot(self, snapshot: bytes) -> _AsyncDrivableOperation:
+        """Feed an exact bytes snapshot already owned by an internal caller."""
+        self._check_encoder_available()
+        if not self._started:
+            raise ValueError("gzip encoder must be started before feeding data")
+        size = len(snapshot)
+        if self._strict_size and self._input_size + size > 0xFFFFFFFF:
+            raise OSError(
+                f"uncompressed member size would exceed the gzip ISIZE "
+                f"field's 4 GiB limit ({self._input_size} + {size} > "
+                f"{0xFFFFFFFF}); drop strict_size to allow ISIZE "
+                f"truncation or split the payload into multiple members"
+            )
+        return self._reserve(self._feed(snapshot))
+
     def _feed(self, data: bytes) -> Iterator[bytes]:
         try:
             compressed = self._engine.compress(data)

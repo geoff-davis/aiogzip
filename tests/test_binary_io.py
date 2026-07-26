@@ -192,6 +192,19 @@ class TestAsyncGzipBinaryFile:
         with gzip.open(temp_file, "rb") as raw:
             assert raw.read() == expected
 
+    async def test_write_does_not_repeat_codec_snapshot(self, temp_file, monkeypatch):
+        from aiogzip import codec
+
+        def unexpected_snapshot(data):
+            raise AssertionError("writer already owns an exact bytes snapshot")
+
+        monkeypatch.setattr(codec, "_snapshot_bytes_input", unexpected_snapshot)
+        async with AsyncGzipBinaryFile(temp_file, "wb", mtime=0) as stream:
+            assert await stream.write(b"payload") == 7
+
+        with gzip.open(temp_file, "rb") as raw:
+            assert raw.read() == b"payload"
+
     async def test_binary_accepts_noncontiguous_and_multibyte_buffers(self, temp_file):
         """write() must coerce buffer-protocol inputs that are not already a
         flat, single-byte, contiguous view.

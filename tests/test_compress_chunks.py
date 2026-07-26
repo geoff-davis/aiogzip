@@ -13,6 +13,7 @@ import pytest
 import aiogzip
 from aiogzip import _codec_async as async_module
 from aiogzip import _engine
+from aiogzip import _streaming as streaming_module
 
 
 async def _items(values):
@@ -69,6 +70,36 @@ def _assert_incomplete(compressed):
 
 
 class TestCompressChunks:
+    async def test_internal_snapshot_is_not_repeated_by_codec(self, monkeypatch):
+        from aiogzip import codec
+
+        snapshots = 0
+        original = streaming_module._snapshot_bytes_input
+
+        def counting_snapshot(data):
+            nonlocal snapshots
+            snapshots += 1
+            return original(data)
+
+        def unexpected_codec_snapshot(data):
+            raise AssertionError("streaming already owns an exact bytes snapshot")
+
+        monkeypatch.setattr(
+            streaming_module,
+            "_snapshot_bytes_input",
+            counting_snapshot,
+        )
+        monkeypatch.setattr(
+            codec,
+            "_snapshot_bytes_input",
+            unexpected_codec_snapshot,
+        )
+
+        output = b"".join(await _collect(_items([b"first", b"second"]), mtime=0))
+
+        assert gzip.decompress(output) == b"firstsecond"
+        assert snapshots == 2
+
     @pytest.mark.parametrize("values", [[], [b""], [b"", b"", b""]])
     async def test_empty_source_produces_valid_empty_member(self, values):
         output = await _collect(_items(values), mtime=0)

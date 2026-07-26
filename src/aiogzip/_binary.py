@@ -857,15 +857,13 @@ class AsyncGzipBinaryFile:
         if encoder is None:
             raise RuntimeError("gzip writer encoder is not initialized")
 
-        # feed() performs call-time validation (including strict-size
-        # preflight) before reserving or advancing codec state. Those errors
-        # leave the writer usable. Once an operation exists, however, any
-        # failure can follow codec advancement and must poison the member.
-        operation = encoder.feed(payload)
+        # The writer already owns an exact snapshot. The private feed entry
+        # preserves call-time validation without normalizing it a second time.
+        operation = encoder._feed_snapshot(payload)
         try:
             if length >= _ZLIB_OFFLOAD_THRESHOLD:
                 async for compressed in _drive_operation(
-                    cast(_AsyncDrivableOperation, operation),
+                    operation,
                     workload=payload,
                 ):
                     await self._write_all(compressed)

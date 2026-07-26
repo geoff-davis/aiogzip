@@ -139,7 +139,7 @@ async def _compress_chunks_impl(
             if not snapshot:
                 continue
             async for output in _drive_operation(
-                cast(_AsyncDrivableOperation, encoder.feed(snapshot)),
+                encoder._feed_snapshot(snapshot),
                 workload=snapshot,
             ):
                 yield output
