@@ -500,6 +500,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#200a2-decoder-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.0.0a2 decoder evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#text-operations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -824,6 +835,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#200a2-decoder-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.0.0a2 decoder evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#text-operations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1048,6 +1070,64 @@ or data.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="200a2-decoder-evidence">2.0.0a2 decoder evidence</h3>
+<p>The final release-reference measurements were captured on the Framework
+Desktop from the clean candidate and both locked historical revisions. Full
+environment metadata, samples, dispersion, hashes, and delta dispositions are
+in the
+<a href="https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-candidate.md">2.0.0a2 candidate record</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th style="text-align: right;">8 MiB stream, 64/64 KiB</th>
+<th style="text-align: right;">8 MiB stream, 512/256 KiB</th>
+<th style="text-align: right;">32 MiB one item</th>
+<th style="text-align: right;">64 MiB one item</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>stdlib</td>
+<td style="text-align: right;">2.255 ms</td>
+<td style="text-align: right;">1.857 ms</td>
+<td style="text-align: right;">20.498 ms</td>
+<td style="text-align: right;">40.792 ms</td>
+</tr>
+<tr>
+<td>zlib-ng</td>
+<td style="text-align: right;">1.241 ms</td>
+<td style="text-align: right;">0.837 ms</td>
+<td style="text-align: right;">16.219 ms</td>
+<td style="text-align: right;">32.274 ms</td>
+</tr>
+</tbody>
+</table>
+<p>In the isolated release matrix, the 512/256 KiB case was 21.5% below the
+same-machine <code>v1.11.0</code> stdlib median and 23.2% below its zlib-ng median.
+One-feed decode scales linearly from 8 through 64 MiB. For the one-item
+32 MiB scheduler case, maximum observed ticker gaps were 0.850 ms with stdlib
+and 0.696 ms with zlib-ng. These values support the bounded-window and
+scheduler choices; they are not portable speed claims.</p>
+<p>The decoder now consumes immutable queued spans through 256 KiB compressed
+windows and inflates into separate internal output blocks that adapt between
+64 KiB and 256 KiB. Public <code>output_chunk_size</code> controls emitted slices and the
+bounded batch chosen within that range, so a one-byte public bound does not
+trigger one inflate call per byte. A complete archive supplied in one source
+item no longer incurs repeated whole-suffix copying. Transport-sized source
+items remain sensible because they bound snapshot lifetime, executor work, and
+per-source backpressure.</p>
+<p>The diagnostic 10-byte write case remains materially slower than <code>v1.11.0</code>,
+although immediate nine-repeat comparisons stay within the release plan's
++10% anti-regression guard against <code>2.0.0a1</code>. The remaining cost is one
+deterministic codec operation per accepted write. Buffering across writes is
+deferred because it would change when compression and sink errors surface.</p>
+<p>See the committed
+<a href="https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-wp3-buffer-tuning.md">buffer tuning</a>,
+<a href="https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-wp5-scheduler.md">scheduler</a>,
+and
+<a href="https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-compression-analysis.md">compression analysis</a>
+records for commands, samples, dispersion, and fixture hashes.</p>
 <p>Run the suite on the target workload before making a capacity or latency
 decision:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">AIOGZIP_ENGINE</span><span class="o">=</span>stdlib<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>benchmarks/run_benchmarks.py<span class="w"> </span><span class="se">\</span>
@@ -1100,7 +1180,8 @@ calling synchronous <code>gzip</code> directly inside an async application.</p>
   overlapping the delays; it is not a raw codec-speed comparison.</li>
 <li>The suite also includes a short five-operation mixed read/write workload;
   treat its ratio as latency-sensitive rather than a stable throughput claim.</li>
-<li>CPU-bound <code>zlib</code> work above a 256 KiB chunk is offloaded to a thread, so multiple streams compress/decompress in parallel instead of serializing on the loop.</li>
+<li>Large CPU-bound codec work may be offloaded to a thread, while bounded
+  decoder steps below that private threshold use cooperative checkpoints.</li>
 <li>Independent application tasks can continue while file or offloaded codec
   work is pending.</li>
 </ul>
@@ -1145,11 +1226,12 @@ when the optional engine is installed:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>benchmarks/run_benchmarks.py<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--category<span class="w"> </span>streaming<span class="w"> </span>--size<span class="w"> </span><span class="m">32</span><span class="w"> </span>--repeat<span class="w"> </span><span class="m">3</span>
 </code></pre></div>
-<p>Inputs below the 256 KiB codec-offload threshold often maximize raw throughput
-for short operations but may complete inline without giving an independent
-event-loop task a turn. Larger codec calls are offloaded, trading a thread hop
-for event-loop responsiveness. Measure with source chunk sizes representative
-of the real producer rather than selecting solely from synthetic throughput.</p>
+<p>Inputs below the private codec-offload thresholds often maximize raw throughput
+for short operations. Inline decoder work checkpoints after bounded output,
+no-output progress, or cumulative source input; larger codec calls are
+offloaded, trading a thread hop for event-loop responsiveness. Measure with
+source chunk sizes representative of the real producer rather than selecting
+solely from synthetic throughput.</p>
 <p>The synchronous <code>GzipEncoder</code> and <code>GzipDecoder</code> never offload. Their direct
 8 MiB release measurements are informational because v1.11.0 had no public
 codec equivalent. <code>GzipEncoder</code> measured 120.77 ms beside a 118.56 ms

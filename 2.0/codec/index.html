@@ -483,6 +483,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#counter-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Counter timing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#lazy-operations-and-ownership" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -734,6 +745,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#counter-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Counter timing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#lazy-operations-and-ownership" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -796,7 +818,7 @@ transport. They are synchronous state machines: callers provide immutable
 <code>compress_chunks()</code>, and <code>decompress_chunks()</code> without changing their code.</p>
 <h2 id="encoding-one-member">Encoding one member</h2>
 <p>One encoder creates exactly one complete gzip member. Each state-changing call
-returns a lazy iterator that must be exhausted before the next call:</p>
+returns a lazy <code>CodecOperation</code> that must be exhausted before the next call:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aiogzip</span><span class="w"> </span><span class="kn">import</span> <span class="n">GzipEncoder</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">encoder</span> <span class="o">=</span> <span class="n">GzipEncoder</span><span class="p">(</span><span class="n">mtime</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">output_chunk_size</span><span class="o">=</span><span class="mi">64</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
@@ -846,9 +868,11 @@ valid:</p>
 <p>Input boundaries are arbitrary for correctness, but they are not
 performance-neutral. For predictable memory and copy costs, pass
 transport-sized compressed chunks as they arrive instead of one complete
-large archive to a single <code>feed()</code> call. <code>AsyncGzipBinaryFile</code> reads according
-to its configured <code>chunk_size</code>; callers of <code>decompress_chunks()</code> control the
-size of each source item.</p>
+large archive to a single <code>feed()</code> call. The span queue prevents a large source
+item from causing superlinear whole-suffix copies, but transport-sized items
+still bound snapshot lifetime and executor workload. <code>AsyncGzipBinaryFile</code>
+reads according to its configured <code>chunk_size</code>; callers of
+<code>decompress_chunks()</code> control the size of each source item.</p>
 <blockquote>
 <p><strong>Warning — integrity is established only at normal completion.</strong> <code>feed()</code>
 may emit payload before the corresponding CRC-32 and <code>ISIZE</code> trailer arrives.
@@ -859,9 +883,11 @@ on before complete validation, use <code>verify()</code> first or stage the outp
 validation succeeds.</p>
 </blockquote>
 <p><code>max_decompressed_size</code> is a cumulative positive-integer limit. Every inflate
-step is bounded to the remaining allowance plus one byte, and no byte beyond
-the configured limit is emitted. Limit failures raise <code>OSError</code>; corrupt,
-truncated, or malformed gzip data raises <code>gzip.BadGzipFile</code>.</p>
+step is bounded to the remaining allowance plus one probe byte. Every allowed
+byte is emitted before a later advancement raises <code>OSError</code> for the first byte
+over the limit. That probe byte is not yielded and is not included in
+<code>uncompressed_size</code>, CRC-32, or ISIZE accounting. Corrupt, truncated, or
+malformed gzip data raises <code>gzip.BadGzipFile</code>.</p>
 <p>Pass <code>collect_member_info=True</code> when member metadata is needed. After each
 member's trailer is validated, <code>members</code> gains a <code>GzipMemberInfo</code> entry and
 <code>member_count</code> advances. Metadata for an incomplete or corrupt member is never
@@ -869,11 +895,35 @@ committed.</p>
 <p>After successful completion, another decoder <code>feed()</code> or <code>finish()</code> raises
 <code>ValueError</code>. Repeated encoder finalization and invalid method ordering also
 raise <code>ValueError</code>; create a new codec for another stream.</p>
+<h2 id="counter-timing">Counter timing</h2>
+<p>The counters reflect different commitment boundaries:</p>
+<ul>
+<li><code>GzipEncoder.input_size</code> and <code>crc32</code> change when a <code>feed()</code> operation
+  advances far enough to pass its complete snapshot through the compression
+  engine. Calling <code>feed()</code> without advancing its operation does not change
+  them.</li>
+<li><code>GzipDecoder.compressed_size</code> changes when <code>feed()</code> returns, after its input
+  has been validated and snapshotted but before the operation advances.</li>
+<li><code>GzipDecoder.uncompressed_size</code> changes as inflate steps complete. Internal
+  output is accounted before its bounded public chunks are yielded, so the
+  counter can temporarily lead the bytes already consumed by the caller.</li>
+<li><code>member_count</code> and <code>members</code> change only after a complete member trailer has
+  been validated.</li>
+</ul>
 <h2 id="lazy-operations-and-ownership">Lazy operations and ownership</h2>
 <p>Calls reserve the codec immediately, but engine work occurs as the returned
 operation iterator advances. Exhaust one operation before requesting another.
 This keeps output pull-driven and bounded without a producer task, background
 queue, or eager <code>list()</code> allocation.</p>
+<p>A decoder <code>feed()</code> snapshots and counts its complete argument at call time,
+but advancing the operation reads compressed input through bounded 256 KiB
+windows. Inflate output is produced in separate internal batches that adapt
+between 64 KiB and 256 KiB, then sliced to the caller's <code>output_chunk_size</code>.
+Consequently
+<code>compressed_size</code> can lead engine consumption during an active operation, and
+<code>uncompressed_size</code> can lead public delivery by at most the pending internal
+batch. These are accounting boundaries, not evidence that the complete input
+or output has been copied into a second contiguous buffer.</p>
 <p>Abandonment is deliberately deterministic:</p>
 <ul>
 <li>ignoring an unadvanced or partially advanced operation leaves the codec
@@ -882,12 +932,28 @@ queue, or eager <code>list()</code> allocation.</p>
   garbage collection has run;</li>
 <li>explicitly closing a partially consumed operation makes the codec unusable;</li>
 <li>no iterator finalizer releases ownership or mutates codec state; and</li>
-<li>if an abandoned operation is unreachable, <code>discard()</code> is the only cleanup.
-  It permanently invalidates the codec and releases its retained state.</li>
+<li><code>discard()</code> permanently invalidates the codec and any retained operation,
+  immediately releasing the operation's captured input and codec state.</li>
 </ul>
 <p>When an operation is still reachable, exhaust it if the stream should remain
-usable. Otherwise close the operation and discard the codec. <code>discard()</code> is
-idempotent, but it is not a reset; construct a new instance to continue.</p>
+usable. Otherwise call its idempotent <code>close()</code> method. A <code>try</code>/<code>finally</code>
+ensures an exception or early return cannot leave the codec reserved:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">aiogzip</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">decode_chunk</span><span class="p">(</span><span class="n">decoder</span><span class="p">:</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">GzipDecoder</span><span class="p">,</span> <span class="n">chunk</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">operation</span><span class="p">:</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">CodecOperation</span> <span class="o">=</span> <span class="n">decoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="k">return</span> <span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">operation</span><span class="p">)</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">finally</span><span class="p">:</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="n">operation</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</code></pre></div>
+<p>Calling <code>close()</code> after exhaustion has no effect. Calling it earlier releases
+the operation and makes the codec unusable. If the caller no longer retains
+the operation, use the codec's idempotent <code>discard()</code> method; it invalidates
+active work and promptly releases both the captured operation input and codec
+state. Neither method resets the codec, so construct a new instance to
+continue.</p>
 <p>Codec instances and their operation iterators are <strong>not thread-safe</strong>. Use an
 instance from one thread at a time, or hold an external lock around the entire
 call-and-exhaust operation lifecycle. The same rule excludes overlapping

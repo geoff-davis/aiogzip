@@ -635,6 +635,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#bounded-decoder-buffering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded decoder buffering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#async-bridge-and-cancellation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -822,6 +833,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#bounded-decoder-buffering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded decoder buffering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#async-bridge-and-cancellation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -875,7 +897,8 @@
 
 
 <h1 id="adr-one-synchronous-sans-io-gzip-codec">ADR: One synchronous sans-I/O gzip codec</h1>
-<p><strong>Status:</strong> Decided for the 2.0 alpha series (2026-07-22)</p>
+<p><strong>Status:</strong> Decided for the 2.0 alpha series (2026-07-22); bounded buffering
+amendment accepted for <code>2.0.0a2</code> (2026-07-26)</p>
 <h2 id="context">Context</h2>
 <p>aiogzip 1.x has separate gzip state machines in its binary-file, async
 streaming, and inspection implementations. Keeping framing, trailer validation,
@@ -897,23 +920,27 @@ Async wrappers retain responsibility for sources and sinks, executor policy,
 cancellation, buffering, seeking, and text handling. Raw DEFLATE, AnyIO/Trio,
 ISA-L, and indexed seeking are outside this alpha.</p>
 <h2 id="lazy-operations-and-ownership">Lazy operations and ownership</h2>
-<p>Every state-changing method returns a lazy, single-use iterator of non-empty
-<code>bytes</code> chunks bounded by <code>output_chunk_size</code>. A successful call reserves its
-codec before it returns; only exhausting the operation commits it and releases
-that reservation.</p>
+<p>Every state-changing method returns a lazy, single-use <code>CodecOperation</code> of
+non-empty <code>bytes</code> chunks bounded by <code>output_chunk_size</code>. The protocol extends
+<code>Iterator[bytes]</code> with <code>close()</code>, making deterministic abandonment available
+to type checkers without exposing the concrete operation class. A successful
+call reserves its codec before it returns; only exhausting the operation
+commits it and releases that reservation.</p>
 <p>The reservation is codec-owned and independent of reachability of the returned
 iterator. Dropping an iterator does not release, commit, close, or poison the
 operation through garbage-collector side effects. A later state-changing call
 therefore raises <code>RuntimeError</code> deterministically on both reference-counted and
 tracing garbage collectors. If the operation is still reachable, explicitly
-closing it makes the codec unusable. If it is unreachable, <code>discard()</code> is the
-only cleanup and makes the codec unusable.</p>
+closing it makes the codec unusable. If the caller no longer retains it,
+<code>discard()</code> is the codec-owned cleanup and makes the codec unusable.</p>
 <p><code>discard()</code> is idempotent and immediately invalidates a retained operation.
 Advancing that operation afterward raises <code>RuntimeError</code> without yielding
-buffered data or touching engine state; closing it is harmless. Exceptions
-after engine state changes also make the codec unusable. Async wrappers must
-always exhaust or explicitly close operations and must not depend on finalizer
-timing.</p>
+buffered data or touching engine state; closing it is harmless. In <code>a2</code>,
+invalidation also closes and drops the operation's underlying generator before
+the reservation token is removed, promptly releasing captured feed input even
+when the public operation object remains reachable. Exceptions after engine
+state changes also make the codec unusable. Async wrappers must always exhaust
+or explicitly close operations and must not depend on finalizer timing.</p>
 <p>This ownership rule supplies bounded, pull-driven output without a producer
 task or unbounded result list. It is a misuse guard, not synchronization.
 Codec instances and operation iterators are not thread-safe. Use one instance
@@ -963,11 +990,58 @@ the codec. The codec retains its own pending input, detects no-progress steps,
 and never assumes that engine-owned leftover fields alias or overlap. This
 keeps stdlib zlib and zlib-ng behavior aligned and permits future engines with
 different post-EOF semantics without exposing an engine-specific public API.</p>
+<h2 id="bounded-decoder-buffering">Bounded decoder buffering</h2>
+<p><code>2.0.0a1</code> retained accepted compressed input in one <code>bytearray</code>. Each body step
+converted the complete remaining suffix to <code>bytes</code>, and consumption deleted
+from the front. Large one-item feeds therefore repeated work over progressively
+smaller suffixes and scaled superlinearly.</p>
+<p><code>2.0.0a2</code> uses a deque of immutable byte spans with a cursor into the first
+span. Consuming a partial span advances its offset; consuming a complete span
+releases that reference. Body inflation pops at most a 256 KiB compressed
+window. Engine-retained bytes are normalized by the engine adapter and
+prepended once, so the queue never depends on aliasing behavior of
+<code>unused_data</code> or <code>unconsumed_tail</code>.</p>
+<p>Inflate output has its own adaptive 64–256 KiB private batch limit. One output
+cursor holds
+that block and yields slices bounded by the caller's independent
+<code>output_chunk_size</code>, releasing the block when drained. Tiny public chunks
+therefore do not multiply engine calls. During an active operation,
+<code>compressed_size</code> already includes the complete call-time snapshot while
+engine read-ahead is bounded by one private input window;
+<code>uncompressed_size</code> can include the current private output block before all of
+its public slices have been pulled.</p>
+<p>Header parsing uses the same span queue but maintains explicit state for fixed
+fields, FEXTRA, FNAME, FCOMMENT, and FHCRC. It consumes bytes once, updates
+header CRC incrementally, and retains optional metadata only when requested.
+NUL padding advances queue cursors and trailers use exact eight-byte reads.
+The header safety check runs before accepting the first byte beyond its limit.</p>
+<p>The decompression limit permits internal production of one probe byte after
+the remaining allowance. All allowed bytes are accounted and drained first;
+the next advancement raises <code>OSError</code> without yielding, CRC-accounting, or
+size-accounting the probe byte.</p>
+<p>Wrapper-only source rechunking was rejected because direct <code>GzipDecoder.feed()</code>
+would retain the same defect and callers may legitimately supply complete
+archives. Retaining one shifting buffer was rejected because it cannot avoid
+whole-suffix conversion and front deletion. A segmented queue plus bounded
+engine windows fixes the shared codec and therefore every transport.</p>
 <h2 id="async-bridge-and-cancellation">Async bridge and cancellation</h2>
-<p>A private async driver pulls one codec output chunk at a time. Cheap steps run
-inline and sufficiently large work uses the existing executor threshold. It
-does not call <code>list(operation)</code> and does not read another source item until all
-output for the current item is consumed.</p>
+<p>A private async driver pulls one codec event at a time. Cheap steps run inline;
+the first raw advancement of compression work at or above 256 KiB uses the
+executor. Decoder inputs use a 1 MiB threshold because each raw advancement is
+already bounded to one 256 KiB compressed window; smaller fragmented streams
+checkpoint cooperatively before processing more than 16 MiB of cumulative
+inline source input.
+Private no-output progress events let the driver account for bounded inflate
+work without exposing empty public chunks. It checkpoints after 1 MiB or 4,096
+inline output chunks, or after 128 KiB or eight consecutive no-output steps.
+It does not call <code>list(operation)</code> and does not read another source item until
+all output for the current item is consumed.</p>
+<p>Offloading every <code>next()</code> call was rejected because most later advances only
+slice an already-produced block, making a thread hop more expensive than the
+work and obscuring whether the synchronous step is bounded. The chosen
+thresholds keep large engine work off the loop while cooperative checkpoints
+bound long inline drains. The M3 tuning evidence is recorded in the WP3-WP5
+benchmark reports; final release claims require the Framework Desktop rerun.</p>
 <p>If cancellation happens while a worker may still be advancing an operation,
 the wrapper waits for that worker to finish before discarding the codec and
 re-raising <code>CancelledError</code>. No replacement operation may race the old worker,
