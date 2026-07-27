@@ -6,12 +6,27 @@ from __future__ import annotations
 import argparse
 import asyncio
 import gzip
+import importlib.util
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import aiogzip
+
+
+def _require(condition: bool, message: str) -> None:
+    """Fail the release smoke even when Python runs with optimization enabled."""
+    if not condition:
+        raise RuntimeError(message)
+
+
+def _is_source_checkout(module_path: PurePath) -> bool:
+    parts = tuple(part.casefold() for part in module_path.parts)
+    return any(
+        parts[index : index + 2] == ("src", "aiogzip")
+        for index in range(len(parts) - 1)
+    )
 
 
 async def _items(*values: bytes):
@@ -39,14 +54,20 @@ async def _smoke_async(path: Path, payload: bytes) -> None:
             )
         ]
     )
-    assert restored == payload
+    _require(restored == payload, "async chunk round-trip mismatch")
 
     await aiogzip.write(path, payload, mtime=0)
-    assert await aiogzip.read(path) == payload
+    _require(await aiogzip.read(path) == payload, "async file round-trip mismatch")
     info = await aiogzip.inspect(path)
     verified = await aiogzip.verify(path)
-    assert info.member_count == verified.member_count == 1
-    assert info.uncompressed_size == verified.uncompressed_size == len(payload)
+    _require(
+        info.member_count == verified.member_count == 1,
+        "inspect/verify member-count mismatch",
+    )
+    _require(
+        info.uncompressed_size == verified.uncompressed_size == len(payload),
+        "inspect/verify uncompressed-size mismatch",
+    )
 
 
 def main() -> int:
@@ -55,20 +76,30 @@ def main() -> int:
     parser.add_argument("--expect-fast", action="store_true")
     args = parser.parse_args()
 
-    assert aiogzip.__version__ == args.expected_version
-    assert "/src/aiogzip/" not in str(Path(aiogzip.__file__).resolve())
-    assert not any(name.startswith("bench_") for name in sys.modules)
+    _require(
+        aiogzip.__version__ == args.expected_version,
+        f"version mismatch: {aiogzip.__version__!r} != {args.expected_version!r}",
+    )
+    package_path = Path(aiogzip.__file__).resolve()
+    _require(
+        not _is_source_checkout(package_path),
+        f"imported aiogzip from source checkout: {package_path}",
+    )
+    _require(
+        importlib.util.find_spec("bench_common") is None,
+        "benchmark module bench_common is importable from the wheel environment",
+    )
 
     payload = b"wheel smoke payload\n" * 100
     encoder = aiogzip.GzipEncoder(mtime=0, output_chunk_size=17)
     compressed = b"".join(encoder.start())
     compressed += b"".join(encoder.feed(payload))
     compressed += b"".join(encoder.finish())
-    assert gzip.decompress(compressed) == payload
+    _require(gzip.decompress(compressed) == payload, "sync encoder round-trip mismatch")
 
     decoder = aiogzip.GzipDecoder(output_chunk_size=19)
     restored = b"".join(decoder.feed(compressed)) + b"".join(decoder.finish())
-    assert restored == payload
+    _require(restored == payload, "sync decoder round-trip mismatch")
 
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "smoke.gz"
@@ -76,8 +107,6 @@ def main() -> int:
         subprocess.run(
             [sys.executable, "-m", "aiogzip", "verify", str(path)],
             check=True,
-            capture_output=True,
-            text=True,
         )
     version = subprocess.run(
         [sys.executable, "-m", "aiogzip", "--version"],
@@ -85,11 +114,17 @@ def main() -> int:
         capture_output=True,
         text=True,
     ).stdout.strip()
-    assert version == args.expected_version
+    _require(
+        version == args.expected_version,
+        f"CLI version mismatch: {version!r} != {args.expected_version!r}",
+    )
 
     engine = aiogzip.engine_info()
     if args.expect_fast:
-        assert engine.decompression == "zlib-ng"
+        _require(
+            engine.decompression == "zlib-ng",
+            f"expected zlib-ng decompression, got {engine.decompression!r}",
+        )
     print(
         f"aiogzip {aiogzip.__version__} smoke passed on "
         f"Python {sys.version_info.major}.{sys.version_info.minor} "
