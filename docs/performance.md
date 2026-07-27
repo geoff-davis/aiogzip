@@ -47,12 +47,13 @@ with stdlib and 0.873 ms with zlib-ng. These values support the bounded-window
 and scheduler choices; they are not portable speed claims.
 
 The decoder now consumes immutable queued spans through 256 KiB compressed
-windows and inflates into separate 256 KiB internal output blocks. Public
-`output_chunk_size` controls only emitted slices, so a one-byte public bound
-does not trigger one inflate call per byte. A complete archive supplied in one
-source item no longer incurs repeated whole-suffix copying. Transport-sized
-source items remain sensible because they bound snapshot lifetime, executor
-work, and per-source backpressure.
+windows and inflates into separate internal output blocks that adapt between
+64 KiB and 256 KiB. Public `output_chunk_size` controls emitted slices and the
+bounded batch chosen within that range, so a one-byte public bound does not
+trigger one inflate call per byte. A complete archive supplied in one source
+item no longer incurs repeated whole-suffix copying. Transport-sized source
+items remain sensible because they bound snapshot lifetime, executor work, and
+per-source backpressure.
 
 The diagnostic 10-byte write case remains about 117-122% slower than
 `v1.11.0` in the provisional M3 runs, although it stays within 3.1% of

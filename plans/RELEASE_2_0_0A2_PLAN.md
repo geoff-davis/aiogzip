@@ -392,17 +392,18 @@ Requirements:
 
 The public `output_chunk_size` remains an upper bound on each yielded `bytes`. It is no longer the only bound passed to `decompressobj.decompress()`.
 
-Start with:
+Start with a 64 KiB floor and a 256 KiB ceiling:
 
 ```python
+_INFLATE_OUTPUT_MIN_BATCH = 64 * 1024
 _INFLATE_OUTPUT_BATCH = 256 * 1024
 ```
 
-The engine output bound is the private `_INFLATE_OUTPUT_BATCH`, independent of the caller's public `output_chunk_size`. A public output bound larger than the private batch may therefore receive smaller chunks; the public contract promises a maximum, not a minimum or exact chunk size. Do not coalesce several engine blocks merely to fill a larger public bound.
+The engine output bound is `min(_INFLATE_OUTPUT_BATCH, max(_INFLATE_OUTPUT_MIN_BATCH, output_chunk_size))`. A tiny public bound therefore still uses a useful engine batch, while a 64 KiB consumer does not retain a 256 KiB block. A public output bound larger than the private ceiling may receive smaller chunks; the public contract promises a maximum, not a minimum or exact chunk size. Do not coalesce several engine blocks merely to fill a larger public bound.
 
 For a decoder with `max_decompressed_size`, do not combine allowed output and the overflow probe in one engine block:
 
-- while the remaining allowance is positive, request at most `min(_INFLATE_OUTPUT_BATCH, remaining)` bytes;
+- while the remaining allowance is positive, request at most `min(batch, remaining)` bytes;
 - after the exact limit is reached, request at most one additional byte on the next engine step only when EOF has not already been established;
 - if that probe produces a byte, raise the existing limit error before storing, accounting, or yielding it;
 - if the probe produces no output but consumes input or reaches EOF, continue normal framing validation;
@@ -411,7 +412,7 @@ For a decoder with `max_decompressed_size`, do not combine allowed output and th
 
 Store one engine output block plus an offset. Split it into public chunks using an offset; do not delete from the front of a `bytearray` or repeatedly copy the un-emitted suffix. When the public bound exceeds the internal block, yield the internal block directly rather than copying or waiting to coalesce more output.
 
-Treat 256 KiB as the initial value, not an unmeasured conclusion. Record comparative evidence for at least 64 KiB, 256 KiB, 512 KiB, and 1 MiB private output batches on both engines before freezing the release value.
+Treat 256 KiB as the initial ceiling, not an unmeasured conclusion. Record comparative evidence for at least 64 KiB, 256 KiB, 512 KiB, and 1 MiB private output batches on both engines before freezing the release value. The Framework release-reference memory sentinel is authoritative for the final floor and adaptation policy.
 
 The decoder may account CRC and member size for the bounded internal block before every slice has been returned, because an abandoned partial operation is unusable by contract. Document that counters can be ahead of the last chunk observed by at most one bounded internal batch while an operation is active. Full integrity is still established only after trailer validation.
 

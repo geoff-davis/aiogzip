@@ -37,6 +37,7 @@ from ._metadata import GzipMemberInfo
 __all__ = ["CodecOperation", "GzipDecoder", "GzipEncoder"]
 
 _INFLATE_INPUT_WINDOW = 256 * 1024
+_INFLATE_OUTPUT_MIN_BATCH = 64 * 1024
 _INFLATE_OUTPUT_BATCH = 256 * 1024
 
 
@@ -489,12 +490,16 @@ class GzipDecoder(_CodecBase):
         return self._reserve(self._process(finalizing=True))
 
     def _inflate_output_limit(self) -> int:
+        batch = min(
+            _INFLATE_OUTPUT_BATCH,
+            max(_INFLATE_OUTPUT_MIN_BATCH, self._output_chunk_size),
+        )
         limit = self._max_decompressed_size
         if limit is None:
-            return _INFLATE_OUTPUT_BATCH
+            return batch
         remaining = limit - self._uncompressed_size
         if remaining > 0:
-            return min(_INFLATE_OUTPUT_BATCH, remaining)
+            return min(batch, remaining)
         return 1
 
     def _account_output(self, output: bytes) -> None:

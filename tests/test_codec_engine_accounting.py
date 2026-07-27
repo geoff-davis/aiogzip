@@ -183,6 +183,29 @@ def test_non_eof_unconsumed_suffix_is_counted():
     )
 
 
+def test_non_eof_accumulated_tail_is_clamped_to_current_span():
+    data = b"current span"
+
+    class FakeEngine:
+        eof = False
+        unused_data = b""
+        unconsumed_tail = b""
+
+        def decompress(self, supplied, max_length=0):
+            self.unconsumed_tail = b"older pending input" + supplied
+            return b"output"
+
+    step = _engine.inflate_step(FakeEngine(), data)
+
+    assert step == _engine._InflateStep(
+        output=b"output",
+        consumed=0,
+        eof=False,
+        retained=data,
+    )
+    assert step.retained is data
+
+
 def test_non_eof_non_suffix_tail_is_rejected():
     class FakeEngine:
         eof = False

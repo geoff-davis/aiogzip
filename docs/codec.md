@@ -125,8 +125,9 @@ queue, or eager `list()` allocation.
 
 A decoder `feed()` snapshots and counts its complete argument at call time,
 but advancing the operation reads compressed input through bounded 256 KiB
-windows. Inflate output is produced in separate 256 KiB internal batches and
-then sliced to the caller's `output_chunk_size`. Consequently
+windows. Inflate output is produced in separate internal batches that adapt
+between 64 KiB and 256 KiB, then sliced to the caller's `output_chunk_size`.
+Consequently
 `compressed_size` can lead engine consumption during an active operation, and
 `uncompressed_size` can lead public delivery by at most the pending internal
 batch. These are accounting boundaries, not evidence that the complete input

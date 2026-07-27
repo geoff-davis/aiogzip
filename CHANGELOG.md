@@ -9,10 +9,11 @@ All notable changes to this project will be documented in this file.
 - Replaced the decoder's monolithic pending-input buffer with immutable spans
   and bounded 256 KiB engine windows. A large `feed()` no longer rebuilds and
   front-deletes the complete unconsumed suffix for every inflate step.
-- Decoupled the 256 KiB internal inflate batch from public
-  `output_chunk_size`. One-byte public output no longer causes one engine call
-  per byte; a cursor drains each internal output block into bounded public
-  chunks.
+- Decoupled bounded internal inflate batches from public `output_chunk_size`.
+  Batches adapt between 64 KiB and 256 KiB, so one-byte public output no longer
+  causes one engine call per byte while ordinary 64 KiB consumers retain their
+  previous bounded memory profile. A cursor drains each internal output block
+  into bounded public chunks.
 - Parsed fixed and optional gzip headers incrementally, including FEXTRA,
   FNAME, FCOMMENT, and FHCRC. Fragmented fields are consumed once and the
   128 MiB safety limit is checked before accepting an over-limit byte.

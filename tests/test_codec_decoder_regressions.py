@@ -90,7 +90,7 @@ def test_every_public_output_bound_is_strict(output_size):
 
 
 def test_tiny_public_chunks_do_not_multiply_inflate_calls(monkeypatch):
-    payload = _payload(128 * 1024)
+    payload = _payload(32 * 1024)
     wire = gzip.compress(payload, mtime=0)
     engines = _record_engines(monkeypatch)
 
@@ -101,6 +101,23 @@ def test_tiny_public_chunks_do_not_multiply_inflate_calls(monkeypatch):
 
     assert tiny_calls == large_calls
     assert tiny_calls <= 3
+
+
+@pytest.mark.parametrize(
+    ("output_size", "expected_batch"),
+    [
+        (1, 64 * 1024),
+        (64 * 1024, 64 * 1024),
+        (128 * 1024, 128 * 1024),
+        (512 * 1024, 256 * 1024),
+    ],
+)
+def test_internal_output_batch_adapts_within_private_bounds(
+    output_size, expected_batch
+):
+    decoder = GzipDecoder(output_chunk_size=output_size)
+
+    assert decoder._inflate_output_limit() == expected_batch
 
 
 def test_retained_non_eof_input_is_replayed_once_in_order(monkeypatch):

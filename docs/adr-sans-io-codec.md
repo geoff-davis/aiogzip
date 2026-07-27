@@ -127,7 +127,8 @@ window. Engine-retained bytes are normalized by the engine adapter and
 prepended once, so the queue never depends on aliasing behavior of
 `unused_data` or `unconsumed_tail`.
 
-Inflate output has its own 256 KiB private batch limit. One output cursor holds
+Inflate output has its own adaptive 64–256 KiB private batch limit. One output
+cursor holds
 that block and yields slices bounded by the caller's independent
 `output_chunk_size`, releasing the block when drained. Tiny public chunks
 therefore do not multiply engine calls. During an active operation,
