@@ -47,6 +47,7 @@ CATEGORIES = {
 }
 
 QUICK_CATEGORIES = ["io", "compression"]
+_CPU_SYSFS_ROOT = Path("/sys/devices/system/cpu")
 
 
 async def run_category(
@@ -126,6 +127,47 @@ def _file_sha256(path: Path) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _read_sysfs_value(path: Path) -> str | None:
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return value or None
+
+
+def _cpu_tuning() -> tuple[str, str]:
+    """Return Linux CPU governor and boost state when sysfs exposes them."""
+    if platform.system() != "Linux":
+        unavailable = "unavailable on this platform"
+        return unavailable, unavailable
+
+    governors = {
+        value
+        for path in _CPU_SYSFS_ROOT.glob("cpu[0-9]*/cpufreq/scaling_governor")
+        if (value := _read_sysfs_value(path)) is not None
+    }
+    if not governors:
+        governor = "unavailable on Linux"
+    elif len(governors) == 1:
+        governor = governors.pop()
+    else:
+        governor = f"mixed: {', '.join(sorted(governors))}"
+
+    boost_value = _read_sysfs_value(_CPU_SYSFS_ROOT / "cpufreq" / "boost")
+    if boost_value is not None:
+        boost = {"0": "disabled", "1": "enabled"}.get(
+            boost_value, f"unknown: {boost_value}"
+        )
+    else:
+        no_turbo = _read_sysfs_value(_CPU_SYSFS_ROOT / "intel_pstate" / "no_turbo")
+        boost = (
+            {"0": "enabled", "1": "disabled"}.get(no_turbo, f"unknown: {no_turbo}")
+            if no_turbo is not None
+            else "unavailable on Linux"
+        )
+    return governor, boost
+
+
 def configure_source_root(source_root: Path) -> dict[str, Any]:
     """Import and attest aiogzip from one explicit source checkout."""
     resolved_root = source_root.resolve()
@@ -189,6 +231,8 @@ def collect_environment(
     except AttributeError:
         affinity = "unavailable"
 
+    cpu_governor, cpu_boost = _cpu_tuning()
+
     uv_path = shutil.which("uv")
     uv_version = None
     if uv_path:
@@ -236,8 +280,8 @@ def collect_environment(
             Path(source_identity["source_root"]) / "uv.lock"
         ),
         "cpu_affinity": affinity,
-        "cpu_governor": "unavailable on this platform",
-        "cpu_boost": "unavailable on this platform",
+        "cpu_governor": cpu_governor,
+        "cpu_boost": cpu_boost,
         "system_load": list(os.getloadavg()) if hasattr(os, "getloadavg") else None,
         "garbage_collection_enabled": gc.isenabled(),
         "garbage_collection_thresholds": list(gc.get_threshold()),

@@ -21,6 +21,7 @@ DataGenerator = bench_common.DataGenerator
 median_results = bench_common.median_results
 positive_int = run_benchmarks.positive_int
 configure_source_root = run_benchmarks.configure_source_root
+cpu_tuning = run_benchmarks._cpu_tuning
 write_comparison_fixture = bench_common.write_comparison_fixture
 StreamingBenchmarks = bench_streaming.StreamingBenchmarks
 RegressionsBenchmarks = bench_codec_regressions.RegressionsBenchmarks
@@ -133,6 +134,42 @@ def test_source_root_attestation_identifies_current_checkout():
     assert Path(identity["aiogzip_file"]).is_relative_to(repository_root / "src")
     assert identity["target_commit"]
     assert identity["package_version"]
+
+
+def test_cpu_tuning_reads_linux_sysfs(tmp_path, monkeypatch):
+    governor = tmp_path / "cpu0" / "cpufreq" / "scaling_governor"
+    governor.parent.mkdir(parents=True)
+    governor.write_text("powersave\n", encoding="utf-8")
+    boost = tmp_path / "cpufreq" / "boost"
+    boost.parent.mkdir()
+    boost.write_text("1\n", encoding="utf-8")
+    monkeypatch.setattr(run_benchmarks.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(run_benchmarks, "_CPU_SYSFS_ROOT", tmp_path)
+
+    assert cpu_tuning() == ("powersave", "enabled")
+
+
+def test_cpu_tuning_reports_mixed_governors_and_intel_no_turbo(tmp_path, monkeypatch):
+    for cpu, governor in (("cpu0", "powersave"), ("cpu1", "performance")):
+        path = tmp_path / cpu / "cpufreq" / "scaling_governor"
+        path.parent.mkdir(parents=True)
+        path.write_text(governor, encoding="utf-8")
+    no_turbo = tmp_path / "intel_pstate" / "no_turbo"
+    no_turbo.parent.mkdir()
+    no_turbo.write_text("1\n", encoding="utf-8")
+    monkeypatch.setattr(run_benchmarks.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(run_benchmarks, "_CPU_SYSFS_ROOT", tmp_path)
+
+    assert cpu_tuning() == ("mixed: performance, powersave", "disabled")
+
+
+def test_cpu_tuning_is_explicitly_unavailable_off_linux(monkeypatch):
+    monkeypatch.setattr(run_benchmarks.platform, "system", lambda: "Darwin")
+
+    assert cpu_tuning() == (
+        "unavailable on this platform",
+        "unavailable on this platform",
+    )
 
 
 @pytest.mark.parametrize(
