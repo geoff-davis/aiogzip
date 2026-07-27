@@ -563,7 +563,9 @@ class GzipDecoder(_CodecBase):
             )
         self._member_count += 1
         self._header = None
-        self._header_parser = self._new_header_parser()
+        parser = self._header_parser
+        assert parser is not None
+        parser.reset()
         self._engine = None
         self._state = "header"
         self._allow_padding = True

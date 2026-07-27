@@ -34,11 +34,12 @@ class _Span:
 class _InputQueue:
     """A queue of immutable spans with O(1) length and head removal."""
 
-    __slots__ = ("_size", "_spans")
+    __slots__ = ("_size", "_spans", "_spare")
 
     def __init__(self) -> None:
         self._spans: deque[_Span] = deque()
         self._size = 0
+        self._spare: _Span | None = None
 
     def __len__(self) -> int:
         return self._size
@@ -47,15 +48,32 @@ class _InputQueue:
         """Append one exact immutable span without copying it."""
         _require_exact_bytes(data)
         if data:
-            self._spans.append(_Span(data, 0, len(data)))
+            self._spans.append(self._span_for(data))
             self._size += len(data)
 
     def prepend(self, data: bytes) -> None:
         """Prepend one exact immutable span without disturbing later input."""
         _require_exact_bytes(data)
         if data:
-            self._spans.appendleft(_Span(data, 0, len(data)))
+            self._spans.appendleft(self._span_for(data))
             self._size += len(data)
+
+    def _span_for(self, data: bytes) -> _Span:
+        spare = self._spare
+        if spare is None:
+            return _Span(data, 0, len(data))
+        self._spare = None
+        spare.data = data
+        spare.start = 0
+        spare.end = len(data)
+        return spare
+
+    def _release_span(self, span: _Span) -> None:
+        if self._spare is None:
+            span.data = b""
+            span.start = 0
+            span.end = 0
+            self._spare = span
 
     @property
     def head_size(self) -> int:
@@ -73,6 +91,23 @@ class _InputQueue:
         span = self._spans[0]
         end = min(span.start + max_bytes, span.end)
         return memoryview(span.data)[span.start : end]
+
+    def take_view(self, size: int) -> memoryview:
+        """Consume and return an exact zero-copy view within the head span."""
+        if size < 0:
+            raise ValueError("view byte count cannot be negative")
+        if not self._spans or size > len(self._spans[0]):
+            raise ValueError("view must fit within the queued head span")
+        span = self._spans[0]
+        start = span.start
+        view = memoryview(span.data)[start : start + size]
+        if size == len(span):
+            self._spans.popleft()
+            self._release_span(span)
+        else:
+            span.start += size
+        self._size -= size
+        return view
 
     def find_in_head(self, value: int, max_bytes: int) -> int | None:
         """Return the relative index of *value* in the bounded head span."""
@@ -102,17 +137,24 @@ class _InputQueue:
                 span.start += remaining
                 self._size -= remaining
                 return
-            self._spans.popleft()
+            drained = self._spans.popleft()
             self._size -= available
             remaining -= available
+            self._release_span(drained)
 
     def _take_head(self, size: int) -> bytes:
         span = self._spans[0]
-        if size == len(span) and span.start == 0 and span.end == len(span.data):
+        available = span.end - span.start
+        if size == available and span.start == 0 and span.end == len(span.data):
             result = span.data
         else:
             result = span.data[span.start : span.start + size]
-        self.consume(size)
+        if size == available:
+            self._spans.popleft()
+            self._release_span(span)
+        else:
+            span.start += size
+        self._size -= size
         return result
 
     def take(self, max_bytes: int) -> bytes:
@@ -139,12 +181,16 @@ class _InputQueue:
             raise ValueError("exact byte count cannot be negative")
         if self._size < size:
             return None
+        if size <= len(self._spans[0]):
+            return self._take_head(size)
         return self.take(size)
 
     def pop_window(self, max_bytes: int) -> bytes:
         """Consume one non-empty contiguous window bounded by *max_bytes*."""
         if max_bytes <= 0:
             raise ValueError("window size must be positive")
+        if self._size <= max_bytes and len(self._spans) == 1:
+            return self._take_head(self._size)
         return self.take(max_bytes)
 
     def consume_leading_zeroes(self) -> int:
@@ -152,6 +198,8 @@ class _InputQueue:
         consumed = 0
         while self._spans:
             span = self._spans[0]
+            if span.data[span.start] != 0:
+                break
             match = _NON_ZERO.search(span.data, span.start, span.end)
             position = match.start() if match is not None else span.end
             amount = position - span.start
@@ -164,6 +212,7 @@ class _InputQueue:
     def clear(self) -> None:
         """Release every queued span."""
         self._spans.clear()
+        self._spare = None
         self._size = 0
 
 

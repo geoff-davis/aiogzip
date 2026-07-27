@@ -73,6 +73,18 @@ def _normalized_retained(data: bytes, first: bytes, second: bytes) -> bytes:
     Resolve those representations here so callers receive one exact suffix.
     """
 
+    # stdlib zlib and zlib-ng normally expose the complete suffix in one
+    # field, or identically in both. Keep those per-member paths direct before
+    # entering the defensive normalization for accumulated or split tails.
+    if len(first) <= len(data) and (not second or first == second):
+        if not data.endswith(first):
+            raise RuntimeError("inflate engine returned input not present in its span")
+        return first
+    if not first and len(second) <= len(data):
+        if not data.endswith(second):
+            raise RuntimeError("inflate engine returned input not present in its span")
+        return second
+
     def current_span(fragment: bytes) -> bytes:
         if len(fragment) <= len(data):
             return fragment

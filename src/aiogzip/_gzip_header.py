@@ -46,6 +46,7 @@ class _GzipHeaderParser:
         "_filename",
         "_limit",
         "_mtime",
+        "_plain_result",
         "_result",
         "_size",
         "_state",
@@ -67,6 +68,7 @@ class _GzipHeaderParser:
         self._filename: str | None = None
         self._extra: bytes | None = None
         self._comment: str | None = None
+        self._plain_result: _ParsedHeader | None = None
         self._result: _ParsedHeader | None = None
 
     @property
@@ -78,6 +80,21 @@ class _GzipHeaderParser:
     def size(self) -> int:
         """Number of header bytes consumed so far."""
         return self._size
+
+    def reset(self) -> None:
+        """Prepare this parser for the next member with the same policy."""
+        self._state = "fixed"
+        self._size = 0
+        self._crc = 0
+        self._fixed.clear()
+        self._field_buffer = None
+        self._extra_remaining = 0
+        self._flags = 0
+        self._mtime = 0
+        self._filename = None
+        self._extra = None
+        self._comment = None
+        self._result = None
 
     def _available(self, pending: _InputQueue) -> int:
         remaining = self._limit - self._size
@@ -129,6 +146,7 @@ class _GzipHeaderParser:
         self._consume(
             pending,
             target - len(self._fixed),
+            checksum=bool(self._flags & GZIP_FLAG_FHCRC),
             capture=self._fixed,
         )
         size = len(self._fixed)
@@ -144,6 +162,8 @@ class _GzipHeaderParser:
                 raise gzip.BadGzipFile(
                     f"Reserved flags are set in gzip header: {self._flags:#04x}"
                 )
+            if self._flags & GZIP_FLAG_FHCRC:
+                self._crc = _engine.crc32(self._fixed)
         if size == 10:
             self._mtime = struct.unpack_from("<I", self._fixed, 4)[0]
             self._fixed.clear()
@@ -156,6 +176,7 @@ class _GzipHeaderParser:
         self._consume(
             pending,
             2 - len(self._field_buffer),
+            checksum=bool(self._flags & GZIP_FLAG_FHCRC),
             capture=self._field_buffer,
         )
         if len(self._field_buffer) < 2:
@@ -169,6 +190,7 @@ class _GzipHeaderParser:
         consumed = self._consume(
             pending,
             self._extra_remaining,
+            checksum=bool(self._flags & GZIP_FLAG_FHCRC),
             capture=self._field_buffer,
         )
         self._extra_remaining -= consumed
@@ -190,7 +212,8 @@ class _GzipHeaderParser:
         terminator = pending.find_in_head(0, amount)
         take = amount if terminator is None else terminator + 1
         view = pending.peek_span(take)
-        self._crc = _engine.crc32(view, self._crc)
+        if self._flags & GZIP_FLAG_FHCRC:
+            self._crc = _engine.crc32(view, self._crc)
         if self._field_buffer is not None:
             self._field_buffer.extend(view if terminator is None else view[:-1])
         pending.consume(take)
@@ -235,6 +258,56 @@ class _GzipHeaderParser:
 
     def advance(self, pending: _InputQueue) -> _ParsedHeader | None:
         """Consume available header bytes and return metadata once complete."""
+        if (
+            self._state == "fixed"
+            and not self._fixed
+            and pending.head_size >= 10
+            and self._limit >= 10
+        ):
+            # Most members have one contiguous fixed header and no optional
+            # fields. Complete that common case without traversing the
+            # incremental state dispatch used by fragmented headers.
+            fixed = pending.take_view(10)
+            if fixed[0] != 0x1F or fixed[1] != 0x8B:
+                raise gzip.BadGzipFile("Not a gzipped file")
+            if fixed[2] != GZIP_METHOD_DEFLATE:
+                raise gzip.BadGzipFile(f"Unknown compression method {fixed[2]}")
+            flags = fixed[3]
+            if flags & _RESERVED_FLAGS:
+                raise gzip.BadGzipFile(
+                    f"Reserved flags are set in gzip header: {flags:#04x}"
+                )
+            self._flags = flags
+            self._mtime = struct.unpack_from("<I", fixed, 4)[0]
+            if flags & GZIP_FLAG_FHCRC:
+                self._crc = _engine.crc32(fixed, self._crc)
+            self._size = 10
+            if not flags & (
+                GZIP_FLAG_FEXTRA
+                | GZIP_FLAG_FNAME
+                | GZIP_FLAG_FCOMMENT
+                | GZIP_FLAG_FHCRC
+            ):
+                self._state = "done"
+                result = self._plain_result
+                if (
+                    result is None
+                    or result.mtime != self._mtime
+                    or result.flags != flags
+                ):
+                    result = _ParsedHeader(
+                        size=10,
+                        mtime=self._mtime,
+                        original_filename=None,
+                        comment=None,
+                        extra=None,
+                        flags=flags,
+                    )
+                    self._plain_result = result
+                self._result = result
+                return self._result
+            self._next_optional_state("fixed")
+
         while self._state != "done":
             state = self._state
             if state == "fixed":
