@@ -1618,9 +1618,11 @@ Produce an auditable `2.0.0a2` candidate only after all hard gates pass.
 - [ ] Include fixture and source hashes.
 - [ ] Include any accepted non-blocking tiny-write disposition.
 
-Production code is frozen at `c71d6db`; WP8 and the WP9 documentation changes
-do not modify `src/aiogzip/`. The exact Framework Desktop commands and
-attestation checks are consolidated in
+The decoder implementation was frozen at `c71d6db`. PR review follow-up
+`fb0a483` removed two unused private queue helpers, shared the encoder's
+strict-size preflight, and added explanatory comments; it does not change the
+decoder hot path. The exact Framework Desktop commands and attestation checks
+are consolidated in
 `plans/benchmarks/v2.0.0a2-framework-rerun.md`. Final benchmark items remain
 open because M3 results cannot substitute for the release-reference capture.
 
