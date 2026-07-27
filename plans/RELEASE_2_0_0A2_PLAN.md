@@ -1627,9 +1627,13 @@ The decoder implementation was frozen at `c71d6db`. PR review follow-up
 strict-size preflight, and added explanatory comments; it does not change the
 decoder hot path. Framework tuning commits culminated in `58b1b3f`, which
 also repaired the repeated-member inspection delta exposed by the complete
-historical rerun. The exact Framework Desktop commands and attestation checks
-are consolidated in `plans/benchmarks/v2.0.0a2-framework-rerun.md`; accepted
-results are recorded in `plans/benchmarks/v2.0.0a2-candidate.md`.
+historical rerun. Final review advanced the release production freeze to
+`0cca05d` only to restore the unused zero-size `take_exact()` contract and add
+fairness/accounting comments. Immediate nine-repeat inspection comparisons
+confirmed that bounded many-member verify/inspect remain inside their gates.
+The exact Framework Desktop commands and attestation checks are consolidated
+in `plans/benchmarks/v2.0.0a2-framework-rerun.md`; accepted results are
+recorded in `plans/benchmarks/v2.0.0a2-candidate.md`.
 
 #### Quality and packaging tasks
 
@@ -1656,7 +1660,7 @@ Provisional M3 correctness and packaging preflight is recorded in
 both engine selections, the real header-limit selection passed, provisional
 artifacts passed Twine and metadata inspection, and clean Python 3.11/3.14
 wheel smokes passed with active zlib-ng and forced stdlib. The required
-post-Framework rerun passed from `c43ee95` and is recorded in
+post-Framework rerun was refreshed from `0cca05d` and is recorded in
 `plans/benchmarks/v2.0.0a2-packaging-validation.md`. Its development-version
 artifact hashes are preflight evidence, not final release hashes.
 

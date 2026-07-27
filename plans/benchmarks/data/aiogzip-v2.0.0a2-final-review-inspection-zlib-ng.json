@@ -1,0 +1,323 @@
+{
+  "schema_version": 2,
+  "timestamp": 1785176452.4870932,
+  "categories": [
+    "inspection"
+  ],
+  "data_size_mb": 8,
+  "repeat": 9,
+  "regression_profile": null,
+  "regression_mode": null,
+  "source": {
+    "source_root": "/home/geoff/Projects/personal/aiogzip",
+    "aiogzip_file": "/home/geoff/Projects/personal/aiogzip/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a2.dev0",
+    "target_commit": "0cca05d7487a2a4914c7cb8b138d9cb57e7bf8a4",
+    "target_describe": "v2.0.0a1-29-g0cca05d",
+    "target_dirty": false
+  },
+  "environment": {
+    "source_root": "/home/geoff/Projects/personal/aiogzip",
+    "aiogzip_file": "/home/geoff/Projects/personal/aiogzip/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a2.dev0",
+    "target_commit": "0cca05d7487a2a4914c7cb8b138d9cb57e7bf8a4",
+    "target_describe": "v2.0.0a1-29-g0cca05d",
+    "target_dirty": false,
+    "environment_label": "Framework Desktop 2.0.0a2 final-review zlib-ng",
+    "runner_root": "/home/geoff/Projects/personal/aiogzip",
+    "runner_commit": "0cca05d7487a2a4914c7cb8b138d9cb57e7bf8a4",
+    "regression_harness_sha256": "6cb2d3a9709fd905cbc7871c4cb80f9ae848668378d7bd08aeb070aeed2a112d",
+    "python_implementation": "CPython",
+    "python_version": "3.12.12 (main, Dec 17 2025, 21:10:06) [Clang 21.1.4 ]",
+    "python_executable": "/home/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "platform": "Linux-6.17.0-35-generic-x86_64-with-glibc2.42",
+    "os_name": "Linux",
+    "os_release": "6.17.0-35-generic",
+    "kernel_version": "#35-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 13:10:28 UTC 2026",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.42"
+    ],
+    "processor": "",
+    "cpu_count": 32,
+    "ram_bytes": 131894415360,
+    "filesystem_temp_root": "/tmp",
+    "zlib_compile_version": "1.3.1",
+    "zlib_runtime_version": "1.3.1",
+    "zlib_ng_package_version": "1.0.0",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "zlib-ng",
+      "crc32": "zlib-ng"
+    },
+    "forced_engine": "zlib-ng",
+    "uv_version": "uv 0.9.22",
+    "uv_lock_sha256": "e7b91a8c8b42c1ad455ac2d48b20a84d5e07fcb657bb48797baba8686ffa6871",
+    "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "cpu_governor": "powersave",
+    "cpu_boost": "enabled",
+    "system_load": [
+      1.5,
+      1.62158203125,
+      1.51708984375
+    ],
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      700,
+      10,
+      10
+    ]
+  },
+  "results": [
+    {
+      "name": "verify (compressible)",
+      "category": "inspection",
+      "duration": 0.0016051176935434341,
+      "duration_samples": [
+        0.005327743943780661,
+        0.0015475903637707233,
+        0.0016051176935434341,
+        0.0016152169555425644,
+        0.0015041870065033436,
+        0.0016049579717218876,
+        0.0015934561379253864,
+        0.0017319577746093273,
+        0.0018076207488775253
+      ],
+      "median_absolute_deviation": 5.75273297727108e-05,
+      "duration_min": 0.0015041870065033436,
+      "duration_max": 0.005327743943780661,
+      "metrics": {
+        "peak_python_mb": 0.571507453918457,
+        "engine": "zlib-ng",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "inspect (compressible)",
+      "category": "inspection",
+      "duration": 0.0012471810914576054,
+      "duration_samples": [
+        0.0019212872721254826,
+        0.001134476624429226,
+        0.0012471810914576054,
+        0.0011192983947694302,
+        0.0011267219670116901,
+        0.0013405168429017067,
+        0.0013833092525601387,
+        0.0011982768774032593,
+        0.0015071420930325985
+      ],
+      "median_absolute_deviation": 0.00012045912444591522,
+      "duration_min": 0.0011192983947694302,
+      "duration_max": 0.0019212872721254826,
+      "metrics": {
+        "peak_python_mb": 0.5714998245239258,
+        "engine": "zlib-ng",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "_read_discard (compressible)",
+      "category": "inspection",
+      "duration": 0.0030187638476490974,
+      "duration_samples": [
+        0.004164623096585274,
+        0.003174558747559786,
+        0.0028663347475230694,
+        0.0028493227437138557,
+        0.003039834089577198,
+        0.0030187638476490974,
+        0.002937550190836191,
+        0.0028432421386241913,
+        0.003087193239480257
+      ],
+      "median_absolute_deviation": 0.00015242910012602806,
+      "duration_min": 0.0028432421386241913,
+      "duration_max": 0.004164623096585274,
+      "metrics": {
+        "peak_python_mb": 16.0120210647583,
+        "engine": "zlib-ng",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "verify (incompressible)",
+      "category": "inspection",
+      "duration": 0.003989871125668287,
+      "duration_samples": [
+        0.004049655050039291,
+        0.003736412152647972,
+        0.003985442686825991,
+        0.0053394148126244545,
+        0.005599027033895254,
+        0.003989871125668287,
+        0.003636944107711315,
+        0.0038069551810622215,
+        0.004819461610168219
+      ],
+      "median_absolute_deviation": 0.00025345897302031517,
+      "duration_min": 0.003636944107711315,
+      "duration_max": 0.005599027033895254,
+      "metrics": {
+        "peak_python_mb": 0.804774284362793,
+        "engine": "zlib-ng",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "inspect (incompressible)",
+      "category": "inspection",
+      "duration": 0.004073910880833864,
+      "duration_samples": [
+        0.003330032341182232,
+        0.0032904082909226418,
+        0.0041328719817101955,
+        0.003521515056490898,
+        0.003389816265553236,
+        0.0041859629563987255,
+        0.004073910880833864,
+        0.004510457161813974,
+        0.004369871225208044
+      ],
+      "median_absolute_deviation": 0.00043654628098011017,
+      "duration_min": 0.0032904082909226418,
+      "duration_max": 0.004510457161813974,
+      "metrics": {
+        "peak_python_mb": 0.8048582077026367,
+        "engine": "zlib-ng",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "_read_discard (incompressible)",
+      "category": "inspection",
+      "duration": 0.004439081065356731,
+      "duration_samples": [
+        0.00618039770051837,
+        0.004852383863180876,
+        0.004865908995270729,
+        0.00532239256426692,
+        0.004103305749595165,
+        0.0043166400864720345,
+        0.0042524877935647964,
+        0.004144695121794939,
+        0.004439081065356731
+      ],
+      "median_absolute_deviation": 0.00033577531576156616,
+      "duration_min": 0.004103305749595165,
+      "duration_max": 0.00618039770051837,
+      "metrics": {
+        "peak_python_mb": 16.012189865112305,
+        "engine": "zlib-ng",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "verify (many-members)",
+      "category": "inspection",
+      "duration": 0.02470215316861868,
+      "duration_samples": [
+        0.02470215316861868,
+        0.024676265195012093,
+        0.02821737714111805,
+        0.02501376299187541,
+        0.025347364135086536,
+        0.024585862644016743,
+        0.025217919144779444,
+        0.024634485598653555,
+        0.024586004205048084
+      ],
+      "median_absolute_deviation": 0.00011629052460193634,
+      "duration_min": 0.024585862644016743,
+      "duration_max": 0.02821737714111805,
+      "metrics": {
+        "peak_python_mb": 0.33564090728759766,
+        "engine": "zlib-ng",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "inspect (many-members)",
+      "category": "inspection",
+      "duration": 0.027737979777157307,
+      "duration_samples": [
+        0.027737979777157307,
+        0.034528231248259544,
+        0.028752169106155634,
+        0.027103908825665712,
+        0.027835873886942863,
+        0.027488958090543747,
+        0.028268312104046345,
+        0.027598055079579353,
+        0.0274297958239913
+      ],
+      "median_absolute_deviation": 0.000308183953166008,
+      "duration_min": 0.027103908825665712,
+      "duration_max": 0.034528231248259544,
+      "metrics": {
+        "peak_python_mb": 0.6284151077270508,
+        "engine": "zlib-ng",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "_read_discard (many-members)",
+      "category": "inspection",
+      "duration": 0.02764984220266342,
+      "duration_samples": [
+        0.028607374988496304,
+        0.02935116272419691,
+        0.028408538084477186,
+        0.02743309224024415,
+        0.027752195950597525,
+        0.02749982802197337,
+        0.02764984220266342,
+        0.02722078002989292,
+        0.027126160915941
+      ],
+      "median_absolute_deviation": 0.0004290621727705002,
+      "duration_min": 0.027126160915941,
+      "duration_max": 0.02935116272419691,
+      "metrics": {
+        "peak_python_mb": 16.1246395111084,
+        "engine": "zlib-ng",
+        "suite_repeats": 9
+      }
+    }
+  ]
+}
