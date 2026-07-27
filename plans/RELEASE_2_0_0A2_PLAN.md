@@ -922,21 +922,21 @@ Rules:
 
 Using the newly locked `v2.0.0a1` regression baseline:
 
-- [ ] At 32 MiB, the candidate one-feed median is at least 4× faster than `a1`.
-- [ ] At 64 MiB, the candidate one-feed median is at least 4× faster than `a1`.
-- [ ] Candidate one-feed/chunked ratio is ≤ 1.5× target and ≤ 3.0× hard maximum at both 32 and 64 MiB.
-- [ ] Candidate 16/8, 32/16, and 64/32 one-feed doubling ratios are ≤ 2.25× target and ≤ 2.5× hard maximum.
-- [ ] Candidate time per MiB at 64 MiB is ≤ 1.25× target and ≤ 1.5× hard maximum relative to 8 MiB.
-- [ ] Both stdlib zlib and zlib-ng show non-superlinear growth; zlib-ng may have different absolute throughput.
+- [x] At 32 MiB, the candidate one-feed median is at least 4× faster than `a1` (16.4× stdlib, 20.3× zlib-ng).
+- [x] At 64 MiB, the candidate one-feed median is at least 4× faster than `a1` (92.1× stdlib, 117.1× zlib-ng).
+- [x] Candidate one-feed/chunked ratio is ≤ 1.5× target and ≤ 3.0× hard maximum at both 32 and 64 MiB (worst 1.007×).
+- [x] Candidate 16/8, 32/16, and 64/32 one-feed doubling ratios are ≤ 2.25× target and ≤ 2.5× hard maximum (largest 2.013×).
+- [x] Candidate time per MiB at 64 MiB is ≤ 1.25× target and ≤ 1.5× hard maximum relative to 8 MiB (0.993× stdlib, 0.967× zlib-ng).
+- [x] Both stdlib zlib and zlib-ng show non-superlinear growth; zlib-ng may have different absolute throughput.
 
 If the `a1` reference machine differs from the candidate machine, rerun the exact `a1` tag and candidate in the same session; do not compare absolute numbers across machines.
 
 ### 9.3 Tiny-output deterministic gate
 
-- [ ] For output fitting within one internal batch, `output_chunk_size=1` does not cause engine calls proportional to output bytes.
-- [ ] A counting-engine test establishes the bound without timing.
-- [ ] Maximum public yield length is exactly within the configured bound for every matrix value.
-- [ ] Memory remains bounded by the private internal batch plus ordinary codec state; it does not grow with the number of emitted chunks.
+- [x] For output fitting within one internal batch, `output_chunk_size=1` does not cause engine calls proportional to output bytes (2 engine calls for 131,072 one-byte yields).
+- [x] A counting-engine test establishes the bound without timing.
+- [x] Maximum public yield length is exactly within the configured bound for every matrix value.
+- [x] Memory remains bounded by the private internal batch plus ordinary codec state; it does not grow with the number of emitted chunks (64 MiB one-feed peaks at ~1 MiB).
 
 ### 9.4 Scheduler-latency gate
 
@@ -951,21 +951,21 @@ Timing-sensitive scheduler gates run in the release benchmark, not as brittle or
 
 The adversarial no-output path has a separate hard functional gate:
 
-- [ ] the deterministic fake engine gives a sibling task progress no later than the first configured no-output byte or step threshold;
-- [ ] one private raw advancement performs at most one inflate-engine call;
-- [ ] the valid empty-block fixture gives the ticker progress before decode completion and emits no empty public chunks;
-- [ ] failure of any of these conditions blocks the release even when ordinary one-item throughput and maximum-gap timing pass.
+- [x] the deterministic fake engine gives a sibling task progress no later than the first configured no-output byte or step threshold;
+- [x] one private raw advancement performs at most one inflate-engine call;
+- [x] the valid empty-block fixture gives the ticker progress before decode completion and emits no empty public chunks;
+- [x] failure of any of these conditions blocks the release even when ordinary one-item throughput and maximum-gap timing pass (none failed).
 
 The synthetic fixture's absolute throughput is informational; its bounded-progress behavior is not.
 
 ### 9.5 Header and memory gates
 
-- [ ] With metadata collection disabled, parsing a 32 MiB incomplete FNAME or FCOMMENT has incremental Python peak allocation below 4 MiB when fixture creation is excluded.
-- [ ] With metadata enabled, peak incremental allocation is no more than field size × 2.25 plus 4 MiB; this allows the encoded field and decoded Latin-1 string to coexist briefly but forbids duplicate whole-header retention.
-- [ ] Fragmented-header doubling ratios are ≤ 2.5×.
-- [ ] A reduced-limit unit test proves rejection occurs before consuming or copying the first byte beyond the configured header limit.
-- [ ] A release-only real-limit test validates the 128 MiB boundary.
-- [ ] No body input following a legal near-limit header is misclassified as header bytes.
+- [x] With metadata collection disabled, parsing a 32 MiB incomplete FNAME or FCOMMENT has incremental Python peak allocation below 4 MiB when fixture creation is excluded (peaks ~2 KiB).
+- [x] With metadata enabled, peak incremental allocation is no more than field size × 2.25 plus 4 MiB; this allows the encoded field and decoded Latin-1 string to coexist briefly but forbids duplicate whole-header retention (35.861 MiB against the 76 MiB limit).
+- [x] Fragmented-header doubling ratios are ≤ 2.5× (1.96–2.08×).
+- [x] A reduced-limit unit test proves rejection occurs before consuming or copying the first byte beyond the configured header limit.
+- [x] A release-only real-limit test validates the 128 MiB boundary.
+- [x] No body input following a legal near-limit header is misclassified as header bytes.
 
 ### 9.6 Existing memory sentinels
 
