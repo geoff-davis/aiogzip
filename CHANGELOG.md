@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0a2] - 2026-07-27
+
 ### Fixed
 
 - Replaced the decoder's monolithic pending-input buffer with immutable spans
@@ -721,5 +723,6 @@ All notable changes to this project will be documented in this file.
 - Normalize iteration errors from `AsyncGzipBinaryFile` to `TypeError`, matching the standard file API.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
 
-[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a1...HEAD
+[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a2...HEAD
+[2.0.0a2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a1...v2.0.0a2
 [2.0.0a1]: https://github.com/geoff-davis/aiogzip/compare/v1.11.0...v2.0.0a1
