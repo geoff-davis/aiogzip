@@ -1,6 +1,7 @@
 # aiogzip 2.0.0a2 Regression-Repair Release Plan
 
-> **Status:** Implemented through WP8; WP9 Framework release gates open
+> **Status:** WP9 Framework performance and local quality gates complete;
+> packaging and remote release gates open
 > **Target release:** `2.0.0a2`
 > **Repository destination:** `plans/RELEASE_2_0_0A2_PLAN.md`
 > **Primary objective:** remove the decoder performance and scheduler-latency regressions exposed by `2.0.0a1` without weakening gzip correctness, bounded output, lifecycle ownership, cancellation safety, or engine portability.
@@ -1606,41 +1607,42 @@ Produce an auditable `2.0.0a2` candidate only after all hard gates pass.
 #### Final benchmark tasks
 
 - [x] Freeze production code before final benchmark capture.
-- [ ] Run the complete historical suite under forced stdlib with five or more repeats.
-- [ ] Run the complete historical suite with zlib-ng active with three or more repeats.
-- [ ] Run the complete regression category with release matrix and five or more repeats.
-- [ ] Rerun noisy cases with nine repeats.
-- [ ] Commit raw JSON samples.
-- [ ] Create `plans/benchmarks/v2.0.0a2-candidate.md`.
-- [ ] Include direct comparisons to both locked baselines.
-- [ ] List every >5% delta and its investigation.
-- [ ] State explicitly that the central decoder gates have no waiver.
-- [ ] Include event-loop gap distributions.
-- [ ] Include memory peaks.
-- [ ] Include engine-call counts.
-- [ ] Include fixture and source hashes.
-- [ ] Include any accepted non-blocking tiny-write disposition.
+- [x] Run the complete historical suite under forced stdlib with five or more repeats.
+- [x] Run the complete historical suite with zlib-ng active with three or more repeats.
+- [x] Run the complete regression category with release matrix and five or more repeats.
+- [x] Rerun noisy cases with nine repeats.
+- [x] Commit raw JSON samples.
+- [x] Create `plans/benchmarks/v2.0.0a2-candidate.md`.
+- [x] Include direct comparisons to both locked baselines.
+- [x] List every >5% delta and its investigation.
+- [x] State explicitly that the central decoder gates have no waiver.
+- [x] Include event-loop gap distributions.
+- [x] Include memory peaks.
+- [x] Include engine-call counts.
+- [x] Include fixture and source hashes.
+- [x] Include any accepted non-blocking tiny-write disposition.
 
 The decoder implementation was frozen at `c71d6db`. PR review follow-up
 `fb0a483` removed two unused private queue helpers, shared the encoder's
 strict-size preflight, and added explanatory comments; it does not change the
-decoder hot path. The exact Framework Desktop commands and attestation checks
-are consolidated in
-`plans/benchmarks/v2.0.0a2-framework-rerun.md`. Final benchmark items remain
-open because M3 results cannot substitute for the release-reference capture.
+decoder hot path. Framework tuning commits culminated in `58b1b3f`, which
+also repaired the repeated-member inspection delta exposed by the complete
+historical rerun. The exact Framework Desktop commands and attestation checks
+are consolidated in `plans/benchmarks/v2.0.0a2-framework-rerun.md`; accepted
+results are recorded in `plans/benchmarks/v2.0.0a2-candidate.md`.
 
 #### Quality and packaging tasks
 
-- [ ] Run `ruff check .`.
-- [ ] Run `ruff format --check .`.
-- [ ] Run `mypy src`.
-- [ ] Run `ty check src`.
-- [ ] Run `uv run prek run --all-files`.
-- [ ] Run forced-stdlib pytest with branch coverage and `--cov-fail-under=85`.
-- [ ] Run zlib-ng-active pytest with branch coverage and `--cov-fail-under=85`.
-- [ ] Run forced stdlib while zlib-ng remains installed.
-- [ ] Run the slow release tests, including real header limit and scaling checks.
-- [ ] Run strict documentation build.
+- [x] Run `ruff check .`.
+- [x] Run `ruff format --check .`.
+- [x] Run `mypy src`.
+- [x] Run `ty check src`.
+- [x] Run `uv run prek run --all-files`.
+- [x] Run forced-stdlib pytest with branch coverage and `--cov-fail-under=85`.
+- [x] Run zlib-ng-active pytest with branch coverage and `--cov-fail-under=85`.
+- [x] Run forced stdlib while zlib-ng remains installed.
+- [x] Run the slow release tests, including real header limit and scaling checks.
+- [x] Run strict documentation build.
 - [ ] Build wheel and sdist.
 - [ ] Inspect metadata: version, Python floor, Alpha classifier, typed marker, dependencies.
 - [ ] Install wheel into clean Python 3.11 and 3.14 environments.
@@ -1776,13 +1778,13 @@ open below; none of these checks closes a Framework performance gate.
 
 ### Performance — hard blockers
 
-- [ ] 512/256 KiB decoder historical gate passes without waiver.
-- [ ] direct large-feed scaling hard gates pass.
-- [ ] tiny-output engine-call invariant passes.
-- [ ] scheduler maximum-gap hard gate passes.
-- [ ] header allocation and scaling gates pass.
-- [ ] existing memory hard ceilings pass.
-- [ ] no new representative high-level case exceeds +10% without an explicitly permitted, reviewed exception; the central decoder cases do not permit one.
+- [x] 512/256 KiB decoder historical gate passes without waiver.
+- [x] direct large-feed scaling hard gates pass.
+- [x] tiny-output engine-call invariant passes.
+- [x] scheduler maximum-gap hard gate passes.
+- [x] header allocation and scaling gates pass.
+- [x] existing memory hard ceilings pass.
+- [x] no new representative high-level case exceeds +10% without an explicitly permitted, reviewed exception; the central decoder cases do not permit one.
 
 ### Quality and packaging — hard blockers
 

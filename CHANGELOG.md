@@ -16,7 +16,9 @@ All notable changes to this project will be documented in this file.
   into bounded public chunks.
 - Parsed fixed and optional gzip headers incrementally, including FEXTRA,
   FNAME, FCOMMENT, and FHCRC. Fragmented fields are consumed once and the
-  128 MiB safety limit is checked before accepting an over-limit byte.
+  128 MiB safety limit is checked before accepting an over-limit byte. A
+  validated contiguous-header path and cleared parser/span reuse keep streams
+  containing many ordinary members within the high-level performance budget.
 - Added bounded cooperative checkpoints to long inline decoder drains,
   including valid DEFLATE sequences that consume input without producing
   output. Cancellation still waits for an active worker before cleanup.
@@ -48,17 +50,17 @@ All notable changes to this project will be documented in this file.
 
 ### Performance
 
-- Provisional Apple M3 MacBook Air measurements put the 8 MiB
-  `decompress_chunks()` 512/256 KiB case at 4.885 ms with stdlib and 4.764 ms
-  with zlib-ng, respectively 28.2% and 34.6% below same-machine `v1.11.0`
-  medians. A 32 MiB one-item source recorded maximum event-loop gaps of
-  1.063 ms and 0.873 ms. These are implementation evidence, not final release
-  numbers; the complete candidate and both historical references must be
-  rerun on the Framework Desktop before release.
-- The 10-byte write diagnostic remains roughly 117-122% slower than
-  `v1.11.0` on the M3, while staying within 3.1% of `2.0.0a1`. Buffering writes
-  across API calls could reduce that overhead but would change sink-error
-  timing, so it remains deferred rather than being described as fixed.
+- Final Framework Desktop measurements put the release-matrix
+  `decompress_chunks()` 512/256 KiB case 21.5% below `v1.11.0` and 26.5%
+  below `2.0.0a1` with stdlib; zlib-ng recorded improvements of 23.2% and
+  38.1%. Direct 8-64 MiB one-feed decode scales linearly, and the 32 MiB
+  one-item scheduler case recorded maximum event-loop gaps of 0.850 ms and
+  0.696 ms.
+- The 10-byte write diagnostic remains materially slower than `v1.11.0` but
+  stays within the explicit +10% anti-regression guard against `2.0.0a1`.
+  Buffering writes across API calls could reduce that overhead but would
+  change sink-error timing, so it remains deferred rather than being
+  described as fixed.
 
 ### Documentation
 

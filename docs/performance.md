@@ -28,23 +28,25 @@ or data.
 | Highly compressible bulk `read(-1)` | ~1.08x faster | ~14.5x faster |
 | Ten files with simulated 10 ms latency | ~6.4x faster | ~6.9x faster |
 
-### Provisional 2.0.0a2 decoder evidence
+### 2.0.0a2 decoder evidence
 
-The final `2.0.0a2` table is intentionally not published yet. The values below
-were measured on an Apple M3 MacBook Air while selecting the implementation;
-release-reference results must be recaptured on the Framework Desktop using
-the committed candidate and both locked historical revisions.
+The final release-reference measurements were captured on the Framework
+Desktop from the clean candidate and both locked historical revisions. Full
+environment metadata, samples, dispersion, hashes, and delta dispositions are
+in the
+[2.0.0a2 candidate record](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-candidate.md).
 
-| Engine | 8 MiB stream, 64/64 KiB | 8 MiB stream, 512/256 KiB | 32 MiB one item | 32 MiB 256 KiB items |
+| Engine | 8 MiB stream, 64/64 KiB | 8 MiB stream, 512/256 KiB | 32 MiB one item | 64 MiB one item |
 | --- | ---: | ---: | ---: | ---: |
-| stdlib | 3.975 ms | 4.885 ms | 22.259 ms | 30.211 ms |
-| zlib-ng | 3.978 ms | 4.764 ms | 15.034 ms | 30.609 ms |
+| stdlib | 2.255 ms | 1.857 ms | 20.498 ms | 40.792 ms |
+| zlib-ng | 1.241 ms | 0.837 ms | 16.219 ms | 32.274 ms |
 
-The isolated streaming measurements put the 512/256 KiB case 28.2% below the
-same-machine `v1.11.0` stdlib median and 34.6% below its zlib-ng median. For
-the one-item 32 MiB scheduler case, maximum observed ticker gaps were 1.063 ms
-with stdlib and 0.873 ms with zlib-ng. These values support the bounded-window
-and scheduler choices; they are not portable speed claims.
+In the isolated release matrix, the 512/256 KiB case was 21.5% below the
+same-machine `v1.11.0` stdlib median and 23.2% below its zlib-ng median.
+One-feed decode scales linearly from 8 through 64 MiB. For the one-item
+32 MiB scheduler case, maximum observed ticker gaps were 0.850 ms with stdlib
+and 0.696 ms with zlib-ng. These values support the bounded-window and
+scheduler choices; they are not portable speed claims.
 
 The decoder now consumes immutable queued spans through 256 KiB compressed
 windows and inflates into separate internal output blocks that adapt between
@@ -55,11 +57,11 @@ item no longer incurs repeated whole-suffix copying. Transport-sized source
 items remain sensible because they bound snapshot lifetime, executor work, and
 per-source backpressure.
 
-The diagnostic 10-byte write case remains about 117-122% slower than
-`v1.11.0` in the provisional M3 runs, although it stays within 3.1% of
-`2.0.0a1`. The remaining cost is one deterministic codec operation per
-accepted write. Buffering across writes is deferred because it would change
-when compression and sink errors surface.
+The diagnostic 10-byte write case remains materially slower than `v1.11.0`,
+although immediate nine-repeat comparisons stay within the release plan's
++10% anti-regression guard against `2.0.0a1`. The remaining cost is one
+deterministic codec operation per accepted write. Buffering across writes is
+deferred because it would change when compression and sink errors surface.
 
 See the committed
 [buffer tuning](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-wp3-buffer-tuning.md),
