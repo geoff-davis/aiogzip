@@ -1,7 +1,7 @@
 # aiogzip 2.0.0a2 Regression-Repair Release Plan
 
-> **Status:** WP9 Framework performance and local quality gates complete;
-> packaging and remote release gates open
+> **Status:** WP9 Framework performance, local quality, and packaging
+> preflight gates complete; release preparation and maintainer gates open
 > **Target release:** `2.0.0a2`
 > **Repository destination:** `plans/RELEASE_2_0_0A2_PLAN.md`
 > **Primary objective:** remove the decoder performance and scheduler-latency regressions exposed by `2.0.0a1` without weakening gzip correctness, bounded output, lifecycle ownership, cancellation safety, or engine portability.
@@ -1643,21 +1643,22 @@ results are recorded in `plans/benchmarks/v2.0.0a2-candidate.md`.
 - [x] Run forced stdlib while zlib-ng remains installed.
 - [x] Run the slow release tests, including real header limit and scaling checks.
 - [x] Run strict documentation build.
-- [ ] Build wheel and sdist.
-- [ ] Inspect metadata: version, Python floor, Alpha classifier, typed marker, dependencies.
-- [ ] Install wheel into clean Python 3.11 and 3.14 environments.
-- [ ] Smoke direct codec, streaming, file I/O, inspect, verify, CLI, and optional zlib-ng from the wheel.
-- [ ] Confirm source tree and built wheel report the intended version.
-- [ ] Confirm no benchmark fixtures or oversized raw files accidentally entered the distribution.
-- [ ] Confirm package import contains no benchmark dependency.
+- [x] Build wheel and sdist.
+- [x] Inspect metadata: version, Python floor, Alpha classifier, typed marker, dependencies.
+- [x] Install wheel into clean Python 3.11 and 3.14 environments.
+- [x] Smoke direct codec, streaming, file I/O, inspect, verify, CLI, and optional zlib-ng from the wheel.
+- [x] Confirm source tree and built wheel report the intended version.
+- [x] Confirm no benchmark fixtures or oversized raw files accidentally entered the distribution.
+- [x] Confirm package import contains no benchmark dependency.
 
 Provisional M3 correctness and packaging preflight is recorded in
 `plans/benchmarks/v2.0.0a2-local-validation.md`. Coverage exceeded 92.8% under
 both engine selections, the real header-limit selection passed, provisional
 artifacts passed Twine and metadata inspection, and clean Python 3.11/3.14
-wheel smokes passed with active zlib-ng and forced stdlib. These checkboxes
-remain open because the plan requires the quality and packaging matrix to be
-rerun from the post-Framework release candidate.
+wheel smokes passed with active zlib-ng and forced stdlib. The required
+post-Framework rerun passed from `c43ee95` and is recorded in
+`plans/benchmarks/v2.0.0a2-packaging-validation.md`. Its development-version
+artifact hashes are preflight evidence, not final release hashes.
 
 #### Release-preparation tasks
 
@@ -1672,13 +1673,13 @@ Only after all gates pass:
 
 #### Exit criteria
 
-- [ ] Every hard regression gate passes.
-- [ ] No central decoder exception remains.
-- [ ] Every >5% high-level delta is explained.
-- [ ] Raw data is committed.
-- [ ] All CI-equivalent checks pass.
-- [ ] Wheel smoke tests pass.
-- [ ] Release notes are accurate and reproducible.
+- [x] Every hard regression gate passes.
+- [x] No central decoder exception remains.
+- [x] Every >5% high-level delta is explained.
+- [x] Raw data is committed.
+- [x] All CI-equivalent checks pass.
+- [x] Wheel smoke tests pass.
+- [x] Release notes are accurate and reproducible.
 - [ ] At least one independent reviewer has approved the buffering and async-cancellation changes before maintainer publication.
 
 #### Suggested commits
@@ -1788,13 +1789,13 @@ open below; none of these checks closes a Framework performance gate.
 
 ### Quality and packaging — hard blockers
 
-- [ ] Ruff, mypy, `ty`, `prek`, coverage, and docs pass.
-- [ ] Python/OS matrix passes.
-- [ ] both engine modes pass.
-- [ ] wheel and sdist build.
-- [ ] clean-wheel smoke tests pass.
-- [ ] package metadata is correct.
-- [ ] raw benchmark samples and candidate report are committed.
+- [x] Ruff, mypy, `ty`, `prek`, coverage, and docs pass.
+- [x] Python/OS matrix passes.
+- [x] both engine modes pass.
+- [x] wheel and sdist build.
+- [x] clean-wheel smoke tests pass.
+- [x] package metadata is correct.
+- [x] raw benchmark samples and candidate report are committed.
 - [ ] version and changelog are consistent.
 
 ### Maintainer-only gates
