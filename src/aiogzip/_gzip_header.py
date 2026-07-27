@@ -266,7 +266,9 @@ class _GzipHeaderParser:
         ):
             # Most members have one contiguous fixed header and no optional
             # fields. Complete that common case without traversing the
-            # incremental state dispatch used by fragmented headers.
+            # incremental state dispatch used by fragmented headers. Fixed
+            # bytes are consumed before validation; any error poisons the
+            # decoder and releases its queue and accounting together.
             fixed = pending.take_view(10)
             if fixed[0] != 0x1F or fixed[1] != 0x8B:
                 raise gzip.BadGzipFile("Not a gzipped file")

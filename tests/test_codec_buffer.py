@@ -68,6 +68,16 @@ def test_exact_take_failure_does_not_consume_partial_input():
     assert len(queue) == 0
 
 
+@pytest.mark.parametrize("data", [b"", b"abc"])
+def test_zero_exact_take_does_not_require_or_consume_a_span(data):
+    queue = _InputQueue()
+    queue.append(data)
+
+    assert queue.take_exact(0) == b""
+    assert len(queue) == len(data)
+    assert queue.take(len(data)) == data
+
+
 def test_head_inspection_is_bounded_zero_copy_and_does_not_consume():
     first = b"abc"
     queue = _InputQueue()

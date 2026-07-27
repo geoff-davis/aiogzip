@@ -179,6 +179,8 @@ class _InputQueue:
         """Consume exactly *size* bytes, or return ``None`` without consuming."""
         if size < 0:
             raise ValueError("exact byte count cannot be negative")
+        if size == 0:
+            return b""
         if self._size < size:
             return None
         if size <= len(self._spans[0]):

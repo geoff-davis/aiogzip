@@ -20,6 +20,8 @@ from .codec import (
     _snapshot_bytes_input,
 )
 
+# This stream-level backstop bounds compressed source input, not decompression
+# work or output volume; per-operation output counters reset for every feed.
 _INLINE_SOURCE_BYTES_CHECKPOINT = 16 * 1024 * 1024
 
 
