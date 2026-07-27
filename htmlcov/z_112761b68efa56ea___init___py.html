@@ -66,8 +66,8 @@
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a id="nextFileLink" class="nav" href="z_112761b68efa56ea___main___py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.14.3">coverage.py v7.14.3</a>,
-            created at 2026-07-24 19:00 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.2">coverage.py v7.15.2</a>,
+            created at 2026-07-27 18:58 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -111,9 +111,9 @@
     <p class="run run2"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t"><span class="key">from</span> <span class="op">.</span><span class="nam">_streaming</span> <span class="key">import</span> <span class="nam">_compress_chunks</span><span class="op">,</span> <span class="nam">_decompress_chunks</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t29" href="#t29">29</a></span><span class="t"><span class="key">from</span> <span class="op">.</span><span class="nam">_text</span> <span class="key">import</span> <span class="nam">AsyncGzipTextFile</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t"><span class="key">from</span> <span class="op">.</span><span class="nam">codec</span> <span class="key">import</span> <span class="nam">GzipDecoder</span><span class="op">,</span> <span class="nam">GzipEncoder</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t"><span class="key">from</span> <span class="op">.</span><span class="nam">codec</span> <span class="key">import</span> <span class="nam">CodecOperation</span><span class="op">,</span> <span class="nam">GzipDecoder</span><span class="op">,</span> <span class="nam">GzipEncoder</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t"><span class="nam">__version__</span> <span class="op">=</span> <span class="str">"2.0.0a1"</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t"><span class="nam">__version__</span> <span class="op">=</span> <span class="str">"2.0.0a2.dev0"</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t"><span class="com"># Mode strings that select a text stream (they contain a 't'). The factory</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t"><span class="com"># parses modes character-by-character and is permutation-tolerant, so these</span>&nbsp;</span><span class="r"></span></p>
@@ -539,32 +539,33 @@
     <p class="run run2"><span class="n"><a id="t455" href="#t455">455</a></span><span class="t">    <span class="str">"AsyncGzipBinaryFile"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t456" href="#t456">456</a></span><span class="t">    <span class="str">"AsyncGzipFile"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t457" href="#t457">457</a></span><span class="t">    <span class="str">"AsyncGzipTextFile"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t458" href="#t458">458</a></span><span class="t">    <span class="str">"EngineInfo"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t459" href="#t459">459</a></span><span class="t">    <span class="str">"GzipInfo"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t460" href="#t460">460</a></span><span class="t">    <span class="str">"GzipDecoder"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t461" href="#t461">461</a></span><span class="t">    <span class="str">"GzipEncoder"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t462" href="#t462">462</a></span><span class="t">    <span class="str">"GzipMemberInfo"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t463" href="#t463">463</a></span><span class="t">    <span class="str">"VerificationResult"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t464" href="#t464">464</a></span><span class="t">    <span class="str">"WithAsyncRead"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t465" href="#t465">465</a></span><span class="t">    <span class="str">"WithAsyncReadWrite"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t466" href="#t466">466</a></span><span class="t">    <span class="str">"WithAsyncWrite"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t467" href="#t467">467</a></span><span class="t">    <span class="str">"ZlibEngine"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t468" href="#t468">468</a></span><span class="t">    <span class="str">"GZIP_WBITS"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t469" href="#t469">469</a></span><span class="t">    <span class="str">"GZIP_FLAG_FNAME"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t470" href="#t470">470</a></span><span class="t">    <span class="str">"GZIP_FLAG_FHCRC"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t471" href="#t471">471</a></span><span class="t">    <span class="str">"GZIP_FLAG_FEXTRA"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t472" href="#t472">472</a></span><span class="t">    <span class="str">"GZIP_FLAG_FCOMMENT"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t473" href="#t473">473</a></span><span class="t">    <span class="str">"GZIP_METHOD_DEFLATE"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t474" href="#t474">474</a></span><span class="t">    <span class="str">"GZIP_OS_UNKNOWN"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t475" href="#t475">475</a></span><span class="t">    <span class="str">"open"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t476" href="#t476">476</a></span><span class="t">    <span class="str">"read"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t477" href="#t477">477</a></span><span class="t">    <span class="str">"write"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t478" href="#t478">478</a></span><span class="t">    <span class="str">"engine_info"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t479" href="#t479">479</a></span><span class="t">    <span class="str">"inspect"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t480" href="#t480">480</a></span><span class="t">    <span class="str">"verify"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t481" href="#t481">481</a></span><span class="t">    <span class="str">"decompress_chunks"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t482" href="#t482">482</a></span><span class="t">    <span class="str">"compress_chunks"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t483" href="#t483">483</a></span><span class="t"><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t458" href="#t458">458</a></span><span class="t">    <span class="str">"CodecOperation"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t459" href="#t459">459</a></span><span class="t">    <span class="str">"EngineInfo"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t460" href="#t460">460</a></span><span class="t">    <span class="str">"GzipInfo"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t461" href="#t461">461</a></span><span class="t">    <span class="str">"GzipDecoder"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t462" href="#t462">462</a></span><span class="t">    <span class="str">"GzipEncoder"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t463" href="#t463">463</a></span><span class="t">    <span class="str">"GzipMemberInfo"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t464" href="#t464">464</a></span><span class="t">    <span class="str">"VerificationResult"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t465" href="#t465">465</a></span><span class="t">    <span class="str">"WithAsyncRead"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t466" href="#t466">466</a></span><span class="t">    <span class="str">"WithAsyncReadWrite"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t467" href="#t467">467</a></span><span class="t">    <span class="str">"WithAsyncWrite"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t468" href="#t468">468</a></span><span class="t">    <span class="str">"ZlibEngine"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t469" href="#t469">469</a></span><span class="t">    <span class="str">"GZIP_WBITS"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t470" href="#t470">470</a></span><span class="t">    <span class="str">"GZIP_FLAG_FNAME"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t471" href="#t471">471</a></span><span class="t">    <span class="str">"GZIP_FLAG_FHCRC"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t472" href="#t472">472</a></span><span class="t">    <span class="str">"GZIP_FLAG_FEXTRA"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t473" href="#t473">473</a></span><span class="t">    <span class="str">"GZIP_FLAG_FCOMMENT"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t474" href="#t474">474</a></span><span class="t">    <span class="str">"GZIP_METHOD_DEFLATE"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t475" href="#t475">475</a></span><span class="t">    <span class="str">"GZIP_OS_UNKNOWN"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t476" href="#t476">476</a></span><span class="t">    <span class="str">"open"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t477" href="#t477">477</a></span><span class="t">    <span class="str">"read"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t478" href="#t478">478</a></span><span class="t">    <span class="str">"write"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t479" href="#t479">479</a></span><span class="t">    <span class="str">"engine_info"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t480" href="#t480">480</a></span><span class="t">    <span class="str">"inspect"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t481" href="#t481">481</a></span><span class="t">    <span class="str">"verify"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t482" href="#t482">482</a></span><span class="t">    <span class="str">"decompress_chunks"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t483" href="#t483">483</a></span><span class="t">    <span class="str">"compress_chunks"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t484" href="#t484">484</a></span><span class="t"><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -573,8 +574,8 @@
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a class="nav" href="z_112761b68efa56ea___main___py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.14.3">coverage.py v7.14.3</a>,
-            created at 2026-07-24 19:00 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.2">coverage.py v7.15.2</a>,
+            created at 2026-07-27 18:58 +0000
         </p>
     </div>
 </footer>
