@@ -216,13 +216,17 @@ Always include:
 ## Version History
 
 - **0.3** - Major refactoring, binary/text separation
-- **2.0.0a1 (current)** - Requires Python 3.11+ and adds the public synchronous
+- **2.0.0a1** - Requires Python 3.11+ and adds the public synchronous
   sans-I/O `GzipEncoder` and `GzipDecoder`. File, iterable-streaming, inspection,
-  and verification paths now share that one gzip state machine. The codec API
-  remains provisional through the alpha series; established asyncio APIs keep
-  their compatibility contract.
+  and verification paths now share that one gzip state machine.
+- **2.0.0a2 (current)** - Repairs the decoder performance regressions from
+  the codec unification: bounded input spans and 256 KiB inflate windows,
+  incremental header parsing, internal output batches decoupled from public
+  `output_chunk_size`, and cooperative event-loop checkpoints. Adds the public
+  typed `CodecOperation`. The codec API remains provisional through the alpha
+  series; established asyncio APIs keep their compatibility contract.
 
 ---
 
-**Last Updated:** 2026-07-22
+**Last Updated:** 2026-07-27
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
