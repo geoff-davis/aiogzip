@@ -1684,7 +1684,7 @@ Only after all gates pass:
 - [x] All CI-equivalent checks pass.
 - [x] Wheel smoke tests pass.
 - [x] Release notes are accurate and reproducible.
-- [ ] At least one independent reviewer has approved the buffering and async-cancellation changes before maintainer publication.
+- [x] At least one independent reviewer has approved the buffering and async-cancellation changes before maintainer publication. (Maintainer accepted the multi-round Claude Code review of PR #82 — four passes over the decoder buffering, header parser, offload policy, and cancellation paths, with all findings fixed or explicitly recorded as deferrals — as satisfying this gate, 2026-07-27.)
 
 #### Suggested commits
 
@@ -1800,19 +1800,29 @@ open below; none of these checks closes a Framework performance gate.
 - [x] clean-wheel smoke tests pass.
 - [x] package metadata is correct.
 - [x] raw benchmark samples and candidate report are committed.
-- [ ] version and changelog are consistent.
+- [x] version and changelog are consistent (release PR #83, `9534eb3`).
 
 ### Maintainer-only gates
 
-- [ ] independent review obtained;
-- [ ] remote issue/milestone updated or created for any deferred regression;
-- [ ] release commit signed according to project practice;
-- [ ] tag created from exact release commit;
-- [ ] GitHub prerelease created;
-- [ ] artifacts published through Trusted Publishing;
-- [ ] attestations verified;
-- [ ] versioned docs deployed under the prerelease alias;
-- [ ] `main` advanced to the next development version after release.
+- [x] independent review obtained (maintainer accepted the multi-round PR #82
+  review, 2026-07-27);
+- [x] remote issue/milestone updated or created for any deferred regression
+  (issue #86 tracks the deferred small-write overhead);
+- [x] release commit signed according to project practice (`9534eb3` is a
+  GitHub-signed merge commit, verification `valid`);
+- [x] tag created from exact release commit (`v2.0.0a2` on `9534eb3`);
+- [x] GitHub prerelease created (flagged `Pre-release`; `v1.11.0` retains
+  `Latest`);
+- [x] artifacts published through Trusted Publishing (publish run test and
+  publish jobs succeeded; wheel and sdist live on PyPI, default resolution
+  still `1.11.0`);
+- [x] attestations verified (PyPI serves provenance attestation bundles for
+  both the wheel and the sdist);
+- [x] versioned docs deployed under the prerelease alias (`2.0` titled
+  `2.0.0a2` under `dev`; `latest` still `1.11`; stray `2.0.0a2.dev0` entry
+  removed);
+- [x] `main` advanced to the next development version after release
+  (`2.0.0a3.dev0`, PR #84).
 
 Codex records these items but does not execute them.
 
