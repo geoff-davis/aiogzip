@@ -4,7 +4,11 @@ import warnings
 from typing import Any, AsyncIterable, AsyncIterator, Optional, Union, cast
 
 from . import _engine
-from ._codec_async import _drive_operation
+from ._codec_async import (
+    _DECODE_OFFLOAD_THRESHOLD,
+    _cooperative_checkpoint,
+    _drive_operation,
+)
 from ._common import (
     _validate_chunk_size,
     _validate_optional_positive_int,
@@ -15,6 +19,8 @@ from .codec import (
     _AsyncDrivableOperation,
     _snapshot_bytes_input,
 )
+
+_INLINE_SOURCE_BYTES_CHECKPOINT = 16 * 1024 * 1024
 
 
 def _decompress_chunks(
@@ -52,6 +58,7 @@ async def _decompress_chunks_impl(
         decoder.discard()
         raise TypeError("source.__aiter__() must return an asynchronous iterator")
     failed = False
+    inline_source_bytes = 0
     try:
         while True:
             try:
@@ -63,11 +70,20 @@ async def _decompress_chunks_impl(
             snapshot = _snapshot_bytes_input(compressed)
             if not snapshot:
                 continue
+            offloaded = len(snapshot) >= _DECODE_OFFLOAD_THRESHOLD
+            if offloaded:
+                inline_source_bytes = 0
+            elif inline_source_bytes >= _INLINE_SOURCE_BYTES_CHECKPOINT:
+                await _cooperative_checkpoint()
+                inline_source_bytes = 0
             async for output in _drive_operation(
                 cast(_AsyncDrivableOperation, decoder.feed(snapshot)),
                 workload=snapshot,
+                offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
             ):
                 yield output
+            if not offloaded:
+                inline_source_bytes += len(snapshot)
 
         async for output in _drive_operation(
             cast(_AsyncDrivableOperation, decoder.finish())

@@ -134,7 +134,8 @@ calling synchronous `gzip` directly inside an async application.
   overlapping the delays; it is not a raw codec-speed comparison.
 - The suite also includes a short five-operation mixed read/write workload;
   treat its ratio as latency-sensitive rather than a stable throughput claim.
-- CPU-bound `zlib` work above a 256 KiB chunk is offloaded to a thread, so multiple streams compress/decompress in parallel instead of serializing on the loop.
+- Large CPU-bound codec work may be offloaded to a thread, while bounded
+  decoder steps below that private threshold use cooperative checkpoints.
 - Independent application tasks can continue while file or offloaded codec
   work is pending.
 
@@ -188,11 +189,12 @@ uv run python benchmarks/run_benchmarks.py \
   --category streaming --size 32 --repeat 3
 ```
 
-Inputs below the 256 KiB codec-offload threshold often maximize raw throughput
-for short operations but may complete inline without giving an independent
-event-loop task a turn. Larger codec calls are offloaded, trading a thread hop
-for event-loop responsiveness. Measure with source chunk sizes representative
-of the real producer rather than selecting solely from synthetic throughput.
+Inputs below the private codec-offload thresholds often maximize raw throughput
+for short operations. Inline decoder work checkpoints after bounded output,
+no-output progress, or cumulative source input; larger codec calls are
+offloaded, trading a thread hop for event-loop responsiveness. Measure with
+source chunk sizes representative of the real producer rather than selecting
+solely from synthetic throughput.
 
 The synchronous `GzipEncoder` and `GzipDecoder` never offload. Their direct
 8 MiB release measurements are informational because v1.11.0 had no public

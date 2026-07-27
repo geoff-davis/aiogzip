@@ -39,6 +39,12 @@ All notable changes to this project will be documented in this file.
   setting remains a strict maximum rather than an exact chunk size.
 - Async scheduling policy now lives outside the synchronous engine adapter.
   The codec remains free of event-loop and executor dependencies.
+- Decoder first-step offload now starts at 1 MiB of accepted compressed input;
+  smaller async-iterable source items checkpoint before processing more than
+  16 MiB cumulatively. No-output inflate progress checkpoints after 128 KiB so
+  adversarial zero-output runs remain cooperative below the offload threshold.
+  This avoids executor dispatch for each 256–512 KiB item while retaining
+  bounded event-loop fairness.
 
 ### Performance
 

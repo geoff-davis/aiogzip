@@ -157,10 +157,14 @@ engine windows fixes the shared codec and therefore every transport.
 ## Async bridge and cancellation
 
 A private async driver pulls one codec event at a time. Cheap steps run inline;
-the first raw advancement of work at or above 256 KiB uses the executor.
+the first raw advancement of compression work at or above 256 KiB uses the
+executor. Decoder inputs use a 1 MiB threshold because each raw advancement is
+already bounded to one 256 KiB compressed window; smaller fragmented streams
+checkpoint cooperatively before processing more than 16 MiB of cumulative
+inline source input.
 Private no-output progress events let the driver account for bounded inflate
 work without exposing empty public chunks. It checkpoints after 1 MiB or 4,096
-inline output chunks, or after 1 MiB or eight consecutive no-output steps.
+inline output chunks, or after 128 KiB or eight consecutive no-output steps.
 It does not call `list(operation)` and does not read another source item until
 all output for the current item is consumed.
 

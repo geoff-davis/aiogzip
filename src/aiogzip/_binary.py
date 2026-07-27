@@ -19,7 +19,11 @@ from typing import (
 import aiofiles
 
 from . import _engine
-from ._codec_async import _ZLIB_OFFLOAD_THRESHOLD, _drive_operation
+from ._codec_async import (
+    _DECODE_OFFLOAD_THRESHOLD,
+    _ZLIB_OFFLOAD_THRESHOLD,
+    _drive_operation,
+)
 from ._common import (
     _MAX_CHUNK_SIZE,
     WithAsyncRead,
@@ -128,10 +132,11 @@ class AsyncGzipBinaryFile:
 
     # 256 KiB balances bulk-read throughput against per-file memory. Below it
     # (e.g. the former 64 KiB) read-all throughput drops ~35-60% on large
-    # files from per-chunk overhead, and decompression never reaches the
-    # _ZLIB_OFFLOAD_THRESHOLD so it cannot offload to the executor. Larger
-    # sizes give little extra while costing proportionally more memory per
-    # open file. Callers can still pass any chunk_size explicitly.
+    # files from per-chunk overhead. Larger sizes give little extra while
+    # costing proportionally more memory per open file. File reads already
+    # yield during asynchronous I/O, so decoder executor offload is reserved
+    # for larger accepted inputs. Callers can still pass any chunk_size
+    # explicitly.
     DEFAULT_CHUNK_SIZE = 256 * 1024  # 256 KiB
     # When the read buffer's head offset crosses this, drop the consumed
     # prefix so the bytearray does not grow unbounded while reads march
@@ -1078,6 +1083,7 @@ class AsyncGzipBinaryFile:
                 async for piece in _drive_operation(
                     cast(_AsyncDrivableOperation, operation),
                     workload=compressed_chunk,
+                    offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
                 )
             ]
         except asyncio.CancelledError:

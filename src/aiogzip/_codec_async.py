@@ -12,9 +12,14 @@ from .codec import _AsyncDrivableOperation, _CodecProgress
 _DONE: Final = object()
 # Below this size, the executor hop costs more than one bounded codec step.
 _ZLIB_OFFLOAD_THRESHOLD = 256 * 1024
+# A decoder advancement consumes at most one 256 KiB input window. Framework
+# measurements show that dispatching every 256–512 KiB source item costs more
+# than that bounded work, while larger accepted inputs still benefit from
+# first-step offload.
+_DECODE_OFFLOAD_THRESHOLD = 1024 * 1024
 _INLINE_OUTPUT_BYTES_CHECKPOINT = 1024 * 1024
 _INLINE_OUTPUT_CHUNKS_CHECKPOINT = 4096
-_NO_OUTPUT_BYTES_CHECKPOINT = 1024 * 1024
+_NO_OUTPUT_BYTES_CHECKPOINT = 128 * 1024
 _NO_OUTPUT_STEPS_CHECKPOINT = 8
 
 _T = TypeVar("_T")
@@ -72,6 +77,7 @@ async def _drive_operation(
     operation: _AsyncDrivableOperation,
     *,
     workload: bytes = b"",
+    offload_threshold: int = _ZLIB_OFFLOAD_THRESHOLD,
 ) -> AsyncIterator[bytes]:
     """Pull one bounded codec chunk at a time, inline or in an executor."""
     completed = False
@@ -83,9 +89,7 @@ async def _drive_operation(
     no_output_steps = 0
     try:
         while True:
-            should_offload = (
-                advancing_first and len(workload) >= _ZLIB_OFFLOAD_THRESHOLD
-            )
+            should_offload = advancing_first and len(workload) >= offload_threshold
             if should_offload:
                 result = await _offloaded_next(operation, workload)
                 inline_output_bytes = 0

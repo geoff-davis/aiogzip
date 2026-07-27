@@ -516,7 +516,7 @@ The async driver counts private no-output progress as well as visible output. In
 
 Use `await asyncio.sleep(0)` or a small private equivalent. Visible output resets only the consecutive no-output counters. A worker-thread hop or cooperative checkpoint resets all fairness counters. A raw async advancement performs at most one inflate-engine call; public synchronous `next()` may continue across private progress events because synchronous callers did not request scheduler cooperation.
 
-These thresholds are private and may be tuned only with the scheduler-gap, adversarial no-output, and throughput benchmarks. The final values and evidence must be recorded.
+These thresholds are private and may be tuned only with the scheduler-gap, adversarial no-output, and throughput benchmarks. The final Framework policy raises decoder-only first-step offload to 1 MiB and tightens the no-output byte checkpoint to 128 KiB; fragmented inline sources also checkpoint before processing more than 16 MiB cumulatively. The final values and evidence must be recorded.
 
 Do not:
 
@@ -1343,6 +1343,8 @@ Make the bounded synchronous work visible as responsive asyncio behavior while p
 - [x] Add a private progress event for a no-output inflate step; keep it out of the future public `CodecOperation`, `__all__`, documentation, and public iteration.
 - [x] Make ordinary `_Operation.__next__()` swallow private progress events while a private async-only advancement returns at most one raw byte/progress/completion event.
 - [x] Preserve first-step offload based on accepted workload size.
+- [x] Tune decoder first-step offload separately from compression after the
+  Framework reference showed per-item executor overhead at 512 KiB.
 - [x] Track inline output bytes, inline yielded-chunk count, no-output compressed bytes, and consecutive no-output steps.
 - [x] Add cooperative checkpoints at the private thresholds.
 - [x] Reset the relevant counters after visible output, executor hops, and checkpoints.

@@ -32,6 +32,20 @@ async def test_small_operation_runs_inline(monkeypatch):
     assert gzip.decompress(b"".join((*header, *body, *final))) == b"payload"
 
 
+async def test_custom_offload_threshold_keeps_smaller_operation_inline(monkeypatch):
+    async def unexpected_offload(method, data):
+        raise AssertionError("operation below the custom threshold must stay inline")
+
+    monkeypatch.setattr(async_module, "_run_in_thread", unexpected_offload)
+    operation = _SequenceOperation([b"output"])
+
+    assert await _collect(
+        operation,
+        workload=b"x" * 32,
+        offload_threshold=33,
+    ) == [b"output"]
+
+
 async def test_large_encoder_operation_offloads_only_engine_advancement(monkeypatch):
     calls = []
 

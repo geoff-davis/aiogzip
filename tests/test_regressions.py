@@ -801,14 +801,16 @@ class TestMediumPriorityEdgeCases:
 
         with patch.object(_codec_async, "_run_in_thread", tracking):
             async with AsyncGzipBinaryFile(
-                temp_file, "rb", chunk_size=_binary._ZLIB_OFFLOAD_THRESHOLD * 2
+                temp_file,
+                "rb",
+                chunk_size=_binary._DECODE_OFFLOAD_THRESHOLD,
             ) as f:
                 got = await f.read()
         assert got == payload
         assert calls, "large decompress should have been offloaded"
 
-    async def test_threshold_sized_decompress_is_offloaded(self, temp_file):
-        """A default-sized compressed read should take the executor path."""
+    async def test_default_sized_decompress_stays_inline(self, temp_file):
+        """A default-sized read stays below the decoder offload threshold."""
         import gzip as _gzip
         import os as _os
         from unittest.mock import patch
@@ -831,7 +833,7 @@ class TestMediumPriorityEdgeCases:
                 got = await f.read()
 
         assert got == payload
-        assert _binary._ZLIB_OFFLOAD_THRESHOLD in calls
+        assert calls == []
 
     async def test_large_subsequent_member_offloaded_to_executor(self, temp_file):
         """A large second member, surfaced as unused_data after the first
@@ -1340,7 +1342,7 @@ class TestReadCancellationDuringOffload:
         import asyncio
         import gzip
 
-        payload = os.urandom(512 * 1024)
+        payload = os.urandom(2 * _codec_async._DECODE_OFFLOAD_THRESHOLD)
         with gzip.open(temp_file, "wb") as raw:
             raw.write(payload)
 

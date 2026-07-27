@@ -7,7 +7,7 @@ from typing import Any, Optional, Tuple, Union, cast
 
 import aiofiles
 
-from ._codec_async import _drive_operation
+from ._codec_async import _DECODE_OFFLOAD_THRESHOLD, _drive_operation
 from ._common import (
     WithAsyncRead,
     WithAsyncReadWrite,
@@ -79,6 +79,7 @@ async def _scan_gzip(
             async for _ in _drive_operation(
                 cast(_AsyncDrivableOperation, decoder.feed(snapshot)),
                 workload=snapshot,
+                offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
             ):
                 pass
         async for _ in _drive_operation(
