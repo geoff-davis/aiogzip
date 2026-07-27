@@ -94,8 +94,9 @@ decoder = aiogzip.GzipDecoder()
 payload = b"".join(decoder.feed(wire)) + b"".join(decoder.finish())
 ```
 
-Every returned operation iterator must be exhausted before the next codec
-call. Decoder integrity is established only after `finish()` is exhausted.
+Every returned `CodecOperation` must be exhausted before the next codec call;
+its idempotent `close()` method handles deterministic early abandonment.
+Decoder integrity is established only after `finish()` is exhausted.
 See the [synchronous codec guide](https://geoff-davis.github.io/aiogzip/codec/)
 for ownership, limits, immutable inputs, and thread-safety details.
 

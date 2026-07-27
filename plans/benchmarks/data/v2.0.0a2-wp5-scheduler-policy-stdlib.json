@@ -1,0 +1,246 @@
+{
+  "kind": "scheduler-policy",
+  "repeat": 9,
+  "engine": "stdlib-zlib",
+  "python": "3.12.8 (v3.12.8:2dc476bcb91, Dec  3 2024, 14:43:19) [Clang 13.0.0 (clang-1300.0.29.30)]",
+  "target_commit": "da5c2dacdadda6fa2866212f5eea977824779109",
+  "target_dirty": true,
+  "environment_label": "Apple M3 MacBook Air (provisional; rerun release gates on Framework Desktop)",
+  "fixture": {
+    "empty_blocks": 100000,
+    "compressed_bytes": 500054,
+    "compressed_sha256": "c13d11159b282f8960b7d6807a6bb33628b36c3a9883498b9c4d77965dd88c33",
+    "output_bytes": 26,
+    "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd"
+  },
+  "thresholds": {
+    "inline_output_bytes": 1048576,
+    "inline_output_chunks": 4096,
+    "no_output_bytes": 1048576,
+    "no_output_steps": 8,
+    "offload_bytes": 262144
+  },
+  "file_sha256": {
+    "benchmarks/measure_scheduler_policy.py": "536667951951cd1a54ce68cdc34742103ba0a89bdac896f9c2730340d81c4312",
+    "src/aiogzip/_codec_async.py": "021e9e6240323af82e099613157c5d92608b0cc831f3f35733edef96133f59ba",
+    "src/aiogzip/_engine.py": "0daa91d5cdbb6ab814710ad8636ebd18ea7acf63021ab8ab62f315bec521cd56",
+    "src/aiogzip/codec.py": "1ab82a8718beb02121388f03b8e3f166b83d799bdd0d6a084cf3f909fcec629e"
+  },
+  "duration_median_seconds": 0.0006534580024890602,
+  "duration_mad_seconds": 1.491699367761612e-05,
+  "samples": [
+    {
+      "duration_seconds": 0.0018469170026946813,
+      "ticker_count": 25,
+      "ticker_gap_p50_seconds": 1.3374999980442226e-05,
+      "ticker_gap_p95_seconds": 5.5042008170858026e-05,
+      "ticker_gap_p99_seconds": 0.0011833750031655654,
+      "ticker_gap_max_seconds": 0.0011833750031655654,
+      "engine_calls": 2,
+      "progress_events": 1,
+      "progress_bytes": 237892,
+      "output_bytes": 26,
+      "output_chunks": 1,
+      "empty_output_chunks": 0,
+      "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd"
+    },
+    {
+      "duration_seconds": 0.0006607499963138252,
+      "ticker_count": 28,
+      "ticker_gap_p50_seconds": 1.329201040789485e-05,
+      "ticker_gap_p95_seconds": 2.762500662356615e-05,
+      "ticker_gap_p99_seconds": 3.508299414534122e-05,
+      "ticker_gap_max_seconds": 3.508299414534122e-05,
+      "engine_calls": 2,
+      "progress_events": 1,
+      "progress_bytes": 237892,
+      "output_bytes": 26,
+      "output_chunks": 1,
+      "empty_output_chunks": 0,
+      "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd"
+    },
+    {
+      "duration_seconds": 0.0007438750035362318,
+      "ticker_count": 24,
+      "ticker_gap_p50_seconds": 1.5833007637411356e-05,
+      "ticker_gap_p95_seconds": 4.48749924544245e-05,
+      "ticker_gap_p99_seconds": 5.025000427849591e-05,
+      "ticker_gap_max_seconds": 5.025000427849591e-05,
+      "engine_calls": 2,
+      "progress_events": 1,
+      "progress_bytes": 237892,
+      "output_bytes": 26,
+      "output_chunks": 1,
+      "empty_output_chunks": 0,
+      "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd"
+    },
+    {
+      "duration_seconds": 0.0006876249972265214,
+      "ticker_count": 28,
+      "ticker_gap_p50_seconds": 1.3249999028630555e-05,
+      "ticker_gap_p95_seconds": 2.433299960102886e-05,
+      "ticker_gap_p99_seconds": 5.40409964742139e-05,
+      "ticker_gap_max_seconds": 5.40409964742139e-05,
+      "engine_calls": 2,
+      "progress_events": 1,
+      "progress_bytes": 237892,
+      "output_bytes": 26,
+      "output_chunks": 1,
+      "empty_output_chunks": 0,
+      "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd"
+    },
+    {
+      "duration_seconds": 0.0006316670041996986,
+      "ticker_count": 28,
+      "ticker_gap_p50_seconds": 1.316699490416795e-05,
+      "ticker_gap_p95_seconds": 2.5542001822032034e-05,
+      "ticker_gap_p99_seconds": 3.2041993108578026e-05,
+      "ticker_gap_max_seconds": 3.2041993108578026e-05,
+      "engine_calls": 2,
+      "progress_events": 1,
+      "progress_bytes": 237892,
+      "output_bytes": 26,
+      "output_chunks": 1,
+      "empty_output_chunks": 0,
+      "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd"
+    },
+    {
+      "duration_seconds": 0.0006487919890787452,
+      "ticker_count": 29,
+      "ticker_gap_p50_seconds": 1.333300315309316e-05,
+      "ticker_gap_p95_seconds": 2.112500078510493e-05,
+      "ticker_gap_p99_seconds": 3.237499913666397e-05,
+      "ticker_gap_max_seconds": 3.237499913666397e-05,
+      "engine_calls": 2,
+      "progress_events": 1,
+      "progress_bytes": 237892,
+      "output_bytes": 26,
+      "output_chunks": 1,
+      "empty_output_chunks": 0,
+      "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd"
+    },
+    {
+      "duration_seconds": 0.000638541008811444,
+      "ticker_count": 30,
+      "ticker_gap_p50_seconds": 1.3208002201281488e-05,
+      "ticker_gap_p95_seconds": 1.9875005818903446e-05,
+      "ticker_gap_p99_seconds": 2.3208005586639047e-05,
+      "ticker_gap_max_seconds": 2.3208005586639047e-05,
+      "engine_calls": 2,
+      "progress_events": 1,
+      "progress_bytes": 237892,
+      "output_bytes": 26,
+      "output_chunks": 1,
+      "empty_output_chunks": 0,
+      "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd"
+    },
+    {
+      "duration_seconds": 0.0006453750102082267,
+      "ticker_count": 30,
+      "ticker_gap_p50_seconds": 1.204099680762738e-05,
+      "ticker_gap_p95_seconds": 2.3791988496668637e-05,
+      "ticker_gap_p99_seconds": 2.4833003408275545e-05,
+      "ticker_gap_max_seconds": 2.4833003408275545e-05,
+      "engine_calls": 2,
+      "progress_events": 1,
+      "progress_bytes": 237892,
+      "output_bytes": 26,
+      "output_chunks": 1,
+      "empty_output_chunks": 0,
+      "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd"
+    },
+    {
+      "duration_seconds": 0.0006534580024890602,
+      "ticker_count": 29,
+      "ticker_gap_p50_seconds": 1.2041011359542608e-05,
+      "ticker_gap_p95_seconds": 2.8624999686144292e-05,
+      "ticker_gap_p99_seconds": 4.5249995309859514e-05,
+      "ticker_gap_max_seconds": 4.5249995309859514e-05,
+      "engine_calls": 2,
+      "progress_events": 1,
+      "progress_bytes": 237892,
+      "output_bytes": 26,
+      "output_chunks": 1,
+      "empty_output_chunks": 0,
+      "output_sha256": "af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd"
+    }
+  ],
+  "checkpoint_cost": {
+    "fixture_bytes": 8388608,
+    "fixture_sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+    "compressed_bytes": 8391186,
+    "compressed_sha256": "24ed3f5ed4a14a3d22ccf67eef0f84f714d04d91779f546bf1536bf90f598ffe",
+    "cases": {
+      "64K-in 64K-out": {
+        "source_items": 129,
+        "source_item_bytes": 65536,
+        "output_chunk_size": 65536,
+        "enabled": {
+          "duration_median_seconds": 0.003974999999627471,
+          "duration_mad_seconds": 1.808399974834174e-05,
+          "duration_samples_seconds": [
+            0.004560583009151742,
+            0.0044177079980727285,
+            0.003964832998462953,
+            0.003974999999627471,
+            0.004376875003799796,
+            0.003993083999375813,
+            0.003961291004088707,
+            0.003964624993386678,
+            0.0039513340016128495
+          ]
+        },
+        "disabled": {
+          "duration_median_seconds": 0.004030416996101849,
+          "duration_mad_seconds": 6.666699482593685e-05,
+          "duration_samples_seconds": [
+            0.004355375000159256,
+            0.0041608339961385354,
+            0.004006624993053265,
+            0.004455499991308898,
+            0.004030416996101849,
+            0.003959582987590693,
+            0.004086207991349511,
+            0.0040137920004781336,
+            0.003963750001275912
+          ]
+        }
+      },
+      "512K-in 256K-out": {
+        "source_items": 17,
+        "source_item_bytes": 524288,
+        "output_chunk_size": 262144,
+        "enabled": {
+          "duration_median_seconds": 0.004884833004325628,
+          "duration_mad_seconds": 8.904199057724327e-05,
+          "duration_samples_seconds": [
+            0.005400708992965519,
+            0.004933582997182384,
+            0.004800208000233397,
+            0.004831917001865804,
+            0.005115500011015683,
+            0.0047948340070433915,
+            0.004884833004325628,
+            0.0046716249926248565,
+            0.0049738749949028715
+          ]
+        },
+        "disabled": {
+          "duration_median_seconds": 0.004822625007363968,
+          "duration_mad_seconds": 0.0001291250082431361,
+          "duration_samples_seconds": [
+            0.004708709006081335,
+            0.004929083996103145,
+            0.005030375003116205,
+            0.004822625007363968,
+            0.005052374996012077,
+            0.004999166005291045,
+            0.004772999993292615,
+            0.0046934999991208315,
+            0.004692540998803452
+          ]
+        }
+      }
+    }
+  }
+}

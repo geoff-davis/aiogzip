@@ -1,0 +1,398 @@
+{
+  "schema_version": 2,
+  "timestamp": 1785100197.0568058,
+  "categories": [
+    "streaming"
+  ],
+  "data_size_mb": 8,
+  "repeat": 9,
+  "regression_profile": null,
+  "regression_mode": null,
+  "source": {
+    "source_root": "/Users/geoff/Projects/personal/aiogzip",
+    "aiogzip_file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a2.dev0",
+    "target_commit": "8a4927ca1543466f1c63888d1c93226c736f11ac",
+    "target_describe": "v2.0.0a1-12-g8a4927c-dirty",
+    "target_dirty": true
+  },
+  "environment": {
+    "source_root": "/Users/geoff/Projects/personal/aiogzip",
+    "aiogzip_file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a2.dev0",
+    "target_commit": "8a4927ca1543466f1c63888d1c93226c736f11ac",
+    "target_describe": "v2.0.0a1-12-g8a4927c-dirty",
+    "target_dirty": true,
+    "environment_label": "Apple M3 MacBook Air (provisional WP6 compression analysis; rerun on Framework Desktop)",
+    "runner_root": "/Users/geoff/Projects/personal/aiogzip",
+    "runner_commit": "8a4927ca1543466f1c63888d1c93226c736f11ac",
+    "regression_harness_sha256": "6cb2d3a9709fd905cbc7871c4cb80f9ae848668378d7bd08aeb070aeed2a112d",
+    "python_implementation": "CPython",
+    "python_version": "3.12.8 (v3.12.8:2dc476bcb91, Dec  3 2024, 14:43:19) [Clang 13.0.0 (clang-1300.0.29.30)]",
+    "python_executable": "/Users/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "os_name": "Darwin",
+    "os_release": "25.5.0",
+    "kernel_version": "Darwin Kernel Version 25.5.0: Tue Jun  9 22:19:21 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8122",
+    "architecture": "arm64",
+    "libc": [
+      "",
+      ""
+    ],
+    "processor": "arm",
+    "cpu_count": 8,
+    "ram_bytes": 17179869184,
+    "filesystem_temp_root": "/var/folders/n2/mg9l_t791_q1ctmgyk14m3s80000gn/T",
+    "zlib_compile_version": "1.2.11",
+    "zlib_runtime_version": "1.2.12",
+    "zlib_ng_package_version": "1.0.0",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "stdlib-zlib",
+      "crc32": "stdlib-zlib"
+    },
+    "forced_engine": "stdlib",
+    "uv_version": "uv 0.11.32 (Homebrew 2026-07-23 aarch64-apple-darwin)",
+    "uv_lock_sha256": "e7b91a8c8b42c1ad455ac2d48b20a84d5e07fcb657bb48797baba8686ffa6871",
+    "cpu_affinity": "unavailable",
+    "cpu_governor": "unavailable on this platform",
+    "cpu_boost": "unavailable on this platform",
+    "system_load": [
+      2.61962890625,
+      2.60888671875,
+      2.8466796875
+    ],
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      700,
+      10,
+      10
+    ]
+  },
+  "results": [
+    {
+      "name": "stdlib gzip.compress reference",
+      "category": "streaming",
+      "duration": 0.1171008749952307,
+      "duration_samples": [
+        0.1175557079986902,
+        0.11813008300669026,
+        0.1170464579918189,
+        0.1171008749952307,
+        0.11686895899765659,
+        0.11761004199797753,
+        0.1194842080003582,
+        0.1169889580050949,
+        0.11663591700198594
+      ],
+      "median_absolute_deviation": 0.0004548330034594983,
+      "duration_min": 0.11663591700198594,
+      "duration_max": 0.1194842080003582,
+      "metrics": {
+        "input_bytes": 8388608,
+        "compressed_bytes": 8391186,
+        "informational": true,
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "sans-I/O codec encode (informational)",
+      "category": "streaming",
+      "duration": 0.12133520799397957,
+      "duration_samples": [
+        0.11897162499371916,
+        0.12147737499617506,
+        0.11869208399730269,
+        0.12013612499868032,
+        0.12133520799397957,
+        0.12147762499807868,
+        0.11900579200300854,
+        0.12210408301325515,
+        0.12255191699659918
+      ],
+      "median_absolute_deviation": 0.0011990829952992499,
+      "duration_min": 0.11869208399730269,
+      "duration_max": 0.12255191699659918,
+      "metrics": {
+        "input_bytes": 8388608,
+        "compressed_bytes": 8391186,
+        "output_chunks": 35,
+        "stdlib_reference_seconds": 0.11686895899765659,
+        "informational": true,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "stdlib gzip.decompress reference",
+      "category": "streaming",
+      "duration": 0.0016088749980553985,
+      "duration_samples": [
+        0.0019324159948155284,
+        0.001706499999272637,
+        0.0014330410049296916,
+        0.0014819170028204098,
+        0.0014977090031607077,
+        0.0017298329912591726,
+        0.0014980000123614445,
+        0.0016088749980553985,
+        0.0022031669941497967
+      ],
+      "median_absolute_deviation": 0.0001209579932037741,
+      "duration_min": 0.0014330410049296916,
+      "duration_max": 0.0022031669941497967,
+      "metrics": {
+        "input_bytes": 8391186,
+        "output_bytes": 8388608,
+        "informational": true,
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "sans-I/O codec decode (informational)",
+      "category": "streaming",
+      "duration": 0.002086958003928885,
+      "duration_samples": [
+        0.002184917000704445,
+        0.002086958003928885,
+        0.001917125002364628,
+        0.0019524170056683943,
+        0.001959250002983026,
+        0.0020702089968835935,
+        0.0021105829946463928,
+        0.0023177080001914874,
+        0.0024764169938862324
+      ],
+      "median_absolute_deviation": 0.00012770800094585866,
+      "duration_min": 0.001917125002364628,
+      "duration_max": 0.0024764169938862324,
+      "metrics": {
+        "input_bytes": 8391186,
+        "output_bytes": 8388608,
+        "output_chunks": 33,
+        "stdlib_reference_seconds": 0.001706499999272637,
+        "informational": true,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "decompress_chunks (64K in, 64K out)",
+      "category": "streaming",
+      "duration": 0.0023737500014249235,
+      "duration_samples": [
+        0.0024872920039342716,
+        0.002330165996681899,
+        0.0023272499965969473,
+        0.0023737500014249235,
+        0.002441832999465987,
+        0.0024954580003395677,
+        0.002904499997384846,
+        0.0016729170019971207,
+        0.0015210830024443567
+      ],
+      "median_absolute_deviation": 0.0001135420025093481,
+      "duration_min": 0.0015210830024443567,
+      "duration_max": 0.002904499997384846,
+      "metrics": {
+        "event_loop_ticks": 0,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "decompress_chunks (512K in, 256K out)",
+      "category": "streaming",
+      "duration": 0.004009291005786508,
+      "duration_samples": [
+        0.00509375000547152,
+        0.003781499995966442,
+        0.0040577500039944425,
+        0.0035416669998085126,
+        0.004009291005786508,
+        0.003999459004262462,
+        0.004008250005426817,
+        0.004198167007416487,
+        0.004297792009310797
+      ],
+      "median_absolute_deviation": 0.00018887600162997842,
+      "duration_min": 0.0035416669998085126,
+      "duration_max": 0.00509375000547152,
+      "metrics": {
+        "event_loop_ticks": 116,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "file reader (64K output)",
+      "category": "streaming",
+      "duration": 0.007199583007604815,
+      "duration_samples": [
+        0.006520166003610939,
+        0.006029665993992239,
+        0.006162417004816234,
+        0.007199583007604815,
+        0.007270000001881272,
+        0.00808320900250692,
+        0.007322958001168445,
+        0.006845291005447507,
+        0.007968165999045596
+      ],
+      "median_absolute_deviation": 0.0006794170039938763,
+      "duration_min": 0.006029665993992239,
+      "duration_max": 0.00808320900250692,
+      "metrics": {
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "decompress_chunks compressible peak",
+      "category": "streaming",
+      "duration": 0.003427208008361049,
+      "duration_samples": [
+        0.003049209000892006,
+        0.0031339169945567846,
+        0.003427208008361049,
+        0.0031637499923817813,
+        0.003496958001051098,
+        0.0034778330009430647,
+        0.0035340000031283125,
+        0.003350707993377,
+        0.0036326249974081293
+      ],
+      "median_absolute_deviation": 0.00010679199476726353,
+      "duration_min": 0.003049209000892006,
+      "duration_max": 0.0036326249974081293,
+      "metrics": {
+        "peak_python_mb": 0.8665428161621094,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "full read compressible peak",
+      "category": "streaming",
+      "duration": 0.003983291011536494,
+      "duration_samples": [
+        0.0036565000045811757,
+        0.003477875012322329,
+        0.003907082995283417,
+        0.0036093750095460564,
+        0.003995916995336302,
+        0.004045958994538523,
+        0.003983291011536494,
+        0.004101416998310015,
+        0.004572666002786718
+      ],
+      "median_absolute_deviation": 0.00011812598677352071,
+      "duration_min": 0.003477875012322329,
+      "duration_max": 0.004572666002786718,
+      "metrics": {
+        "peak_python_mb": 16.012402534484863,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "compress_chunks (64K in, 64K out)",
+      "category": "streaming",
+      "duration": 0.12060633400687948,
+      "duration_samples": [
+        0.1167565000068862,
+        0.11720158299431205,
+        0.12030091699853074,
+        0.11768312499043532,
+        0.1213068749930244,
+        0.12197649999870919,
+        0.12168754200683907,
+        0.12088237500574905,
+        0.12060633400687948
+      ],
+      "median_absolute_deviation": 0.001081207999959588,
+      "duration_min": 0.1167565000068862,
+      "duration_max": 0.12197649999870919,
+      "metrics": {
+        "compressed_bytes": 8391186,
+        "event_loop_ticks": 0,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "compress_chunks (512K in, 256K out)",
+      "category": "streaming",
+      "duration": 0.12289450000389479,
+      "duration_samples": [
+        0.12107662500056904,
+        0.12207949999719858,
+        0.1229111659922637,
+        0.12289450000389479,
+        0.230976874998305,
+        0.12158350000390783,
+        0.12200508298701607,
+        0.12367916599032469,
+        0.12386387499282137
+      ],
+      "median_absolute_deviation": 0.0008894170168787241,
+      "duration_min": 0.12107662500056904,
+      "duration_max": 0.230976874998305,
+      "metrics": {
+        "compressed_bytes": 8391186,
+        "event_loop_ticks": 8953,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "file writer (64K input)",
+      "category": "streaming",
+      "duration": 0.1241848750069039,
+      "duration_samples": [
+        0.12325533300463576,
+        0.1241848750069039,
+        0.12389162500039674,
+        0.1239304579939926,
+        0.1252412500034552,
+        0.12421879199973773,
+        0.12322416699316818,
+        0.12562920899654273,
+        0.12472070798685309
+      ],
+      "median_absolute_deviation": 0.0005358329799491912,
+      "duration_min": 0.12322416699316818,
+      "duration_max": 0.12562920899654273,
+      "metrics": {
+        "compressed_bytes": 8391203,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    },
+    {
+      "name": "compress_chunks compressible peak",
+      "category": "streaming",
+      "duration": 0.017743292002705857,
+      "duration_samples": [
+        0.018298458991921507,
+        0.017861542000900954,
+        0.017743292002705857,
+        0.016230582987191156,
+        0.01614766700367909,
+        0.016246541010332294,
+        0.018108709002262913,
+        0.018336499997531064,
+        0.01623933299561031
+      ],
+      "median_absolute_deviation": 0.0005932079948252067,
+      "duration_min": 0.01614766700367909,
+      "duration_max": 0.018336499997531064,
+      "metrics": {
+        "peak_python_mb": 0.38672733306884766,
+        "compressed_bytes": 8176,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 9
+      }
+    }
+  ]
+}

@@ -12,7 +12,7 @@ The codec API is provisional throughout the 2.0 alpha series. Ordinary
 ## Encoding one member
 
 One encoder creates exactly one complete gzip member. Each state-changing call
-returns a lazy iterator that must be exhausted before the next call:
+returns a lazy `CodecOperation` that must be exhausted before the next call:
 
 ```python
 from aiogzip import GzipEncoder
@@ -70,9 +70,11 @@ assert decoder.finished
 Input boundaries are arbitrary for correctness, but they are not
 performance-neutral. For predictable memory and copy costs, pass
 transport-sized compressed chunks as they arrive instead of one complete
-large archive to a single `feed()` call. `AsyncGzipBinaryFile` reads according
-to its configured `chunk_size`; callers of `decompress_chunks()` control the
-size of each source item.
+large archive to a single `feed()` call. The span queue prevents a large source
+item from causing superlinear whole-suffix copies, but transport-sized items
+still bound snapshot lifetime and executor workload. `AsyncGzipBinaryFile`
+reads according to its configured `chunk_size`; callers of
+`decompress_chunks()` control the size of each source item.
 
 > **Warning — integrity is established only at normal completion.** `feed()`
 > may emit payload before the corresponding CRC-32 and `ISIZE` trailer arrives.
@@ -83,9 +85,11 @@ size of each source item.
 > validation succeeds.
 
 `max_decompressed_size` is a cumulative positive-integer limit. Every inflate
-step is bounded to the remaining allowance plus one byte, and no byte beyond
-the configured limit is emitted. Limit failures raise `OSError`; corrupt,
-truncated, or malformed gzip data raises `gzip.BadGzipFile`.
+step is bounded to the remaining allowance plus one probe byte. Every allowed
+byte is emitted before a later advancement raises `OSError` for the first byte
+over the limit. That probe byte is not yielded and is not included in
+`uncompressed_size`, CRC-32, or ISIZE accounting. Corrupt, truncated, or
+malformed gzip data raises `gzip.BadGzipFile`.
 
 Pass `collect_member_info=True` when member metadata is needed. After each
 member's trailer is validated, `members` gains a `GzipMemberInfo` entry and
@@ -96,12 +100,38 @@ After successful completion, another decoder `feed()` or `finish()` raises
 `ValueError`. Repeated encoder finalization and invalid method ordering also
 raise `ValueError`; create a new codec for another stream.
 
+## Counter timing
+
+The counters reflect different commitment boundaries:
+
+- `GzipEncoder.input_size` and `crc32` change when a `feed()` operation
+  advances far enough to pass its complete snapshot through the compression
+  engine. Calling `feed()` without advancing its operation does not change
+  them.
+- `GzipDecoder.compressed_size` changes when `feed()` returns, after its input
+  has been validated and snapshotted but before the operation advances.
+- `GzipDecoder.uncompressed_size` changes as inflate steps complete. Internal
+  output is accounted before its bounded public chunks are yielded, so the
+  counter can temporarily lead the bytes already consumed by the caller.
+- `member_count` and `members` change only after a complete member trailer has
+  been validated.
+
 ## Lazy operations and ownership
 
 Calls reserve the codec immediately, but engine work occurs as the returned
 operation iterator advances. Exhaust one operation before requesting another.
 This keeps output pull-driven and bounded without a producer task, background
 queue, or eager `list()` allocation.
+
+A decoder `feed()` snapshots and counts its complete argument at call time,
+but advancing the operation reads compressed input through bounded 256 KiB
+windows. Inflate output is produced in separate internal batches that adapt
+between 64 KiB and 256 KiB, then sliced to the caller's `output_chunk_size`.
+Consequently
+`compressed_size` can lead engine consumption during an active operation, and
+`uncompressed_size` can lead public delivery by at most the pending internal
+batch. These are accounting boundaries, not evidence that the complete input
+or output has been copied into a second contiguous buffer.
 
 Abandonment is deliberately deterministic:
 
@@ -111,12 +141,31 @@ Abandonment is deliberately deterministic:
   garbage collection has run;
 - explicitly closing a partially consumed operation makes the codec unusable;
 - no iterator finalizer releases ownership or mutates codec state; and
-- if an abandoned operation is unreachable, `discard()` is the only cleanup.
-  It permanently invalidates the codec and releases its retained state.
+- `discard()` permanently invalidates the codec and any retained operation,
+  immediately releasing the operation's captured input and codec state.
 
 When an operation is still reachable, exhaust it if the stream should remain
-usable. Otherwise close the operation and discard the codec. `discard()` is
-idempotent, but it is not a reset; construct a new instance to continue.
+usable. Otherwise call its idempotent `close()` method. A `try`/`finally`
+ensures an exception or early return cannot leave the codec reserved:
+
+```python
+import aiogzip
+
+
+def decode_chunk(decoder: aiogzip.GzipDecoder, chunk: bytes) -> bytes:
+    operation: aiogzip.CodecOperation = decoder.feed(chunk)
+    try:
+        return b"".join(operation)
+    finally:
+        operation.close()
+```
+
+Calling `close()` after exhaustion has no effect. Calling it earlier releases
+the operation and makes the codec unusable. If the caller no longer retains
+the operation, use the codec's idempotent `discard()` method; it invalidates
+active work and promptly releases both the captured operation input and codec
+state. Neither method resets the codec, so construct a new instance to
+continue.
 
 Codec instances and their operation iterators are **not thread-safe**. Use an
 instance from one thread at a time, or hold an external lock around the entire

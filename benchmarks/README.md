@@ -97,6 +97,55 @@ The direct codec cases are labeled informational. aiogzip 1.11.0 had no public
 sans-I/O codec, so those absolute timings and their same-run stdlib references
 do not participate in the release regression thresholds.
 
+### 9. Decoder regression harness (`bench_codec_regressions.py`)
+
+The `regressions` category is the auditable harness for the 2.0.0a2 repair.
+It requires an explicit source checkout so historical runs cannot accidentally
+import the editable package from another worktree:
+
+```bash
+AIOGZIP_ENGINE=stdlib uv run --frozen python \
+  benchmarks/run_benchmarks.py \
+  --category regressions \
+  --regression-profile quick \
+  --regression-mode throughput \
+  --source-root . \
+  --repeat 3 \
+  --output /tmp/aiogzip-regressions.json
+```
+
+Profiles are `quick` for smoke validation and `release` for the locked 8–64
+MiB scaling, scheduler, header, and allocation matrices. Measurement modes are
+separate:
+
+- `throughput`: direct one-feed/chunked scaling, historical streaming cases,
+  public output bounds and engine-call counts, and header timing
+- `memory`: direct-decoder and incomplete-header `tracemalloc` peaks
+- `ticker`: async scheduling-gap distributions and the empty-block case
+- `all`: runs the three modes sequentially while preserving each result's mode
+
+Fixtures are generated deterministically before measurement and source items
+are pre-split before timed or allocation regions. Every decode is consumed
+into SHA-256 with byte-count and chunk-bound validation. JSON output records
+individual duration samples, median absolute deviation, fixture hashes, source
+item statistics, the resolved package file and commit, Python/OS/engine
+details, the lockfile hash, and the regression-harness hash.
+
+Use the harness from the implementation checkout while targeting detached
+historical worktrees:
+
+```bash
+uv run --frozen python benchmarks/run_benchmarks.py \
+  --category regressions --regression-profile release \
+  --regression-mode all \
+  --source-root /tmp/aiogzip-v2.0.0a1-regression \
+  --repeat 5 --output /tmp/v2.0.0a1-regressions.json
+```
+
+The public codec cases are emitted as explicit skips for targets such as
+`v1.11.0` that predate `GzipDecoder`; supported high-level streaming cases
+still run normally.
+
 ## Running Benchmarks
 
 ### Command Line Options
@@ -111,6 +160,13 @@ Options:
   --size N             Data size in MB (default: 1)
   --repeat N           Run each category N times, report median (default: 3)
   --output, -o FILE    Save results to JSON file
+  --source-root PATH   Verify and import aiogzip from PATH/src
+  --regression-profile {quick,release}
+                       Select the regression matrix size
+  --regression-mode {throughput,memory,ticker,all}
+                       Keep timing, allocation, and ticker runs distinct
+  --environment-label TEXT
+                       Record the benchmark machine and purpose in JSON
 ```
 
 Each category runs three times by default. Reported durations are medians, and
@@ -257,6 +313,7 @@ benchmarks/
 ├── bench_scenarios.py     # Real-world scenarios
 ├── bench_errors.py        # Error handling
 ├── bench_micro.py         # Micro-benchmarks
+├── bench_codec_regressions.py # 2.0.0a2 regression matrices
 ├── bench_compare.py       # Result comparison tool
 └── README.md              # This file
 ```

@@ -28,6 +28,48 @@ or data.
 | Highly compressible bulk `read(-1)` | ~1.08x faster | ~14.5x faster |
 | Ten files with simulated 10 ms latency | ~6.4x faster | ~6.9x faster |
 
+### 2.0.0a2 decoder evidence
+
+The final release-reference measurements were captured on the Framework
+Desktop from the clean candidate and both locked historical revisions. Full
+environment metadata, samples, dispersion, hashes, and delta dispositions are
+in the
+[2.0.0a2 candidate record](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-candidate.md).
+
+| Engine | 8 MiB stream, 64/64 KiB | 8 MiB stream, 512/256 KiB | 32 MiB one item | 64 MiB one item |
+| --- | ---: | ---: | ---: | ---: |
+| stdlib | 2.255 ms | 1.857 ms | 20.498 ms | 40.792 ms |
+| zlib-ng | 1.241 ms | 0.837 ms | 16.219 ms | 32.274 ms |
+
+In the isolated release matrix, the 512/256 KiB case was 21.5% below the
+same-machine `v1.11.0` stdlib median and 23.2% below its zlib-ng median.
+One-feed decode scales linearly from 8 through 64 MiB. For the one-item
+32 MiB scheduler case, maximum observed ticker gaps were 0.850 ms with stdlib
+and 0.696 ms with zlib-ng. These values support the bounded-window and
+scheduler choices; they are not portable speed claims.
+
+The decoder now consumes immutable queued spans through 256 KiB compressed
+windows and inflates into separate internal output blocks that adapt between
+64 KiB and 256 KiB. Public `output_chunk_size` controls emitted slices and the
+bounded batch chosen within that range, so a one-byte public bound does not
+trigger one inflate call per byte. A complete archive supplied in one source
+item no longer incurs repeated whole-suffix copying. Transport-sized source
+items remain sensible because they bound snapshot lifetime, executor work, and
+per-source backpressure.
+
+The diagnostic 10-byte write case remains materially slower than `v1.11.0`,
+although immediate nine-repeat comparisons stay within the release plan's
++10% anti-regression guard against `2.0.0a1`. The remaining cost is one
+deterministic codec operation per accepted write. Buffering across writes is
+deferred because it would change when compression and sink errors surface.
+
+See the committed
+[buffer tuning](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-wp3-buffer-tuning.md),
+[scheduler](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-wp5-scheduler.md),
+and
+[compression analysis](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-compression-analysis.md)
+records for commands, samples, dispersion, and fixture hashes.
+
 Run the suite on the target workload before making a capacity or latency
 decision:
 
@@ -94,7 +136,8 @@ calling synchronous `gzip` directly inside an async application.
   overlapping the delays; it is not a raw codec-speed comparison.
 - The suite also includes a short five-operation mixed read/write workload;
   treat its ratio as latency-sensitive rather than a stable throughput claim.
-- CPU-bound `zlib` work above a 256 KiB chunk is offloaded to a thread, so multiple streams compress/decompress in parallel instead of serializing on the loop.
+- Large CPU-bound codec work may be offloaded to a thread, while bounded
+  decoder steps below that private threshold use cooperative checkpoints.
 - Independent application tasks can continue while file or offloaded codec
   work is pending.
 
@@ -148,11 +191,12 @@ uv run python benchmarks/run_benchmarks.py \
   --category streaming --size 32 --repeat 3
 ```
 
-Inputs below the 256 KiB codec-offload threshold often maximize raw throughput
-for short operations but may complete inline without giving an independent
-event-loop task a turn. Larger codec calls are offloaded, trading a thread hop
-for event-loop responsiveness. Measure with source chunk sizes representative
-of the real producer rather than selecting solely from synthetic throughput.
+Inputs below the private codec-offload thresholds often maximize raw throughput
+for short operations. Inline decoder work checkpoints after bounded output,
+no-output progress, or cumulative source input; larger codec calls are
+offloaded, trading a thread hop for event-loop responsiveness. Measure with
+source chunk sizes representative of the real producer rather than selecting
+solely from synthetic throughput.
 
 The synchronous `GzipEncoder` and `GzipDecoder` never offload. Their direct
 8 MiB release measurements are informational because v1.11.0 had no public

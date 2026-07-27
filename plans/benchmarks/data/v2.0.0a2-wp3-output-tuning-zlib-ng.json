@@ -1,0 +1,225 @@
+{
+  "kind": "output",
+  "repeat": 5,
+  "engine": "zlib-ng",
+  "python": "3.12.8 (v3.12.8:2dc476bcb91, Dec  3 2024, 14:43:19) [Clang 13.0.0 (clang-1300.0.29.30)]",
+  "target_commit": "fc84f4eeeb6670fd0a10999e99c4f2669a34d50e",
+  "target_dirty": true,
+  "file_sha256": {
+    "benchmarks/tune_decoder_batches.py": "63e3154a456fa77dd5b0b668b02965794ee6e37d0afd23b5852158b77b6e9a18",
+    "src/aiogzip/_codec_buffer.py": "75696c5f2032ca2981d021b62062eff7878f0960a182836e5e5c54079f4bb027",
+    "src/aiogzip/_engine.py": "b7f8d3f9a5614c6155ea584fa5a5f744a82f29cb9a1385afbc6a371fd8f51954",
+    "src/aiogzip/codec.py": "75b583fda65d5e5165ee5cde1bd69faddb01306540473777095a33b59e06f0eb"
+  },
+  "environment_label": "Apple M3 MacBook Air (provisional; rerun release gates on Framework Desktop)",
+  "results": [
+    {
+      "candidate_bytes": 65536,
+      "case": "direct one-feed 8MiB",
+      "duration_samples": [
+        0.004691166992415674,
+        0.0044291250087553635,
+        0.0047845420049270615,
+        0.004464458004804328,
+        0.00477149999642279
+      ],
+      "median_seconds": 0.004691166992415674,
+      "median_absolute_deviation": 9.337501251138747e-05,
+      "metrics": {
+        "output_chunks": 129,
+        "max_output_chunk": 65536
+      }
+    },
+    {
+      "candidate_bytes": 65536,
+      "case": "exact-limit then overflow 1MiB",
+      "duration_samples": [
+        0.0006303749978542328,
+        0.0008643749897601083,
+        0.0006549999961862341,
+        0.0006335000070976093,
+        0.0006217909976840019
+      ],
+      "median_seconds": 0.0006335000070976093,
+      "median_absolute_deviation": 1.1709009413607419e-05,
+      "metrics": {
+        "output_bytes": 524288,
+        "output_sha256": "9148640d5de80ad31fe21ffdae766c9f31f2b2e76dbdf12a1a203fc4ba3ac09e"
+      }
+    },
+    {
+      "candidate_bytes": 65536,
+      "case": "tiny public output 128KiB",
+      "duration_samples": [
+        0.04249779200472403,
+        0.04384491601376794,
+        0.04513341700658202,
+        0.045299582998268306,
+        0.04573270799301099
+      ],
+      "median_seconds": 0.04513341700658202,
+      "median_absolute_deviation": 0.0005992909864289686,
+      "metrics": {
+        "engine_calls": 2,
+        "output_chunks": 131072,
+        "max_output_chunk": 1
+      }
+    },
+    {
+      "candidate_bytes": 262144,
+      "case": "direct one-feed 8MiB",
+      "duration_samples": [
+        0.0037849999935133383,
+        0.003805917003774084,
+        0.003996875006123446,
+        0.003955084001063369,
+        0.0040272920014103875
+      ],
+      "median_seconds": 0.003955084001063369,
+      "median_absolute_deviation": 7.220800034701824e-05,
+      "metrics": {
+        "output_chunks": 33,
+        "max_output_chunk": 262064
+      }
+    },
+    {
+      "candidate_bytes": 262144,
+      "case": "exact-limit then overflow 1MiB",
+      "duration_samples": [
+        0.0006198329938342795,
+        0.0005780419887742028,
+        0.000567542010685429,
+        0.000526834002812393,
+        0.0005564589955611154
+      ],
+      "median_seconds": 0.000567542010685429,
+      "median_absolute_deviation": 1.1083015124313533e-05,
+      "metrics": {
+        "output_bytes": 524288,
+        "output_sha256": "9148640d5de80ad31fe21ffdae766c9f31f2b2e76dbdf12a1a203fc4ba3ac09e"
+      }
+    },
+    {
+      "candidate_bytes": 262144,
+      "case": "tiny public output 128KiB",
+      "duration_samples": [
+        0.04289154200523626,
+        0.04262658399238717,
+        0.049550165989785455,
+        0.04639629099983722,
+        0.04472441600228194
+      ],
+      "median_seconds": 0.04472441600228194,
+      "median_absolute_deviation": 0.0018328739970456809,
+      "metrics": {
+        "engine_calls": 1,
+        "output_chunks": 131072,
+        "max_output_chunk": 1
+      }
+    },
+    {
+      "candidate_bytes": 524288,
+      "case": "direct one-feed 8MiB",
+      "duration_samples": [
+        0.0037048329977551475,
+        0.0036962919984944165,
+        0.003729124990059063,
+        0.003731582997716032,
+        0.004838332999497652
+      ],
+      "median_seconds": 0.003729124990059063,
+      "median_absolute_deviation": 2.4291992303915322e-05,
+      "metrics": {
+        "output_chunks": 33,
+        "max_output_chunk": 262064
+      }
+    },
+    {
+      "candidate_bytes": 524288,
+      "case": "exact-limit then overflow 1MiB",
+      "duration_samples": [
+        0.0005245840002316982,
+        0.000556665996555239,
+        0.0007559169898740947,
+        0.0007054169982438907,
+        0.0006648749986197799
+      ],
+      "median_seconds": 0.0006648749986197799,
+      "median_absolute_deviation": 9.104199125431478e-05,
+      "metrics": {
+        "output_bytes": 524288,
+        "output_sha256": "9148640d5de80ad31fe21ffdae766c9f31f2b2e76dbdf12a1a203fc4ba3ac09e"
+      }
+    },
+    {
+      "candidate_bytes": 524288,
+      "case": "tiny public output 128KiB",
+      "duration_samples": [
+        0.04258612499688752,
+        0.04297058300289791,
+        0.04456629201013129,
+        0.1373306669993326,
+        0.04571158401085995
+      ],
+      "median_seconds": 0.04456629201013129,
+      "median_absolute_deviation": 0.0015957090072333813,
+      "metrics": {
+        "engine_calls": 1,
+        "output_chunks": 131072,
+        "max_output_chunk": 1
+      }
+    },
+    {
+      "candidate_bytes": 1048576,
+      "case": "direct one-feed 8MiB",
+      "duration_samples": [
+        0.0036674580042017624,
+        0.003667415992822498,
+        0.0038394580042222515,
+        0.0038490420120069757,
+        0.003791542010731064
+      ],
+      "median_seconds": 0.003791542010731064,
+      "median_absolute_deviation": 5.750000127591193e-05,
+      "metrics": {
+        "output_chunks": 33,
+        "max_output_chunk": 262064
+      }
+    },
+    {
+      "candidate_bytes": 1048576,
+      "case": "exact-limit then overflow 1MiB",
+      "duration_samples": [
+        0.0005301250057527795,
+        0.0005929589970037341,
+        0.000738540999009274,
+        0.0005504579894477502,
+        0.000610458999290131
+      ],
+      "median_seconds": 0.0005929589970037341,
+      "median_absolute_deviation": 4.250100755598396e-05,
+      "metrics": {
+        "output_bytes": 524288,
+        "output_sha256": "9148640d5de80ad31fe21ffdae766c9f31f2b2e76dbdf12a1a203fc4ba3ac09e"
+      }
+    },
+    {
+      "candidate_bytes": 1048576,
+      "case": "tiny public output 128KiB",
+      "duration_samples": [
+        0.04290354100521654,
+        0.042829166995943524,
+        0.04441837500780821,
+        0.04526695799722802,
+        0.044912875004229136
+      ],
+      "median_seconds": 0.04441837500780821,
+      "median_absolute_deviation": 0.0008485829894198105,
+      "metrics": {
+        "engine_calls": 1,
+        "output_chunks": 131072,
+        "max_output_chunk": 1
+      }
+    }
+  ]
+}

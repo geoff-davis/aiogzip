@@ -1,0 +1,4103 @@
+{
+  "kind": "compression-profile",
+  "engine_info": {
+    "compression": "stdlib-zlib",
+    "decompression": "stdlib-zlib",
+    "crc32": "stdlib-zlib"
+  },
+  "python": "3.12.8 (v3.12.8:2dc476bcb91, Dec  3 2024, 14:43:19) [Clang 13.0.0 (clang-1300.0.29.30)]",
+  "target_commit": "8a4927ca1543466f1c63888d1c93226c736f11ac",
+  "target_dirty": false,
+  "environment_label": "Apple M3 MacBook Air (provisional; rerun release gates on Framework Desktop)",
+  "fixture": {
+    "bytes": 8388608,
+    "sha256": "3c9e8769d685b5201c6708f02667378cac778c8657e13e3ba7946fbf048d9678",
+    "tiny_write_bytes": 10
+  },
+  "file_sha256": {
+    "benchmarks/profile_compression_paths.py": "eef02b3034d19776bd3211aa77c51f2ddc0a96a0e3c4af3ee3bce0c051874b65",
+    "src/aiogzip/_binary.py": "9b9b41f94e1aa0e2fbb438c7b3aa1804b1ef08714d88bbcd08eb1c1d4a08e822",
+    "src/aiogzip/_codec_async.py": "021e9e6240323af82e099613157c5d92608b0cc831f3f35733edef96133f59ba",
+    "src/aiogzip/codec.py": "1ab82a8718beb02121388f03b8e3f166b83d799bdd0d6a084cf3f909fcec629e"
+  },
+  "profile_notes": "Category times are cProfile aggregates and are not additive. Direct cases capture engine work; executor work is outside the main-thread async profile.",
+  "cases": [
+    {
+      "name": "direct stdlib 64K-in 64K-out",
+      "duration_seconds": 0.12253633300133515,
+      "compressed_bytes": 8391186,
+      "compressed_sha256": "7a47a89a1aff1b052d44b6736143edbc24bd19a6fa5d342d9c0c7d9f56358e3b",
+      "profile": {
+        "categories": {
+          "input_normalization": {
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 1.3252000000000001e-05,
+            "cumulative_seconds": 1.3252000000000001e-05,
+            "matches": [
+              "codec.py:58:_snapshot_bytes_input"
+            ]
+          },
+          "operation_allocation": {
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 3.699e-05,
+            "cumulative_seconds": 4.6995e-05,
+            "matches": [
+              "codec.py:150:_reserve"
+            ]
+          },
+          "operation_next": {
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 7.817e-05,
+            "cumulative_seconds": 0.11701884300000001,
+            "matches": [
+              "codec.py:85:__next__"
+            ]
+          },
+          "engine_compression": {
+            "primitive_calls": 129,
+            "total_calls": 129,
+            "self_seconds": 0.11608370500000001,
+            "cumulative_seconds": 0.11608370500000001,
+            "matches": [
+              "~:0:<built-in method zlib.compressobj>",
+              "~:0:<method 'compress' of 'zlib.Compress' objects>"
+            ]
+          },
+          "crc": {
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 0.00022967700000000002,
+            "cumulative_seconds": 0.00022967700000000002,
+            "matches": [
+              "~:0:<built-in method zlib.crc32>"
+            ]
+          },
+          "output_slicing": {
+            "primitive_calls": 389,
+            "total_calls": 389,
+            "self_seconds": 0.000334348,
+            "cumulative_seconds": 0.11664637600000001,
+            "matches": [
+              "codec.py:181:_output_chunks",
+              "codec.py:290:_feed"
+            ]
+          },
+          "async_driver": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          },
+          "sink_writes": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          },
+          "event_loop": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          }
+        },
+        "top_by_cumulative": [
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 227,
+            "function": "<lambda>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3.542e-06,
+            "cumulative_seconds": 0.122493209
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 36,
+            "function": "_direct_compress",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 0.002455712,
+            "cumulative_seconds": 0.12248966700000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'join' of 'bytes' objects>",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 0.000368833,
+            "cumulative_seconds": 0.117398661
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 85,
+            "function": "__next__",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 7.817e-05,
+            "cumulative_seconds": 0.11701884300000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 91,
+            "function": "_advance_raw",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 0.00010346900000000001,
+            "cumulative_seconds": 0.11692753800000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.next>",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 6.630500000000001e-05,
+            "cumulative_seconds": 0.11681551500000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 290,
+            "function": "_feed",
+            "primitive_calls": 383,
+            "total_calls": 383,
+            "self_seconds": 0.00033143,
+            "cumulative_seconds": 0.11664329300000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'compress' of 'zlib.Compress' objects>",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 0.11606991400000001,
+            "cumulative_seconds": 0.11606991400000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'extend' of 'bytearray' objects>",
+            "primitive_calls": 132,
+            "total_calls": 132,
+            "self_seconds": 0.0023938360000000003,
+            "cumulative_seconds": 0.0023938360000000003
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.crc32>",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 0.00022967700000000002,
+            "cumulative_seconds": 0.00022967700000000002
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 274,
+            "function": "feed",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 7.892000000000001e-05,
+            "cumulative_seconds": 0.000168541
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 328,
+            "function": "_finish",
+            "primitive_calls": 3,
+            "total_calls": 3,
+            "self_seconds": 7.959000000000001e-06,
+            "cumulative_seconds": 8.979200000000001e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'flush' of 'zlib.Compress' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 7.3125e-05,
+            "cumulative_seconds": 7.3125e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 197,
+            "function": "__init__",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 2.7581000000000002e-05,
+            "cumulative_seconds": 5.4709e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 150,
+            "function": "_reserve",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 3.699e-05,
+            "cumulative_seconds": 4.6995e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 257,
+            "function": "_check_encoder_available",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 2.4099e-05,
+            "cumulative_seconds": 3.3129e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.len>",
+            "primitive_calls": 387,
+            "total_calls": 387,
+            "self_seconds": 1.9307e-05,
+            "cumulative_seconds": 1.9307e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 262,
+            "function": "start",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 7.5e-06,
+            "cumulative_seconds": 1.7541e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 269,
+            "function": "_start",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 4.5e-06,
+            "cumulative_seconds": 1.6125000000000002e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_engine.py",
+            "line": 193,
+            "function": "compressobj",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.2510000000000002e-06,
+            "cumulative_seconds": 1.5042000000000001e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.isinstance>",
+            "primitive_calls": 263,
+            "total_calls": 263,
+            "self_seconds": 1.3886e-05,
+            "cumulative_seconds": 1.3886e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.3834e-05,
+            "cumulative_seconds": 1.3834e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.compressobj>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.3791e-05,
+            "cumulative_seconds": 1.3791e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 58,
+            "function": "_snapshot_bytes_input",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 1.3252000000000001e-05,
+            "cumulative_seconds": 1.3252000000000001e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 82,
+            "function": "__iter__",
+            "primitive_calls": 260,
+            "total_calls": 260,
+            "self_seconds": 1.0985e-05,
+            "cumulative_seconds": 1.0985e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 203,
+            "function": "_build_gzip_header",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 6.46e-06,
+            "cumulative_seconds": 1.0042000000000001e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 72,
+            "function": "__init__",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 1.0005e-05,
+            "cumulative_seconds": 1.0005e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 144,
+            "function": "_check_available",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 9.03e-06,
+            "cumulative_seconds": 9.03e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 158,
+            "function": "_operation_succeeded",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 8.554e-06,
+            "cumulative_seconds": 8.554e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 231,
+            "function": "_build_gzip_trailer",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 2.0000000000000003e-06,
+            "cumulative_seconds": 7.208e-06
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method _struct.pack>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 7.167e-06,
+            "cumulative_seconds": 7.167e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 115,
+            "function": "_validate_compresslevel",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 6.334000000000001e-06,
+            "cumulative_seconds": 6.834e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 139,
+            "function": "__init__",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3.2920000000000004e-06,
+            "cumulative_seconds": 3.2920000000000004e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 181,
+            "function": "_output_chunks",
+            "primitive_calls": 6,
+            "total_calls": 6,
+            "self_seconds": 2.9180000000000003e-06,
+            "cumulative_seconds": 3.0830000000000004e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 321,
+            "function": "finish",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.249e-06,
+            "cumulative_seconds": 1.833e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 140,
+            "function": "_normalize_mtime",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.0840000000000001e-06,
+            "cumulative_seconds": 1.209e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 95,
+            "function": "_validate_chunk_size",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 4.5800000000000005e-07,
+            "cumulative_seconds": 5.84e-07
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'append' of 'bytearray' objects>",
+            "primitive_calls": 4,
+            "total_calls": 4,
+            "self_seconds": 4.5700000000000003e-07,
+            "cumulative_seconds": 4.5700000000000003e-07
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 171,
+            "function": "_derive_header_filename",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.400000000000001e-08,
+            "cumulative_seconds": 8.400000000000001e-08
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 154,
+            "function": "_validate_original_filename",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.3e-08,
+            "cumulative_seconds": 8.3e-08
+          }
+        ],
+        "top_by_self": [
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'compress' of 'zlib.Compress' objects>",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 0.11606991400000001,
+            "cumulative_seconds": 0.11606991400000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 36,
+            "function": "_direct_compress",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 0.002455712,
+            "cumulative_seconds": 0.12248966700000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'extend' of 'bytearray' objects>",
+            "primitive_calls": 132,
+            "total_calls": 132,
+            "self_seconds": 0.0023938360000000003,
+            "cumulative_seconds": 0.0023938360000000003
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'join' of 'bytes' objects>",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 0.000368833,
+            "cumulative_seconds": 0.117398661
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 290,
+            "function": "_feed",
+            "primitive_calls": 383,
+            "total_calls": 383,
+            "self_seconds": 0.00033143,
+            "cumulative_seconds": 0.11664329300000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.crc32>",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 0.00022967700000000002,
+            "cumulative_seconds": 0.00022967700000000002
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 91,
+            "function": "_advance_raw",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 0.00010346900000000001,
+            "cumulative_seconds": 0.11692753800000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 274,
+            "function": "feed",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 7.892000000000001e-05,
+            "cumulative_seconds": 0.000168541
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 85,
+            "function": "__next__",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 7.817e-05,
+            "cumulative_seconds": 0.11701884300000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'flush' of 'zlib.Compress' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 7.3125e-05,
+            "cumulative_seconds": 7.3125e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.next>",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 6.630500000000001e-05,
+            "cumulative_seconds": 0.11681551500000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 150,
+            "function": "_reserve",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 3.699e-05,
+            "cumulative_seconds": 4.6995e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 197,
+            "function": "__init__",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 2.7581000000000002e-05,
+            "cumulative_seconds": 5.4709e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 257,
+            "function": "_check_encoder_available",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 2.4099e-05,
+            "cumulative_seconds": 3.3129e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.len>",
+            "primitive_calls": 387,
+            "total_calls": 387,
+            "self_seconds": 1.9307e-05,
+            "cumulative_seconds": 1.9307e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.isinstance>",
+            "primitive_calls": 263,
+            "total_calls": 263,
+            "self_seconds": 1.3886e-05,
+            "cumulative_seconds": 1.3886e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.3834e-05,
+            "cumulative_seconds": 1.3834e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.compressobj>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.3791e-05,
+            "cumulative_seconds": 1.3791e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 58,
+            "function": "_snapshot_bytes_input",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 1.3252000000000001e-05,
+            "cumulative_seconds": 1.3252000000000001e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 82,
+            "function": "__iter__",
+            "primitive_calls": 260,
+            "total_calls": 260,
+            "self_seconds": 1.0985e-05,
+            "cumulative_seconds": 1.0985e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 72,
+            "function": "__init__",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 1.0005e-05,
+            "cumulative_seconds": 1.0005e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 144,
+            "function": "_check_available",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 9.03e-06,
+            "cumulative_seconds": 9.03e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 158,
+            "function": "_operation_succeeded",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 8.554e-06,
+            "cumulative_seconds": 8.554e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 328,
+            "function": "_finish",
+            "primitive_calls": 3,
+            "total_calls": 3,
+            "self_seconds": 7.959000000000001e-06,
+            "cumulative_seconds": 8.979200000000001e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 262,
+            "function": "start",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 7.5e-06,
+            "cumulative_seconds": 1.7541e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method _struct.pack>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 7.167e-06,
+            "cumulative_seconds": 7.167e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 203,
+            "function": "_build_gzip_header",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 6.46e-06,
+            "cumulative_seconds": 1.0042000000000001e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 115,
+            "function": "_validate_compresslevel",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 6.334000000000001e-06,
+            "cumulative_seconds": 6.834e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 269,
+            "function": "_start",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 4.5e-06,
+            "cumulative_seconds": 1.6125000000000002e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 227,
+            "function": "<lambda>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3.542e-06,
+            "cumulative_seconds": 0.122493209
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 139,
+            "function": "__init__",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3.2920000000000004e-06,
+            "cumulative_seconds": 3.2920000000000004e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 181,
+            "function": "_output_chunks",
+            "primitive_calls": 6,
+            "total_calls": 6,
+            "self_seconds": 2.9180000000000003e-06,
+            "cumulative_seconds": 3.0830000000000004e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 231,
+            "function": "_build_gzip_trailer",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 2.0000000000000003e-06,
+            "cumulative_seconds": 7.208e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_engine.py",
+            "line": 193,
+            "function": "compressobj",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.2510000000000002e-06,
+            "cumulative_seconds": 1.5042000000000001e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 321,
+            "function": "finish",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.249e-06,
+            "cumulative_seconds": 1.833e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 140,
+            "function": "_normalize_mtime",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.0840000000000001e-06,
+            "cumulative_seconds": 1.209e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 95,
+            "function": "_validate_chunk_size",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 4.5800000000000005e-07,
+            "cumulative_seconds": 5.84e-07
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'append' of 'bytearray' objects>",
+            "primitive_calls": 4,
+            "total_calls": 4,
+            "self_seconds": 4.5700000000000003e-07,
+            "cumulative_seconds": 4.5700000000000003e-07
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 171,
+            "function": "_derive_header_filename",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.400000000000001e-08,
+            "cumulative_seconds": 8.400000000000001e-08
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 154,
+            "function": "_validate_original_filename",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.3e-08,
+            "cumulative_seconds": 8.3e-08
+          }
+        ]
+      }
+    },
+    {
+      "name": "direct stdlib 512K-in 256K-out",
+      "duration_seconds": 0.12000508299388457,
+      "compressed_bytes": 8391186,
+      "compressed_sha256": "7a47a89a1aff1b052d44b6736143edbc24bd19a6fa5d342d9c0c7d9f56358e3b",
+      "profile": {
+        "categories": {
+          "input_normalization": {
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 2.334e-06,
+            "cumulative_seconds": 2.334e-06,
+            "matches": [
+              "codec.py:58:_snapshot_bytes_input"
+            ]
+          },
+          "operation_allocation": {
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 8.081000000000001e-06,
+            "cumulative_seconds": 9.665e-06,
+            "matches": [
+              "codec.py:150:_reserve"
+            ]
+          },
+          "operation_next": {
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 1.6537e-05,
+            "cumulative_seconds": 0.115759999,
+            "matches": [
+              "codec.py:85:__next__"
+            ]
+          },
+          "engine_compression": {
+            "primitive_calls": 17,
+            "total_calls": 17,
+            "self_seconds": 0.11516216700000001,
+            "cumulative_seconds": 0.11516216700000001,
+            "matches": [
+              "~:0:<built-in method zlib.compressobj>",
+              "~:0:<method 'compress' of 'zlib.Compress' objects>"
+            ]
+          },
+          "crc": {
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 0.000220293,
+            "cumulative_seconds": 0.000220293,
+            "matches": [
+              "~:0:<built-in method zlib.crc32>"
+            ]
+          },
+          "output_slicing": {
+            "primitive_calls": 69,
+            "total_calls": 69,
+            "self_seconds": 0.000272613,
+            "cumulative_seconds": 0.11564903500000001,
+            "matches": [
+              "codec.py:181:_output_chunks",
+              "codec.py:290:_feed"
+            ]
+          },
+          "async_driver": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          },
+          "sink_writes": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          },
+          "event_loop": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          }
+        },
+        "top_by_cumulative": [
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 227,
+            "function": "<lambda>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3.4875e-05,
+            "cumulative_seconds": 0.119972459
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 36,
+            "function": "_direct_compress",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 0.001232129,
+            "cumulative_seconds": 0.11993758400000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'join' of 'bytes' objects>",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 0.00017695700000000002,
+            "cumulative_seconds": 0.11593874900000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 85,
+            "function": "__next__",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 1.6537e-05,
+            "cumulative_seconds": 0.115759999
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 91,
+            "function": "_advance_raw",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 2.2333e-05,
+            "cumulative_seconds": 0.11574029200000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.next>",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 1.5049000000000001e-05,
+            "cumulative_seconds": 0.115716461
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 290,
+            "function": "_feed",
+            "primitive_calls": 63,
+            "total_calls": 63,
+            "self_seconds": 0.000269949,
+            "cumulative_seconds": 0.11564616200000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'compress' of 'zlib.Compress' objects>",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 0.11515354200000001,
+            "cumulative_seconds": 0.11515354200000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'extend' of 'bytearray' objects>",
+            "primitive_calls": 20,
+            "total_calls": 20,
+            "self_seconds": 0.002710249,
+            "cumulative_seconds": 0.002710249
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.crc32>",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 0.000220293,
+            "cumulative_seconds": 0.000220293
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 328,
+            "function": "_finish",
+            "primitive_calls": 3,
+            "total_calls": 3,
+            "self_seconds": 6.9180000000000005e-06,
+            "cumulative_seconds": 4.6084e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'flush' of 'zlib.Compress' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3.4792e-05,
+            "cumulative_seconds": 3.4792e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 274,
+            "function": "feed",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 1.321e-05,
+            "cumulative_seconds": 3.0083000000000003e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 197,
+            "function": "__init__",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 6.0840000000000005e-06,
+            "cumulative_seconds": 2.2125000000000002e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.4083e-05,
+            "cumulative_seconds": 1.4083e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 150,
+            "function": "_reserve",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 8.081000000000001e-06,
+            "cumulative_seconds": 9.665e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_engine.py",
+            "line": 193,
+            "function": "compressobj",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 9.160000000000001e-07,
+            "cumulative_seconds": 9.541e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 269,
+            "function": "_start",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 1.416e-06,
+            "cumulative_seconds": 9.166e-06
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.compressobj>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.625000000000001e-06,
+            "cumulative_seconds": 8.625000000000001e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 257,
+            "function": "_check_encoder_available",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 4.835e-06,
+            "cumulative_seconds": 6.4170000000000006e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 203,
+            "function": "_build_gzip_header",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 4.249e-06,
+            "cumulative_seconds": 6.4170000000000006e-06
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.isinstance>",
+            "primitive_calls": 55,
+            "total_calls": 55,
+            "self_seconds": 3.712e-06,
+            "cumulative_seconds": 3.712e-06
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.len>",
+            "primitive_calls": 51,
+            "total_calls": 51,
+            "self_seconds": 3.711e-06,
+            "cumulative_seconds": 3.711e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 115,
+            "function": "_validate_compresslevel",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3e-06,
+            "cumulative_seconds": 3.333e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 181,
+            "function": "_output_chunks",
+            "primitive_calls": 6,
+            "total_calls": 6,
+            "self_seconds": 2.6640000000000002e-06,
+            "cumulative_seconds": 2.8730000000000003e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 231,
+            "function": "_build_gzip_trailer",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.2930000000000002e-06,
+            "cumulative_seconds": 2.8340000000000003e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 321,
+            "function": "finish",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.5e-06,
+            "cumulative_seconds": 2.7500000000000004e-06
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method _struct.pack>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 2.458e-06,
+            "cumulative_seconds": 2.458e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 58,
+            "function": "_snapshot_bytes_input",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 2.334e-06,
+            "cumulative_seconds": 2.334e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 262,
+            "function": "start",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 9.160000000000001e-07,
+            "cumulative_seconds": 2.333e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 82,
+            "function": "__iter__",
+            "primitive_calls": 36,
+            "total_calls": 36,
+            "self_seconds": 1.793e-06,
+            "cumulative_seconds": 1.793e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 72,
+            "function": "__init__",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 1.584e-06,
+            "cumulative_seconds": 1.584e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 144,
+            "function": "_check_available",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 1.582e-06,
+            "cumulative_seconds": 1.582e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 158,
+            "function": "_operation_succeeded",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 1.498e-06,
+            "cumulative_seconds": 1.498e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 140,
+            "function": "_normalize_mtime",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.1240000000000002e-06,
+            "cumulative_seconds": 1.2080000000000001e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 95,
+            "function": "_validate_chunk_size",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.0420000000000001e-06,
+            "cumulative_seconds": 1.167e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 139,
+            "function": "__init__",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 5.84e-07,
+            "cumulative_seconds": 5.84e-07
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'append' of 'bytearray' objects>",
+            "primitive_calls": 4,
+            "total_calls": 4,
+            "self_seconds": 4.1700000000000004e-07,
+            "cumulative_seconds": 4.1700000000000004e-07
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 171,
+            "function": "_derive_header_filename",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.67e-07,
+            "cumulative_seconds": 1.67e-07
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 154,
+            "function": "_validate_original_filename",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 4.1e-08,
+            "cumulative_seconds": 4.1e-08
+          }
+        ],
+        "top_by_self": [
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'compress' of 'zlib.Compress' objects>",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 0.11515354200000001,
+            "cumulative_seconds": 0.11515354200000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'extend' of 'bytearray' objects>",
+            "primitive_calls": 20,
+            "total_calls": 20,
+            "self_seconds": 0.002710249,
+            "cumulative_seconds": 0.002710249
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 36,
+            "function": "_direct_compress",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 0.001232129,
+            "cumulative_seconds": 0.11993758400000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 290,
+            "function": "_feed",
+            "primitive_calls": 63,
+            "total_calls": 63,
+            "self_seconds": 0.000269949,
+            "cumulative_seconds": 0.11564616200000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.crc32>",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 0.000220293,
+            "cumulative_seconds": 0.000220293
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'join' of 'bytes' objects>",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 0.00017695700000000002,
+            "cumulative_seconds": 0.11593874900000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 227,
+            "function": "<lambda>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3.4875e-05,
+            "cumulative_seconds": 0.119972459
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'flush' of 'zlib.Compress' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3.4792e-05,
+            "cumulative_seconds": 3.4792e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 91,
+            "function": "_advance_raw",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 2.2333e-05,
+            "cumulative_seconds": 0.11574029200000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 85,
+            "function": "__next__",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 1.6537e-05,
+            "cumulative_seconds": 0.115759999
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.next>",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 1.5049000000000001e-05,
+            "cumulative_seconds": 0.115716461
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.4083e-05,
+            "cumulative_seconds": 1.4083e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 274,
+            "function": "feed",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 1.321e-05,
+            "cumulative_seconds": 3.0083000000000003e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.compressobj>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.625000000000001e-06,
+            "cumulative_seconds": 8.625000000000001e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 150,
+            "function": "_reserve",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 8.081000000000001e-06,
+            "cumulative_seconds": 9.665e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 328,
+            "function": "_finish",
+            "primitive_calls": 3,
+            "total_calls": 3,
+            "self_seconds": 6.9180000000000005e-06,
+            "cumulative_seconds": 4.6084e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 197,
+            "function": "__init__",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 6.0840000000000005e-06,
+            "cumulative_seconds": 2.2125000000000002e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 257,
+            "function": "_check_encoder_available",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 4.835e-06,
+            "cumulative_seconds": 6.4170000000000006e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 203,
+            "function": "_build_gzip_header",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 4.249e-06,
+            "cumulative_seconds": 6.4170000000000006e-06
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.isinstance>",
+            "primitive_calls": 55,
+            "total_calls": 55,
+            "self_seconds": 3.712e-06,
+            "cumulative_seconds": 3.712e-06
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.len>",
+            "primitive_calls": 51,
+            "total_calls": 51,
+            "self_seconds": 3.711e-06,
+            "cumulative_seconds": 3.711e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 115,
+            "function": "_validate_compresslevel",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3e-06,
+            "cumulative_seconds": 3.333e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 181,
+            "function": "_output_chunks",
+            "primitive_calls": 6,
+            "total_calls": 6,
+            "self_seconds": 2.6640000000000002e-06,
+            "cumulative_seconds": 2.8730000000000003e-06
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method _struct.pack>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 2.458e-06,
+            "cumulative_seconds": 2.458e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 58,
+            "function": "_snapshot_bytes_input",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 2.334e-06,
+            "cumulative_seconds": 2.334e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 82,
+            "function": "__iter__",
+            "primitive_calls": 36,
+            "total_calls": 36,
+            "self_seconds": 1.793e-06,
+            "cumulative_seconds": 1.793e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 72,
+            "function": "__init__",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 1.584e-06,
+            "cumulative_seconds": 1.584e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 144,
+            "function": "_check_available",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 1.582e-06,
+            "cumulative_seconds": 1.582e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 321,
+            "function": "finish",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.5e-06,
+            "cumulative_seconds": 2.7500000000000004e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 158,
+            "function": "_operation_succeeded",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 1.498e-06,
+            "cumulative_seconds": 1.498e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 269,
+            "function": "_start",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 1.416e-06,
+            "cumulative_seconds": 9.166e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 231,
+            "function": "_build_gzip_trailer",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.2930000000000002e-06,
+            "cumulative_seconds": 2.8340000000000003e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 140,
+            "function": "_normalize_mtime",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.1240000000000002e-06,
+            "cumulative_seconds": 1.2080000000000001e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 95,
+            "function": "_validate_chunk_size",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.0420000000000001e-06,
+            "cumulative_seconds": 1.167e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 262,
+            "function": "start",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 9.160000000000001e-07,
+            "cumulative_seconds": 2.333e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_engine.py",
+            "line": 193,
+            "function": "compressobj",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 9.160000000000001e-07,
+            "cumulative_seconds": 9.541e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 139,
+            "function": "__init__",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 5.84e-07,
+            "cumulative_seconds": 5.84e-07
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'append' of 'bytearray' objects>",
+            "primitive_calls": 4,
+            "total_calls": 4,
+            "self_seconds": 4.1700000000000004e-07,
+            "cumulative_seconds": 4.1700000000000004e-07
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 171,
+            "function": "_derive_header_filename",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.67e-07,
+            "cumulative_seconds": 1.67e-07
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_common.py",
+            "line": 154,
+            "function": "_validate_original_filename",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 4.1e-08,
+            "cumulative_seconds": 4.1e-08
+          }
+        ]
+      }
+    },
+    {
+      "name": "async stdlib 64K-in 64K-out",
+      "duration_seconds": 0.1245070409931941,
+      "compressed_bytes": 8391186,
+      "compressed_sha256": "7a47a89a1aff1b052d44b6736143edbc24bd19a6fa5d342d9c0c7d9f56358e3b",
+      "profile": {
+        "categories": {
+          "input_normalization": {
+            "primitive_calls": 256,
+            "total_calls": 256,
+            "self_seconds": 2.3675000000000003e-05,
+            "cumulative_seconds": 2.3675000000000003e-05,
+            "matches": [
+              "codec.py:58:_snapshot_bytes_input"
+            ]
+          },
+          "operation_allocation": {
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 7.1696e-05,
+            "cumulative_seconds": 8.1582e-05,
+            "matches": [
+              "codec.py:150:_reserve"
+            ]
+          },
+          "operation_next": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          },
+          "engine_compression": {
+            "primitive_calls": 129,
+            "total_calls": 129,
+            "self_seconds": 0.114897707,
+            "cumulative_seconds": 0.114897707,
+            "matches": [
+              "~:0:<built-in method zlib.compressobj>",
+              "~:0:<method 'compress' of 'zlib.Compress' objects>"
+            ]
+          },
+          "crc": {
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 0.00023383,
+            "cumulative_seconds": 0.00023383,
+            "matches": [
+              "~:0:<built-in method zlib.crc32>"
+            ]
+          },
+          "output_slicing": {
+            "primitive_calls": 389,
+            "total_calls": 389,
+            "self_seconds": 0.00045035400000000003,
+            "cumulative_seconds": 0.11559340700000001,
+            "matches": [
+              "codec.py:181:_output_chunks",
+              "codec.py:290:_feed"
+            ]
+          },
+          "async_driver": {
+            "primitive_calls": 776,
+            "total_calls": 776,
+            "self_seconds": 0.000263566,
+            "cumulative_seconds": 0.232829682,
+            "matches": [
+              "_codec_async.py:34:_raw_next_or_done",
+              "_codec_async.py:71:_drive_operation"
+            ]
+          },
+          "sink_writes": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          },
+          "event_loop": {
+            "primitive_calls": 6,
+            "total_calls": 6,
+            "self_seconds": 3.5123e-05,
+            "cumulative_seconds": 0.49753816700000003,
+            "matches": [
+              "base_events.py:626:run_forever",
+              "base_events.py:650:run_until_complete",
+              "events.py:86:_run",
+              "base_events.py:1915:_run_once"
+            ]
+          }
+        },
+        "top_by_cumulative": [
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/runners.py",
+            "line": 86,
+            "function": "run",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.8083e-05,
+            "cumulative_seconds": 0.12447395900000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 650,
+            "function": "run_until_complete",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 9.541e-06,
+            "cumulative_seconds": 0.12441750000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 626,
+            "function": "run_forever",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.916e-06,
+            "cumulative_seconds": 0.124400667
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 1915,
+            "function": "_run_once",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 1.2e-05,
+            "cumulative_seconds": 0.124385667
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/events.py",
+            "line": 86,
+            "function": "_run",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 4.666e-06,
+            "cumulative_seconds": 0.124334333
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'run' of '_contextvars.Context' objects>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 4.825e-05,
+            "cumulative_seconds": 0.124329667
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 55,
+            "function": "_stream_compress",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 0.001449916,
+            "cumulative_seconds": 0.12426925000000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_streaming.py",
+            "line": 116,
+            "function": "_compress_chunks_impl",
+            "primitive_calls": 259,
+            "total_calls": 259,
+            "self_seconds": 0.00027301500000000004,
+            "cumulative_seconds": 0.11718554
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_codec_async.py",
+            "line": 71,
+            "function": "_drive_operation",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 0.00019626500000000002,
+            "cumulative_seconds": 0.116547856
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_codec_async.py",
+            "line": 34,
+            "function": "_raw_next_or_done",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 6.7301e-05,
+            "cumulative_seconds": 0.116281826
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 91,
+            "function": "_advance_raw",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 0.00010255500000000001,
+            "cumulative_seconds": 0.11621452500000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.next>",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 0.00040652500000000003,
+            "cumulative_seconds": 0.11610135
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 290,
+            "function": "_feed",
+            "primitive_calls": 383,
+            "total_calls": 383,
+            "self_seconds": 0.00044864600000000003,
+            "cumulative_seconds": 0.115591574
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'compress' of 'zlib.Compress' objects>",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 0.11489516500000001,
+            "cumulative_seconds": 0.11489516500000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'extend' of 'bytearray' objects>",
+            "primitive_calls": 260,
+            "total_calls": 260,
+            "self_seconds": 0.0056167940000000005,
+            "cumulative_seconds": 0.0056167940000000005
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.crc32>",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 0.00023383,
+            "cumulative_seconds": 0.00023383
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 274,
+            "function": "feed",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 7.1394e-05,
+            "cumulative_seconds": 0.00020022100000000002
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 328,
+            "function": "_finish",
+            "primitive_calls": 3,
+            "total_calls": 3,
+            "self_seconds": 5.71e-06,
+            "cumulative_seconds": 9.691700000000001e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'flush' of 'zlib.Compress' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.716600000000001e-05,
+            "cumulative_seconds": 8.716600000000001e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 150,
+            "function": "_reserve",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 7.1696e-05,
+            "cumulative_seconds": 8.1582e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 551,
+            "function": "_asyncgen_firstiter_hook",
+            "primitive_calls": 132,
+            "total_calls": 132,
+            "self_seconds": 2.1671e-05,
+            "cumulative_seconds": 6.9881e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.isinstance>",
+            "primitive_calls": 913,
+            "total_calls": 913,
+            "self_seconds": 5.5729e-05,
+            "cumulative_seconds": 5.5729e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/_weakrefset.py",
+            "line": 85,
+            "function": "add",
+            "primitive_calls": 133,
+            "total_calls": 133,
+            "self_seconds": 3.6289000000000004e-05,
+            "cumulative_seconds": 4.9085e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.len>",
+            "primitive_calls": 780,
+            "total_calls": 780,
+            "self_seconds": 4.4563e-05,
+            "cumulative_seconds": 4.4563e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/_weakrefset.py",
+            "line": 39,
+            "function": "_remove",
+            "primitive_calls": 133,
+            "total_calls": 133,
+            "self_seconds": 3.0283e-05,
+            "cumulative_seconds": 4.2088e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/selectors.py",
+            "line": 558,
+            "function": "select",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 3.626e-06,
+            "cumulative_seconds": 3.575e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'control' of 'select.kqueue' objects>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 3.0166000000000002e-05,
+            "cumulative_seconds": 3.0166000000000002e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 257,
+            "function": "_check_encoder_available",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 2.1176000000000002e-05,
+            "cumulative_seconds": 2.9708e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 58,
+            "function": "_snapshot_bytes_input",
+            "primitive_calls": 256,
+            "total_calls": 256,
+            "self_seconds": 2.3675000000000003e-05,
+            "cumulative_seconds": 2.3675000000000003e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 31,
+            "function": "_source",
+            "primitive_calls": 129,
+            "total_calls": 129,
+            "self_seconds": 1.7453e-05,
+            "cumulative_seconds": 1.7453e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/__init__.py",
+            "line": 410,
+            "function": "compress_chunks",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.667e-06,
+            "cumulative_seconds": 1.5917e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_streaming.py",
+            "line": 84,
+            "function": "_compress_chunks",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 4.835e-06,
+            "cumulative_seconds": 1.425e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 450,
+            "function": "create_task",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.625000000000001e-06,
+            "cumulative_seconds": 1.4167e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'add' of 'set' objects>",
+            "primitive_calls": 134,
+            "total_calls": 134,
+            "self_seconds": 1.3171000000000001e-05,
+            "cumulative_seconds": 1.3171000000000001e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.2542000000000001e-05,
+            "cumulative_seconds": 1.2542000000000001e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'discard' of 'set' objects>",
+            "primitive_calls": 133,
+            "total_calls": 133,
+            "self_seconds": 1.1805000000000001e-05,
+            "cumulative_seconds": 1.1805000000000001e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/signal.py",
+            "line": 56,
+            "function": "signal",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 2.166e-06,
+            "cumulative_seconds": 1.1083e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 158,
+            "function": "_operation_succeeded",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 1.062e-05,
+            "cumulative_seconds": 1.062e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 784,
+            "function": "call_soon",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 2.708e-06,
+            "cumulative_seconds": 1.0292e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 72,
+            "function": "__init__",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 9.886e-06,
+            "cumulative_seconds": 9.886e-06
+          }
+        ],
+        "top_by_self": [
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'compress' of 'zlib.Compress' objects>",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 0.11489516500000001,
+            "cumulative_seconds": 0.11489516500000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'extend' of 'bytearray' objects>",
+            "primitive_calls": 260,
+            "total_calls": 260,
+            "self_seconds": 0.0056167940000000005,
+            "cumulative_seconds": 0.0056167940000000005
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 55,
+            "function": "_stream_compress",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 0.001449916,
+            "cumulative_seconds": 0.12426925000000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 290,
+            "function": "_feed",
+            "primitive_calls": 383,
+            "total_calls": 383,
+            "self_seconds": 0.00044864600000000003,
+            "cumulative_seconds": 0.115591574
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.next>",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 0.00040652500000000003,
+            "cumulative_seconds": 0.11610135
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_streaming.py",
+            "line": 116,
+            "function": "_compress_chunks_impl",
+            "primitive_calls": 259,
+            "total_calls": 259,
+            "self_seconds": 0.00027301500000000004,
+            "cumulative_seconds": 0.11718554
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.crc32>",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 0.00023383,
+            "cumulative_seconds": 0.00023383
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_codec_async.py",
+            "line": 71,
+            "function": "_drive_operation",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 0.00019626500000000002,
+            "cumulative_seconds": 0.116547856
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 91,
+            "function": "_advance_raw",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 0.00010255500000000001,
+            "cumulative_seconds": 0.11621452500000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'flush' of 'zlib.Compress' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.716600000000001e-05,
+            "cumulative_seconds": 8.716600000000001e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 150,
+            "function": "_reserve",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 7.1696e-05,
+            "cumulative_seconds": 8.1582e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 274,
+            "function": "feed",
+            "primitive_calls": 128,
+            "total_calls": 128,
+            "self_seconds": 7.1394e-05,
+            "cumulative_seconds": 0.00020022100000000002
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_codec_async.py",
+            "line": 34,
+            "function": "_raw_next_or_done",
+            "primitive_calls": 388,
+            "total_calls": 388,
+            "self_seconds": 6.7301e-05,
+            "cumulative_seconds": 0.116281826
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.isinstance>",
+            "primitive_calls": 913,
+            "total_calls": 913,
+            "self_seconds": 5.5729e-05,
+            "cumulative_seconds": 5.5729e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'run' of '_contextvars.Context' objects>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 4.825e-05,
+            "cumulative_seconds": 0.124329667
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.len>",
+            "primitive_calls": 780,
+            "total_calls": 780,
+            "self_seconds": 4.4563e-05,
+            "cumulative_seconds": 4.4563e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/_weakrefset.py",
+            "line": 85,
+            "function": "add",
+            "primitive_calls": 133,
+            "total_calls": 133,
+            "self_seconds": 3.6289000000000004e-05,
+            "cumulative_seconds": 4.9085e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/_weakrefset.py",
+            "line": 39,
+            "function": "_remove",
+            "primitive_calls": 133,
+            "total_calls": 133,
+            "self_seconds": 3.0283e-05,
+            "cumulative_seconds": 4.2088e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'control' of 'select.kqueue' objects>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 3.0166000000000002e-05,
+            "cumulative_seconds": 3.0166000000000002e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 58,
+            "function": "_snapshot_bytes_input",
+            "primitive_calls": 256,
+            "total_calls": 256,
+            "self_seconds": 2.3675000000000003e-05,
+            "cumulative_seconds": 2.3675000000000003e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 551,
+            "function": "_asyncgen_firstiter_hook",
+            "primitive_calls": 132,
+            "total_calls": 132,
+            "self_seconds": 2.1671e-05,
+            "cumulative_seconds": 6.9881e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 257,
+            "function": "_check_encoder_available",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 2.1176000000000002e-05,
+            "cumulative_seconds": 2.9708e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/runners.py",
+            "line": 86,
+            "function": "run",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.8083e-05,
+            "cumulative_seconds": 0.12447395900000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 31,
+            "function": "_source",
+            "primitive_calls": 129,
+            "total_calls": 129,
+            "self_seconds": 1.7453e-05,
+            "cumulative_seconds": 1.7453e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'add' of 'set' objects>",
+            "primitive_calls": 134,
+            "total_calls": 134,
+            "self_seconds": 1.3171000000000001e-05,
+            "cumulative_seconds": 1.3171000000000001e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.2542000000000001e-05,
+            "cumulative_seconds": 1.2542000000000001e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 1915,
+            "function": "_run_once",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 1.2e-05,
+            "cumulative_seconds": 0.124385667
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'discard' of 'set' objects>",
+            "primitive_calls": 133,
+            "total_calls": 133,
+            "self_seconds": 1.1805000000000001e-05,
+            "cumulative_seconds": 1.1805000000000001e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 158,
+            "function": "_operation_succeeded",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 1.062e-05,
+            "cumulative_seconds": 1.062e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 72,
+            "function": "__init__",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 9.886e-06,
+            "cumulative_seconds": 9.886e-06
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 650,
+            "function": "run_until_complete",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 9.541e-06,
+            "cumulative_seconds": 0.12441750000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 626,
+            "function": "run_forever",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.916e-06,
+            "cumulative_seconds": 0.124400667
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 450,
+            "function": "create_task",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 8.625000000000001e-06,
+            "cumulative_seconds": 1.4167e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 144,
+            "function": "_check_available",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 8.532e-06,
+            "cumulative_seconds": 8.532e-06
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/typing.py",
+            "line": 2183,
+            "function": "cast",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 6.999e-06,
+            "cumulative_seconds": 6.999e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 328,
+            "function": "_finish",
+            "primitive_calls": 3,
+            "total_calls": 3,
+            "self_seconds": 5.71e-06,
+            "cumulative_seconds": 9.691700000000001e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 813,
+            "function": "_call_soon",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 5.667e-06,
+            "cumulative_seconds": 7.5e-06
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/signal.py",
+            "line": 36,
+            "function": "_enum_to_int",
+            "primitive_calls": 4,
+            "total_calls": 4,
+            "self_seconds": 5.166e-06,
+            "cumulative_seconds": 5.166e-06
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_streaming.py",
+            "line": 84,
+            "function": "_compress_chunks",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 4.835e-06,
+            "cumulative_seconds": 1.425e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 181,
+            "function": "_run_until_complete_cb",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 4.749000000000001e-06,
+            "cumulative_seconds": 6.25e-06
+          }
+        ]
+      }
+    },
+    {
+      "name": "async stdlib 512K-in 256K-out",
+      "duration_seconds": 0.12761854199925438,
+      "compressed_bytes": 8391186,
+      "compressed_sha256": "7a47a89a1aff1b052d44b6736143edbc24bd19a6fa5d342d9c0c7d9f56358e3b",
+      "profile": {
+        "categories": {
+          "input_normalization": {
+            "primitive_calls": 32,
+            "total_calls": 32,
+            "self_seconds": 5.003e-06,
+            "cumulative_seconds": 5.003e-06,
+            "matches": [
+              "codec.py:58:_snapshot_bytes_input"
+            ]
+          },
+          "operation_allocation": {
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 7.830000000000001e-06,
+            "cumulative_seconds": 9.913e-06,
+            "matches": [
+              "codec.py:150:_reserve"
+            ]
+          },
+          "operation_next": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          },
+          "engine_compression": {
+            "primitive_calls": 17,
+            "total_calls": 17,
+            "self_seconds": 0.11551362400000001,
+            "cumulative_seconds": 0.11551362400000001,
+            "matches": [
+              "~:0:<built-in method zlib.compressobj>",
+              "~:0:<method 'compress' of 'zlib.Compress' objects>"
+            ]
+          },
+          "crc": {
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 0.000220709,
+            "cumulative_seconds": 0.000220709,
+            "matches": [
+              "~:0:<built-in method zlib.crc32>"
+            ]
+          },
+          "output_slicing": {
+            "primitive_calls": 69,
+            "total_calls": 69,
+            "self_seconds": 0.000267504,
+            "cumulative_seconds": 0.115997918,
+            "matches": [
+              "codec.py:181:_output_chunks",
+              "codec.py:290:_feed"
+            ]
+          },
+          "async_driver": {
+            "primitive_calls": 216,
+            "total_calls": 216,
+            "self_seconds": 0.00012917400000000002,
+            "cumulative_seconds": 0.118196252,
+            "matches": [
+              "_codec_async.py:23:_run_in_thread",
+              "_codec_async.py:34:_raw_next_or_done",
+              "_codec_async.py:45:_offloaded_next",
+              "_codec_async.py:71:_drive_operation"
+            ]
+          },
+          "sink_writes": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          },
+          "event_loop": {
+            "primitive_calls": 214,
+            "total_calls": 218,
+            "self_seconds": 0.0007824910000000001,
+            "cumulative_seconds": 0.385060619,
+            "matches": [
+              "base_events.py:626:run_forever",
+              "base_events.py:650:run_until_complete",
+              "events.py:86:_run",
+              "base_events.py:1915:_run_once"
+            ]
+          }
+        },
+        "top_by_cumulative": [
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/runners.py",
+            "line": 86,
+            "function": "run",
+            "primitive_calls": 1,
+            "total_calls": 2,
+            "self_seconds": 1.042e-05,
+            "cumulative_seconds": 0.127436709
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 650,
+            "function": "run_until_complete",
+            "primitive_calls": 1,
+            "total_calls": 2,
+            "self_seconds": 6.5850000000000005e-06,
+            "cumulative_seconds": 0.127428083
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 626,
+            "function": "run_forever",
+            "primitive_calls": 1,
+            "total_calls": 2,
+            "self_seconds": 2.8550000000000003e-05,
+            "cumulative_seconds": 0.127423708
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 1915,
+            "function": "_run_once",
+            "primitive_calls": 82,
+            "total_calls": 83,
+            "self_seconds": 0.000702062,
+            "cumulative_seconds": 0.12413724300000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/selectors.py",
+            "line": 558,
+            "function": "select",
+            "primitive_calls": 82,
+            "total_calls": 82,
+            "self_seconds": 0.000113171,
+            "cumulative_seconds": 0.117293959
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_codec_async.py",
+            "line": 34,
+            "function": "_raw_next_or_done",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 2.0043e-05,
+            "cumulative_seconds": 0.11671762200000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 91,
+            "function": "_advance_raw",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 3.133e-05,
+            "cumulative_seconds": 0.11669707900000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.next>",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 0.000557376,
+            "cumulative_seconds": 0.1165975
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/thread.py",
+            "line": 54,
+            "function": "run",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 2.2039e-05,
+            "cumulative_seconds": 0.116170332
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 290,
+            "function": "_feed",
+            "primitive_calls": 63,
+            "total_calls": 63,
+            "self_seconds": 0.000265875,
+            "cumulative_seconds": 0.115996082
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'compress' of 'zlib.Compress' objects>",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 0.11550720800000001,
+            "cumulative_seconds": 0.11550720800000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/events.py",
+            "line": 86,
+            "function": "_run",
+            "primitive_calls": 130,
+            "total_calls": 131,
+            "self_seconds": 4.5294000000000004e-05,
+            "cumulative_seconds": 0.006071585
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'run' of '_contextvars.Context' objects>",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 0.00011811900000000001,
+            "cumulative_seconds": 0.0060288320000000005
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 55,
+            "function": "_stream_compress",
+            "primitive_calls": 17,
+            "total_calls": 17,
+            "self_seconds": 0.0012694610000000002,
+            "cumulative_seconds": 0.0051879560000000005
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/__init__.py",
+            "line": 41,
+            "function": "__getattr__",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 5.625e-06,
+            "cumulative_seconds": 0.0033982920000000002
+          },
+          {
+            "file": "<frozen importlib._bootstrap>",
+            "line": 1349,
+            "function": "_find_and_load",
+            "primitive_calls": 1,
+            "total_calls": 3,
+            "self_seconds": 1.1127e-05,
+            "cumulative_seconds": 0.003392542
+          },
+          {
+            "file": "<frozen importlib._bootstrap>",
+            "line": 1304,
+            "function": "_find_and_load_unlocked",
+            "primitive_calls": 1,
+            "total_calls": 3,
+            "self_seconds": 8.332000000000001e-06,
+            "cumulative_seconds": 0.0033615840000000004
+          },
+          {
+            "file": "<frozen importlib._bootstrap>",
+            "line": 911,
+            "function": "_load_unlocked",
+            "primitive_calls": 1,
+            "total_calls": 3,
+            "self_seconds": 6.543000000000001e-06,
+            "cumulative_seconds": 0.0032908340000000003
+          },
+          {
+            "file": "<frozen importlib._bootstrap_external>",
+            "line": 993,
+            "function": "exec_module",
+            "primitive_calls": 1,
+            "total_calls": 2,
+            "self_seconds": 4.418e-06,
+            "cumulative_seconds": 0.003234667
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'extend' of 'bytearray' objects>",
+            "primitive_calls": 52,
+            "total_calls": 52,
+            "self_seconds": 0.0027201630000000003,
+            "cumulative_seconds": 0.0027201630000000003
+          },
+          {
+            "file": "<frozen importlib._bootstrap>",
+            "line": 480,
+            "function": "_call_with_frames_removed",
+            "primitive_calls": 2,
+            "total_calls": 7,
+            "self_seconds": 5.917e-06,
+            "cumulative_seconds": 0.0024615410000000002
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.exec>",
+            "primitive_calls": 1,
+            "total_calls": 2,
+            "self_seconds": 2.9580000000000003e-06,
+            "cumulative_seconds": 0.0024581660000000003
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/thread.py",
+            "line": 1,
+            "function": "<module>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.4417000000000001e-05,
+            "cumulative_seconds": 0.002456625
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/queue.py",
+            "line": 1,
+            "function": "<module>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 7.833000000000001e-06,
+            "cumulative_seconds": 0.00195375
+          },
+          {
+            "file": "<frozen importlib._bootstrap>",
+            "line": 806,
+            "function": "module_from_spec",
+            "primitive_calls": 3,
+            "total_calls": 3,
+            "self_seconds": 4.709e-06,
+            "cumulative_seconds": 0.001883792
+          },
+          {
+            "file": "<frozen importlib._bootstrap_external>",
+            "line": 1291,
+            "function": "create_module",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 1.6680000000000002e-06,
+            "cumulative_seconds": 0.0018143340000000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method _imp.create_dynamic>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 0.0018114160000000002,
+            "cumulative_seconds": 0.0018114160000000002
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_streaming.py",
+            "line": 116,
+            "function": "_compress_chunks_impl",
+            "primitive_calls": 67,
+            "total_calls": 67,
+            "self_seconds": 7.1951e-05,
+            "cumulative_seconds": 0.001178666
+          },
+          {
+            "file": "<frozen importlib._bootstrap_external>",
+            "line": 1066,
+            "function": "get_code",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 1.221e-05,
+            "cumulative_seconds": 0.0011438330000000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_codec_async.py",
+            "line": 71,
+            "function": "_drive_operation",
+            "primitive_calls": 84,
+            "total_calls": 84,
+            "self_seconds": 6.921600000000001e-05,
+            "cumulative_seconds": 0.001023629
+          },
+          {
+            "file": "<frozen importlib._bootstrap_external>",
+            "line": 1187,
+            "function": "get_data",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 5.375e-06,
+            "cumulative_seconds": 0.001011416
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'read' of '_io.BufferedReader' objects>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 0.0009106240000000001,
+            "cumulative_seconds": 0.0009106240000000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'control' of 'select.kqueue' objects>",
+            "primitive_calls": 82,
+            "total_calls": 82,
+            "self_seconds": 0.000881955,
+            "cumulative_seconds": 0.000881955
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_codec_async.py",
+            "line": 23,
+            "function": "_run_in_thread",
+            "primitive_calls": 32,
+            "total_calls": 32,
+            "self_seconds": 1.796e-05,
+            "cumulative_seconds": 0.000313045
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 848,
+            "function": "run_in_executor",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 2.4214000000000002e-05,
+            "cumulative_seconds": 0.000293543
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.crc32>",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 0.000220709,
+            "cumulative_seconds": 0.000220709
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 383,
+            "function": "_set_state",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 8.750000000000001e-06,
+            "cumulative_seconds": 0.000193167
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/_base.py",
+            "line": 537,
+            "function": "set_result",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 2.8083000000000002e-05,
+            "cumulative_seconds": 0.000176751
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 347,
+            "function": "_copy_future_state",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 3.2036e-05,
+            "cumulative_seconds": 0.000176582
+          },
+          {
+            "file": "<frozen importlib._bootstrap>",
+            "line": 1240,
+            "function": "_find_spec",
+            "primitive_calls": 3,
+            "total_calls": 3,
+            "self_seconds": 1.0043e-05,
+            "cumulative_seconds": 0.00015104200000000002
+          }
+        ],
+        "top_by_self": [
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'compress' of 'zlib.Compress' objects>",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 0.11550720800000001,
+            "cumulative_seconds": 0.11550720800000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'extend' of 'bytearray' objects>",
+            "primitive_calls": 52,
+            "total_calls": 52,
+            "self_seconds": 0.0027201630000000003,
+            "cumulative_seconds": 0.0027201630000000003
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method _imp.create_dynamic>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 0.0018114160000000002,
+            "cumulative_seconds": 0.0018114160000000002
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 55,
+            "function": "_stream_compress",
+            "primitive_calls": 17,
+            "total_calls": 17,
+            "self_seconds": 0.0012694610000000002,
+            "cumulative_seconds": 0.0051879560000000005
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'read' of '_io.BufferedReader' objects>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 0.0009106240000000001,
+            "cumulative_seconds": 0.0009106240000000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'control' of 'select.kqueue' objects>",
+            "primitive_calls": 82,
+            "total_calls": 82,
+            "self_seconds": 0.000881955,
+            "cumulative_seconds": 0.000881955
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 1915,
+            "function": "_run_once",
+            "primitive_calls": 82,
+            "total_calls": 83,
+            "self_seconds": 0.000702062,
+            "cumulative_seconds": 0.12413724300000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.next>",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 0.000557376,
+            "cumulative_seconds": 0.1165975
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 290,
+            "function": "_feed",
+            "primitive_calls": 63,
+            "total_calls": 63,
+            "self_seconds": 0.000265875,
+            "cumulative_seconds": 0.115996082
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.crc32>",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 0.000220709,
+            "cumulative_seconds": 0.000220709
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'run' of '_contextvars.Context' objects>",
+            "primitive_calls": 130,
+            "total_calls": 130,
+            "self_seconds": 0.00011811900000000001,
+            "cumulative_seconds": 0.0060288320000000005
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/selectors.py",
+            "line": 558,
+            "function": "select",
+            "primitive_calls": 82,
+            "total_calls": 82,
+            "self_seconds": 0.000113171,
+            "cumulative_seconds": 0.117293959
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method marshal.loads>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 9.3584e-05,
+            "cumulative_seconds": 9.3584e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method _io.open_code>",
+            "primitive_calls": 2,
+            "total_calls": 2,
+            "self_seconds": 8.945800000000001e-05,
+            "cumulative_seconds": 8.945800000000001e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'recv' of '_socket.socket' objects>",
+            "primitive_calls": 32,
+            "total_calls": 32,
+            "self_seconds": 8.045900000000001e-05,
+            "cumulative_seconds": 8.045900000000001e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_streaming.py",
+            "line": 116,
+            "function": "_compress_chunks_impl",
+            "primitive_calls": 67,
+            "total_calls": 67,
+            "self_seconds": 7.1951e-05,
+            "cumulative_seconds": 0.001178666
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_codec_async.py",
+            "line": 71,
+            "function": "_drive_operation",
+            "primitive_calls": 84,
+            "total_calls": 84,
+            "self_seconds": 6.921600000000001e-05,
+            "cumulative_seconds": 0.001023629
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method posix.stat>",
+            "primitive_calls": 11,
+            "total_calls": 11,
+            "self_seconds": 6.4293e-05,
+            "cumulative_seconds": 6.4293e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 813,
+            "function": "_call_soon",
+            "primitive_calls": 114,
+            "total_calls": 114,
+            "self_seconds": 5.7288000000000004e-05,
+            "cumulative_seconds": 0.000111002
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.__build_class__>",
+            "primitive_calls": 8,
+            "total_calls": 8,
+            "self_seconds": 5.6416e-05,
+            "cumulative_seconds": 6.8417e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'send' of '_socket.socket' objects>",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 5.3125000000000004e-05,
+            "cumulative_seconds": 5.3125000000000004e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/events.py",
+            "line": 86,
+            "function": "_run",
+            "primitive_calls": 130,
+            "total_calls": 131,
+            "self_seconds": 4.5294000000000004e-05,
+            "cumulative_seconds": 0.006071585
+          },
+          {
+            "file": "<frozen importlib._bootstrap_external>",
+            "line": 132,
+            "function": "_path_split",
+            "primitive_calls": 4,
+            "total_calls": 4,
+            "self_seconds": 3.6166e-05,
+            "cumulative_seconds": 4.1041e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'get' of '_queue.SimpleQueue' objects>",
+            "primitive_calls": 15,
+            "total_calls": 15,
+            "self_seconds": 3.6124e-05,
+            "cumulative_seconds": 3.6124e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py",
+            "line": 299,
+            "function": "__enter__",
+            "primitive_calls": 146,
+            "total_calls": 146,
+            "self_seconds": 3.5223000000000005e-05,
+            "cumulative_seconds": 5.6391e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/thread.py",
+            "line": 165,
+            "function": "submit",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 3.4831e-05,
+            "cumulative_seconds": 0.00014591500000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/events.py",
+            "line": 36,
+            "function": "__init__",
+            "primitive_calls": 114,
+            "total_calls": 114,
+            "self_seconds": 3.2365e-05,
+            "cumulative_seconds": 4.1918e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 347,
+            "function": "_copy_future_state",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 3.2036e-05,
+            "cumulative_seconds": 0.000176582
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py",
+            "line": 302,
+            "function": "__exit__",
+            "primitive_calls": 146,
+            "total_calls": 146,
+            "self_seconds": 3.1499000000000005e-05,
+            "cumulative_seconds": 4.3968e-05
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 91,
+            "function": "_advance_raw",
+            "primitive_calls": 68,
+            "total_calls": 68,
+            "self_seconds": 3.133e-05,
+            "cumulative_seconds": 0.11669707900000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 367,
+            "function": "_chain_future",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 3.0034e-05,
+            "cumulative_seconds": 8.1124e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 784,
+            "function": "call_soon",
+            "primitive_calls": 98,
+            "total_calls": 98,
+            "self_seconds": 2.9752000000000002e-05,
+            "cumulative_seconds": 0.00012137500000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py",
+            "line": 277,
+            "function": "__init__",
+            "primitive_calls": 18,
+            "total_calls": 18,
+            "self_seconds": 2.9254e-05,
+            "cumulative_seconds": 4.2919e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 626,
+            "function": "run_forever",
+            "primitive_calls": 1,
+            "total_calls": 2,
+            "self_seconds": 2.8550000000000003e-05,
+            "cumulative_seconds": 0.127423708
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'flush' of 'zlib.Compress' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 2.8292000000000003e-05,
+            "cumulative_seconds": 2.8292000000000003e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/_base.py",
+            "line": 537,
+            "function": "set_result",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 2.8083000000000002e-05,
+            "cumulative_seconds": 0.000176751
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 450,
+            "function": "create_task",
+            "primitive_calls": 17,
+            "total_calls": 17,
+            "self_seconds": 2.7627e-05,
+            "cumulative_seconds": 6.2667e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_futures.py",
+            "line": 13,
+            "function": "isfuture",
+            "primitive_calls": 114,
+            "total_calls": 114,
+            "self_seconds": 2.6183000000000003e-05,
+            "cumulative_seconds": 3.7882e-05
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.len>",
+            "primitive_calls": 302,
+            "total_calls": 302,
+            "self_seconds": 2.4628000000000002e-05,
+            "cumulative_seconds": 2.4628000000000002e-05
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 848,
+            "function": "run_in_executor",
+            "primitive_calls": 16,
+            "total_calls": 16,
+            "self_seconds": 2.4214000000000002e-05,
+            "cumulative_seconds": 0.000293543
+          }
+        ]
+      }
+    },
+    {
+      "name": "binary writer 10-byte chunks",
+      "duration_seconds": 2.9973245410074014,
+      "compressed_bytes": 8391198,
+      "compressed_sha256": "f0fd136d2bb7dedf045072ed9ca7910ef1ec0cdac65d938877b8b1472cb7f07a",
+      "profile": {
+        "categories": {
+          "input_normalization": {
+            "primitive_calls": 1677722,
+            "total_calls": 1677722,
+            "self_seconds": 0.13936530200000002,
+            "cumulative_seconds": 0.13936530200000002,
+            "matches": [
+              "codec.py:58:_snapshot_bytes_input",
+              "_binary.py:888:_coerce_byteslike"
+            ]
+          },
+          "operation_allocation": {
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.147757619,
+            "cumulative_seconds": 0.192606087,
+            "matches": [
+              "codec.py:150:_reserve"
+            ]
+          },
+          "operation_next": {
+            "primitive_calls": 839377,
+            "total_calls": 839377,
+            "self_seconds": 0.124806024,
+            "cumulative_seconds": 1.240754954,
+            "matches": [
+              "codec.py:85:__next__"
+            ]
+          },
+          "engine_compression": {
+            "primitive_calls": 838862,
+            "total_calls": 838862,
+            "self_seconds": 0.299180125,
+            "cumulative_seconds": 0.299180125,
+            "matches": [
+              "~:0:<built-in method zlib.compressobj>",
+              "~:0:<method 'compress' of 'zlib.Compress' objects>"
+            ]
+          },
+          "crc": {
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.066353675,
+            "cumulative_seconds": 0.066353675,
+            "matches": [
+              "~:0:<built-in method zlib.crc32>"
+            ]
+          },
+          "output_slicing": {
+            "primitive_calls": 839378,
+            "total_calls": 839378,
+            "self_seconds": 0.255880405,
+            "cumulative_seconds": 0.656656685,
+            "matches": [
+              "codec.py:181:_output_chunks",
+              "codec.py:290:_feed"
+            ]
+          },
+          "async_driver": {
+            "primitive_calls": 0,
+            "total_calls": 0,
+            "self_seconds": 0,
+            "cumulative_seconds": 0,
+            "matches": []
+          },
+          "sink_writes": {
+            "primitive_calls": 1028,
+            "total_calls": 1028,
+            "self_seconds": 0.000614584,
+            "cumulative_seconds": 0.010544974,
+            "matches": [
+              "_binary.py:904:_write_all"
+            ]
+          },
+          "event_loop": {
+            "primitive_calls": 3102,
+            "total_calls": 3102,
+            "self_seconds": 0.003627234,
+            "cumulative_seconds": 11.961018698,
+            "matches": [
+              "base_events.py:626:run_forever",
+              "base_events.py:650:run_until_complete",
+              "events.py:86:_run",
+              "base_events.py:1915:_run_once"
+            ]
+          }
+        },
+        "top_by_cumulative": [
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/runners.py",
+            "line": 86,
+            "function": "run",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 6.542e-06,
+            "cumulative_seconds": 2.997290167
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 650,
+            "function": "run_until_complete",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 3.666e-06,
+            "cumulative_seconds": 2.997261625
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 626,
+            "function": "run_forever",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 0.000258894,
+            "cumulative_seconds": 2.99725375
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 1915,
+            "function": "_run_once",
+            "primitive_calls": 1034,
+            "total_calls": 1034,
+            "self_seconds": 0.002666393,
+            "cumulative_seconds": 2.9969901880000003
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/events.py",
+            "line": 86,
+            "function": "_run",
+            "primitive_calls": 2066,
+            "total_calls": 2066,
+            "self_seconds": 0.000698281,
+            "cumulative_seconds": 2.969513135
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'run' of '_contextvars.Context' objects>",
+            "primitive_calls": 2066,
+            "total_calls": 2066,
+            "self_seconds": 0.000798491,
+            "cumulative_seconds": 2.968814854
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 72,
+            "function": "_tiny_file_write",
+            "primitive_calls": 517,
+            "total_calls": 517,
+            "self_seconds": 0.16834816500000002,
+            "cumulative_seconds": 2.9598126060000003
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_binary.py",
+            "line": 831,
+            "function": "write",
+            "primitive_calls": 839372,
+            "total_calls": 839372,
+            "self_seconds": 0.555628373,
+            "cumulative_seconds": 2.7894767330000003
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 85,
+            "function": "__next__",
+            "primitive_calls": 839377,
+            "total_calls": 839377,
+            "self_seconds": 0.124806024,
+            "cumulative_seconds": 1.240754954
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 91,
+            "function": "_advance_raw",
+            "primitive_calls": 839377,
+            "total_calls": 839377,
+            "self_seconds": 0.28712988300000003,
+            "cumulative_seconds": 1.1159120150000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 274,
+            "function": "feed",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.36589779100000003,
+            "cumulative_seconds": 0.80128462
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.next>",
+            "primitive_calls": 839377,
+            "total_calls": 839377,
+            "self_seconds": 0.12371330600000001,
+            "cumulative_seconds": 0.7804122400000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 290,
+            "function": "_feed",
+            "primitive_calls": 839372,
+            "total_calls": 839372,
+            "self_seconds": 0.25587853,
+            "cumulative_seconds": 0.65665456
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'compress' of 'zlib.Compress' objects>",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.299177791,
+            "cumulative_seconds": 0.299177791
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 150,
+            "function": "_reserve",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.147757619,
+            "cumulative_seconds": 0.192606087
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 257,
+            "function": "_check_encoder_available",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.103328872,
+            "cumulative_seconds": 0.141231765
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.len>",
+            "primitive_calls": 2520221,
+            "total_calls": 2520223,
+            "self_seconds": 0.102002623,
+            "cumulative_seconds": 0.102002957
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_binary.py",
+            "line": 888,
+            "function": "_coerce_byteslike",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.071110822,
+            "cumulative_seconds": 0.071110822
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 58,
+            "function": "_snapshot_bytes_input",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.06825448,
+            "cumulative_seconds": 0.06825448
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.crc32>",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.066353675,
+            "cumulative_seconds": 0.066353675
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 158,
+            "function": "_operation_succeeded",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.048369892000000005,
+            "cumulative_seconds": 0.048369892000000005
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 72,
+            "function": "__init__",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.044848468,
+            "cumulative_seconds": 0.044848468
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 234,
+            "function": "input_size",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.039430088,
+            "cumulative_seconds": 0.039430088
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 144,
+            "function": "_check_available",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.037902893,
+            "cumulative_seconds": 0.037902893
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 82,
+            "function": "__iter__",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.037631282,
+            "cumulative_seconds": 0.037631282
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/selectors.py",
+            "line": 558,
+            "function": "select",
+            "primitive_calls": 1034,
+            "total_calls": 1034,
+            "self_seconds": 0.0022343090000000003,
+            "cumulative_seconds": 0.023382388
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/thread.py",
+            "line": 54,
+            "function": "run",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.005818693000000001,
+            "cumulative_seconds": 0.01058071
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_binary.py",
+            "line": 904,
+            "function": "_write_all",
+            "primitive_calls": 1028,
+            "total_calls": 1028,
+            "self_seconds": 0.000614584,
+            "cumulative_seconds": 0.010544974
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/.venv/lib/python3.12/site-packages/aiofiles/threadpool/utils.py",
+            "line": 41,
+            "function": "method",
+            "primitive_calls": 1030,
+            "total_calls": 1030,
+            "self_seconds": 0.000675855,
+            "cumulative_seconds": 0.009808714000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 848,
+            "function": "run_in_executor",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.0006092500000000001,
+            "cumulative_seconds": 0.008987615000000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'control' of 'select.kqueue' objects>",
+            "primitive_calls": 1034,
+            "total_calls": 1034,
+            "self_seconds": 0.007569277,
+            "cumulative_seconds": 0.007569277
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 383,
+            "function": "_set_state",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.000282344,
+            "cumulative_seconds": 0.005817658000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 347,
+            "function": "_copy_future_state",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.0008529070000000001,
+            "cumulative_seconds": 0.005295889000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/thread.py",
+            "line": 165,
+            "function": "submit",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.000933015,
+            "cumulative_seconds": 0.004461368
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/_base.py",
+            "line": 537,
+            "function": "set_result",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.000621797,
+            "cumulative_seconds": 0.004075681
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 411,
+            "function": "wrap_future",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.0005577360000000001,
+            "cumulative_seconds": 0.0038287560000000004
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/_base.py",
+            "line": 337,
+            "function": "_invoke_callbacks",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.000176526,
+            "cumulative_seconds": 0.002754938
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 367,
+            "function": "_chain_future",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.0008801600000000001,
+            "cumulative_seconds": 0.0026196260000000003
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 396,
+            "function": "_call_set_state",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.000353426,
+            "cumulative_seconds": 0.002578412
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/selector_events.py",
+            "line": 129,
+            "function": "_read_from_self",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.000483932,
+            "cumulative_seconds": 0.0022240890000000003
+          }
+        ],
+        "top_by_self": [
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_binary.py",
+            "line": 831,
+            "function": "write",
+            "primitive_calls": 839372,
+            "total_calls": 839372,
+            "self_seconds": 0.555628373,
+            "cumulative_seconds": 2.7894767330000003
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 274,
+            "function": "feed",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.36589779100000003,
+            "cumulative_seconds": 0.80128462
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'compress' of 'zlib.Compress' objects>",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.299177791,
+            "cumulative_seconds": 0.299177791
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 91,
+            "function": "_advance_raw",
+            "primitive_calls": 839377,
+            "total_calls": 839377,
+            "self_seconds": 0.28712988300000003,
+            "cumulative_seconds": 1.1159120150000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 290,
+            "function": "_feed",
+            "primitive_calls": 839372,
+            "total_calls": 839372,
+            "self_seconds": 0.25587853,
+            "cumulative_seconds": 0.65665456
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/benchmarks/profile_compression_paths.py",
+            "line": 72,
+            "function": "_tiny_file_write",
+            "primitive_calls": 517,
+            "total_calls": 517,
+            "self_seconds": 0.16834816500000002,
+            "cumulative_seconds": 2.9598126060000003
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 150,
+            "function": "_reserve",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.147757619,
+            "cumulative_seconds": 0.192606087
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 85,
+            "function": "__next__",
+            "primitive_calls": 839377,
+            "total_calls": 839377,
+            "self_seconds": 0.124806024,
+            "cumulative_seconds": 1.240754954
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.next>",
+            "primitive_calls": 839377,
+            "total_calls": 839377,
+            "self_seconds": 0.12371330600000001,
+            "cumulative_seconds": 0.7804122400000001
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 257,
+            "function": "_check_encoder_available",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.103328872,
+            "cumulative_seconds": 0.141231765
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method builtins.len>",
+            "primitive_calls": 2520221,
+            "total_calls": 2520223,
+            "self_seconds": 0.102002623,
+            "cumulative_seconds": 0.102002957
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/_binary.py",
+            "line": 888,
+            "function": "_coerce_byteslike",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.071110822,
+            "cumulative_seconds": 0.071110822
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 58,
+            "function": "_snapshot_bytes_input",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.06825448,
+            "cumulative_seconds": 0.06825448
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<built-in method zlib.crc32>",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.066353675,
+            "cumulative_seconds": 0.066353675
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 158,
+            "function": "_operation_succeeded",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.048369892000000005,
+            "cumulative_seconds": 0.048369892000000005
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 72,
+            "function": "__init__",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.044848468,
+            "cumulative_seconds": 0.044848468
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 234,
+            "function": "input_size",
+            "primitive_calls": 838861,
+            "total_calls": 838861,
+            "self_seconds": 0.039430088,
+            "cumulative_seconds": 0.039430088
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 144,
+            "function": "_check_available",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.037902893,
+            "cumulative_seconds": 0.037902893
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/src/aiogzip/codec.py",
+            "line": 82,
+            "function": "__iter__",
+            "primitive_calls": 838863,
+            "total_calls": 838863,
+            "self_seconds": 0.037631282,
+            "cumulative_seconds": 0.037631282
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'control' of 'select.kqueue' objects>",
+            "primitive_calls": 1034,
+            "total_calls": 1034,
+            "self_seconds": 0.007569277,
+            "cumulative_seconds": 0.007569277
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/thread.py",
+            "line": 54,
+            "function": "run",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.005818693000000001,
+            "cumulative_seconds": 0.01058071
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 1915,
+            "function": "_run_once",
+            "primitive_calls": 1034,
+            "total_calls": 1034,
+            "self_seconds": 0.002666393,
+            "cumulative_seconds": 2.9969901880000003
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/selectors.py",
+            "line": 558,
+            "function": "select",
+            "primitive_calls": 1034,
+            "total_calls": 1034,
+            "self_seconds": 0.0022343090000000003,
+            "cumulative_seconds": 0.023382388
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'recv' of '_socket.socket' objects>",
+            "primitive_calls": 1032,
+            "total_calls": 1032,
+            "self_seconds": 0.0016208610000000001,
+            "cumulative_seconds": 0.0016208610000000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'read' of '_io.BufferedReader' objects>",
+            "primitive_calls": 1,
+            "total_calls": 1,
+            "self_seconds": 0.0015010420000000002,
+            "cumulative_seconds": 0.0015010420000000002
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'get' of '_queue.SimpleQueue' objects>",
+            "primitive_calls": 515,
+            "total_calls": 515,
+            "self_seconds": 0.001321763,
+            "cumulative_seconds": 0.001321763
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'put' of '_queue.SimpleQueue' objects>",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.0011495300000000002,
+            "cumulative_seconds": 0.0011495300000000002
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py",
+            "line": 299,
+            "function": "__enter__",
+            "primitive_calls": 4644,
+            "total_calls": 4644,
+            "self_seconds": 0.001015292,
+            "cumulative_seconds": 0.001690464
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/thread.py",
+            "line": 165,
+            "function": "submit",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.000933015,
+            "cumulative_seconds": 0.004461368
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'send' of '_socket.socket' objects>",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.0009302140000000001,
+            "cumulative_seconds": 0.0009302140000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py",
+            "line": 302,
+            "function": "__exit__",
+            "primitive_calls": 4644,
+            "total_calls": 4644,
+            "self_seconds": 0.000927835,
+            "cumulative_seconds": 0.0013056340000000002
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 367,
+            "function": "_chain_future",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.0008801600000000001,
+            "cumulative_seconds": 0.0026196260000000003
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/futures.py",
+            "line": 347,
+            "function": "_copy_future_state",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.0008529070000000001,
+            "cumulative_seconds": 0.005295889000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py",
+            "line": 813,
+            "function": "_call_soon",
+            "primitive_calls": 1550,
+            "total_calls": 1550,
+            "self_seconds": 0.000839359,
+            "cumulative_seconds": 0.0017384710000000001
+          },
+          {
+            "file": "~",
+            "line": 0,
+            "function": "<method 'run' of '_contextvars.Context' objects>",
+            "primitive_calls": 2066,
+            "total_calls": 2066,
+            "self_seconds": 0.000798491,
+            "cumulative_seconds": 2.968814854
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_futures.py",
+            "line": 13,
+            "function": "isfuture",
+            "primitive_calls": 3098,
+            "total_calls": 3098,
+            "self_seconds": 0.000736622,
+            "cumulative_seconds": 0.001089293
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/events.py",
+            "line": 86,
+            "function": "_run",
+            "primitive_calls": 2066,
+            "total_calls": 2066,
+            "self_seconds": 0.000698281,
+            "cumulative_seconds": 2.969513135
+          },
+          {
+            "file": "/Users/geoff/Projects/personal/aiogzip/.venv/lib/python3.12/site-packages/aiofiles/threadpool/utils.py",
+            "line": 41,
+            "function": "method",
+            "primitive_calls": 1030,
+            "total_calls": 1030,
+            "self_seconds": 0.000675855,
+            "cumulative_seconds": 0.009808714000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/threading.py",
+            "line": 277,
+            "function": "__init__",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.0006412550000000001,
+            "cumulative_seconds": 0.0009674750000000001
+          },
+          {
+            "file": "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/concurrent/futures/_base.py",
+            "line": 537,
+            "function": "set_result",
+            "primitive_calls": 516,
+            "total_calls": 516,
+            "self_seconds": 0.000621797,
+            "cumulative_seconds": 0.004075681
+          }
+        ]
+      }
+    }
+  ]
+}

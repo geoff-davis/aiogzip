@@ -19,7 +19,11 @@ from typing import (
 import aiofiles
 
 from . import _engine
-from ._codec_async import _drive_operation
+from ._codec_async import (
+    _DECODE_OFFLOAD_THRESHOLD,
+    _ZLIB_OFFLOAD_THRESHOLD,
+    _drive_operation,
+)
 from ._common import (
     _MAX_CHUNK_SIZE,
     WithAsyncRead,
@@ -36,15 +40,7 @@ from ._common import (
     _validate_optional_positive_int,
     _validate_original_filename,
 )
-from .codec import GzipDecoder, GzipEncoder
-
-# Inputs smaller than this run zlib inline — the executor round-trip
-# (~50-100µs thread hop + wake-up) otherwise costs more than the CPU
-# work it offloads. Calibrated against incompressible data: below 256
-# KiB, decompressing a single chunk is faster than the hop, so the
-# event-loop benefit does not pay for itself. At or above it, the CPU work
-# dominates and the hop is amortised.
-_ZLIB_OFFLOAD_THRESHOLD = _engine.ZLIB_OFFLOAD_THRESHOLD
+from .codec import GzipDecoder, GzipEncoder, _AsyncDrivableOperation
 
 
 def _decompression_error_message(error: gzip.BadGzipFile) -> str:
@@ -136,10 +132,11 @@ class AsyncGzipBinaryFile:
 
     # 256 KiB balances bulk-read throughput against per-file memory. Below it
     # (e.g. the former 64 KiB) read-all throughput drops ~35-60% on large
-    # files from per-chunk overhead, and decompression never reaches the
-    # _ZLIB_OFFLOAD_THRESHOLD so it cannot offload to the executor. Larger
-    # sizes give little extra while costing proportionally more memory per
-    # open file. Callers can still pass any chunk_size explicitly.
+    # files from per-chunk overhead. Larger sizes give little extra while
+    # costing proportionally more memory per open file. File reads already
+    # yield during asynchronous I/O, so decoder executor offload is reserved
+    # for larger accepted inputs. Callers can still pass any chunk_size
+    # explicitly.
     DEFAULT_CHUNK_SIZE = 256 * 1024  # 256 KiB
     # When the read buffer's head offset crosses this, drop the consumed
     # prefix so the bytearray does not grow unbounded while reads march
@@ -865,22 +862,20 @@ class AsyncGzipBinaryFile:
         if encoder is None:
             raise RuntimeError("gzip writer encoder is not initialized")
 
-        # feed() performs call-time validation (including strict-size
-        # preflight) before reserving or advancing codec state. Those errors
-        # leave the writer usable. Once an operation exists, however, any
-        # failure can follow codec advancement and must poison the member.
-        operation = encoder.feed(payload)
+        # The writer already owns an exact snapshot. The private feed entry
+        # preserves call-time validation without normalizing it a second time.
+        operation = encoder._feed_snapshot(payload)
         try:
             if length >= _ZLIB_OFFLOAD_THRESHOLD:
                 async for compressed in _drive_operation(
                     operation,
                     workload=payload,
-                    offload_first_only=True,
                 ):
                     await self._write_all(compressed)
             else:
-                # Avoid constructing an async-generator driver for inline
-                # zlib work. Iteration remains lazy and is fully exhausted.
+                # Small writes bound the inline work by the caller's payload;
+                # a similarly small compressed read could expand enormously
+                # and must use the checkpointing async driver instead.
                 for compressed in operation:
                     await self._write_all(compressed)
         except BaseException:
@@ -1083,25 +1078,12 @@ class AsyncGzipBinaryFile:
 
         try:
             operation = decoder.feed(compressed_chunk)
-            if len(compressed_chunk) < _ZLIB_OFFLOAD_THRESHOLD:
-                # Match the writer's cheap path: avoid an async-generator
-                # transition for codec work that is intentionally staying on
-                # the event-loop thread. Fully exhaust the lazy operation
-                # before returning any pieces to the read buffer.
-                pieces = []
-                for piece in operation:
-                    pieces.append(piece)
-                return pieces
             return [
                 piece
                 async for piece in _drive_operation(
-                    operation,
+                    cast(_AsyncDrivableOperation, operation),
                     workload=compressed_chunk,
-                    # File input and decoder output share the same bound, so
-                    # one offloaded inflate step covers the CPU-heavy work for
-                    # a typical source chunk. Exhaustion bookkeeping stays
-                    # inline, avoiding a second executor hop per file read.
-                    offload_first_only=True,
+                    offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
                 )
             ]
         except asyncio.CancelledError:

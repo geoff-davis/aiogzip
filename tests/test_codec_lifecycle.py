@@ -2,6 +2,7 @@
 
 import gc
 import gzip
+import sys
 
 import pytest
 
@@ -177,3 +178,43 @@ def test_discard_is_idempotent(kind):
 
     with pytest.raises(OSError, match="unusable"):
         codec.start() if kind == "encoder" else codec.finish()
+
+
+def test_discard_releases_unadvanced_feed_snapshot():
+    payload = b"x" * (8 * 1024 * 1024)
+    decoder = GzipDecoder()
+    initial_references = sys.getrefcount(payload)
+
+    operation = decoder.feed(payload)
+    assert sys.getrefcount(payload) > initial_references
+
+    decoder.discard()
+
+    assert sys.getrefcount(payload) == initial_references
+    with pytest.raises(RuntimeError, match="invalidated"):
+        next(operation)
+    operation.close()
+    operation.close()
+
+
+def test_discard_prevents_unadvanced_engine_call():
+    calls = []
+
+    class RecordingEngine:
+        def compress(self, data):
+            calls.append(data)
+            return b""
+
+    encoder = GzipEncoder(mtime=0)
+    list(encoder.start())
+    engine = RecordingEngine()
+    encoder._engine = engine
+    operation = encoder.feed(b"payload")
+
+    encoder.discard()
+
+    with pytest.raises(RuntimeError, match="invalidated"):
+        next(operation)
+    operation.close()
+    operation.close()
+    assert calls == []

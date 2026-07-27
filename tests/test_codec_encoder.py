@@ -196,7 +196,8 @@ def test_sync_flush_makes_input_recoverable_before_finish():
     encoder.discard()
 
 
-def test_strict_size_fails_before_engine_advances():
+@pytest.mark.parametrize("feed_method", ["feed", "_feed_snapshot"])
+def test_strict_size_fails_before_engine_advances(feed_method):
     encoder = GzipEncoder(mtime=0, strict_size=True)
     list(encoder.start())
     encoder._input_size = 0xFFFFFFFF
@@ -209,7 +210,7 @@ def test_strict_size_fails_before_engine_advances():
     encoder._engine = SpyEngine()
 
     with pytest.raises(OSError, match="4 GiB limit"):
-        encoder.feed(b"x")
+        getattr(encoder, feed_method)(b"x")
 
     assert calls == []
     encoder.discard()

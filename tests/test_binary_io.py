@@ -165,18 +165,18 @@ class TestAsyncGzipBinaryFile:
         """Caller mutation cannot race executor-backed compression."""
         import asyncio
 
-        from aiogzip import _engine
+        from aiogzip import _codec_async
 
         started = asyncio.Event()
         release = asyncio.Event()
-        original = _engine.run_zlib_in_thread
+        original = _codec_async._run_in_thread
 
         async def delayed(method, data):
             started.set()
             await release.wait()
             return await original(method, data)
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", delayed)
+        monkeypatch.setattr(_codec_async, "_run_in_thread", delayed)
         source = bytearray(os.urandom(512 * 1024))
         expected = bytes(source)
 
@@ -191,6 +191,19 @@ class TestAsyncGzipBinaryFile:
 
         with gzip.open(temp_file, "rb") as raw:
             assert raw.read() == expected
+
+    async def test_write_does_not_repeat_codec_snapshot(self, temp_file, monkeypatch):
+        from aiogzip import codec
+
+        def unexpected_snapshot(data):
+            raise AssertionError("writer already owns an exact bytes snapshot")
+
+        monkeypatch.setattr(codec, "_snapshot_bytes_input", unexpected_snapshot)
+        async with AsyncGzipBinaryFile(temp_file, "wb", mtime=0) as stream:
+            assert await stream.write(b"payload") == 7
+
+        with gzip.open(temp_file, "rb") as raw:
+            assert raw.read() == b"payload"
 
     async def test_binary_accepts_noncontiguous_and_multibyte_buffers(self, temp_file):
         """write() must coerce buffer-protocol inputs that are not already a

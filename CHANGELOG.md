@@ -4,6 +4,64 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Replaced the decoder's monolithic pending-input buffer with immutable spans
+  and bounded 256 KiB engine windows. A large `feed()` no longer rebuilds and
+  front-deletes the complete unconsumed suffix for every inflate step.
+- Decoupled bounded internal inflate batches from public `output_chunk_size`.
+  Batches adapt between 64 KiB and 256 KiB, so one-byte public output no longer
+  causes one engine call per byte while ordinary 64 KiB consumers retain their
+  previous bounded memory profile. A cursor drains each internal output block
+  into bounded public chunks.
+- Parsed fixed and optional gzip headers incrementally, including FEXTRA,
+  FNAME, FCOMMENT, and FHCRC. Fragmented fields are consumed once and the
+  128 MiB safety limit is checked before accepting an over-limit byte. A
+  validated contiguous-header path and cleared parser/span reuse keep streams
+  containing many ordinary members within the high-level performance budget.
+- Added bounded cooperative checkpoints to long inline decoder drains,
+  including valid DEFLATE sequences that consume input without producing
+  output. Cancellation still waits for an active worker before cleanup.
+
+### Added
+
+- Public `CodecOperation`, the typed closeable iterator returned by
+  `GzipEncoder` and `GzipDecoder` state changes.
+
+### Changed
+
+- `CodecOperation.close()` remains idempotent. Explicit codec `discard()` now
+  invalidates a retained operation and promptly releases its captured input as
+  well as codec-owned state.
+- Decompression limits emit and account every allowed byte before a later
+  advancement rejects the first probe byte. The probe byte is neither yielded
+  nor included in `uncompressed_size` or CRC/ISIZE accounting.
+- Decoder chunks may now be smaller than a requested `output_chunk_size` above
+  256 KiB because internal inflate batches are capped at 256 KiB. The public
+  setting remains a strict maximum rather than an exact chunk size.
+- Async scheduling policy now lives outside the synchronous engine adapter.
+  The codec remains free of event-loop and executor dependencies.
+- Decoder first-step offload now starts at 1 MiB of accepted compressed input;
+  smaller async-iterable source items checkpoint before processing more than
+  16 MiB cumulatively. No-output inflate progress checkpoints after 128 KiB so
+  adversarial zero-output runs remain cooperative below the offload threshold.
+  This avoids executor dispatch for each 256–512 KiB item while retaining
+  bounded event-loop fairness.
+
+### Performance
+
+- Final Framework Desktop measurements put the release-matrix
+  `decompress_chunks()` 512/256 KiB case 21.5% below `v1.11.0` and 26.5%
+  below `2.0.0a1` with stdlib; zlib-ng recorded improvements of 23.2% and
+  38.1%. Direct 8-64 MiB one-feed decode scales linearly, and the 32 MiB
+  one-item scheduler case recorded maximum event-loop gaps of 0.850 ms and
+  0.696 ms.
+- The 10-byte write diagnostic remains materially slower than `v1.11.0` but
+  stays within the explicit +10% anti-regression guard against `2.0.0a1`.
+  Buffering writes across API calls could reduce that overhead but would
+  change sink-error timing, so it remains deferred rather than being
+  described as fixed.
+
 ### Documentation
 
 - The documentation site is now versioned with mike. Each minor line

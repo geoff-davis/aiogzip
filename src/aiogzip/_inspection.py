@@ -3,11 +3,11 @@
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union, cast
 
 import aiofiles
 
-from ._codec_async import _drive_operation
+from ._codec_async import _DECODE_OFFLOAD_THRESHOLD, _drive_operation
 from ._common import (
     WithAsyncRead,
     WithAsyncReadWrite,
@@ -16,7 +16,7 @@ from ._common import (
     _validate_optional_positive_int,
 )
 from ._metadata import GzipInfo, GzipMemberInfo, VerificationResult
-from .codec import GzipDecoder, _snapshot_bytes_input
+from .codec import GzipDecoder, _AsyncDrivableOperation, _snapshot_bytes_input
 
 __all__ = ["GzipInfo", "GzipMemberInfo", "VerificationResult"]
 
@@ -76,9 +76,15 @@ async def _scan_gzip(
             snapshot = _snapshot_bytes_input(chunk)
             if not snapshot:
                 break
-            async for _ in _drive_operation(decoder.feed(snapshot), workload=snapshot):
+            async for _ in _drive_operation(
+                cast(_AsyncDrivableOperation, decoder.feed(snapshot)),
+                workload=snapshot,
+                offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
+            ):
                 pass
-        async for _ in _drive_operation(decoder.finish()):
+        async for _ in _drive_operation(
+            cast(_AsyncDrivableOperation, decoder.finish())
+        ):
             pass
         return _ScanResult(
             members=decoder.members,

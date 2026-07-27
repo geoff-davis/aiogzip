@@ -77,8 +77,8 @@ for a full defensive-reading recipe.
 ## Codec finalization and operation abandonment
 
 Every state-changing `GzipEncoder` or `GzipDecoder` call reserves the codec and
-returns a lazy operation iterator. Engine errors, integrity failures, or
-closing an operation before it is exhausted make that codec unusable. This is
+returns a lazy `CodecOperation`. Engine errors, integrity failures, or closing
+an operation before it is exhausted make that codec unusable. This is
 intentional: the engine may already have consumed input, so silently reusing
 the instance could skip bytes or emit a valid-looking trailer for incomplete
 output.
@@ -86,9 +86,10 @@ output.
 Dropping an operation does not invoke state-changing finalizer behavior. The
 codec remains reserved and another operation raises `RuntimeError` regardless
 of garbage-collector timing. If the operation is reachable, exhaust it to
-continue or close it to abandon the stream. If it is unreachable, call the
-codec's idempotent `discard()` method; this releases retained state but does
-not reset the instance. Start again with a new codec.
+continue or call its idempotent `close()` method to abandon the stream. If the
+caller no longer retains it, call the codec's idempotent `discard()` method;
+this invalidates the operation and promptly releases its captured input and
+codec state. Neither method resets the instance. Start again with a new codec.
 
 `GzipDecoder.finish()` checks that the current deflate stream and trailer are
 complete, that no partial next header remains, and that all CRC and `ISIZE`

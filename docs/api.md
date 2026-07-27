@@ -13,6 +13,7 @@
 - `VerificationResult` and `verify` — lightweight aggregate counts after complete integrity verification
 - `decompress_chunks` — pull-driven decompression from an `AsyncIterable[bytes]` with bounded output chunks
 - `compress_chunks` — one-member gzip compression from an `AsyncIterable[bytes]` with bounded output chunks
+- `CodecOperation` — the closeable iterator returned by codec state changes
 - `GzipEncoder` and `GzipDecoder` — synchronous sans-I/O state machines for
   transport-independent, bounded gzip encoding and decoding
 - `WithAsyncRead`, `WithAsyncWrite`, `WithAsyncReadWrite` — runtime-checkable protocols describing the async file objects accepted via `fileobj=`
@@ -49,8 +50,9 @@ into memory. Use `open()` for streaming large files.
 Use `GzipEncoder` and `GzipDecoder` when an application owns a synchronous or
 custom transport and needs aiogzip's framing, concatenated-member traversal,
 integrity validation, and output limits without any I/O or executor policy.
-Each state-changing call returns a lazy iterator that must be exhausted before
-another operation begins.
+Each state-changing call returns a lazy `CodecOperation` that must be exhausted
+before another operation begins. Its idempotent `close()` method provides
+deterministic cleanup when a caller exits before exhaustion.
 
 ```python
 import aiogzip
@@ -70,6 +72,8 @@ payload = b"".join(decoder.feed(wire)) + b"".join(decoder.finish())
 The codec API is provisional during the 2.0 alpha series. See the
 [synchronous codec guide](codec.md) for constructor validation, immutable
 input snapshots, lifecycle hazards, thread safety, and error behavior.
+
+::: aiogzip.codec.CodecOperation
 
 ::: aiogzip.codec.GzipEncoder
 

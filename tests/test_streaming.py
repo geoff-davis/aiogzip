@@ -11,7 +11,7 @@ import zlib
 import pytest
 
 import aiogzip
-from aiogzip import _engine
+from aiogzip import _codec_async as async_module
 from aiogzip import _streaming as streaming_module
 
 
@@ -27,6 +27,23 @@ async def _items(values):
 
 async def _collect(source, **kwargs):
     return [chunk async for chunk in aiogzip.decompress_chunks(source, **kwargs)]
+
+
+class _OperationStub:
+    def __init__(self, values):
+        self.values = iter(values)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self.values)
+
+    def _advance_raw(self):
+        return next(self.values)
+
+    def close(self):
+        pass
 
 
 def _metadata_member(payload):
@@ -99,10 +116,10 @@ class TestDecompressChunks:
                 pass
 
             def feed(self, data):
-                return iter(())
+                return _OperationStub(())
 
             def finish(self):
-                return iter((b"final output",))
+                return _OperationStub((b"final output",))
 
             def discard(self):
                 pass
@@ -112,6 +129,34 @@ class TestDecompressChunks:
         output = await _collect(_items([]))
 
         assert output == [b"final output"]
+
+    async def test_inline_source_items_checkpoint_cumulatively(self, monkeypatch):
+        checkpoints = 0
+
+        class EmptyDecoder:
+            def __init__(self, **kwargs):
+                pass
+
+            def feed(self, data):
+                return _OperationStub(())
+
+            def finish(self):
+                return _OperationStub(())
+
+            def discard(self):
+                pass
+
+        async def checkpoint():
+            nonlocal checkpoints
+            checkpoints += 1
+
+        monkeypatch.setattr(streaming_module, "GzipDecoder", EmptyDecoder)
+        monkeypatch.setattr(streaming_module, "_DECODE_OFFLOAD_THRESHOLD", 5)
+        monkeypatch.setattr(streaming_module, "_INLINE_SOURCE_BYTES_CHECKPOINT", 4)
+        monkeypatch.setattr(streaming_module, "_cooperative_checkpoint", checkpoint)
+
+        assert await _collect(_items([b"aa", b"bb", b"c"])) == []
+        assert checkpoints == 1
 
     @pytest.mark.parametrize("input_chunk_size", [1, 2, 3, 7, 17, 257, 4096])
     async def test_one_member_arbitrary_input_chunks(self, input_chunk_size):
@@ -402,7 +447,7 @@ class TestDecompressChunks:
 
     async def test_cancellation_during_offloaded_codec_work(self, monkeypatch):
         compressed = gzip.compress(
-            os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1024), mtime=0
+            os.urandom(async_module._DECODE_OFFLOAD_THRESHOLD + 1024), mtime=0
         )
         started = asyncio.Event()
         release = asyncio.Event()
@@ -416,7 +461,7 @@ class TestDecompressChunks:
             finally:
                 completed.set()
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", blocked_offload)
+        monkeypatch.setattr(async_module, "_run_in_thread", blocked_offload)
         stream = aiogzip.decompress_chunks(_items([compressed]))
         task = asyncio.create_task(stream.__anext__())
         await started.wait()

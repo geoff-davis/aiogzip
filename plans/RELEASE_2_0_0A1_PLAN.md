@@ -35,7 +35,7 @@ line, cherry-pick the underlying documentation commit
 optional documentation change separate preserves an unambiguous, reproducible
 branch point at the released and tested artifact.
 
-- [ ] Maintainer creates and pushes `1.x` at the exact release commit above.
+- [x] Maintainer creates and pushes `1.x` at the exact release commit above.
 - [ ] Codex verifies the branch point before WP0 and reports a mismatch; Codex
       must not move or create the remote branch itself.
 
@@ -1657,7 +1657,7 @@ Every item is mandatory unless explicitly marked as a maintainer-only action.
 - [ ] Required branch-protection checks reflect the new CI matrix.
 - [ ] `2.0.0a1` milestone/issue tracking is updated.
 - [ ] Final release commit is reviewed.
-- [ ] Tag `v2.0.0a1` is created from the reviewed release commit.
+- [x] Tag `v2.0.0a1` is created from the reviewed release commit.
 - [ ] Publish workflow succeeds.
 - [ ] PyPI metadata and files are inspected.
 - [ ] GitHub prerelease notes are published.

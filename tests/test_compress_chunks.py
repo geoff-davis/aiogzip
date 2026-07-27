@@ -11,7 +11,9 @@ import zlib
 import pytest
 
 import aiogzip
+from aiogzip import _codec_async as async_module
 from aiogzip import _engine
+from aiogzip import _streaming as streaming_module
 
 
 async def _items(values):
@@ -68,6 +70,36 @@ def _assert_incomplete(compressed):
 
 
 class TestCompressChunks:
+    async def test_internal_snapshot_is_not_repeated_by_codec(self, monkeypatch):
+        from aiogzip import codec
+
+        snapshots = 0
+        original = streaming_module._snapshot_bytes_input
+
+        def counting_snapshot(data):
+            nonlocal snapshots
+            snapshots += 1
+            return original(data)
+
+        def unexpected_codec_snapshot(data):
+            raise AssertionError("streaming already owns an exact bytes snapshot")
+
+        monkeypatch.setattr(
+            streaming_module,
+            "_snapshot_bytes_input",
+            counting_snapshot,
+        )
+        monkeypatch.setattr(
+            codec,
+            "_snapshot_bytes_input",
+            unexpected_codec_snapshot,
+        )
+
+        output = b"".join(await _collect(_items([b"first", b"second"]), mtime=0))
+
+        assert gzip.decompress(output) == b"firstsecond"
+        assert snapshots == 2
+
     @pytest.mark.parametrize("values", [[], [b""], [b"", b"", b""]])
     async def test_empty_source_produces_valid_empty_member(self, values):
         output = await _collect(_items(values), mtime=0)
@@ -224,8 +256,8 @@ class TestCompressChunks:
             calls.append(len(data))
             return method(data)
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", recording_offload)
-        payload = os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1)
+        monkeypatch.setattr(async_module, "_run_in_thread", recording_offload)
+        payload = os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1)
 
         output = await _collect(_items([payload]), mtime=0)
 
@@ -391,8 +423,8 @@ class TestCompressChunks:
             finally:
                 completed.set()
 
-        monkeypatch.setattr(_engine, "run_zlib_in_thread", blocked_offload)
-        payload = os.urandom(_engine.ZLIB_OFFLOAD_THRESHOLD + 1)
+        monkeypatch.setattr(async_module, "_run_in_thread", blocked_offload)
+        payload = os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1)
         stream = aiogzip.compress_chunks(_items([payload]), mtime=0)
         assert await stream.__anext__()
         task = asyncio.create_task(stream.__anext__())

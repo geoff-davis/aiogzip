@@ -38,13 +38,20 @@ class BenchmarkResults:
     category: str
     duration: float
     metrics: Dict[str, Any] = field(default_factory=dict)
+    duration_samples: List[float] = field(default_factory=list)
+    median_absolute_deviation: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
+        samples = self.duration_samples or [self.duration]
         return {
             "name": self.name,
             "category": self.category,
             "duration": self.duration,
+            "duration_samples": samples,
+            "median_absolute_deviation": self.median_absolute_deviation,
+            "duration_min": min(samples),
+            "duration_max": max(samples),
             "metrics": self.metrics,
         }
 
@@ -87,12 +94,17 @@ def median_results(
         )
         metrics = dict(representative.metrics)
         metrics["suite_repeats"] = len(runs)
+        durations = [sample.duration for sample in samples]
         aggregated.append(
             BenchmarkResults(
                 name=name,
                 category=representative.category,
                 duration=duration,
                 metrics=metrics,
+                duration_samples=durations,
+                median_absolute_deviation=float(
+                    statistics.median(abs(sample - duration) for sample in durations)
+                ),
             )
         )
     return aggregated

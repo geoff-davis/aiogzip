@@ -4,14 +4,17 @@ import ast
 from pathlib import Path
 
 import aiogzip
-from aiogzip.codec import GzipDecoder, GzipEncoder
+from aiogzip.codec import CodecOperation, GzipDecoder, GzipEncoder
 
 
 def test_codec_is_exported_from_both_public_paths():
+    assert aiogzip.CodecOperation is CodecOperation
     assert aiogzip.GzipEncoder is GzipEncoder
     assert aiogzip.GzipDecoder is GzipDecoder
+    assert "CodecOperation" in aiogzip.__all__
     assert "GzipEncoder" in aiogzip.__all__
     assert "GzipDecoder" in aiogzip.__all__
+    assert "CodecOperation" in aiogzip.codec.__all__
 
 
 def test_codec_module_has_no_async_or_io_dependencies():

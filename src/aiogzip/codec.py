@@ -13,17 +13,14 @@ from __future__ import annotations
 import gzip
 import struct
 import warnings
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
+from typing import Protocol, cast
 
 from . import _engine
+from ._codec_buffer import _InputQueue, _OutputCursor
 from ._common import (
     _MAX_CHUNK_SIZE,
-    GZIP_FLAG_FCOMMENT,
-    GZIP_FLAG_FEXTRA,
-    GZIP_FLAG_FHCRC,
-    GZIP_FLAG_FNAME,
-    GZIP_METHOD_DEFLATE,
     ZlibEngine,
     _build_gzip_header,
     _build_gzip_trailer,
@@ -34,11 +31,43 @@ from ._common import (
     _validate_optional_positive_int,
     _validate_original_filename,
 )
+from ._gzip_header import _GzipHeaderParser, _ParsedHeader
 from ._metadata import GzipMemberInfo
 
-__all__ = ["GzipDecoder", "GzipEncoder"]
+__all__ = ["CodecOperation", "GzipDecoder", "GzipEncoder"]
 
-_RESERVED_FLAGS = 0xE0
+_INFLATE_INPUT_WINDOW = 256 * 1024
+_INFLATE_OUTPUT_MIN_BATCH = 64 * 1024
+_INFLATE_OUTPUT_BATCH = 256 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class _CodecProgress:
+    """One no-output inflate step exposed only to the private async driver."""
+
+    compressed_bytes: int
+
+
+class CodecOperation(Iterator[bytes], Protocol):
+    """A lazy codec operation with deterministic abandonment cleanup.
+
+    Exhaust the operation to complete it. Calling :meth:`close` before
+    exhaustion releases captured work and makes the owning codec unusable;
+    closing an exhausted or already closed operation has no effect.
+    """
+
+    def close(self) -> None:
+        """Release this operation, abandoning its codec if still incomplete."""
+        ...
+
+
+class _AsyncDrivableOperation(CodecOperation, Protocol):
+    """Private operation surface used by the cooperative async driver."""
+
+    def _advance_raw(self) -> bytes | _CodecProgress: ...
+
+
+_CodecIterator = Generator[bytes | _CodecProgress, None, None]
 
 
 def _snapshot_bytes_input(data: bytes) -> bytes:
@@ -53,19 +82,31 @@ def _snapshot_bytes_input(data: bytes) -> bytes:
 class _Operation(Iterator[bytes]):
     """Single-use iterator tied to a codec-owned reservation token."""
 
-    __slots__ = ("_advancing", "_closed", "_iterator", "_owner")
+    __slots__ = ("_advancing", "_closed", "_invalidated", "_iterator", "_owner")
 
-    def __init__(self, owner: _CodecBase, iterator: Iterator[bytes]) -> None:
+    def __init__(
+        self,
+        owner: _CodecBase,
+        iterator: _CodecIterator,
+    ) -> None:
         self._owner = owner
         self._iterator = iterator
         self._advancing = False
         self._closed = False
+        self._invalidated = False
 
     def __iter__(self) -> _Operation:
         return self
 
     def __next__(self) -> bytes:
-        if self._owner._discarded:
+        while True:
+            output = self._advance_raw()
+            if isinstance(output, bytes):
+                return output
+
+    def _advance_raw(self) -> bytes | _CodecProgress:
+        """Return exactly one internal byte or progress event."""
+        if self._invalidated or self._owner._discarded:
             raise RuntimeError("gzip codec operation was invalidated by discard()")
         if self._closed:
             raise StopIteration
@@ -89,25 +130,35 @@ class _Operation(Iterator[bytes]):
             self._advancing = False
         return output
 
+    def _invalidate(self) -> None:
+        """Release captured work while preserving invalid-operation behavior."""
+        if self._invalidated:
+            return
+        self._invalidated = True
+        self._closed = True
+        iterator = self._iterator
+        self._iterator = _empty_codec_iterator()
+        iterator.close()
+
     def close(self) -> None:
         """Close this operation, poisoning its codec unless already invalid."""
         if self._closed:
             return
-        invalidated = self._owner._discarded
         self._closed = True
         iterator = self._iterator
-        self._iterator = iter(())
-        if not invalidated:
-            self._owner._operation_failed(self)
-        close = getattr(iterator, "close", None)
-        if callable(close):
-            close()
+        self._iterator = _empty_codec_iterator()
+        self._owner._operation_failed(self)
+        iterator.close()
+
+
+def _empty_codec_iterator() -> _CodecIterator:
+    yield from ()
 
 
 class _CodecBase:
     """Shared deterministic operation ownership."""
 
-    _active_token: object | None
+    _active_token: _Operation | None
     _discarded: bool
     _unusable: bool
 
@@ -122,7 +173,10 @@ class _CodecBase:
         if self._unusable:
             raise OSError(f"gzip {name} is unusable after a prior failure")
 
-    def _reserve(self, iterator: Iterator[bytes]) -> Iterator[bytes]:
+    def _reserve(
+        self,
+        iterator: _CodecIterator,
+    ) -> CodecOperation:
         operation = _Operation(self, iterator)
         self._active_token = operation
         return operation
@@ -146,6 +200,9 @@ class _CodecBase:
             return
         self._discarded = True
         self._unusable = True
+        operation = self._active_token
+        if operation is not None:
+            operation._invalidate()
         self._active_token = None
         self._release_state()
 
@@ -205,12 +262,12 @@ class GzipEncoder(_CodecBase):
 
     @property
     def input_size(self) -> int:
-        """Number of uncompressed bytes committed to this member."""
+        """Uncompressed bytes committed by advancing feed operations."""
         return self._input_size
 
     @property
     def crc32(self) -> int:
-        """Running CRC-32 of committed uncompressed input."""
+        """CRC-32 of input committed by advancing feed operations."""
         return self._crc
 
     @property
@@ -231,25 +288,7 @@ class GzipEncoder(_CodecBase):
         if self._finished:
             raise ValueError("gzip encoder is already finalized")
 
-    def start(self) -> Iterator[bytes]:
-        """Start the member and lazily emit its gzip header exactly once."""
-        self._check_encoder_available()
-        if self._started:
-            raise ValueError("gzip encoder is already started")
-        return self._reserve(self._start())
-
-    def _start(self) -> Iterator[bytes]:
-        header = _build_gzip_header(self._filename, self._mtime, self._compresslevel)
-        self._started = True
-        yield from _output_chunks(header, self._output_chunk_size)
-
-    def feed(self, data: bytes) -> Iterator[bytes]:
-        """Consume one immutable input snapshot and emit compressed chunks."""
-        self._check_encoder_available()
-        if not self._started:
-            raise ValueError("gzip encoder must be started before feeding data")
-        snapshot = _snapshot_bytes_input(data)
-        size = len(snapshot)
+    def _check_feed_size(self, size: int) -> None:
         if self._strict_size and self._input_size + size > 0xFFFFFFFF:
             raise OSError(
                 f"uncompressed member size would exceed the gzip ISIZE "
@@ -257,9 +296,39 @@ class GzipEncoder(_CodecBase):
                 f"{0xFFFFFFFF}); drop strict_size to allow ISIZE "
                 f"truncation or split the payload into multiple members"
             )
+
+    def start(self) -> CodecOperation:
+        """Start the member and lazily emit its gzip header exactly once."""
+        self._check_encoder_available()
+        if self._started:
+            raise ValueError("gzip encoder is already started")
+        return self._reserve(self._start())
+
+    def _start(self) -> _CodecIterator:
+        header = _build_gzip_header(self._filename, self._mtime, self._compresslevel)
+        self._started = True
+        yield from _output_chunks(header, self._output_chunk_size)
+
+    def feed(self, data: bytes) -> CodecOperation:
+        """Consume one immutable input snapshot and emit compressed chunks."""
+        self._check_encoder_available()
+        if not self._started:
+            raise ValueError("gzip encoder must be started before feeding data")
+        snapshot = _snapshot_bytes_input(data)
+        size = len(snapshot)
+        self._check_feed_size(size)
         return self._reserve(self._feed(snapshot))
 
-    def _feed(self, data: bytes) -> Iterator[bytes]:
+    def _feed_snapshot(self, snapshot: bytes) -> _AsyncDrivableOperation:
+        """Feed an exact bytes snapshot already owned by an internal caller."""
+        self._check_encoder_available()
+        if not self._started:
+            raise ValueError("gzip encoder must be started before feeding data")
+        size = len(snapshot)
+        self._check_feed_size(size)
+        return cast(_AsyncDrivableOperation, self._reserve(self._feed(snapshot)))
+
+    def _feed(self, data: bytes) -> _CodecIterator:
         try:
             compressed = self._engine.compress(data)
         except _engine.ZLIB_ERRORS as error:
@@ -272,14 +341,14 @@ class GzipEncoder(_CodecBase):
             for offset in range(0, len(compressed), self._output_chunk_size):
                 yield compressed[offset : offset + self._output_chunk_size]
 
-    def flush(self) -> Iterator[bytes]:
+    def flush(self) -> CodecOperation:
         """Perform a non-finalizing ``Z_SYNC_FLUSH`` operation."""
         self._check_encoder_available()
         if not self._started:
             raise ValueError("gzip encoder must be started before flushing")
         return self._reserve(self._flush())
 
-    def _flush(self) -> Iterator[bytes]:
+    def _flush(self) -> _CodecIterator:
         try:
             output = self._engine.flush(_engine.Z_SYNC_FLUSH)
         except _engine.ZLIB_ERRORS as error:
@@ -290,14 +359,14 @@ class GzipEncoder(_CodecBase):
             ) from error
         yield from _output_chunks(output, self._output_chunk_size)
 
-    def finish(self) -> Iterator[bytes]:
+    def finish(self) -> CodecOperation:
         """Finalize DEFLATE and lazily emit the gzip trailer exactly once."""
         self._check_encoder_available()
         if not self._started:
             raise ValueError("gzip encoder must be started before finalizing")
         return self._reserve(self._finish())
 
-    def _finish(self) -> Iterator[bytes]:
+    def _finish(self) -> _CodecIterator:
         try:
             remaining = self._engine.flush()
         except _engine.ZLIB_ERRORS as error:
@@ -311,88 +380,6 @@ class GzipEncoder(_CodecBase):
         yield from _output_chunks(trailer, self._output_chunk_size)
         self._finished = True
         self._engine = None
-
-
-@dataclass(frozen=True, slots=True)
-class _ParsedHeader:
-    size: int
-    mtime: int
-    original_filename: str | None
-    comment: str | None
-    extra: bytes | None
-    flags: int
-
-
-def _parse_header(data: bytes, collect_metadata: bool) -> _ParsedHeader | None:
-    if len(data) < 2:
-        return None
-    if data[:2] != b"\x1f\x8b":
-        raise gzip.BadGzipFile("Not a gzipped file")
-    if len(data) < 3:
-        return None
-    if data[2] != GZIP_METHOD_DEFLATE:
-        raise gzip.BadGzipFile(f"Unknown compression method {data[2]}")
-    if len(data) < 4:
-        return None
-
-    flags = data[3]
-    if flags & _RESERVED_FLAGS:
-        raise gzip.BadGzipFile(f"Reserved flags are set in gzip header: {flags:#04x}")
-    if len(data) < 10:
-        return None
-
-    mtime = struct.unpack("<I", data[4:8])[0]
-    position = 10
-    extra: bytes | None = None
-    filename: str | None = None
-    comment: str | None = None
-
-    if flags & GZIP_FLAG_FEXTRA:
-        if len(data) < position + 2:
-            return None
-        extra_length = struct.unpack("<H", data[position : position + 2])[0]
-        position += 2
-        if len(data) < position + extra_length:
-            return None
-        if collect_metadata:
-            extra = data[position : position + extra_length]
-        position += extra_length
-
-    if flags & GZIP_FLAG_FNAME:
-        terminator = data.find(b"\x00", position)
-        if terminator < 0:
-            return None
-        if collect_metadata:
-            filename = data[position:terminator].decode("latin-1")
-        position = terminator + 1
-
-    if flags & GZIP_FLAG_FCOMMENT:
-        terminator = data.find(b"\x00", position)
-        if terminator < 0:
-            return None
-        if collect_metadata:
-            comment = data[position:terminator].decode("latin-1")
-        position = terminator + 1
-
-    if flags & GZIP_FLAG_FHCRC:
-        if len(data) < position + 2:
-            return None
-        expected = struct.unpack("<H", data[position : position + 2])[0]
-        actual = _engine.crc32(data[:position]) & 0xFFFF
-        if actual != expected:
-            raise gzip.BadGzipFile(
-                f"Header CRC check failed ({actual:#06x} != {expected:#06x})"
-            )
-        position += 2
-
-    return _ParsedHeader(
-        size=position,
-        mtime=mtime,
-        original_filename=filename,
-        comment=comment,
-        extra=extra,
-        flags=flags,
-    )
 
 
 class GzipDecoder(_CodecBase):
@@ -419,10 +406,14 @@ class GzipDecoder(_CodecBase):
         self._output_chunk_size = output_chunk_size
         self._max_decompressed_size = max_decompressed_size
         self._collect_member_info = bool(collect_member_info)
-        self._pending = bytearray()
+        self._pending = _InputQueue()
+        self._inflate_input: bytes | None = None
+        self._output = _OutputCursor()
+        self._eof_after_output = False
         self._state = "header"
         self._engine: ZlibEngine = None
         self._header: _ParsedHeader | None = None
+        self._header_parser: _GzipHeaderParser | None = self._new_header_parser()
         self._members: list[GzipMemberInfo] = []
         self._member_count = 0
         self._member_offset = 0
@@ -446,12 +437,12 @@ class GzipDecoder(_CodecBase):
 
     @property
     def compressed_size(self) -> int:
-        """Number of compressed bytes accepted by :meth:`feed`."""
+        """Compressed bytes snapshotted by calls to :meth:`feed`."""
         return self._compressed_size
 
     @property
     def uncompressed_size(self) -> int:
-        """Number of decompressed bytes accounted by the decoder."""
+        """Decompressed bytes accounted during operation advancement."""
         return self._uncompressed_size
 
     @property
@@ -461,16 +452,26 @@ class GzipDecoder(_CodecBase):
 
     def _release_state(self) -> None:
         self._pending.clear()
+        self._inflate_input = None
+        self._output.clear()
+        self._eof_after_output = False
         self._engine = None
         self._header = None
+        self._header_parser = None
         self._members.clear()
+
+    def _new_header_parser(self) -> _GzipHeaderParser:
+        return _GzipHeaderParser(
+            collect_metadata=self._collect_member_info,
+            limit=_MAX_CHUNK_SIZE,
+        )
 
     def _check_decoder_available(self) -> None:
         self._check_available("decoder")
         if self._finished:
             raise ValueError("gzip decoder is already finalized")
 
-    def feed(self, data: bytes) -> Iterator[bytes]:
+    def feed(self, data: bytes) -> CodecOperation:
         """Accept compressed bytes and lazily emit bounded decoded output."""
         self._check_decoder_available()
         snapshot = _snapshot_bytes_input(data)
@@ -478,44 +479,49 @@ class GzipDecoder(_CodecBase):
         self._compressed_size += len(snapshot)
         return operation
 
-    def _feed(self, data: bytes) -> Iterator[bytes]:
-        self._pending.extend(data)
+    def _feed(self, data: bytes) -> _CodecIterator:
+        self._pending.append(data)
+        data = b""
         yield from self._process(finalizing=False)
 
-    def finish(self) -> Iterator[bytes]:
+    def finish(self) -> CodecOperation:
         """Prove that all accepted input forms a complete valid gzip stream."""
         self._check_decoder_available()
         return self._reserve(self._process(finalizing=True))
 
-    def _consume(self, size: int) -> None:
-        del self._pending[:size]
-        self._consumed_size += size
-
-    def _output_limit(self) -> int:
+    def _inflate_output_limit(self) -> int:
+        batch = min(
+            _INFLATE_OUTPUT_BATCH,
+            max(_INFLATE_OUTPUT_MIN_BATCH, self._output_chunk_size),
+        )
         limit = self._max_decompressed_size
         if limit is None:
-            return self._output_chunk_size
+            return batch
         remaining = limit - self._uncompressed_size
-        return min(self._output_chunk_size, remaining + 1)
+        if remaining > 0:
+            return min(batch, remaining)
+        return 1
 
     def _account_output(self, output: bytes) -> None:
         size = len(output)
+        limit = self._max_decompressed_size
+        if limit is not None and self._uncompressed_size >= limit:
+            raise OSError(
+                f"decompressed output exceeded max_decompressed_size "
+                f"({self._uncompressed_size + 1} > {limit} bytes)"
+            )
+        if limit is not None and size > limit - self._uncompressed_size:
+            raise RuntimeError("inflate engine exceeded its requested output bound")
         self._member_crc = _engine.crc32(output, self._member_crc)
         self._member_size += size
         self._uncompressed_size += size
-        limit = self._max_decompressed_size
-        if limit is not None and self._uncompressed_size > limit:
-            raise OSError(
-                f"decompressed output exceeded max_decompressed_size "
-                f"({self._uncompressed_size} > {limit} bytes)"
-            )
 
-    def _inflate(self, data: bytes) -> _engine._InflateStep:
+    def _inflate(self, data: bytes, max_length: int) -> _engine._InflateStep:
         try:
             return _engine.inflate_step(
                 self._engine,
                 data,
-                max_length=self._output_limit(),
+                max_length=max_length,
             )
         except _engine.ZLIB_ERRORS as error:
             raise gzip.BadGzipFile(
@@ -539,7 +545,6 @@ class GzipDecoder(_CodecBase):
 
         header = self._header
         assert header is not None
-        self._consume(8)
         if self._collect_member_info:
             self._members.append(
                 GzipMemberInfo(
@@ -558,59 +563,85 @@ class GzipDecoder(_CodecBase):
             )
         self._member_count += 1
         self._header = None
+        parser = self._header_parser
+        assert parser is not None
+        parser.reset()
         self._engine = None
         self._state = "header"
         self._allow_padding = True
 
-    def _process(self, *, finalizing: bool) -> Iterator[bytes]:
+    def _process(self, *, finalizing: bool) -> _CodecIterator:
         while True:
+            output = self._output.pop(self._output_chunk_size)
+            if output is not None:
+                yield output
+                continue
+            if self._eof_after_output:
+                self._eof_after_output = False
+                self._state = "trailer"
+
             if self._state == "header":
                 if self._allow_padding:
-                    padding = len(self._pending) - len(self._pending.lstrip(b"\x00"))
-                    if padding:
-                        self._consume(padding)
+                    padding = self._pending.consume_leading_zeroes()
+                    self._consumed_size += padding
                     if not self._pending:
                         break
 
-                parsed = _parse_header(bytes(self._pending), self._collect_member_info)
+                parser = self._header_parser
+                assert parser is not None
+                if not parser.started:
+                    self._member_offset = self._consumed_size
+                pending_size = len(self._pending)
+                parsed = parser.advance(self._pending)
+                self._consumed_size += pending_size - len(self._pending)
+                if parser.started:
+                    self._allow_padding = False
                 if parsed is None:
-                    if len(self._pending) > _MAX_CHUNK_SIZE:
-                        raise gzip.BadGzipFile(
-                            "gzip header exceeds the 128 MiB safety limit"
-                        )
                     break
-                if parsed.size > _MAX_CHUNK_SIZE:
-                    raise gzip.BadGzipFile(
-                        "gzip header exceeds the 128 MiB safety limit"
-                    )
-                self._member_offset = self._consumed_size
                 self._header = parsed
-                self._consume(parsed.size)
                 self._engine = _engine.decompressobj(-_engine.MAX_WBITS)
                 self._member_crc = 0
                 self._member_size = 0
                 self._state = "body"
-                self._allow_padding = False
                 continue
 
             if self._state == "body":
-                if not self._pending:
-                    break
-                payload = bytes(self._pending)
-                step = self._inflate(payload)
-                if step.consumed:
-                    self._consume(step.consumed)
+                if self._inflate_input is None:
+                    if not self._pending:
+                        break
+                    self._inflate_input = self._pending.pop_window(
+                        _INFLATE_INPUT_WINDOW
+                    )
+                inflate_input = self._inflate_input
+                step = self._inflate(
+                    inflate_input,
+                    self._inflate_output_limit(),
+                )
+                self._consumed_size += step.consumed
+                if step.eof:
+                    self._inflate_input = None
+                    if step.retained:
+                        self._pending.prepend(step.retained)
+                else:
+                    self._inflate_input = step.retained or None
                 if step.output:
                     self._account_output(step.output)
-                    yield step.output
+                    self._output.set_block(step.output)
                 if step.eof:
-                    self._state = "trailer"
+                    if step.output:
+                        self._eof_after_output = True
+                    else:
+                        self._state = "trailer"
+                if not step.output and step.consumed:
+                    yield _CodecProgress(step.consumed)
                 continue
 
             if self._state == "trailer":
-                if len(self._pending) < 8:
+                trailer = self._pending.take_exact(8)
+                if trailer is None:
                     break
-                self._complete_member(bytes(self._pending[:8]))
+                self._consumed_size += 8
+                self._complete_member(trailer)
                 continue
 
             raise AssertionError(f"unknown gzip decoder state: {self._state}")
@@ -626,6 +657,7 @@ class GzipDecoder(_CodecBase):
                     f"gzip member {self._member_count} at compressed offset "
                     f"{self._member_offset} has a truncated trailer"
                 )
-            if self._pending:
+            parser = self._header_parser
+            if self._pending or (parser is not None and parser.started):
                 raise gzip.BadGzipFile("truncated gzip member header")
             self._finished = True
