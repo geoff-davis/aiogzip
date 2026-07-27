@@ -52,13 +52,13 @@ def test_py_typed_marker_shipped():
     assert marker.exists(), "py.typed marker missing from installed package"
 
 
-def test_2_0_a2_release_metadata_is_synchronized():
+def test_2_0_a3_development_metadata_is_synchronized():
     root = Path(__file__).resolve().parents[1]
     data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     project = data["project"]
 
-    assert aiogzip.__version__ == "2.0.0a2"
+    assert aiogzip.__version__ == "2.0.0a3.dev0"
     assert "## [Unreleased]" in changelog
     release = re.search(
         r"^## \[([^]]+)\] - (\d{4}-\d{2}-\d{2})$", changelog, re.MULTILINE
