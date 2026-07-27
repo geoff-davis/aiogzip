@@ -57,13 +57,6 @@ class _InputQueue:
             self._spans.appendleft(_Span(data, 0, len(data)))
             self._size += len(data)
 
-    def peek_byte(self) -> int | None:
-        """Return the leading byte without consuming it."""
-        if not self._spans:
-            return None
-        span = self._spans[0]
-        return span.data[span.start]
-
     @property
     def head_size(self) -> int:
         """Number of bytes in the first contiguous span."""
@@ -153,23 +146,6 @@ class _InputQueue:
         if max_bytes <= 0:
             raise ValueError("window size must be positive")
         return self.take(max_bytes)
-
-    def consume_leading(self, value: int) -> int:
-        """Consume consecutive leading bytes equal to *value*."""
-        if not 0 <= value <= 255:
-            raise ValueError("leading byte must be between 0 and 255")
-        consumed = 0
-        while self._spans:
-            span = self._spans[0]
-            position = span.start
-            while position < span.end and span.data[position] == value:
-                position += 1
-            amount = position - span.start
-            self.consume(amount)
-            consumed += amount
-            if position < span.end:
-                break
-        return consumed
 
     def consume_leading_zeroes(self) -> int:
         """Consume leading NUL padding without copying complete spans."""

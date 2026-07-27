@@ -17,7 +17,7 @@ def test_append_tracks_length_and_retains_exact_span():
 
     assert len(queue) == len(data)
     assert queue._spans[0].data is data
-    assert queue.peek_byte() == data[0]
+    assert queue.peek_span(1)[0] == data[0]
 
 
 def test_whole_span_take_preserves_identity():
@@ -27,7 +27,7 @@ def test_whole_span_take_preserves_identity():
 
     assert queue.pop_window(len(data)) is data
     assert len(queue) == 0
-    assert queue.peek_byte() is None
+    assert not queue.peek_span(1)
 
 
 def test_partial_consumption_advances_offset_and_releases_drained_span():
@@ -110,16 +110,15 @@ def test_repeated_small_spans_remain_ordered():
     assert not queue._spans
 
 
-def test_leading_byte_inspection_and_consumption():
+def test_leading_zero_consumption():
     queue = _InputQueue()
     queue.append(b"\x00\x00")
     queue.append(b"\x00abc")
 
-    assert queue.peek_byte() == 0
+    assert queue.peek_span(1)[0] == 0
     assert queue.consume_leading_zeroes() == 3
-    assert queue.peek_byte() == ord("a")
-    assert queue.consume_leading(ord("a")) == 1
-    assert queue.take(2) == b"bc"
+    assert queue.peek_span(1)[0] == ord("a")
+    assert queue.take(3) == b"abc"
 
 
 def test_clear_is_idempotent_and_releases_span_reference():

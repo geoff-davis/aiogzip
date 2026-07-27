@@ -868,8 +868,9 @@ class AsyncGzipBinaryFile:
                 ):
                     await self._write_all(compressed)
             else:
-                # Avoid constructing an async-generator driver for inline
-                # zlib work. Iteration remains lazy and is fully exhausted.
+                # Small writes bound the inline work by the caller's payload;
+                # a similarly small compressed read could expand enormously
+                # and must use the checkpointing async driver instead.
                 for compressed in operation:
                     await self._write_all(compressed)
         except BaseException:

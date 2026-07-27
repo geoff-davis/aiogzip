@@ -33,6 +33,9 @@ All notable changes to this project will be documented in this file.
 - Decompression limits emit and account every allowed byte before a later
   advancement rejects the first probe byte. The probe byte is neither yielded
   nor included in `uncompressed_size` or CRC/ISIZE accounting.
+- Decoder chunks may now be smaller than a requested `output_chunk_size` above
+  256 KiB because internal inflate batches are capped at 256 KiB. The public
+  setting remains a strict maximum rather than an exact chunk size.
 - Async scheduling policy now lives outside the synchronous engine adapter.
   The codec remains free of event-loop and executor dependencies.
 

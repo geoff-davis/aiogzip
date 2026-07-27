@@ -205,7 +205,7 @@ def test_reduced_limit_rejects_before_consuming_first_over_limit_byte(
         parser.advance(pending)
 
     assert parser.size == limit
-    assert pending.peek_byte() == 0
+    assert pending.peek_span(1)[0] == 0
     assert pending.take(5) == b"\x00body"
 
 

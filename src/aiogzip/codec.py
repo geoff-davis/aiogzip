@@ -287,6 +287,15 @@ class GzipEncoder(_CodecBase):
         if self._finished:
             raise ValueError("gzip encoder is already finalized")
 
+    def _check_feed_size(self, size: int) -> None:
+        if self._strict_size and self._input_size + size > 0xFFFFFFFF:
+            raise OSError(
+                f"uncompressed member size would exceed the gzip ISIZE "
+                f"field's 4 GiB limit ({self._input_size} + {size} > "
+                f"{0xFFFFFFFF}); drop strict_size to allow ISIZE "
+                f"truncation or split the payload into multiple members"
+            )
+
     def start(self) -> CodecOperation:
         """Start the member and lazily emit its gzip header exactly once."""
         self._check_encoder_available()
@@ -306,13 +315,7 @@ class GzipEncoder(_CodecBase):
             raise ValueError("gzip encoder must be started before feeding data")
         snapshot = _snapshot_bytes_input(data)
         size = len(snapshot)
-        if self._strict_size and self._input_size + size > 0xFFFFFFFF:
-            raise OSError(
-                f"uncompressed member size would exceed the gzip ISIZE "
-                f"field's 4 GiB limit ({self._input_size} + {size} > "
-                f"{0xFFFFFFFF}); drop strict_size to allow ISIZE "
-                f"truncation or split the payload into multiple members"
-            )
+        self._check_feed_size(size)
         return self._reserve(self._feed(snapshot))
 
     def _feed_snapshot(self, snapshot: bytes) -> _AsyncDrivableOperation:
@@ -321,13 +324,7 @@ class GzipEncoder(_CodecBase):
         if not self._started:
             raise ValueError("gzip encoder must be started before feeding data")
         size = len(snapshot)
-        if self._strict_size and self._input_size + size > 0xFFFFFFFF:
-            raise OSError(
-                f"uncompressed member size would exceed the gzip ISIZE "
-                f"field's 4 GiB limit ({self._input_size} + {size} > "
-                f"{0xFFFFFFFF}); drop strict_size to allow ISIZE "
-                f"truncation or split the payload into multiple members"
-            )
+        self._check_feed_size(size)
         return cast(_AsyncDrivableOperation, self._reserve(self._feed(snapshot)))
 
     def _feed(self, data: bytes) -> _CodecIterator:

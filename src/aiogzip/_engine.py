@@ -131,6 +131,8 @@ def inflate_step(
     if eof:
         retained = _normalized_retained(data, unused, tail)
     else:
+        # Some inflate adapters accumulate earlier unconsumed input before
+        # the exact current window; only the current suffix remains actionable.
         if len(tail) > len(data) and tail.endswith(data):
             tail = data
         if not data.endswith(tail):
