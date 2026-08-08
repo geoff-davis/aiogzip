@@ -174,6 +174,22 @@ captures cProfile tables and hot-path call counts for the diagnostic 10 B,
 kept outside ordinary wall-time regions; tracemalloc cases are labeled
 separately and are not used as wall-time claims.
 
+`verify_a3_headers.py` is the release-only structural companion. It leaves the
+locked exact-a2 comparison harness unchanged while checking 64 MiB post-failure
+retention, reporting the intentional non-seekable rewind cache separately,
+sampling a path-backed 16 MiB case, exercising combined optional fields through
+text mode, and testing the real 128 MiB boundary:
+
+```bash
+uv run --frozen python benchmarks/verify_a3_headers.py \
+  --source-root . --engine stdlib \
+  --output /tmp/v2.0.0a3-header-verification-stdlib.json
+```
+
+Run it once with each engine outside normal CI. Fixture creation and reader
+opening precede tracemalloc, and the JSON reports both peak allocation and
+current allocation after close plus garbage collection.
+
 ## Running Benchmarks
 
 ### Command Line Options

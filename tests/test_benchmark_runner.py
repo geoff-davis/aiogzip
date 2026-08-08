@@ -5,7 +5,10 @@ import gzip
 import hashlib
 import importlib
 import json
+import os
+import struct
 import sys
+import zlib
 from pathlib import Path
 
 import pytest
@@ -30,6 +33,7 @@ RegressionsBenchmarks = bench_codec_regressions.RegressionsBenchmarks
 deterministic_bytes = bench_codec_regressions._deterministic_bytes
 fixture = bench_codec_regressions._fixture
 a3_header_fixture = bench_a3_regressions.optional_header_fixture
+a3_combined_header_fixture = bench_a3_regressions.combined_header_fixture
 A3SeekableMemorySource = bench_a3_regressions.SeekableMemorySource
 a3_read_high_level = bench_a3_regressions._read_high_level
 a3_write_once = bench_a3_regressions._write_once
@@ -142,6 +146,247 @@ def test_a3_optional_header_fixtures_are_deterministic_and_valid(field):
 
     assert first == second
     assert gzip.decompress(first) == expected
+
+
+def test_a3_combined_header_fixture_has_expected_layout_and_valid_fhcrc():
+    import aiogzip
+
+    wire, expected, landmarks = a3_combined_header_fixture(
+        extra_size=31,
+        fname_size=37,
+        fcomment_size=41,
+        mtime=0xFFFFFFFF,
+        fhcrc=True,
+    )
+
+    assert wire[:3] == b"\x1f\x8b\x08"
+    assert wire[3] == 0x04 | 0x08 | 0x10 | 0x02
+    assert struct.unpack("<I", wire[4:8])[0] == 0xFFFFFFFF
+    assert struct.unpack("<H", wire[10:12])[0] == 31
+    fhcrc_end = landmarks["fhcrc_end"]
+    assert struct.unpack("<H", wire[fhcrc_end - 2 : fhcrc_end])[0] == (
+        zlib.crc32(wire[: fhcrc_end - 2]) & 0xFFFF
+    )
+    assert gzip.decompress(wire) == expected
+
+    decoder = aiogzip.GzipDecoder()
+    assert b"".join(decoder.feed(wire)) + b"".join(decoder.finish()) == expected
+
+
+class _A3FramedSource:
+    def __init__(self, *frames):
+        self.frames = tuple(frames)
+        self.frame_index = 0
+        self.frame_offset = 0
+        self.read_calls = 0
+
+    def seekable(self):
+        return True
+
+    async def read(self, size=-1):
+        self.read_calls += 1
+        if self.frame_index >= len(self.frames):
+            return b""
+        frame = self.frames[self.frame_index]
+        remaining = len(frame) - self.frame_offset
+        take = remaining if size < 0 else min(size, remaining)
+        start = self.frame_offset
+        self.frame_offset += take
+        if self.frame_offset == len(frame):
+            self.frame_index += 1
+            self.frame_offset = 0
+        return frame[start : start + take]
+
+    async def seek(self, offset, whence=os.SEEK_SET):
+        if offset != 0 or whence != os.SEEK_SET:
+            raise OSError("test source only supports rewind")
+        self.frame_index = 0
+        self.frame_offset = 0
+        return 0
+
+
+@pytest.mark.parametrize(
+    "split_name",
+    [
+        "magic-1",
+        "magic-2",
+        "method",
+        "flags",
+        "fixed-9",
+        "fixed-end",
+        "xlen-1",
+        "xlen-end",
+        "extra-end",
+        "fname-terminator",
+        "fcomment-terminator",
+        "fhcrc-1",
+    ],
+)
+@pytest.mark.asyncio
+async def test_a3_high_level_combined_header_adversarial_splits(split_name):
+    import aiogzip
+
+    wire, expected, landmarks = a3_combined_header_fixture(mtime=123456789)
+    splits = {
+        "magic-1": 1,
+        "magic-2": 2,
+        "method": 3,
+        "flags": 4,
+        "fixed-9": 9,
+        "fixed-end": landmarks["fixed_end"],
+        "xlen-1": landmarks["fixed_end"] + 1,
+        "xlen-end": landmarks["xlen_end"],
+        "extra-end": landmarks["extra_end"],
+        "fname-terminator": landmarks["fname_end"] - 1,
+        "fcomment-terminator": landmarks["fcomment_end"] - 1,
+        "fhcrc-1": landmarks["fhcrc_end"] - 1,
+    }
+    split = splits[split_name]
+    source = _A3FramedSource(wire[:split], wire[split:])
+
+    async with aiogzip.open(
+        None,
+        "rb",
+        fileobj=source,
+        closefd=False,
+        chunk_size=len(wire),
+    ) as stream:
+        assert await stream.read() == expected
+        assert stream.mtime == 123456789
+
+
+@pytest.mark.asyncio
+async def test_a3_corrupt_fhcrc_is_rejected_before_mtime_commit():
+    import aiogzip
+
+    wire, _, landmarks = a3_combined_header_fixture(mtime=987654321)
+    damaged = bytearray(wire)
+    damaged[landmarks["fhcrc_end"] - 1] ^= 0xFF
+    source = _A3FramedSource(bytes(damaged))
+
+    async with aiogzip.open(
+        None,
+        "rb",
+        fileobj=source,
+        closefd=False,
+        chunk_size=len(damaged),
+    ) as stream:
+        with pytest.raises(gzip.BadGzipFile, match="Header CRC"):
+            await stream.read()
+        assert stream.mtime is None
+
+
+@pytest.mark.asyncio
+async def test_a3_incomplete_header_fails_only_when_source_reports_eof():
+    import aiogzip
+
+    wire, _ = a3_header_fixture("fname", 4096, complete=False, mtime=42)
+    eof_requested = asyncio.Event()
+    release_eof = asyncio.Event()
+
+    class EofGateSource(_A3FramedSource):
+        async def read(self, size=-1):
+            if self.frame_index < len(self.frames):
+                return await super().read(size)
+            eof_requested.set()
+            await release_eof.wait()
+            return b""
+
+    source = EofGateSource(wire)
+    stream = aiogzip.open(
+        None,
+        "rb",
+        fileobj=source,
+        closefd=False,
+        chunk_size=len(wire),
+    )
+    await stream.open()
+    try:
+        task = asyncio.create_task(stream.read())
+        await eof_requested.wait()
+        assert not task.done()
+        assert stream.mtime is None
+        release_eof.set()
+        with pytest.raises(gzip.BadGzipFile, match="truncated"):
+            await task
+        assert stream.mtime is None
+    finally:
+        await stream.close()
+
+
+@pytest.mark.asyncio
+async def test_a3_over_limit_header_does_not_commit_public_mtime(monkeypatch):
+    import aiogzip
+    import aiogzip.codec as codec_module
+
+    limit = 32
+    monkeypatch.setattr(codec_module, "_MAX_CHUNK_SIZE", limit)
+    fixed = b"\x1f\x8b\x08\x08" + struct.pack("<I", 777) + b"\x00\xff"
+    wire = fixed + b"x" * (limit - len(fixed) + 1)
+    source = _A3FramedSource(wire[:limit], wire[limit:])
+
+    async with aiogzip.open(
+        None,
+        "rb",
+        fileobj=source,
+        closefd=False,
+        chunk_size=limit,
+    ) as stream:
+        with pytest.raises(gzip.BadGzipFile, match="header exceeds"):
+            await stream.read()
+        assert stream.mtime is None
+        assert source.read_calls == 2
+
+
+def test_a3_parser_rejects_before_consuming_first_byte_over_limit():
+    from aiogzip._codec_buffer import _InputQueue
+    from aiogzip._gzip_header import _GzipHeaderParser
+
+    limit = 32
+    fixed = b"\x1f\x8b\x08\x08" + struct.pack("<I", 777) + b"\x00\xff"
+    pending = _InputQueue()
+    pending.append(fixed + b"x" * (limit - len(fixed)))
+    parser = _GzipHeaderParser(collect_metadata=False, limit=limit)
+
+    assert parser.advance(pending) is None
+    assert parser.size == limit
+    assert not pending
+
+    pending.append(b"x")
+    with pytest.raises(gzip.BadGzipFile, match="header exceeds"):
+        parser.advance(pending)
+    assert parser.size == limit
+    assert len(pending) == 1
+
+
+@pytest.mark.asyncio
+async def test_a3_source_read_count_is_linear_and_seekable_reader_has_no_cache():
+    import aiogzip
+
+    chunk_size = 257
+    counts = []
+    expected_counts = []
+    for field_size in (4096, 8192):
+        wire, _ = a3_header_fixture("fname", field_size, complete=False)
+        expected_counts.append((len(wire) + chunk_size - 1) // chunk_size + 1)
+        source = A3SeekableMemorySource(wire)
+        async with aiogzip.open(
+            None,
+            "rb",
+            fileobj=source,
+            closefd=False,
+            chunk_size=chunk_size,
+        ) as stream:
+            with pytest.raises(gzip.BadGzipFile, match="truncated"):
+                await stream.read()
+            assert source.max_returned <= chunk_size
+            assert stream._compressed_cache == b""
+            assert stream._cache_rewindable_reads is False
+            counts.append(source.read_calls)
+
+    assert counts == expected_counts
+    assert counts[1] - counts[0] == 16
+    assert "_header_probe_buffer" not in aiogzip.AsyncGzipBinaryFile.__slots__
 
 
 @pytest.mark.asyncio

@@ -276,6 +276,46 @@ def optional_header_fixture(
     return bytes(header) + _raw_deflate(payload) + trailer, payload
 
 
+def combined_header_fixture(
+    *,
+    extra_size: int = 17,
+    fname_size: int = 19,
+    fcomment_size: int = 23,
+    mtime: int = 0,
+    fhcrc: bool = True,
+) -> tuple[bytes, bytes, dict[str, int]]:
+    """Build a valid member with every optional field and split landmarks."""
+    if not 0 <= extra_size <= 0xFFFF:
+        raise ValueError("extra_size must fit the gzip XLEN field")
+    if fname_size < 0 or fcomment_size < 0:
+        raise ValueError("string field sizes must be non-negative")
+
+    flags = 0x04 | 0x08 | 0x10 | (0x02 if fhcrc else 0)
+    header = bytearray(b"\x1f\x8b\x08")
+    header.append(flags)
+    header.extend(struct.pack("<I", mtime))
+    header.extend(b"\x00\xff")
+    landmarks = {"fixed_end": len(header)}
+
+    header.extend(struct.pack("<H", extra_size))
+    landmarks["xlen_end"] = len(header)
+    header.extend(b"e" * extra_size)
+    landmarks["extra_end"] = len(header)
+    header.extend(b"n" * fname_size + b"\x00")
+    landmarks["fname_end"] = len(header)
+    header.extend(b"c" * fcomment_size + b"\x00")
+    landmarks["fcomment_end"] = len(header)
+    if fhcrc:
+        header.extend(struct.pack("<H", zlib.crc32(header) & 0xFFFF))
+    landmarks["fhcrc_end"] = len(header)
+
+    payload = b"a3 combined header fixture payload\n"
+    trailer = struct.pack(
+        "<II", zlib.crc32(payload) & 0xFFFFFFFF, len(payload) & 0xFFFFFFFF
+    )
+    return bytes(header) + _raw_deflate(payload) + trailer, payload, landmarks
+
+
 def concatenated_fixture(members: int) -> tuple[bytes, bytes, int]:
     wire = bytearray()
     payload = bytearray()
