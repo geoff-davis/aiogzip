@@ -928,10 +928,10 @@ Do not present `writelines()` as a same-semantics replacement for callers who re
 
 For every write-size case:
 
-- [ ] candidate no more than `5%` slower than exact `a2` without investigation;
-- [ ] candidate no more than `10%` slower than exact `a2` as a hard blocker;
-- [ ] output bytes remain valid and equivalent;
-- [ ] sink-error, position, cancellation, and poisoning tests pass.
+- [x] candidate no more than `5%` slower than exact `a2` without investigation;
+- [x] candidate no more than `10%` slower than exact `a2` as a hard blocker;
+- [x] output bytes remain valid and equivalent;
+- [x] sink-error, position, cancellation, and poisoning tests pass.
 
 For representative `1 KiB` through `64 KiB` writes:
 
@@ -1347,33 +1347,33 @@ WP0 baseline captured; WP2–WP3 complete so benchmark noise from concurrent pro
 
 Before optimization, add or consolidate tests proving:
 
-- [ ] exact bytes and bytes-like inputs are snapshotted before asynchronous work;
-- [ ] bytes subclasses use raw-buffer snapshot semantics;
-- [ ] each successful call returns its input length;
-- [ ] position updates only after all emitted bytes reach the sink;
-- [ ] a sink exception is raised by the triggering call;
-- [ ] short writes are retried to completion;
-- [ ] zero progress fails;
-- [ ] invalid negative/oversized counts fail;
-- [ ] cancellation poisons the writer;
-- [ ] later writes fail after a failed call;
-- [ ] close does not finish a broken member;
-- [ ] `flush()` semantics remain distinct from ordinary `write()`;
-- [ ] `writelines()` batches boundedly and preserves iterator/coercion failure behavior.
+- [x] exact bytes and bytes-like inputs are snapshotted before asynchronous work;
+- [x] bytes subclasses use raw-buffer snapshot semantics;
+- [x] each successful call returns its input length;
+- [x] position updates only after all emitted bytes reach the sink;
+- [x] a sink exception is raised by the triggering call;
+- [x] short writes are retried to completion;
+- [x] zero progress fails;
+- [x] invalid negative/oversized counts fail;
+- [x] cancellation poisons the writer;
+- [x] later writes fail after a failed call;
+- [x] close does not finish a broken member;
+- [x] `flush()` semantics remain distinct from ordinary `write()`;
+- [x] `writelines()` batches boundedly and preserves iterator/coercion failure behavior.
 
 #### Phase B — Profile
 
-- [ ] Run every size in section 8.5 against exact `v1.11.0`, exact `a2`, and candidate.
-- [ ] Capture profiles for 10 B, 1 KiB, and 64 KiB.
-- [ ] Count `_Operation` construction and `__next__` calls.
-- [ ] Count compressor calls and output yields.
-- [ ] Count `_write_all()` calls and underlying sink calls.
-- [ ] Separate payload coercion, reservation, generator advancement, CRC/accounting, compression, and await/sink costs.
-- [ ] Compare repeated `write()` with `writelines()` and explicit batching.
-- [ ] Run one and multiple independent streams.
-- [ ] Run with stdlib and zlib-ng configurations.
-- [ ] Record whether zlib emits no bytes for most tiny calls.
-- [ ] Record whether file I/O or protocol overhead dominates at each size.
+- [x] Run every size in section 8.5 against exact `v1.11.0`, exact `a2`, and candidate.
+- [x] Capture profiles for 10 B, 1 KiB, and 64 KiB.
+- [x] Count `_Operation` construction and `__next__` calls.
+- [x] Count compressor calls and output yields.
+- [x] Count `_write_all()` calls and underlying sink calls.
+- [x] Separate payload coercion, reservation, generator advancement, CRC/accounting, compression, and await/sink costs.
+- [x] Compare repeated `write()` with `writelines()` and explicit batching.
+- [x] Run one and multiple independent streams.
+- [x] Run with stdlib and zlib-ng configurations.
+- [x] Record whether zlib emits no bytes for most tiny calls.
+- [x] Record whether file I/O or protocol overhead dominates at each size.
 
 #### Phase C — Safe optimization candidates
 
@@ -1388,12 +1388,12 @@ Evaluate in order and stop when evidence says further change is not justified:
 
 For every attempted optimization:
 
-- [ ] add a focused benchmark result;
-- [ ] add or retain functional tests;
-- [ ] rerun all write sizes;
-- [ ] rerun direct codec operation lifecycle tests;
-- [ ] rerun file close/flush/failure tests;
-- [ ] revert the change when it does not produce a repeatable useful result.
+- [x] add a focused benchmark result;
+- [x] add or retain functional tests;
+- [x] rerun all write sizes;
+- [x] rerun direct codec operation lifecycle tests;
+- [x] rerun file close/flush/failure tests;
+- [x] revert the change when it does not produce a repeatable useful result.
 
 #### Forbidden “optimizations”
 
@@ -1434,12 +1434,12 @@ It must include:
 #### Exit criteria
 
 - [ ] Every hard small-write gate passes.
-- [ ] No write semantic changed.
-- [ ] Realistic write sizes have a recorded comparison.
-- [ ] The 10-byte case is improved or explicitly accepted with evidence.
-- [ ] Documentation gives a practical batching recommendation.
-- [ ] Issue #86 handoff notes are prepared for the maintainer.
-- [ ] Repository is green.
+- [x] No write semantic changed.
+- [x] Realistic write sizes have a recorded comparison.
+- [x] The 10-byte case is improved or explicitly accepted with evidence.
+- [x] Documentation gives a practical batching recommendation.
+- [x] Issue #86 handoff notes are prepared for the maintainer.
+- [x] Repository is green.
 
 #### Suggested commits
 
