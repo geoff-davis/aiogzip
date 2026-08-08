@@ -616,7 +616,10 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                         "expected_output_bytes": len(expected),
                         "expected_output_sha256": _sha256(expected),
                     }
-                    for measure_memory in (False, True):
+                    measurement_modes = [False]
+                    if not complete and size_mib == args.memory_fixture_size_mib:
+                        measurement_modes.append(True)
+                    for measure_memory in measurement_modes:
                         mode = "memory" if measure_memory else "throughput"
                         name = f"high-level {fixture_name} {mode}"
                         samples = [
@@ -731,6 +734,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
         "configuration": {
             "categories": categories,
             "fixture_sizes_mib": args.fixture_sizes_mib,
+            "memory_fixture_size_mib": args.memory_fixture_size_mib,
             "member_counts": args.member_counts,
             "write_sizes": args.write_sizes,
             "total_write_bytes": args.total_write_bytes,
@@ -780,6 +784,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated concatenated-member counts (default: 1,2,1001)",
     )
     parser.add_argument(
+        "--memory-fixture-size-mib",
+        type=_positive_int,
+        default=32,
+        help="incomplete-header size used for tracemalloc (default: 32)",
+    )
+    parser.add_argument(
         "--write-sizes",
         type=_csv_positive_ints,
         default=_WRITE_SIZES,
@@ -812,6 +822,11 @@ def main() -> int:
     args = parser.parse_args()
     if args.repeat < 5 or args.repeat % 2 == 0:
         parser.error("--repeat must be an odd integer of at least 5")
+    if (
+        "headers" in args.categories.split(",")
+        and args.memory_fixture_size_mib not in args.fixture_sizes_mib
+    ):
+        parser.error("--memory-fixture-size-mib must appear in --fixture-sizes-mib")
     try:
         document = asyncio.run(run_benchmarks(args))
     except (RuntimeError, ValueError) as error:
