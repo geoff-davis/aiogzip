@@ -622,6 +622,9 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                     for measure_memory in measurement_modes:
                         mode = "memory" if measure_memory else "throughput"
                         name = f"high-level {fixture_name} {mode}"
+                        sample_count = (
+                            args.memory_repeat if measure_memory else args.repeat
+                        )
                         samples = [
                             await _read_high_level(
                                 aiogzip,
@@ -630,7 +633,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                                 expect_complete=complete,
                                 measure_memory=measure_memory,
                             )
-                            for _ in range(args.repeat)
+                            for _ in range(sample_count)
                         ]
                         if complete:
                             for sample in samples:
@@ -740,6 +743,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
             "total_write_bytes": args.total_write_bytes,
             "source_chunk_bytes": args.source_chunk_bytes,
             "repeat": args.repeat,
+            "memory_repeat": args.memory_repeat,
             "warm_up_policy": "one 64KiB 1KiB-write run and one 4KiB header read",
             "garbage_collection_policy": "normal interpreter policy; recorded in environment",
             "ordering_policy": "fixed category/size/method order; no randomization",
@@ -813,6 +817,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=5,
         help="odd primary sample count (default: 5)",
     )
+    parser.add_argument(
+        "--memory-repeat",
+        type=_positive_int,
+        default=1,
+        help="tracemalloc peak sample count (default: 1; not a timing claim)",
+    )
     parser.add_argument("--output", type=Path, required=True)
     return parser
 
@@ -822,6 +832,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.repeat < 5 or args.repeat % 2 == 0:
         parser.error("--repeat must be an odd integer of at least 5")
+    if args.memory_repeat % 2 == 0:
+        parser.error("--memory-repeat must be odd")
     if (
         "headers" in args.categories.split(",")
         and args.memory_fixture_size_mib not in args.fixture_sizes_mib

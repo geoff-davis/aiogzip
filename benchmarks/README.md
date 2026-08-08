@@ -165,7 +165,10 @@ Use `--fixture-sizes-mib`, `--memory-fixture-size-mib`, `--member-counts`,
 `--write-sizes`, `--total-write-bytes`, and `--source-chunk-bytes` to select an
 explicitly recorded matrix. By default, tracemalloc is limited to the plan's
 32 MiB incomplete FNAME/FCOMMENT allocation gates; the complete and larger
-cases remain ordinary wall-time measurements. `profile_small_writes.py`
+cases remain ordinary wall-time measurements. Allocation peaks default to one
+sample via `--memory-repeat 1` because their durations are not used as timing
+claims; primary wall-time comparisons retain five or more samples.
+`profile_small_writes.py`
 captures cProfile tables and hot-path call counts for the diagnostic 10 B,
 1 KiB, and 64 KiB write sizes. Correctness checks and fixture construction are
 kept outside ordinary wall-time regions; tracemalloc cases are labeled
