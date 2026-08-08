@@ -1027,12 +1027,12 @@ None beyond section 0.
 - [x] Keep benchmark imports isolated from the source tree under test.
 - [x] Verify output digests outside timed regions.
 - [x] Add a schema/version field to machine-readable results.
-- [ ] Capture exact `v2.0.0a2` stdlib and zlib-ng records.
-- [ ] Capture exact `v1.11.0` comparable records.
-- [ ] Capture locked pre-change `main` records.
-- [ ] Commit individual samples, environment metadata, commands, fixture hashes, and disposition of unavailable cases.
-- [ ] Confirm no production file under `src/aiogzip/` changed in WP0.
-- [ ] Update this checklist in the same benchmark commit.
+- [x] Capture exact `v2.0.0a2` stdlib and zlib-ng records.
+- [x] Capture exact `v1.11.0` comparable records.
+- [x] Capture locked pre-change `main` records.
+- [x] Commit individual samples, environment metadata, commands, fixture hashes, and disposition of unavailable cases.
+- [x] Confirm no production file under `src/aiogzip/` changed in WP0.
+- [x] Update this checklist in the same benchmark commit.
 
 #### Required tests and checks
 
@@ -1046,13 +1046,13 @@ Run a reduced smoke benchmark in ordinary CI time. Mark large timing and 128 MiB
 
 #### Exit criteria
 
-- [ ] Baseline JSON exists for every available engine/source pair.
-- [ ] Exact commits and environments are recorded.
-- [ ] Individual samples are preserved.
-- [ ] Fixtures and results have hashes.
-- [ ] The harness detects incorrect output.
-- [ ] No production code changed.
-- [ ] Repository is green.
+- [x] Baseline JSON exists for every available engine/source pair.
+- [x] Exact commits and environments are recorded.
+- [x] Individual samples are preserved.
+- [x] Fixtures and results have hashes.
+- [x] The harness detects incorrect output.
+- [x] No production code changed.
+- [x] Repository is green.
 
 #### Suggested commit
 

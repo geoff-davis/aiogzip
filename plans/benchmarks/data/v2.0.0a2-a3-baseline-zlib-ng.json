@@ -1,0 +1,4913 @@
+{
+  "schema_version": 1,
+  "benchmark": "aiogzip-2.0.0a3-regressions",
+  "created_at_unix": 1786219496.7560205,
+  "command": [
+    "/home/geoff/Projects/personal/aiogzip/.venv/bin/python",
+    "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+    "--source-root",
+    "/tmp/aiogzip-v2.0.0a2-a3",
+    "--engine",
+    "zlib-ng",
+    "--repeat",
+    "5",
+    "--memory-repeat",
+    "1",
+    "--output",
+    "plans/benchmarks/data/v2.0.0a2-a3-baseline-zlib-ng.json"
+  ],
+  "configuration": {
+    "categories": [
+      "headers",
+      "members",
+      "writes"
+    ],
+    "fixture_sizes_mib": [
+      16,
+      32,
+      64
+    ],
+    "memory_fixture_size_mib": 32,
+    "member_counts": [
+      1,
+      2,
+      1001
+    ],
+    "write_sizes": [
+      10,
+      100,
+      1024,
+      4096,
+      16384,
+      65536,
+      262144
+    ],
+    "total_write_bytes": 8388608,
+    "source_chunk_bytes": 1048576,
+    "repeat": 5,
+    "memory_repeat": 1,
+    "warm_up_policy": "one 64KiB 1KiB-write run and one 4KiB header read",
+    "garbage_collection_policy": "normal interpreter policy; recorded in environment",
+    "ordering_policy": "fixed category/size/method order; no randomization"
+  },
+  "source": {
+    "source_root": "/tmp/aiogzip-v2.0.0a2-a3",
+    "aiogzip_file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a2",
+    "commit": "9534eb31da15417126233eda225d8f897908e3bb",
+    "describe": "v2.0.0a2",
+    "dirty_tracked": false,
+    "requested_engine": "zlib-ng",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "zlib-ng",
+      "crc32": "zlib-ng"
+    }
+  },
+  "environment": {
+    "source_root": "/tmp/aiogzip-v2.0.0a2-a3",
+    "aiogzip_file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a2",
+    "commit": "9534eb31da15417126233eda225d8f897908e3bb",
+    "describe": "v2.0.0a2",
+    "dirty_tracked": false,
+    "requested_engine": "zlib-ng",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "zlib-ng",
+      "crc32": "zlib-ng"
+    },
+    "runner_root": "/home/geoff/Projects/personal/aiogzip",
+    "runner_commit": "799a8153615302e583d827c4016e63241e65609a",
+    "harness_sha256": "813e99de16c95d0f2805de5f07903d58ca31370f630406e1c7dd7e6c68762a89",
+    "fixture_generator_version": "a3-fixtures-v1",
+    "python_implementation": "CPython",
+    "python_version": "3.12.12 (main, Dec 17 2025, 21:10:06) [Clang 21.1.4 ]",
+    "python_executable": "/home/geoff/Projects/personal/aiogzip/.venv/bin/python",
+    "python_build": [
+      "main",
+      "Dec 17 2025 21:10:06"
+    ],
+    "python_config_args": "'--build=x86_64-unknown-linux-gnu' '--host=x86_64-unknown-linux-gnu' '--prefix=/install' '--with-openssl=/tools/deps' '--with-system-expat' '--with-system-libmpdec' '--without-ensurepip' '--with-readline=editline' '--enable-static-libpython-for-interpreter' '--enable-shared' '--enable-optimizations' '--enable-bolt' '--with-lto' '--with-build-python=/tools/host/bin/python3.12' '--with-dbmliborder=bdb' 'build_alias=x86_64-unknown-linux-gnu' 'host_alias=x86_64-unknown-linux-gnu' 'PKG_CONFIG=pkg-config --static' 'PKG_CONFIG_PATH=/tools/deps/share/pkgconfig:/tools/deps/lib/pkgconfig' 'CC=clang' 'CFLAGS=-O3 -fPIC ' 'LDFLAGS= -Wl,--exclude-libs,ALL -LModules/_hacl' 'CPPFLAGS=-O3 -fPIC ' 'PROFILE_TASK=-m test --pgo'",
+    "python_compiler": "Clang 21.1.4 ",
+    "os": "Linux",
+    "os_release": "6.17.0-41-generic",
+    "kernel": "#41-Ubuntu SMP PREEMPT_DYNAMIC Sat Jun 20 18:01:40 UTC 2026",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.42"
+    ],
+    "processor": "",
+    "logical_cores": 32,
+    "physical_cores": 16,
+    "ram_bytes": 131894407168,
+    "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "cpu_policy": {
+      "governors": [
+        "powersave"
+      ],
+      "boost": "enabled"
+    },
+    "system_load": [
+      1.49609375,
+      1.50439453125,
+      1.591796875
+    ],
+    "power_source": "ACAD:1,ucsi-source-psy-USBC000:001:0,ucsi-source-psy-USBC000:002:0",
+    "benchmark_filesystem": {
+      "path": "/tmp/aiogzip-v2.0.0a2-a3",
+      "device": "tmpfs",
+      "type": "tmpfs",
+      "mount": "/tmp"
+    },
+    "temporary_filesystem": {
+      "path": "/tmp",
+      "device": "tmpfs",
+      "type": "tmpfs",
+      "mount": "/tmp"
+    },
+    "temporary_directory": "/tmp",
+    "zlib_compile_version": "1.3.1",
+    "zlib_runtime_version": "1.3.1",
+    "zlib_ng_package_version": "1.0.0",
+    "uv_version": "uv 0.9.22",
+    "uv_lock_sha256": "e7b91a8c8b42c1ad455ac2d48b20a84d5e07fcb657bb48797baba8686ffa6871",
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      700,
+      10,
+      10
+    ]
+  },
+  "fixtures": {
+    "fname-16MiB-complete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fname",
+      "field_bytes": 16777216,
+      "complete": true,
+      "fixture_bytes": 16777263,
+      "fixture_sha256": "7ec0e4612a892ac9129dd955195ca519acfbfd3e664b4088c3a4869ad4bef32c",
+      "expected_output_bytes": 26,
+      "expected_output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023"
+    },
+    "fname-16MiB-incomplete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fname",
+      "field_bytes": 16777216,
+      "complete": false,
+      "fixture_bytes": 16777226,
+      "fixture_sha256": "ef0c3dba81e17d7fb3cf9b0ee6056d826f8f0d74d51ca137a6d668e38cc474d0",
+      "expected_output_bytes": 0,
+      "expected_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fcomment-16MiB-complete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fcomment",
+      "field_bytes": 16777216,
+      "complete": true,
+      "fixture_bytes": 16777263,
+      "fixture_sha256": "8cc1e48bb545b6bd34fd8fbc69874280a052579bb10885630e6d976414794e32",
+      "expected_output_bytes": 26,
+      "expected_output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023"
+    },
+    "fcomment-16MiB-incomplete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fcomment",
+      "field_bytes": 16777216,
+      "complete": false,
+      "fixture_bytes": 16777226,
+      "fixture_sha256": "c712b3cc13193164197ed04d322620bbb73f684287585e4e332c2c65b0e63ca1",
+      "expected_output_bytes": 0,
+      "expected_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fname-32MiB-complete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fname",
+      "field_bytes": 33554432,
+      "complete": true,
+      "fixture_bytes": 33554479,
+      "fixture_sha256": "e9f5ac6916a1445cac207a9d76c7572b2c95fc031803b7d1aaacb1d0e59765c6",
+      "expected_output_bytes": 26,
+      "expected_output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023"
+    },
+    "fname-32MiB-incomplete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fname",
+      "field_bytes": 33554432,
+      "complete": false,
+      "fixture_bytes": 33554442,
+      "fixture_sha256": "c375895ebbb77ac9c6c3c0e5f4c706dca45e392815b939fd3457511ada290232",
+      "expected_output_bytes": 0,
+      "expected_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fcomment-32MiB-complete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fcomment",
+      "field_bytes": 33554432,
+      "complete": true,
+      "fixture_bytes": 33554479,
+      "fixture_sha256": "085094ac5911dab09fb0673fd4304884c2e2dede7a8ce73b0b08e20b767d351a",
+      "expected_output_bytes": 26,
+      "expected_output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023"
+    },
+    "fcomment-32MiB-incomplete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fcomment",
+      "field_bytes": 33554432,
+      "complete": false,
+      "fixture_bytes": 33554442,
+      "fixture_sha256": "c7309faffe30a9edf662ea1c5b3b3af15bf420cbf15847085427cabbd8f22961",
+      "expected_output_bytes": 0,
+      "expected_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fname-64MiB-complete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fname",
+      "field_bytes": 67108864,
+      "complete": true,
+      "fixture_bytes": 67108911,
+      "fixture_sha256": "8884b3ab8a255a232b56b07fa66f22744e64511a6794525f2ce2a4822b963663",
+      "expected_output_bytes": 26,
+      "expected_output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023"
+    },
+    "fname-64MiB-incomplete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fname",
+      "field_bytes": 67108864,
+      "complete": false,
+      "fixture_bytes": 67108874,
+      "fixture_sha256": "e07c9b3fecba25d04c16009a01d9e11712d9c29e8031c58075c170faa699703d",
+      "expected_output_bytes": 0,
+      "expected_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fcomment-64MiB-complete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fcomment",
+      "field_bytes": 67108864,
+      "complete": true,
+      "fixture_bytes": 67108911,
+      "fixture_sha256": "0b33136b7600ddd873a9e450e85e943c3556a8e043fbcefb886e9bcad3879199",
+      "expected_output_bytes": 26,
+      "expected_output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023"
+    },
+    "fcomment-64MiB-incomplete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fcomment",
+      "field_bytes": 67108864,
+      "complete": false,
+      "fixture_bytes": 67108874,
+      "fixture_sha256": "d7804638b1b071069b5c392c6fb7f24334fd7da6b93a318a1305b1ffd914d21b",
+      "expected_output_bytes": 0,
+      "expected_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "members-1": {
+      "generator_version": "a3-fixtures-v1",
+      "members": 1,
+      "fixture_bytes": 30,
+      "fixture_sha256": "5eed09b9414f3a1bf0199fc52e63cbb472b524c3c6cd43bbc5d9071a8c51de51",
+      "expected_output_bytes": 13,
+      "expected_output_sha256": "28afd959a751c0198a5d4611a3a29450e329835d3d1923c6dd0bc84f204dc589",
+      "expected_final_mtime": 0
+    },
+    "members-2": {
+      "generator_version": "a3-fixtures-v1",
+      "members": 2,
+      "fixture_bytes": 61,
+      "fixture_sha256": "e07b41b8b2f4b3a5acef1a338c1223fbb9dfeb9af84975a3731066fc703477f9",
+      "expected_output_bytes": 26,
+      "expected_output_sha256": "95d6006d597a51ff48faf091fa7a49b46796002b696304ba438691491d198ee3",
+      "expected_final_mtime": 4294967295
+    },
+    "members-1001": {
+      "generator_version": "a3-fixtures-v1",
+      "members": 1001,
+      "fixture_bytes": 33012,
+      "fixture_sha256": "c541d136532ef6194f695c23561b5e18cb37c7a0b495e5574adf7b450e7e7741",
+      "expected_output_bytes": 13013,
+      "expected_output_sha256": "2e34c2608fecca38fa7024b2c4c5a6a6ad846646b2aa9749117871476aa2e7ea",
+      "expected_final_mtime": 0
+    },
+    "write-10": {
+      "generator_version": "a3-fixtures-v1",
+      "record_bytes": 10,
+      "record_sha256": "7caf9d96cf075a2b03eac1a494cbf4ebd62604ac89adf5ca03611e69bf31dd04",
+      "payload_bytes": 8388608,
+      "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8"
+    },
+    "write-100": {
+      "generator_version": "a3-fixtures-v1",
+      "record_bytes": 100,
+      "record_sha256": "21373b396a87f46145f4b93359f474dc6bea48de753507091357a2a01aa6ee83",
+      "payload_bytes": 8388608,
+      "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14"
+    },
+    "write-1024": {
+      "generator_version": "a3-fixtures-v1",
+      "record_bytes": 1024,
+      "record_sha256": "442f3632dd79e1d3bbecb68846ba0ce2940c21030e006572dece147cc66d399e",
+      "payload_bytes": 8388608,
+      "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a"
+    },
+    "write-4096": {
+      "generator_version": "a3-fixtures-v1",
+      "record_bytes": 4096,
+      "record_sha256": "ab322d025685581eb59120f2b5de9ab0ce42ca0c2143b685bf6029dc64a2bdaf",
+      "payload_bytes": 8388608,
+      "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026"
+    },
+    "write-16384": {
+      "generator_version": "a3-fixtures-v1",
+      "record_bytes": 16384,
+      "record_sha256": "654f1b3f50c3e5605b5cc4cd64374d9975d4105ad954b249f677574c6fd7285d",
+      "payload_bytes": 8388608,
+      "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f"
+    },
+    "write-65536": {
+      "generator_version": "a3-fixtures-v1",
+      "record_bytes": 65536,
+      "record_sha256": "7b40bd4b3b90eb7f6b3772d17771c47ba0356abd4d948e12cef31e6948cfb8ee",
+      "payload_bytes": 8388608,
+      "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe"
+    },
+    "write-262144": {
+      "generator_version": "a3-fixtures-v1",
+      "record_bytes": 262144,
+      "record_sha256": "63db2762d9a956deb587466fd76899f6f724b3faa4ba4341fca790c1b8994f5e",
+      "payload_bytes": 8388608,
+      "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb"
+    }
+  },
+  "results": [
+    {
+      "name": "high-level fname-16MiB-complete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.015022207982838154,
+        0.011050504981540143,
+        0.009619868011213839,
+        0.008748469001147896,
+        0.008468960993923247
+      ],
+      "median_seconds": 0.009619868011213839,
+      "median_absolute_deviation_seconds": 0.0011509070172905922,
+      "minimum_seconds": 0.008468960993923247,
+      "maximum_seconds": 0.015022207982838154,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fname-16MiB-complete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0009664779645390809,
+        0.0007677020039409399,
+        0.0007263239822350442,
+        0.0006545779760926962,
+        0.0005695080035366118
+      ],
+      "median_seconds": 0.0007263239822350442,
+      "median_absolute_deviation_seconds": 7.174600614234805e-05,
+      "minimum_seconds": 0.0005695080035366118,
+      "maximum_seconds": 0.0009664779645390809,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fname-16MiB-incomplete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.015661787998396903,
+        0.009348325023893267,
+        0.009858850040473044,
+        0.008461838006041944,
+        0.008762326033320278
+      ],
+      "median_seconds": 0.009348325023893267,
+      "median_absolute_deviation_seconds": 0.000585998990572989,
+      "minimum_seconds": 0.008461838006041944,
+      "maximum_seconds": 0.015661787998396903,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fname-16MiB-incomplete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0008364120149053633,
+        0.0008274949504993856,
+        0.0008402190287597477,
+        0.000657114025671035,
+        0.0006006959592923522
+      ],
+      "median_seconds": 0.0008274949504993856,
+      "median_absolute_deviation_seconds": 1.2724078260362148e-05,
+      "minimum_seconds": 0.0006006959592923522,
+      "maximum_seconds": 0.0008402190287597477,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fcomment-16MiB-complete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.009464353963267058,
+        0.00827917200513184,
+        0.00826109800254926,
+        0.008612863020971417,
+        0.008176226983778179
+      ],
+      "median_seconds": 0.00827917200513184,
+      "median_absolute_deviation_seconds": 0.00010294502135366201,
+      "minimum_seconds": 0.008176226983778179,
+      "maximum_seconds": 0.009464353963267058,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fcomment-16MiB-complete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0008908550371415913,
+        0.0008785920217633247,
+        0.0008439460070803761,
+        0.000758624984882772,
+        0.0006439179996959865
+      ],
+      "median_seconds": 0.0008439460070803761,
+      "median_absolute_deviation_seconds": 4.690903006121516e-05,
+      "minimum_seconds": 0.0006439179996959865,
+      "maximum_seconds": 0.0008908550371415913,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fcomment-16MiB-incomplete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.01540905999718234,
+        0.010800582007505,
+        0.012525645026471466,
+        0.011702187010087073,
+        0.010455588984768838
+      ],
+      "median_seconds": 0.011702187010087073,
+      "median_absolute_deviation_seconds": 0.0009016050025820732,
+      "minimum_seconds": 0.010455588984768838,
+      "maximum_seconds": 0.01540905999718234,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 18,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fcomment-16MiB-incomplete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0008797439513728023,
+        0.00082995998673141,
+        0.0007109649595804513,
+        0.0006518730078823864,
+        0.0006336990045383573
+      ],
+      "median_seconds": 0.0007109649595804513,
+      "median_absolute_deviation_seconds": 7.726595504209399e-05,
+      "minimum_seconds": 0.0006336990045383573,
+      "maximum_seconds": 0.0008797439513728023,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fname-32MiB-complete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.14189320500008762,
+        0.06536558404332027,
+        0.08376633399166167,
+        0.07882151001831517,
+        0.08986013097455725
+      ],
+      "median_seconds": 0.08376633399166167,
+      "median_absolute_deviation_seconds": 0.006093796982895583,
+      "minimum_seconds": 0.06536558404332027,
+      "maximum_seconds": 0.14189320500008762,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554479,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554479,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554479,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554479,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554479,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fname-32MiB-complete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0015255759935826063,
+        0.0014219200238585472,
+        0.0013355769915506244,
+        0.0014220299781300128,
+        0.0014628669596277177
+      ],
+      "median_seconds": 0.0014220299781300128,
+      "median_absolute_deviation_seconds": 4.083698149770498e-05,
+      "minimum_seconds": 0.0013355769915506244,
+      "maximum_seconds": 0.0015255759935826063,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fname-32MiB-incomplete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.08438494399888441,
+        0.07348666701000184,
+        0.07221741700777784,
+        0.07570873101940379,
+        0.07187380600953475
+      ],
+      "median_seconds": 0.07348666701000184,
+      "median_absolute_deviation_seconds": 0.0016128610004670918,
+      "minimum_seconds": 0.07187380600953475,
+      "maximum_seconds": 0.08438494399888441,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fname-32MiB-incomplete memory",
+      "category": "headers-memory",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0741333810146898
+      ],
+      "median_seconds": 0.0741333810146898,
+      "median_absolute_deviation_seconds": 0.0,
+      "minimum_seconds": 0.0741333810146898,
+      "maximum_seconds": 0.0741333810146898,
+      "sample_count": 1,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": 69994761,
+          "current_python_bytes": 35391463,
+          "measurement_mode": "tracemalloc"
+        }
+      ]
+    },
+    {
+      "name": "direct fname-32MiB-incomplete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0017698289593681693,
+        0.0016269080224446952,
+        0.0015751399914734066,
+        0.0014788679545745254,
+        0.001441036001779139
+      ],
+      "median_seconds": 0.0015751399914734066,
+      "median_absolute_deviation_seconds": 9.62720368988812e-05,
+      "minimum_seconds": 0.001441036001779139,
+      "maximum_seconds": 0.0017698289593681693,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fcomment-32MiB-complete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.07401795301120728,
+        0.07957123703090474,
+        0.07826983602717519,
+        0.07505473401397467,
+        0.07289950695121661
+      ],
+      "median_seconds": 0.07505473401397467,
+      "median_absolute_deviation_seconds": 0.0021552270627580583,
+      "minimum_seconds": 0.07289950695121661,
+      "maximum_seconds": 0.07957123703090474,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554479,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554479,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554479,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554479,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554479,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fcomment-32MiB-complete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0016610629973001778,
+        0.0016166490386240184,
+        0.001559069030918181,
+        0.001540274010039866,
+        0.0017232399550266564
+      ],
+      "median_seconds": 0.0016166490386240184,
+      "median_absolute_deviation_seconds": 5.758000770583749e-05,
+      "minimum_seconds": 0.001540274010039866,
+      "maximum_seconds": 0.0017232399550266564,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fcomment-32MiB-incomplete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.07974151003872976,
+        0.08665882603963837,
+        0.07221452100202441,
+        0.06713156501064077,
+        0.07406909903511405
+      ],
+      "median_seconds": 0.07406909903511405,
+      "median_absolute_deviation_seconds": 0.005672411003615707,
+      "minimum_seconds": 0.06713156501064077,
+      "maximum_seconds": 0.08665882603963837,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fcomment-32MiB-incomplete memory",
+      "category": "headers-memory",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.07991753303213045
+      ],
+      "median_seconds": 0.07991753303213045,
+      "median_absolute_deviation_seconds": 0.0,
+      "minimum_seconds": 0.07991753303213045,
+      "maximum_seconds": 0.07991753303213045,
+      "sample_count": 1,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 34,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 33554442,
+          "peak_python_bytes": 69994865,
+          "current_python_bytes": 35391567,
+          "measurement_mode": "tracemalloc"
+        }
+      ]
+    },
+    {
+      "name": "direct fcomment-32MiB-incomplete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0015585179789923131,
+        0.0015084139886312187,
+        0.0014132430078461766,
+        0.0013699110131710768,
+        0.0012864029849879444
+      ],
+      "median_seconds": 0.0014132430078461766,
+      "median_absolute_deviation_seconds": 9.517098078504205e-05,
+      "minimum_seconds": 0.0012864029849879444,
+      "maximum_seconds": 0.0015585179789923131,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fname-64MiB-complete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.5901836819830351,
+        0.6134567879489623,
+        0.5246965570258908,
+        0.4934050419833511,
+        0.5413169490057044
+      ],
+      "median_seconds": 0.5413169490057044,
+      "median_absolute_deviation_seconds": 0.04791190702235326,
+      "minimum_seconds": 0.4934050419833511,
+      "maximum_seconds": 0.6134567879489623,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108911,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108911,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108911,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108911,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108911,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fname-64MiB-complete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0038928940193727612,
+        0.002800858987029642,
+        0.0027559029986150563,
+        0.0027729959692806005,
+        0.0027709020068868995
+      ],
+      "median_seconds": 0.0027729959692806005,
+      "median_absolute_deviation_seconds": 1.709297066554427e-05,
+      "minimum_seconds": 0.0027559029986150563,
+      "maximum_seconds": 0.0038928940193727612,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fname-64MiB-incomplete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.5226108619826846,
+        0.5495458960067481,
+        0.5193066810024902,
+        0.49729207501513883,
+        0.52528582199011
+      ],
+      "median_seconds": 0.5226108619826846,
+      "median_absolute_deviation_seconds": 0.00330418098019436,
+      "minimum_seconds": 0.49729207501513883,
+      "maximum_seconds": 0.5495458960067481,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108874,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108874,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108874,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108874,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108874,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fname-64MiB-incomplete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.003103722003288567,
+        0.0029371859855018556,
+        0.00291913200635463,
+        0.002927257970441133,
+        0.0029661720036529005
+      ],
+      "median_seconds": 0.0029371859855018556,
+      "median_absolute_deviation_seconds": 1.805397914722562e-05,
+      "minimum_seconds": 0.00291913200635463,
+      "maximum_seconds": 0.003103722003288567,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fcomment-64MiB-complete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.5438701290404424,
+        0.5190940389875323,
+        0.5127649760106578,
+        0.4970000439789146,
+        0.5131523690070026
+      ],
+      "median_seconds": 0.5131523690070026,
+      "median_absolute_deviation_seconds": 0.005941669980529696,
+      "minimum_seconds": 0.4970000439789146,
+      "maximum_seconds": 0.5438701290404424,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108911,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108911,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108911,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108911,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108911,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fcomment-64MiB-complete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.002796259999740869,
+        0.0029427470290102065,
+        0.0027954690158367157,
+        0.0033760559745132923,
+        0.003324999997857958
+      ],
+      "median_seconds": 0.0029427470290102065,
+      "median_absolute_deviation_seconds": 0.00014727801317349076,
+      "minimum_seconds": 0.0027954690158367157,
+      "maximum_seconds": 0.0033760559745132923,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fcomment-64MiB-incomplete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.5247603480238467,
+        0.48160909698344767,
+        0.5210610700305551,
+        0.5104662179946899,
+        0.6073108420241624
+      ],
+      "median_seconds": 0.5210610700305551,
+      "median_absolute_deviation_seconds": 0.010594852035865188,
+      "minimum_seconds": 0.48160909698344767,
+      "maximum_seconds": 0.6073108420241624,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108874,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108874,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108874,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108874,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 66,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 1048576,
+          "source_position": 67108874,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fcomment-64MiB-incomplete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.002906448964495212,
+        0.0027239329647272825,
+        0.0027700899518094957,
+        0.0029939740197733045,
+        0.0030451109632849693
+      ],
+      "median_seconds": 0.002906448964495212,
+      "median_absolute_deviation_seconds": 0.00013635901268571615,
+      "minimum_seconds": 0.0027239329647272825,
+      "maximum_seconds": 0.0030451109632849693,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level concatenated members 1",
+      "category": "members",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.00015343999257311225,
+        3.4054042771458626e-05,
+        2.0828971173614264e-05,
+        1.7764046788215637e-05,
+        1.675199018791318e-05
+      ],
+      "median_seconds": 2.0828971173614264e-05,
+      "median_absolute_deviation_seconds": 4.076980985701084e-06,
+      "minimum_seconds": 1.675199018791318e-05,
+      "maximum_seconds": 0.00015343999257311225,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 13,
+          "output_sha256": "28afd959a751c0198a5d4611a3a29450e329835d3d1923c6dd0bc84f204dc589",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 30,
+          "source_position": 30,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 13,
+          "output_sha256": "28afd959a751c0198a5d4611a3a29450e329835d3d1923c6dd0bc84f204dc589",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 30,
+          "source_position": 30,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 13,
+          "output_sha256": "28afd959a751c0198a5d4611a3a29450e329835d3d1923c6dd0bc84f204dc589",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 30,
+          "source_position": 30,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 13,
+          "output_sha256": "28afd959a751c0198a5d4611a3a29450e329835d3d1923c6dd0bc84f204dc589",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 30,
+          "source_position": 30,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 13,
+          "output_sha256": "28afd959a751c0198a5d4611a3a29450e329835d3d1923c6dd0bc84f204dc589",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 30,
+          "source_position": 30,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level concatenated members 2",
+      "category": "members",
+      "status": "ok",
+      "duration_samples_seconds": [
+        7.50119797885418e-05,
+        2.9436021577566862e-05,
+        2.6439956855028868e-05,
+        2.4565961211919785e-05,
+        2.3985980078577995e-05
+      ],
+      "median_seconds": 2.6439956855028868e-05,
+      "median_absolute_deviation_seconds": 2.4539767764508724e-06,
+      "minimum_seconds": 2.3985980078577995e-05,
+      "maximum_seconds": 7.50119797885418e-05,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "95d6006d597a51ff48faf091fa7a49b46796002b696304ba438691491d198ee3",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 61,
+          "source_position": 61,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "95d6006d597a51ff48faf091fa7a49b46796002b696304ba438691491d198ee3",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 61,
+          "source_position": 61,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "95d6006d597a51ff48faf091fa7a49b46796002b696304ba438691491d198ee3",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 61,
+          "source_position": 61,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "95d6006d597a51ff48faf091fa7a49b46796002b696304ba438691491d198ee3",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 61,
+          "source_position": 61,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "95d6006d597a51ff48faf091fa7a49b46796002b696304ba438691491d198ee3",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 61,
+          "source_position": 61,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level concatenated members 1001",
+      "category": "members",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.008280724985525012,
+        0.008322263020090759,
+        0.008438632998149842,
+        0.008352951961569488,
+        0.008295063045807183
+      ],
+      "median_seconds": 0.008322263020090759,
+      "median_absolute_deviation_seconds": 3.068894147872925e-05,
+      "minimum_seconds": 0.008280724985525012,
+      "maximum_seconds": 0.008438632998149842,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 13013,
+          "output_sha256": "2e34c2608fecca38fa7024b2c4c5a6a6ad846646b2aa9749117871476aa2e7ea",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 33012,
+          "source_position": 33012,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 13013,
+          "output_sha256": "2e34c2608fecca38fa7024b2c4c5a6a6ad846646b2aa9749117871476aa2e7ea",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 33012,
+          "source_position": 33012,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 13013,
+          "output_sha256": "2e34c2608fecca38fa7024b2c4c5a6a6ad846646b2aa9749117871476aa2e7ea",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 33012,
+          "source_position": 33012,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 13013,
+          "output_sha256": "2e34c2608fecca38fa7024b2c4c5a6a6ad846646b2aa9749117871476aa2e7ea",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 33012,
+          "source_position": 33012,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 13013,
+          "output_sha256": "2e34c2608fecca38fa7024b2c4c5a6a6ad846646b2aa9749117871476aa2e7ea",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 2,
+          "source_max_requested_bytes": 1048576,
+          "source_max_returned_bytes": 33012,
+          "source_position": 33012,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "write 10B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.9021570340264589,
+        0.8022952110040933,
+        0.796510006999597,
+        0.8005044430028647,
+        0.8105697440332733
+      ],
+      "median_seconds": 0.8022952110040933,
+      "median_absolute_deviation_seconds": 0.005785204004496336,
+      "minimum_seconds": 0.796510006999597,
+      "maximum_seconds": 0.9021570340264589,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "write",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 51364,
+          "compressed_sha256": "f9e6235d6d9bc61c2a8fb04602a54512d18fc8764287bf287597a36d99720b99",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 6,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 51364,
+          "compressed_sha256": "f9e6235d6d9bc61c2a8fb04602a54512d18fc8764287bf287597a36d99720b99",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 6,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 51364,
+          "compressed_sha256": "f9e6235d6d9bc61c2a8fb04602a54512d18fc8764287bf287597a36d99720b99",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 6,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 51364,
+          "compressed_sha256": "f9e6235d6d9bc61c2a8fb04602a54512d18fc8764287bf287597a36d99720b99",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 6,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 51364,
+          "compressed_sha256": "f9e6235d6d9bc61c2a8fb04602a54512d18fc8764287bf287597a36d99720b99",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 6,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "writelines 10B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.08386611298192292,
+        0.08512962301028892,
+        0.08403088396880776,
+        0.08282626600703225,
+        0.08546176098752767
+      ],
+      "median_seconds": 0.08403088396880776,
+      "median_absolute_deviation_seconds": 0.001098739041481167,
+      "minimum_seconds": 0.08282626600703225,
+      "maximum_seconds": 0.08546176098752767,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "writelines",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44792,
+          "compressed_sha256": "37ce1573b6f093fc2cac876fd978198f96b6709125e06b70e10c52c6e5af1e88",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44792,
+          "compressed_sha256": "37ce1573b6f093fc2cac876fd978198f96b6709125e06b70e10c52c6e5af1e88",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44792,
+          "compressed_sha256": "37ce1573b6f093fc2cac876fd978198f96b6709125e06b70e10c52c6e5af1e88",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44792,
+          "compressed_sha256": "37ce1573b6f093fc2cac876fd978198f96b6709125e06b70e10c52c6e5af1e88",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44792,
+          "compressed_sha256": "37ce1573b6f093fc2cac876fd978198f96b6709125e06b70e10c52c6e5af1e88",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-65536 10B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.001387864991556853,
+        0.0013672870118170977,
+        0.0013726859469898045,
+        0.0013524190289899707,
+        0.0013520869542844594
+      ],
+      "median_seconds": 0.0013672870118170977,
+      "median_absolute_deviation_seconds": 1.486798282712698e-05,
+      "minimum_seconds": 0.0013520869542844594,
+      "maximum_seconds": 0.001387864991556853,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44779,
+          "compressed_sha256": "75b72d6775fb88124162f3273d108b2264fee05156a10aff724a727d34a65438",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44779,
+          "compressed_sha256": "75b72d6775fb88124162f3273d108b2264fee05156a10aff724a727d34a65438",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44779,
+          "compressed_sha256": "75b72d6775fb88124162f3273d108b2264fee05156a10aff724a727d34a65438",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44779,
+          "compressed_sha256": "75b72d6775fb88124162f3273d108b2264fee05156a10aff724a727d34a65438",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44779,
+          "compressed_sha256": "75b72d6775fb88124162f3273d108b2264fee05156a10aff724a727d34a65438",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-262144 10B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.007071406987961382,
+        0.005539529025554657,
+        0.005566160019952804,
+        0.006660149025265127,
+        0.0049142970237880945
+      ],
+      "median_seconds": 0.005566160019952804,
+      "median_absolute_deviation_seconds": 0.0006518629961647093,
+      "minimum_seconds": 0.0049142970237880945,
+      "maximum_seconds": 0.007071406987961382,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44779,
+          "compressed_sha256": "75b72d6775fb88124162f3273d108b2264fee05156a10aff724a727d34a65438",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44779,
+          "compressed_sha256": "75b72d6775fb88124162f3273d108b2264fee05156a10aff724a727d34a65438",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44779,
+          "compressed_sha256": "75b72d6775fb88124162f3273d108b2264fee05156a10aff724a727d34a65438",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44779,
+          "compressed_sha256": "75b72d6775fb88124162f3273d108b2264fee05156a10aff724a727d34a65438",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 10,
+          "logical_record_count": 838861,
+          "payload_bytes": 8388608,
+          "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "compressed_bytes": 44779,
+          "compressed_sha256": "75b72d6775fb88124162f3273d108b2264fee05156a10aff724a727d34a65438",
+          "output_bytes": 8388608,
+          "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "write 100B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.08703443600097671,
+        0.08491964597487822,
+        0.08521150704473257,
+        0.08403469197219238,
+        0.08455349301220849
+      ],
+      "median_seconds": 0.08491964597487822,
+      "median_absolute_deviation_seconds": 0.0003661529626697302,
+      "minimum_seconds": 0.08403469197219238,
+      "maximum_seconds": 0.08703443600097671,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "write",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 81794,
+          "compressed_sha256": "fa4e73f374a61da9a510f0c35b6aa2904090dadd2a52c4b4a231a63a9a4ca19a",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 6,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 81794,
+          "compressed_sha256": "fa4e73f374a61da9a510f0c35b6aa2904090dadd2a52c4b4a231a63a9a4ca19a",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 6,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 81794,
+          "compressed_sha256": "fa4e73f374a61da9a510f0c35b6aa2904090dadd2a52c4b4a231a63a9a4ca19a",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 6,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 81794,
+          "compressed_sha256": "fa4e73f374a61da9a510f0c35b6aa2904090dadd2a52c4b4a231a63a9a4ca19a",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 6,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 81794,
+          "compressed_sha256": "fa4e73f374a61da9a510f0c35b6aa2904090dadd2a52c4b4a231a63a9a4ca19a",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 6,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "writelines 100B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.009538223966956139,
+        0.009487337025348097,
+        0.009493359015323222,
+        0.009640818054322153,
+        0.009499129955656826
+      ],
+      "median_seconds": 0.009499129955656826,
+      "median_absolute_deviation_seconds": 1.179293030872941e-05,
+      "minimum_seconds": 0.009487337025348097,
+      "maximum_seconds": 0.009640818054322153,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "writelines",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57293,
+          "compressed_sha256": "c3901e42c5ec9e67302fdcc96755eae44e3c779cd4c1b5147b2d281c31e3f3dc",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57293,
+          "compressed_sha256": "c3901e42c5ec9e67302fdcc96755eae44e3c779cd4c1b5147b2d281c31e3f3dc",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57293,
+          "compressed_sha256": "c3901e42c5ec9e67302fdcc96755eae44e3c779cd4c1b5147b2d281c31e3f3dc",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57293,
+          "compressed_sha256": "c3901e42c5ec9e67302fdcc96755eae44e3c779cd4c1b5147b2d281c31e3f3dc",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57293,
+          "compressed_sha256": "c3901e42c5ec9e67302fdcc96755eae44e3c779cd4c1b5147b2d281c31e3f3dc",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-65536 100B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0013813729747198522,
+        0.0013960409560240805,
+        0.0013235639780759811,
+        0.001336487999651581,
+        0.0013287329929880798
+      ],
+      "median_seconds": 0.001336487999651581,
+      "median_absolute_deviation_seconds": 1.2924021575599909e-05,
+      "minimum_seconds": 0.0013235639780759811,
+      "maximum_seconds": 0.0013960409560240805,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57118,
+          "compressed_sha256": "8cf87b951226156e298de76c22ca1e57067e9e81075970b3fa6270266dc2d8a4",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57118,
+          "compressed_sha256": "8cf87b951226156e298de76c22ca1e57067e9e81075970b3fa6270266dc2d8a4",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57118,
+          "compressed_sha256": "8cf87b951226156e298de76c22ca1e57067e9e81075970b3fa6270266dc2d8a4",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57118,
+          "compressed_sha256": "8cf87b951226156e298de76c22ca1e57067e9e81075970b3fa6270266dc2d8a4",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57118,
+          "compressed_sha256": "8cf87b951226156e298de76c22ca1e57067e9e81075970b3fa6270266dc2d8a4",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-262144 100B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.008225520956330001,
+        0.00658320402726531,
+        0.006142149039078504,
+        0.007284941035322845,
+        0.0068791930098086596
+      ],
+      "median_seconds": 0.0068791930098086596,
+      "median_absolute_deviation_seconds": 0.00040574802551418543,
+      "minimum_seconds": 0.006142149039078504,
+      "maximum_seconds": 0.008225520956330001,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57118,
+          "compressed_sha256": "8cf87b951226156e298de76c22ca1e57067e9e81075970b3fa6270266dc2d8a4",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57118,
+          "compressed_sha256": "8cf87b951226156e298de76c22ca1e57067e9e81075970b3fa6270266dc2d8a4",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57118,
+          "compressed_sha256": "8cf87b951226156e298de76c22ca1e57067e9e81075970b3fa6270266dc2d8a4",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57118,
+          "compressed_sha256": "8cf87b951226156e298de76c22ca1e57067e9e81075970b3fa6270266dc2d8a4",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 100,
+          "logical_record_count": 83887,
+          "payload_bytes": 8388608,
+          "payload_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "compressed_bytes": 57118,
+          "compressed_sha256": "8cf87b951226156e298de76c22ca1e57067e9e81075970b3fa6270266dc2d8a4",
+          "output_bytes": 8388608,
+          "output_sha256": "8eb9c28e03bb54b1cd9f96e8f62aaca3290b5fec949ba63db6ba7dcd789a6a14",
+          "sink_write_calls": 4,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "write 1024B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0090048749698326,
+        0.00919115700526163,
+        0.009129420039243996,
+        0.009208920993842185,
+        0.00938500399934128
+      ],
+      "median_seconds": 0.00919115700526163,
+      "median_absolute_deviation_seconds": 6.173696601763368e-05,
+      "minimum_seconds": 0.0090048749698326,
+      "maximum_seconds": 0.00938500399934128,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "write",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 74639,
+          "compressed_sha256": "76163d915d3b38d8c666c49a7c1871aa48eeddf7b8456809e0f962267872676e",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 74639,
+          "compressed_sha256": "76163d915d3b38d8c666c49a7c1871aa48eeddf7b8456809e0f962267872676e",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 74639,
+          "compressed_sha256": "76163d915d3b38d8c666c49a7c1871aa48eeddf7b8456809e0f962267872676e",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 74639,
+          "compressed_sha256": "76163d915d3b38d8c666c49a7c1871aa48eeddf7b8456809e0f962267872676e",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 74639,
+          "compressed_sha256": "76163d915d3b38d8c666c49a7c1871aa48eeddf7b8456809e0f962267872676e",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "writelines 1024B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.009065830032341182,
+        0.006711898022331297,
+        0.005917745002079755,
+        0.005602588993497193,
+        0.007387896010186523
+      ],
+      "median_seconds": 0.006711898022331297,
+      "median_absolute_deviation_seconds": 0.0007941530202515423,
+      "minimum_seconds": 0.005602588993497193,
+      "maximum_seconds": 0.009065830032341182,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "writelines",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-65536 1024B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.00158672098768875,
+        0.001356697001028806,
+        0.0013613859773613513,
+        0.0013448240351863205,
+        0.0013623569975607097
+      ],
+      "median_seconds": 0.0013613859773613513,
+      "median_absolute_deviation_seconds": 4.6889763325452805e-06,
+      "minimum_seconds": 0.0013448240351863205,
+      "maximum_seconds": 0.00158672098768875,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-262144 1024B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.004898256040178239,
+        0.004475086054299027,
+        0.0035604049917310476,
+        0.006722225982230157,
+        0.005182082997635007
+      ],
+      "median_seconds": 0.004898256040178239,
+      "median_absolute_deviation_seconds": 0.0004231699858792126,
+      "minimum_seconds": 0.0035604049917310476,
+      "maximum_seconds": 0.006722225982230157,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 1024,
+          "logical_record_count": 8192,
+          "payload_bytes": 8388608,
+          "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "compressed_bytes": 64914,
+          "compressed_sha256": "b85ae4f4ca47ebf9d3eed1ead5d03e970b5d237c33d363fc99f1885273bb2e14",
+          "output_bytes": 8388608,
+          "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "write 4096B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0031444280175492167,
+        0.0032775510335341096,
+        0.0031729419715702534,
+        0.0031476750154979527,
+        0.0031427249778062105
+      ],
+      "median_seconds": 0.0031476750154979527,
+      "median_absolute_deviation_seconds": 4.950037691742182e-06,
+      "minimum_seconds": 0.0031427249778062105,
+      "maximum_seconds": 0.0032775510335341096,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "write",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76387,
+          "compressed_sha256": "30c4025a90e77ca40d4d28e5cdcdb12f01cc8d737f7033c564423ee3a52f2070",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76387,
+          "compressed_sha256": "30c4025a90e77ca40d4d28e5cdcdb12f01cc8d737f7033c564423ee3a52f2070",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76387,
+          "compressed_sha256": "30c4025a90e77ca40d4d28e5cdcdb12f01cc8d737f7033c564423ee3a52f2070",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76387,
+          "compressed_sha256": "30c4025a90e77ca40d4d28e5cdcdb12f01cc8d737f7033c564423ee3a52f2070",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76387,
+          "compressed_sha256": "30c4025a90e77ca40d4d28e5cdcdb12f01cc8d737f7033c564423ee3a52f2070",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "writelines 4096B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.005693080020137131,
+        0.005274166993331164,
+        0.0049388830084353685,
+        0.006021711975336075,
+        0.005852931994013488
+      ],
+      "median_seconds": 0.005693080020137131,
+      "median_absolute_deviation_seconds": 0.0003286319551989436,
+      "minimum_seconds": 0.0049388830084353685,
+      "maximum_seconds": 0.006021711975336075,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "writelines",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-65536 4096B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0018678330234251916,
+        0.0015129619860090315,
+        0.0014134740340523422,
+        0.0014594210078939795,
+        0.001418683968950063
+      ],
+      "median_seconds": 0.0014594210078939795,
+      "median_absolute_deviation_seconds": 4.594697384163737e-05,
+      "minimum_seconds": 0.0014134740340523422,
+      "maximum_seconds": 0.0018678330234251916,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-262144 4096B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0050347950309515,
+        0.004088604007847607,
+        0.004138758988119662,
+        0.006428091030102223,
+        0.006690377020277083
+      ],
+      "median_seconds": 0.0050347950309515,
+      "median_absolute_deviation_seconds": 0.0009461910231038928,
+      "minimum_seconds": 0.004088604007847607,
+      "maximum_seconds": 0.006690377020277083,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 4096,
+          "logical_record_count": 2048,
+          "payload_bytes": 8388608,
+          "payload_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "compressed_bytes": 76354,
+          "compressed_sha256": "4210eef995bae937d128bffc47ad1041652f0050c3de746bf11748c3d7b35634",
+          "output_bytes": 8388608,
+          "output_sha256": "51cff0827ce7d2cb5afee7578df8531564ac476da8c3b5d01cc21bf0a4242026",
+          "sink_write_calls": 5,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "write 16384B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0021108029759489,
+        0.0020303610363043845,
+        0.002031303010880947,
+        0.002012156997807324,
+        0.0020187089685350657
+      ],
+      "median_seconds": 0.0020303610363043845,
+      "median_absolute_deviation_seconds": 1.1652067769318819e-05,
+      "minimum_seconds": 0.002012156997807324,
+      "maximum_seconds": 0.0021108029759489,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "write",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145568,
+          "compressed_sha256": "44ca852b7ffebdf587bb4c6049fea6750cc0a8d5de148ddca7f2fac28507075f",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145568,
+          "compressed_sha256": "44ca852b7ffebdf587bb4c6049fea6750cc0a8d5de148ddca7f2fac28507075f",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145568,
+          "compressed_sha256": "44ca852b7ffebdf587bb4c6049fea6750cc0a8d5de148ddca7f2fac28507075f",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145568,
+          "compressed_sha256": "44ca852b7ffebdf587bb4c6049fea6750cc0a8d5de148ddca7f2fac28507075f",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145568,
+          "compressed_sha256": "44ca852b7ffebdf587bb4c6049fea6750cc0a8d5de148ddca7f2fac28507075f",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "writelines 16384B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.006033774989191443,
+        0.005114925967063755,
+        0.005711213976610452,
+        0.005675326043274254,
+        0.006387102999724448
+      ],
+      "median_seconds": 0.005711213976610452,
+      "median_absolute_deviation_seconds": 0.0003225610125809908,
+      "minimum_seconds": 0.005114925967063755,
+      "maximum_seconds": 0.006387102999724448,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "writelines",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-65536 16384B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0019135400070808828,
+        0.0018226479878649116,
+        0.001763676991686225,
+        0.0018413030193187296,
+        0.0017754589789547026
+      ],
+      "median_seconds": 0.0018226479878649116,
+      "median_absolute_deviation_seconds": 4.718900891020894e-05,
+      "minimum_seconds": 0.001763676991686225,
+      "maximum_seconds": 0.0019135400070808828,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-262144 16384B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.007586712017655373,
+        0.006542396964505315,
+        0.007361446041613817,
+        0.00747933896491304,
+        0.004837130021769553
+      ],
+      "median_seconds": 0.007361446041613817,
+      "median_absolute_deviation_seconds": 0.0002252659760415554,
+      "minimum_seconds": 0.004837130021769553,
+      "maximum_seconds": 0.007586712017655373,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 16384,
+          "logical_record_count": 512,
+          "payload_bytes": 8388608,
+          "payload_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "compressed_bytes": 145557,
+          "compressed_sha256": "51debf0418765d3b30b97c63b71595a229aebcf6f3e9e3f72281340c50acbbe6",
+          "output_bytes": 8388608,
+          "output_sha256": "944067df758f12d911cef4e7c07842e487b43a74675d686d2ad89dc1b54eaa3f",
+          "sink_write_calls": 9,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "write 65536B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.08832134102704003,
+        0.08935493603348732,
+        0.09050354897044599,
+        0.08508324500871822,
+        0.0894924359745346
+      ],
+      "median_seconds": 0.08935493603348732,
+      "median_absolute_deviation_seconds": 0.0010335950064472854,
+      "minimum_seconds": 0.08508324500871822,
+      "maximum_seconds": 0.09050354897044599,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "write",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "writelines 65536B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.10633162199519575,
+        0.09593587601557374,
+        0.09869708900805563,
+        0.10207330604316667,
+        0.12737076199846342
+      ],
+      "median_seconds": 0.10207330604316667,
+      "median_absolute_deviation_seconds": 0.004258315952029079,
+      "minimum_seconds": 0.09593587601557374,
+      "maximum_seconds": 0.12737076199846342,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "writelines",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-65536 65536B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.08699127397267148,
+        0.08637122198706493,
+        0.08629275299608707,
+        0.08619159099180251,
+        0.0862504230462946
+      ],
+      "median_seconds": 0.08629275299608707,
+      "median_absolute_deviation_seconds": 7.846899097785354e-05,
+      "minimum_seconds": 0.08619159099180251,
+      "maximum_seconds": 0.08699127397267148,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-262144 65536B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.13102265098132193,
+        0.10533736000070348,
+        0.10773979499936104,
+        0.09767715900670737,
+        0.09959161101141945
+      ],
+      "median_seconds": 0.10533736000070348,
+      "median_absolute_deviation_seconds": 0.0057457489892840385,
+      "minimum_seconds": 0.09767715900670737,
+      "maximum_seconds": 0.13102265098132193,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 65536,
+          "logical_record_count": 128,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+          "output_bytes": 8388608,
+          "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "write 262144B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.10357551695778966,
+        0.11262733198236674,
+        0.11039260297548026,
+        0.10983464895980433,
+        0.1031737370067276
+      ],
+      "median_seconds": 0.10983464895980433,
+      "median_absolute_deviation_seconds": 0.0027926830225624144,
+      "minimum_seconds": 0.1031737370067276,
+      "maximum_seconds": 0.11262733198236674,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "write",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "write",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "writelines 262144B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.10743829398415983,
+        0.10613331600325182,
+        0.09792010899400339,
+        0.09663058997830376,
+        0.09974496095674112
+      ],
+      "median_seconds": 0.09974496095674112,
+      "median_absolute_deviation_seconds": 0.003114370978437364,
+      "minimum_seconds": 0.09663058997830376,
+      "maximum_seconds": 0.10743829398415983,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "writelines",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "writelines",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-65536 262144B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0924249830422923,
+        0.09115572198061273,
+        0.09169933095108718,
+        0.09173172299051657,
+        0.09255211398703977
+      ],
+      "median_seconds": 0.09173172299051657,
+      "median_absolute_deviation_seconds": 0.0005760010099038482,
+      "minimum_seconds": 0.09115572198061273,
+      "maximum_seconds": 0.09255211398703977,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-65536",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 131,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "batch-262144 262144B records",
+      "category": "writes",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.10050214402144775,
+        0.09666343202115968,
+        0.1050649750395678,
+        0.11763156799133867,
+        0.11075880599673837
+      ],
+      "median_seconds": 0.1050649750395678,
+      "median_absolute_deviation_seconds": 0.005693830957170576,
+      "minimum_seconds": 0.09666343202115968,
+      "maximum_seconds": 0.11763156799133867,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "method": "batch-262144",
+          "write_size_bytes": 262144,
+          "logical_record_count": 32,
+          "payload_bytes": 8388608,
+          "payload_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "compressed_bytes": 8391191,
+          "compressed_sha256": "6ad64b53e79700451df0430a1e6041fd9252bcc015b6841ed4fc1daf6579c9fd",
+          "output_bytes": 8388608,
+          "output_sha256": "2ea8eeea28398d70d27536c94aa04c88be4dd9f935a672b028f8a0a4c19305fb",
+          "sink_write_calls": 66,
+          "sink_flush_calls": 0,
+          "position_before_close": 8388608,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    }
+  ],
+  "discarded_or_excluded_runs": []
+}
