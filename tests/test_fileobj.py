@@ -3,6 +3,7 @@
 import gzip
 import io
 import os
+import zlib
 
 import pytest
 
@@ -212,6 +213,103 @@ class TestFileobjSupport:
         f = AsyncGzipBinaryFile(None, "wb", fileobj=InvalidWriter(), closefd=False)
         with pytest.raises(OSError, match="invalid byte count|no progress|requested"):
             await f.open()
+
+    @pytest.mark.parametrize("invalid_count", [None, -1, True, 10**9])
+    async def test_invalid_data_write_count_poisoning_is_call_local(
+        self, invalid_count
+    ):
+        class InvalidDataWriter:
+            def __init__(self):
+                self.calls = 0
+                self.buffer = bytearray()
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls > 1:
+                    return invalid_count
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                pass
+
+        writer = InvalidDataWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False)
+        await stream.open()
+        header = bytes(writer.buffer)
+
+        with pytest.raises(OSError, match="invalid byte count|no progress|requested"):
+            await stream.write(os.urandom(512 * 1024))
+        assert await stream.tell() == 0
+        assert stream._write_broken is True
+        with pytest.raises(OSError, match="broken"):
+            await stream.write(b"later")
+
+        await stream.close()
+        assert bytes(writer.buffer) == header
+
+    async def test_position_and_return_value_commit_after_sink_completion(self):
+        import asyncio
+
+        class BlockingDataWriter:
+            def __init__(self):
+                self.calls = 0
+                self.started = asyncio.Event()
+                self.release = asyncio.Event()
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls > 1:
+                    self.started.set()
+                    await self.release.wait()
+                return len(data)
+
+            async def close(self):
+                pass
+
+        payload = os.urandom(512 * 1024)
+        writer = BlockingDataWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False)
+        await stream.open()
+        task = asyncio.create_task(stream.write(payload))
+        await writer.started.wait()
+        assert await stream.tell() == 0
+
+        writer.release.set()
+        assert await task == len(payload)
+        assert await stream.tell() == len(payload)
+        await stream.close()
+
+    async def test_flush_is_distinct_from_ordinary_small_write(self):
+        class RecordingWriter:
+            def __init__(self):
+                self.buffer = bytearray()
+                self.calls = 0
+
+            async def write(self, data):
+                self.calls += 1
+                self.buffer.extend(data)
+                return len(data)
+
+            async def flush(self):
+                pass
+
+            async def close(self):
+                pass
+
+        writer = RecordingWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False, mtime=0)
+        await stream.open()
+        calls_after_header = writer.calls
+        assert await stream.write(b"small pending payload") == 21
+        assert writer.calls == calls_after_header
+
+        await stream.flush()
+        assert writer.calls > calls_after_header
+        decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        assert decompressor.decompress(bytes(writer.buffer)) == b"small pending payload"
+        assert decompressor.eof is False
+        await stream.close()
 
     async def test_non_seekable_fileobj_supports_backward_seek(self):
         payload = b"abcdefghijklmnopqrstuvwxyz"

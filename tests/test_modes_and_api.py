@@ -406,6 +406,21 @@ class TestNewAPIMethods:
         async with AsyncGzipTextFile(temp_file, "rt") as f:
             assert await f.read() == "first\nsecond\n"
 
+    async def test_binary_writelines_flushes_prefix_before_coercion_error(
+        self, temp_file
+    ):
+        def broken_lines():
+            yield b"first\n"
+            yield bytearray(b"second\n")
+            yield object()
+
+        async with AsyncGzipBinaryFile(temp_file, "wb", chunk_size=64) as f:
+            with pytest.raises(TypeError, match="bytes-like"):
+                await f.writelines(broken_lines())
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.read() == b"first\nsecond\n"
+
 
 class TestSyncProtocolStubs:
     """`with` and `for` on the async file classes raise corrective TypeErrors

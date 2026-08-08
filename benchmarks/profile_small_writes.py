@@ -50,12 +50,59 @@ def _category_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
             if Path(row["file"]).name == filename and row["function"] == function
         )
 
+    def count_matching(fragment: str) -> int:
+        return sum(
+            int(row["total_calls"]) for row in rows if fragment in str(row["function"])
+        )
+
+    reservations = count("codec.py", "_reserve")
     return {
-        "operation_reservations": count("codec.py", "_reserve"),
+        "operation_constructions": reservations,
+        "operation_reservations": reservations,
         "operation_next_calls": count("codec.py", "__next__"),
-        "snapshot_calls": count("_codec_buffer.py", "_snapshot_bytes_input"),
+        "operation_raw_advance_calls": count("codec.py", "_advance_raw"),
+        "public_snapshot_calls": count("codec.py", "_snapshot_bytes_input"),
+        "file_payload_coercions": count("_binary.py", "_coerce_byteslike"),
+        "internal_feed_calls": count("codec.py", "_feed_snapshot"),
+        "feed_generator_calls": count("codec.py", "_feed"),
+        "binary_write_calls": count("_binary.py", "write"),
+        "compressor_calls": count_matching("method 'compress'"),
+        "crc32_calls": count_matching("crc32"),
+        "codec_output_chunks": count("_binary.py", "_write_all"),
         "write_all_calls": count("_binary.py", "_write_all"),
         "sink_write_calls": count("bench_a3_regressions.py", "write"),
+    }
+
+
+def _cost_centers(rows: list[dict[str, Any]]) -> dict[str, float]:
+    def self_seconds(filename: str, function: str) -> float:
+        return sum(
+            float(row["self_seconds"])
+            for row in rows
+            if Path(row["file"]).name == filename and row["function"] == function
+        )
+
+    def matching_self_seconds(fragment: str) -> float:
+        return sum(
+            float(row["self_seconds"])
+            for row in rows
+            if fragment in str(row["function"])
+        )
+
+    return {
+        "binary_write_self_seconds": self_seconds("_binary.py", "write"),
+        "payload_coercion_self_seconds": self_seconds(
+            "_binary.py", "_coerce_byteslike"
+        ),
+        "feed_snapshot_self_seconds": self_seconds("codec.py", "_feed_snapshot"),
+        "reservation_self_seconds": self_seconds("codec.py", "_reserve"),
+        "operation_next_self_seconds": self_seconds("codec.py", "__next__"),
+        "operation_raw_advance_self_seconds": self_seconds("codec.py", "_advance_raw"),
+        "feed_generator_self_seconds": self_seconds("codec.py", "_feed"),
+        "crc32_self_seconds": matching_self_seconds("crc32"),
+        "compressor_self_seconds": matching_self_seconds("method 'compress'"),
+        "write_all_self_seconds": self_seconds("_binary.py", "_write_all"),
+        "sink_write_self_seconds": self_seconds("bench_a3_regressions.py", "write"),
     }
 
 
@@ -107,6 +154,7 @@ def main() -> int:
                 "profiled_duration_seconds": elapsed,
                 "sample": sample.metrics,
                 "counts": _category_counts(rows),
+                "cost_centers": _cost_centers(rows),
                 "top_by_cumulative": sorted(
                     rows, key=lambda row: row["cumulative_seconds"], reverse=True
                 )[:50],

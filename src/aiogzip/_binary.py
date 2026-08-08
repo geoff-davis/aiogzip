@@ -855,7 +855,10 @@ class AsyncGzipBinaryFile:
                 "the gzip member is unusable"
             )
 
-        payload = self._coerce_byteslike(data)
+        # Exact bytes already satisfy the immutable-snapshot contract. Keep
+        # the overwhelmingly common path here so each small write does not
+        # pay a second Python method call merely to repeat the type check.
+        payload = data if type(data) is bytes else self._coerce_byteslike(data)
         length = len(payload)
         encoder = self._encoder
         if encoder is None:
@@ -884,7 +887,7 @@ class AsyncGzipBinaryFile:
 
         # The codec may account for input before yielding output. Expose the
         # new file position only after every emitted byte reached the sink.
-        self._position = encoder.input_size
+        self._position += length
 
         return length
 

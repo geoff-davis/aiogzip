@@ -197,6 +197,24 @@ def test_discard_releases_unadvanced_feed_snapshot():
     operation.close()
 
 
+def test_encoder_discard_releases_unadvanced_feed_snapshot():
+    payload = b"x" * (8 * 1024 * 1024)
+    encoder = GzipEncoder(mtime=0)
+    list(encoder.start())
+    initial_references = sys.getrefcount(payload)
+
+    operation = encoder.feed(payload)
+    assert sys.getrefcount(payload) > initial_references
+
+    encoder.discard()
+
+    assert sys.getrefcount(payload) == initial_references
+    with pytest.raises(RuntimeError, match="invalidated"):
+        next(operation)
+    operation.close()
+    operation.close()
+
+
 def test_discard_prevents_unadvanced_engine_call():
     calls = []
 

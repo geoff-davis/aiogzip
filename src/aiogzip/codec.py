@@ -100,7 +100,34 @@ class _Operation(Iterator[bytes]):
 
     def __next__(self) -> bytes:
         while True:
-            output = self._advance_raw()
+            # Keep the public synchronous hot path inline. Calling
+            # ``_advance_raw()`` here adds a Python frame to every operation
+            # advancement; tiny encoder feeds commonly complete without
+            # yielding bytes, so that frame was pure per-call overhead.
+            if self._invalidated or self._owner._discarded:
+                raise RuntimeError("gzip codec operation was invalidated by discard()")
+            if self._closed:
+                raise StopIteration
+            if self._advancing:
+                raise RuntimeError(
+                    "gzip codec operation cannot be advanced reentrantly"
+                )
+            if self._owner._active_token is not self:
+                raise RuntimeError("gzip codec operation is no longer active")
+
+            self._advancing = True
+            try:
+                output = next(self._iterator)
+            except StopIteration:
+                self._closed = True
+                self._owner._operation_succeeded(self)
+                raise
+            except BaseException:
+                self._closed = True
+                self._owner._operation_failed(self)
+                raise
+            finally:
+                self._advancing = False
             if isinstance(output, bytes):
                 return output
 
@@ -321,11 +348,25 @@ class GzipEncoder(_CodecBase):
 
     def _feed_snapshot(self, snapshot: bytes) -> _AsyncDrivableOperation:
         """Feed an exact bytes snapshot already owned by an internal caller."""
-        self._check_encoder_available()
+        # This internal path is the file writer's per-call hot path. Preserve
+        # every public feed() precondition inline, avoiding three helper frames
+        # whose checks are otherwise repeated for every tiny write.
+        if self._active_token is not None:
+            raise RuntimeError("gzip encoder has an active operation")
+        if self._unusable:
+            raise OSError("gzip encoder is unusable after a prior failure")
+        if self._finished:
+            raise ValueError("gzip encoder is already finalized")
         if not self._started:
             raise ValueError("gzip encoder must be started before feeding data")
         size = len(snapshot)
-        self._check_feed_size(size)
+        if self._strict_size and self._input_size + size > 0xFFFFFFFF:
+            raise OSError(
+                f"uncompressed member size would exceed the gzip ISIZE "
+                f"field's 4 GiB limit ({self._input_size} + {size} > "
+                f"{0xFFFFFFFF}); drop strict_size to allow ISIZE "
+                f"truncation or split the payload into multiple members"
+            )
         return cast(_AsyncDrivableOperation, self._reserve(self._feed(snapshot)))
 
     def _feed(self, data: bytes) -> _CodecIterator:
