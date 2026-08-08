@@ -233,50 +233,6 @@ def _build_gzip_trailer(crc: int, size: int) -> bytes:
     return struct.pack("<II", crc & 0xFFFFFFFF, size & 0xFFFFFFFF)
 
 
-def _try_parse_gzip_header_mtime(data: bytes) -> Tuple[Optional[int], bool]:
-    """Try parsing gzip header mtime from raw bytes.
-
-    Returns:
-        (mtime, complete)
-        - mtime: Parsed mtime value when available, else None.
-        - complete: True if enough bytes were available to finish parsing header.
-    """
-    if len(data) < 10:
-        return None, False
-    if data[0:2] != b"\x1f\x8b" or data[2] != GZIP_METHOD_DEFLATE:
-        return None, True
-
-    flags = data[3]
-    mtime = struct.unpack("<I", data[4:8])[0]
-    pos = 10
-
-    if flags & GZIP_FLAG_FEXTRA:
-        if len(data) < pos + 2:
-            return None, False
-        xlen = struct.unpack("<H", data[pos : pos + 2])[0]
-        pos += 2 + xlen
-        if len(data) < pos:
-            return None, False
-
-    if flags & GZIP_FLAG_FNAME:
-        terminator = data.find(b"\x00", pos)
-        if terminator == -1:
-            return None, False
-        pos = terminator + 1
-
-    if flags & GZIP_FLAG_FCOMMENT:
-        terminator = data.find(b"\x00", pos)
-        if terminator == -1:
-            return None, False
-        pos = terminator + 1
-
-    if flags & GZIP_FLAG_FHCRC:
-        if len(data) < pos + 2:
-            return None, False
-
-    return mtime, True
-
-
 def _parse_mode_tokens(mode: str) -> Tuple[str, bool, bool, bool]:
     """Parse a mode string into (op, saw_b, saw_t, plus) flags."""
     if not isinstance(mode, str):
@@ -358,7 +314,6 @@ __all__ = [
     "_derive_header_filename",
     "_build_gzip_header",
     "_build_gzip_trailer",
-    "_try_parse_gzip_header_mtime",
     "_parse_mode_tokens",
     "WithAsyncRead",
     "WithAsyncWrite",

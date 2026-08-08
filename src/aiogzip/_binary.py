@@ -33,7 +33,6 @@ from ._common import (
     _format_file_repr,
     _normalize_mtime,
     _parse_mode_tokens,
-    _try_parse_gzip_header_mtime,
     _validate_chunk_size,
     _validate_compresslevel,
     _validate_filename,
@@ -117,7 +116,7 @@ class AsyncGzipBinaryFile:
         "_owns_file",
         "_position",
         "_mtime",
-        "_header_probe_buffer",
+        "_decoder_header_generation",
         "_compressed_cache",
         "_replay_offset",
         "_cache_rewindable_reads",
@@ -216,7 +215,7 @@ class AsyncGzipBinaryFile:
         self._owns_file: bool = False
         self._position: int = 0
         self._mtime: Optional[int] = None
-        self._header_probe_buffer = bytearray()
+        self._decoder_header_generation: int = 0
         self._compressed_cache = bytearray()
         self._replay_offset: Optional[int] = None
         self._cache_rewindable_reads: bool = False
@@ -298,7 +297,7 @@ class AsyncGzipBinaryFile:
                 self._eof = False
                 self._position = 0
                 self._mtime = None
-                self._header_probe_buffer.clear()
+                self._decoder_header_generation = 0
                 self._compressed_cache.clear()
                 self._replay_offset = None
                 self._underlying_seekable = await self._probe_underlying_seekable()
@@ -1023,9 +1022,9 @@ class AsyncGzipBinaryFile:
         """Read the next compressed chunk and return its decompressed pieces.
 
         This is the shared file/codec bridge. It advances EOF state, retains
-        the small compatibility-only gzip-header mtime probe, and delegates
-        member traversal, finalization, validation, and output limits to the
-        public decoder.
+        the most recently completed header notification from the shared
+        decoder, and delegates member traversal, finalization, validation, and
+        output limits to that decoder.
 
         Each decompressor call already returns a fresh ``bytes`` object, so the
         pieces are handed back as-is: ``read(-1)`` appends them straight to its
@@ -1041,23 +1040,15 @@ class AsyncGzipBinaryFile:
         if decoder is None:
             raise RuntimeError("gzip reader decoder is not initialized")
 
-        if self._mtime is None and compressed_chunk:
-            self._header_probe_buffer.extend(compressed_chunk)
-            parsed_mtime, complete = _try_parse_gzip_header_mtime(
-                bytes(self._header_probe_buffer)
-            )
-            if complete:
-                self._mtime = parsed_mtime
-                self._header_probe_buffer.clear()
-
         if not compressed_chunk:
             # Underlying EOF is the one point at which the decoder can prove
             # that all accepted members and trailers were complete.
             self._eof = True
             try:
-                pieces = []
-                for piece in decoder.finish():
-                    pieces.append(piece)
+                try:
+                    pieces = list(decoder.finish())
+                finally:
+                    self._sync_decoder_mtime(decoder)
                 return pieces
             except asyncio.CancelledError:
                 self._read_broken = True
@@ -1078,14 +1069,17 @@ class AsyncGzipBinaryFile:
 
         try:
             operation = decoder.feed(compressed_chunk)
-            return [
-                piece
-                async for piece in _drive_operation(
-                    cast(_AsyncDrivableOperation, operation),
-                    workload=compressed_chunk,
-                    offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
-                )
-            ]
+            try:
+                return [
+                    piece
+                    async for piece in _drive_operation(
+                        cast(_AsyncDrivableOperation, operation),
+                        workload=compressed_chunk,
+                        offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
+                    )
+                ]
+            finally:
+                self._sync_decoder_mtime(decoder)
         except asyncio.CancelledError:
             # The driver waits for the executor worker to finish before it
             # closes the operation. Only then is it safe to discard the shared
@@ -1099,6 +1093,12 @@ class AsyncGzipBinaryFile:
             raise
         except Exception as error:
             raise OSError(f"Unexpected error during decompression: {error}") from error
+
+    def _sync_decoder_mtime(self, decoder: GzipDecoder) -> None:
+        """Observe the most recently completed header from ``decoder``."""
+        if decoder._header_generation != self._decoder_header_generation:
+            self._decoder_header_generation = decoder._header_generation
+            self._mtime = decoder._last_header_mtime
 
     def _check_read_usable(self) -> None:
         """Reject access after cancellation may have advanced the decompressor."""
@@ -1160,6 +1160,7 @@ class AsyncGzipBinaryFile:
             output_chunk_size=max(self._chunk_size, self.DEFAULT_CHUNK_SIZE),
             max_decompressed_size=self._max_decompressed_size,
         )
+        self._decoder_header_generation = 0
         del self._buffer[:]
         self._buffer_offset = 0
         self._eof = False

@@ -1159,24 +1159,24 @@ WP1 complete.
 
 #### Implementation tasks
 
-- [ ] Replace `_header_probe_buffer` in `AsyncGzipBinaryFile.__slots__` with `_decoder_header_generation`.
-- [ ] Initialize observed generation in `__init__`.
-- [ ] Set `_mtime = None` and observed generation `0` when a read-mode file is opened.
-- [ ] Add a narrow `_sync_decoder_mtime()` helper.
-- [ ] Synchronize after every decoder `feed()` drain.
-- [ ] Synchronize after every decoder `finish()` drain.
-- [ ] Use an inner `try/finally` so notification is observed when a later part of the same operation raises.
-- [ ] Preserve cancellation ordering: active worker finishes, operation cleanup completes, header state synchronizes, decoder is discarded, cancellation propagates.
-- [ ] Do not expose a half-parsed header on cancellation.
-- [ ] When rewind creates a new decoder, reset observed generation to `0`.
-- [ ] Preserve public `_mtime` across rewind until a reread header completes.
-- [ ] Update `_decompress_next()` documentation to describe shared metadata notification, not a compatibility probe.
-- [ ] Remove the `_try_parse_gzip_header_mtime` import.
-- [ ] Delete `_try_parse_gzip_header_mtime()` from `_common.py`.
-- [ ] Remove it from `__all__`.
-- [ ] Remove imports/constants made unused only by that helper.
-- [ ] Run `rg` to prove no probe symbol or helper remains.
-- [ ] Keep `AsyncGzipTextFile.mtime` as delegation rather than adding another cache.
+- [x] Replace `_header_probe_buffer` in `AsyncGzipBinaryFile.__slots__` with `_decoder_header_generation`.
+- [x] Initialize observed generation in `__init__`.
+- [x] Set `_mtime = None` and observed generation `0` when a read-mode file is opened.
+- [x] Add a narrow `_sync_decoder_mtime()` helper.
+- [x] Synchronize after every decoder `feed()` drain.
+- [x] Synchronize after every decoder `finish()` drain.
+- [x] Use an inner `try/finally` so notification is observed when a later part of the same operation raises.
+- [x] Preserve cancellation ordering: active worker finishes, operation cleanup completes, header state synchronizes, decoder is discarded, cancellation propagates.
+- [x] Do not expose a half-parsed header on cancellation.
+- [x] When rewind creates a new decoder, reset observed generation to `0`.
+- [x] Preserve public `_mtime` across rewind until a reread header completes.
+- [x] Update `_decompress_next()` documentation to describe shared metadata notification, not a compatibility probe.
+- [x] Remove the `_try_parse_gzip_header_mtime` import.
+- [x] Delete `_try_parse_gzip_header_mtime()` from `_common.py`.
+- [x] Remove it from `__all__`.
+- [x] Remove imports/constants made unused only by that helper.
+- [x] Run `rg` to prove no probe symbol or helper remains.
+- [x] Keep `AsyncGzipTextFile.mtime` as delegation rather than adding another cache.
 
 #### Exact synchronization shape
 
@@ -1202,33 +1202,33 @@ Adapt syntax to the implementation, but preserve the order. Apply the same princ
 
 #### Required binary-file tests
 
-- [ ] `mtime is None` immediately after open.
-- [ ] first valid header updates before trailer completion.
-- [ ] zero timestamp remains zero.
-- [ ] two concatenated members update from first to second.
-- [ ] three members with repeated timestamps still follow header order.
-- [ ] one compressed read chunk containing several members leaves the last parsed timestamp.
-- [ ] valid header then corrupt body leaves new timestamp visible with the raised error.
-- [ ] valid header then corrupt trailer leaves new timestamp visible with the raised error.
-- [ ] invalid next header leaves prior timestamp visible.
-- [ ] incomplete next header leaves prior timestamp visible.
-- [ ] NUL padding does not change timestamp.
-- [ ] seek to zero preserves old timestamp immediately.
-- [ ] rereading first header changes back to first timestamp.
-- [ ] rereading later member changes again.
-- [ ] non-seekable cached rewind follows the same behavior.
-- [ ] `read()`, `read1()`, `readline()`, `peek()`, `readinto()`, `seek()`, and read-all paths observe the same underlying behavior.
-- [ ] cancellation after header completion but during body work synchronizes completed metadata and marks the reader broken.
-- [ ] cancellation before header completion does not update.
+- [x] `mtime is None` immediately after open.
+- [x] first valid header updates before trailer completion.
+- [x] zero timestamp remains zero.
+- [x] two concatenated members update from first to second.
+- [x] three members with repeated timestamps still follow header order.
+- [x] one compressed read chunk containing several members leaves the last parsed timestamp.
+- [x] valid header then corrupt body leaves new timestamp visible with the raised error.
+- [x] valid header then corrupt trailer leaves new timestamp visible with the raised error.
+- [x] invalid next header leaves prior timestamp visible.
+- [x] incomplete next header leaves prior timestamp visible.
+- [x] NUL padding does not change timestamp.
+- [x] seek to zero preserves old timestamp immediately.
+- [x] rereading first header changes back to first timestamp.
+- [x] rereading later member changes again.
+- [x] non-seekable cached rewind follows the same behavior.
+- [x] `read()`, `read1()`, `readline()`, `peek()`, `readinto()`, `seek()`, and read-all paths observe the same underlying behavior.
+- [x] cancellation after header completion but during body work synchronizes completed metadata and marks the reader broken.
+- [x] cancellation before header completion does not update.
 
 #### Required text-file tests
 
-- [ ] initial `mtime` is `None`;
-- [ ] concatenated-member transition delegates correctly;
-- [ ] zero timestamp;
-- [ ] backward seek/reread when supported by current text semantics;
-- [ ] corrupt body/trailer behavior matches binary layer;
-- [ ] no independent text metadata state is introduced.
+- [x] initial `mtime` is `None`;
+- [x] concatenated-member transition delegates correctly;
+- [x] zero timestamp;
+- [x] backward seek/reread when supported by current text semantics;
+- [x] corrupt body/trailer behavior matches binary layer;
+- [x] no independent text metadata state is introduced.
 
 #### Differential tests with stdlib
 
@@ -1244,8 +1244,8 @@ Do not require aiogzip's internal read-ahead boundary to match stdlib byte-for-b
 #### Package checks
 
 ```bash
-uv run pytest -q tests/test_binary_io.py tests/test_text_io.py tests/test_seek.py
-AIOGZIP_ENGINE=stdlib uv run pytest -q tests/test_binary_io.py tests/test_text_io.py tests/test_seek.py
+uv run pytest -q tests/test_file_mtime.py tests/test_binary_io.py tests/test_text_io.py tests/test_seek_plain_fast.py tests/test_review_gaps.py
+AIOGZIP_ENGINE=stdlib uv run pytest -q tests/test_file_mtime.py tests/test_binary_io.py tests/test_text_io.py tests/test_seek_plain_fast.py tests/test_review_gaps.py
 uv run ruff check src tests
 uv run ruff format --check src tests
 uv run prek run --all-files
@@ -1256,13 +1256,13 @@ The final `rg` should return no production or test references except a deliberat
 
 #### Exit criteria
 
-- [ ] D5 and D6 are implemented.
-- [ ] One header parser remains.
-- [ ] Binary/text parity tests pass.
-- [ ] Seek and non-seekable replay tests pass.
-- [ ] Cancellation and corruption timing tests pass.
-- [ ] No public signature changed.
-- [ ] Repository is green.
+- [x] D5 and D6 are implemented.
+- [x] One header parser remains.
+- [x] Binary/text parity tests pass.
+- [x] Seek and non-seekable replay tests pass.
+- [x] Cancellation and corruption timing tests pass.
+- [x] No public signature changed.
+- [x] Repository is green.
 
 #### Suggested commit
 
