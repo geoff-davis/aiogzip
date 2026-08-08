@@ -2,6 +2,7 @@ import argparse
 import ast
 import asyncio
 import gzip
+import hashlib
 import importlib
 import json
 import sys
@@ -15,6 +16,7 @@ bench_common = importlib.import_module("bench_common")
 run_benchmarks = importlib.import_module("run_benchmarks")
 bench_streaming = importlib.import_module("bench_streaming")
 bench_codec_regressions = importlib.import_module("bench_codec_regressions")
+bench_a3_regressions = importlib.import_module("bench_a3_regressions")
 BenchmarkResults = bench_common.BenchmarkResults
 COMPARISON_COMPRESSLEVEL = bench_common.COMPARISON_COMPRESSLEVEL
 DataGenerator = bench_common.DataGenerator
@@ -27,6 +29,10 @@ StreamingBenchmarks = bench_streaming.StreamingBenchmarks
 RegressionsBenchmarks = bench_codec_regressions.RegressionsBenchmarks
 deterministic_bytes = bench_codec_regressions._deterministic_bytes
 fixture = bench_codec_regressions._fixture
+a3_header_fixture = bench_a3_regressions.optional_header_fixture
+A3SeekableMemorySource = bench_a3_regressions.SeekableMemorySource
+a3_read_high_level = bench_a3_regressions._read_high_level
+a3_write_once = bench_a3_regressions._write_once
 
 
 def _result(name, duration, marker):
@@ -123,6 +129,76 @@ def test_regression_fixture_is_deterministic_and_self_describing():
     assert deterministic_bytes(64, label=b"test") == deterministic_bytes(
         64, label=b"test"
     )
+
+
+@pytest.mark.parametrize("field", ["fname", "fcomment"])
+def test_a3_optional_header_fixtures_are_deterministic_and_valid(field):
+    first, expected = a3_header_fixture(
+        field, 4096, complete=True, mtime=0xFFFFFFFF, fhcrc=True
+    )
+    second, _ = a3_header_fixture(
+        field, 4096, complete=True, mtime=0xFFFFFFFF, fhcrc=True
+    )
+
+    assert first == second
+    assert gzip.decompress(first) == expected
+
+
+@pytest.mark.asyncio
+async def test_a3_high_level_smoke_checks_complete_and_incomplete_headers():
+    import aiogzip
+
+    complete, expected = a3_header_fixture("fname", 4096, complete=True)
+    complete_sample = await a3_read_high_level(
+        aiogzip,
+        complete,
+        chunk_size=257,
+        expect_complete=True,
+        measure_memory=False,
+    )
+    incomplete, _ = a3_header_fixture("fcomment", 4096, complete=False)
+    incomplete_sample = await a3_read_high_level(
+        aiogzip,
+        incomplete,
+        chunk_size=257,
+        expect_complete=False,
+        measure_memory=False,
+    )
+
+    assert (
+        complete_sample.metrics["output_sha256"] == hashlib.sha256(expected).hexdigest()
+    )
+    assert complete_sample.metrics["source_max_returned_bytes"] <= 257
+    assert incomplete_sample.metrics["failure"] is not None
+
+
+@pytest.mark.asyncio
+async def test_a3_write_smoke_validates_position_and_output_digest():
+    import aiogzip
+
+    sample = await a3_write_once(
+        aiogzip,
+        write_size=10,
+        total_bytes=4096,
+        method="write",
+        fast_compress=False,
+    )
+
+    assert sample.metrics["payload_bytes"] == 4096
+    assert sample.metrics["output_sha256"] == sample.metrics["payload_sha256"]
+    assert sample.metrics["position_before_close"] == 4096
+
+
+@pytest.mark.asyncio
+async def test_a3_seekable_source_never_returns_more_than_requested():
+    source = A3SeekableMemorySource(b"0123456789")
+
+    assert await source.read(3) == b"012"
+    assert await source.read(3) == b"345"
+    assert source.max_returned == 3
+    assert await source.seek(0) == 0
+    assert await source.read(20) == b"0123456789"
+    assert source.max_returned == 10
 
 
 def test_source_root_attestation_identifies_current_checkout():

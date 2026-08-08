@@ -146,6 +146,28 @@ The public codec cases are emitted as explicit skips for targets such as
 `v1.11.0` that predate `GzipDecoder`; supported high-level streaming cases
 still run normally.
 
+### 10. 2.0.0a3 file-header and write harness (`bench_a3_regressions.py`)
+
+The `a3` harness targets an explicit checkout and captures the high-level
+optional-header path, concatenated-member metadata overhead, and a fixed-total
+write-size curve. It retains individual samples, medians, MAD/min/max values,
+fixture and output digests, source/sink counts, tracemalloc peaks, and complete
+environment/source attestations:
+
+```bash
+uv run --frozen python benchmarks/bench_a3_regressions.py \
+  --source-root /tmp/aiogzip-v2.0.0a2-a3 \
+  --engine stdlib --repeat 5 \
+  --output /tmp/v2.0.0a2-a3-stdlib.json
+```
+
+Use `--fixture-sizes-mib`, `--member-counts`, `--write-sizes`,
+`--total-write-bytes`, and `--source-chunk-bytes` to select an explicitly
+recorded matrix. `profile_small_writes.py` captures cProfile tables and hot-path
+call counts for the diagnostic 10 B, 1 KiB, and 64 KiB write sizes. Correctness
+checks and fixture construction are kept outside ordinary wall-time regions;
+tracemalloc cases are labeled separately and are not used as wall-time claims.
+
 ## Running Benchmarks
 
 ### Command Line Options
