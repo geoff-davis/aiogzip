@@ -173,6 +173,17 @@ captures cProfile tables and hot-path call counts for the diagnostic 10 B,
 1 KiB, and 64 KiB write sizes. Correctness checks and fixture construction are
 kept outside ordinary wall-time regions; tracemalloc cases are labeled
 separately and are not used as wall-time claims.
+`verify_a3_writes.py` complements that memory-sink matrix with 1, 4, and 10
+independent writers, all seven sizes through temporary path-backed files, and
+separate tracemalloc samples for 10 B, 1 KiB, and 64 KiB writes. Concurrent
+cases keep aggregate input fixed at 8 MiB and verify every independent gzip
+member after timing:
+
+```bash
+uv run --frozen python benchmarks/verify_a3_writes.py \
+  --source-root . --engine stdlib \
+  --output /tmp/v2.0.0a3-write-surfaces-stdlib.json
+```
 
 `verify_a3_headers.py` is the release-only structural companion. It leaves the
 locked exact-a2 comparison harness unchanged while checking 64 MiB post-failure

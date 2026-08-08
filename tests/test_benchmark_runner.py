@@ -20,6 +20,7 @@ run_benchmarks = importlib.import_module("run_benchmarks")
 bench_streaming = importlib.import_module("bench_streaming")
 bench_codec_regressions = importlib.import_module("bench_codec_regressions")
 bench_a3_regressions = importlib.import_module("bench_a3_regressions")
+verify_a3_writes = importlib.import_module("verify_a3_writes")
 BenchmarkResults = bench_common.BenchmarkResults
 COMPARISON_COMPRESSLEVEL = bench_common.COMPARISON_COMPRESSLEVEL
 DataGenerator = bench_common.DataGenerator
@@ -37,6 +38,9 @@ a3_combined_header_fixture = bench_a3_regressions.combined_header_fixture
 A3SeekableMemorySource = bench_a3_regressions.SeekableMemorySource
 a3_read_high_level = bench_a3_regressions._read_high_level
 a3_write_once = bench_a3_regressions._write_once
+a3_concurrent_write_once = verify_a3_writes._concurrent_once
+a3_path_write_once = verify_a3_writes._path_once
+a3_allocation_write_once = verify_a3_writes._allocation_once
 
 
 def _result(name, duration, marker):
@@ -432,6 +436,47 @@ async def test_a3_write_smoke_validates_position_and_output_digest():
     assert sample.metrics["payload_bytes"] == 4096
     assert sample.metrics["output_sha256"] == sample.metrics["payload_sha256"]
     assert sample.metrics["position_before_close"] == 4096
+
+
+@pytest.mark.asyncio
+async def test_a3_concurrent_write_verifier_checks_independent_streams():
+    import aiogzip
+
+    sample = await a3_concurrent_write_once(
+        aiogzip,
+        writer_count=4,
+        write_size=10,
+        aggregate_bytes=4096,
+        fast_compress=False,
+    )
+
+    assert sample["aggregate_payload_bytes"] == 4096
+    assert sample["positions"] == [1024] * 4
+    assert len(sample["compressed_sha256"]) == 4
+
+
+@pytest.mark.asyncio
+async def test_a3_path_and_allocation_write_verifier_smoke():
+    import aiogzip
+
+    path_sample = await a3_path_write_once(
+        aiogzip,
+        write_size=100,
+        total_bytes=4096,
+        fast_compress=False,
+    )
+    allocation_sample = await a3_allocation_write_once(
+        aiogzip,
+        write_size=1024,
+        total_bytes=4096,
+        fast_compress=False,
+    )
+
+    assert path_sample["payload_bytes"] == 4096
+    assert path_sample["position"] == 4096
+    assert allocation_sample["payload_bytes"] == 4096
+    assert allocation_sample["position"] == 4096
+    assert allocation_sample["peak_python_bytes"] > 0
 
 
 @pytest.mark.asyncio
