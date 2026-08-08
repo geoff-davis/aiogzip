@@ -43,6 +43,168 @@ def _metadata_member(payload):
     return bytes(header) + body + trailer
 
 
+def _corrupt_header_variant(damage):
+    if damage == "fhcrc":
+        wire = bytearray(_metadata_member(b"payload"))
+        wire[4] ^= 1
+        return bytes(wire)
+    wire = bytearray(gzip.compress(b"payload", mtime=123))
+    if damage == "magic":
+        wire[0] ^= 1
+    elif damage == "method":
+        wire[2] ^= 1
+    elif damage == "reserved-flags":
+        wire[3] |= 0x20
+    else:
+        raise AssertionError(f"unknown damage: {damage}")
+    return bytes(wire)
+
+
+def test_header_notification_starts_empty_and_commits_at_fixed_header_boundary():
+    wire = gzip.compress(b"payload", mtime=0xFFFFFFFF)
+    decoder = GzipDecoder()
+
+    assert decoder._header_generation == 0
+    assert decoder._last_header_mtime is None
+    operation = decoder.feed(wire[:9])
+    assert decoder._header_generation == 0
+    assert list(operation) == []
+    assert decoder._header_generation == 0
+
+    assert list(decoder.feed(wire[9:10])) == []
+    assert decoder._header_generation == 1
+    assert decoder._last_header_mtime == 0xFFFFFFFF
+    output = b"".join(decoder.feed(wire[10:])) + b"".join(decoder.finish())
+    assert output == b"payload"
+
+
+@pytest.mark.parametrize("split", range(11))
+def test_header_notification_fixed_header_split_at_every_boundary(split):
+    wire = gzip.compress(b"split payload", mtime=0)
+    decoder = GzipDecoder()
+
+    assert list(decoder.feed(wire[:split])) == []
+    assert decoder._header_generation == (1 if split == 10 else 0)
+    assert list(decoder.feed(wire[split:10])) == []
+    assert decoder._header_generation == 1
+    assert decoder._last_header_mtime == 0
+
+    output = b"".join(decoder.feed(wire[10:])) + b"".join(decoder.finish())
+    assert output == b"split payload"
+
+
+def test_header_notification_increments_for_every_member_in_one_feed():
+    wire = b"".join(
+        (
+            gzip.compress(b"first", mtime=100),
+            gzip.compress(b"second", mtime=100),
+            gzip.compress(b"third", mtime=200),
+        )
+    )
+    decoder = GzipDecoder()
+
+    output = b"".join(decoder.feed(wire)) + b"".join(decoder.finish())
+
+    assert output == b"firstsecondthird"
+    assert decoder._header_generation == 3
+    assert decoder._last_header_mtime == 200
+
+
+@pytest.mark.parametrize("collect_member_info", [False, True])
+def test_header_notification_supports_all_optional_fields_without_collection_dependency(
+    collect_member_info,
+):
+    wire = _metadata_member(b"metadata payload")
+    decoder = GzipDecoder(collect_member_info=collect_member_info)
+
+    output = b"".join(decoder.feed(wire)) + b"".join(decoder.finish())
+
+    assert output == b"metadata payload"
+    assert decoder._header_generation == 1
+    assert decoder._last_header_mtime == 123
+
+
+def test_header_notification_waits_for_bytewise_optional_header_completion():
+    wire = _metadata_member(b"bytewise metadata")
+    extra = b"\x01\x02extra"
+    filename = "café.bin".encode("latin-1")
+    comment = b"codec test"
+    header_size = 10 + 2 + len(extra) + len(filename) + 1 + len(comment) + 1 + 2
+    decoder = GzipDecoder()
+    output = bytearray()
+
+    for index, byte in enumerate(wire):
+        output.extend(b"".join(decoder.feed(bytes((byte,)))))
+        expected_generation = 1 if index + 1 >= header_size else 0
+        assert decoder._header_generation == expected_generation
+    output.extend(decoder.finish())
+
+    assert output == b"bytewise metadata"
+    assert decoder._last_header_mtime == 123
+
+
+@pytest.mark.parametrize("damage", ["magic", "method", "reserved-flags", "fhcrc"])
+def test_invalid_header_does_not_commit_notification(damage):
+    decoder = GzipDecoder()
+
+    with pytest.raises(gzip.BadGzipFile):
+        list(decoder.feed(_corrupt_header_variant(damage)))
+
+    assert decoder._header_generation == 0
+    assert decoder._last_header_mtime is None
+
+
+def test_truncated_header_does_not_commit_notification():
+    decoder = GzipDecoder()
+
+    assert list(decoder.feed(b"\x1f\x8b\x08")) == []
+    with pytest.raises(gzip.BadGzipFile, match="truncated gzip member header"):
+        list(decoder.finish())
+
+    assert decoder._header_generation == 0
+    assert decoder._last_header_mtime is None
+
+
+@pytest.mark.parametrize("damage", ["body", "crc", "isize"])
+def test_valid_header_notification_survives_later_member_failure(damage):
+    wire = bytearray(gzip.compress(b"payload", mtime=321))
+    if damage == "body":
+        wire[10] ^= 0xFF
+    elif damage == "crc":
+        wire[-8] ^= 1
+    else:
+        wire[-4] ^= 1
+    decoder = GzipDecoder()
+
+    with pytest.raises(gzip.BadGzipFile):
+        list(decoder.feed(bytes(wire)))
+
+    assert decoder._header_generation == 1
+    assert decoder._last_header_mtime == 321
+
+
+def test_malformed_later_header_retains_previous_notification():
+    decoder = GzipDecoder()
+    wire = gzip.compress(b"first", mtime=456) + b"not a gzip header"
+
+    with pytest.raises(gzip.BadGzipFile):
+        list(decoder.feed(wire))
+
+    assert decoder._header_generation == 1
+    assert decoder._last_header_mtime == 456
+
+
+def test_discard_retains_completed_header_notification_scalars():
+    wire = gzip.compress(b"payload", mtime=789)
+    decoder = GzipDecoder()
+
+    assert list(decoder.feed(wire[:10])) == []
+    decoder.discard()
+
+    assert decoder._header_generation == 1
+    assert decoder._last_header_mtime == 789
+
+
 @pytest.mark.parametrize("parts", [[], [b""], [b"", b""]])
 def test_empty_input_is_a_valid_zero_member_stream(parts):
     output, decoder = _decode(parts, collect_member_info=True)
@@ -111,6 +273,8 @@ def test_concatenated_empty_members_and_nul_padding():
     assert output == b"".join(payloads)
     assert decoder.member_count == 3
     assert len(decoder.members) == 3
+    assert decoder._header_generation == 3
+    assert decoder._last_header_mtime == 0
 
 
 def test_metadata_heavy_header_and_offsets():
@@ -282,8 +446,14 @@ def test_invalid_deflate_payload_is_normalized_and_poisons_decoder():
     ids=["extra-length", "extra-data", "filename", "comment", "fhcrc"],
 )
 def test_truncated_optional_header_fields(wire):
+    decoder = GzipDecoder()
+
     with pytest.raises(gzip.BadGzipFile, match="truncated gzip member header"):
-        _decode([wire])
+        list(decoder.feed(wire))
+        list(decoder.finish())
+
+    assert decoder._header_generation == 0
+    assert decoder._last_header_mtime is None
 
 
 @pytest.mark.parametrize(

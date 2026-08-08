@@ -414,6 +414,11 @@ class GzipDecoder(_CodecBase):
         self._engine: ZlibEngine = None
         self._header: _ParsedHeader | None = None
         self._header_parser: _GzipHeaderParser | None = self._new_header_parser()
+        # Generation distinguishes repeated timestamps and mtime=0 from no
+        # completed header. Package-internal file readers observe these two
+        # scalars without retaining or reparsing header bytes.
+        self._header_generation = 0
+        self._last_header_mtime: int | None = None
         self._members: list[GzipMemberInfo] = []
         self._member_count = 0
         self._member_offset = 0
@@ -599,6 +604,8 @@ class GzipDecoder(_CodecBase):
                 if parsed is None:
                     break
                 self._header = parsed
+                self._header_generation += 1
+                self._last_header_mtime = parsed.mtime
                 self._engine = _engine.decompressobj(-_engine.MAX_WBITS)
                 self._member_crc = 0
                 self._member_size = 0

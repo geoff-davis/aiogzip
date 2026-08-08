@@ -1078,47 +1078,47 @@ Before implementation, add focused tests that fail for the absence of notificati
 
 #### Implementation tasks
 
-- [ ] Inspect `GzipDecoder.__init__`, `_process()`, `_release_state()`, and discard behavior.
-- [ ] Add `_header_generation = 0` during decoder construction.
-- [ ] Add `_last_header_mtime = None` during decoder construction.
-- [ ] Commit notification exactly after a complete `_ParsedHeader` is returned and before engine/body setup.
-- [ ] Increment generation for every complete valid header, including repeated timestamps.
-- [ ] Preserve integer zero exactly.
-- [ ] Keep notification independent of `collect_member_info`.
-- [ ] Do not retain original filename, comment, extra data, or full header solely for notification.
-- [ ] Ensure invalid/truncated headers do not commit.
-- [ ] Ensure later body/trailer failure does not roll the notification back.
-- [ ] Ensure member completion does not reset generation or last timestamp.
-- [ ] Ensure parser reset for the next member does not reset notification.
-- [ ] Ensure `discard()` releases heavyweight state but does not decrement or falsify an already committed notification.
-- [ ] Keep fields package-private and absent from public exports/docs.
-- [ ] Add a concise internal comment explaining why generation is needed even when timestamps repeat or equal zero.
+- [x] Inspect `GzipDecoder.__init__`, `_process()`, `_release_state()`, and discard behavior.
+- [x] Add `_header_generation = 0` during decoder construction.
+- [x] Add `_last_header_mtime = None` during decoder construction.
+- [x] Commit notification exactly after a complete `_ParsedHeader` is returned and before engine/body setup.
+- [x] Increment generation for every complete valid header, including repeated timestamps.
+- [x] Preserve integer zero exactly.
+- [x] Keep notification independent of `collect_member_info`.
+- [x] Do not retain original filename, comment, extra data, or full header solely for notification.
+- [x] Ensure invalid/truncated headers do not commit.
+- [x] Ensure later body/trailer failure does not roll the notification back.
+- [x] Ensure member completion does not reset generation or last timestamp.
+- [x] Ensure parser reset for the next member does not reset notification.
+- [x] Ensure `discard()` releases heavyweight state but does not decrement or falsify an already committed notification.
+- [x] Keep fields package-private and absent from public exports/docs.
+- [x] Add a concise internal comment explaining why generation is needed even when timestamps repeat or equal zero.
 
 #### Required direct tests
 
-- [ ] fresh decoder: generation 0, timestamp `None`;
-- [ ] fixed ten-byte header split at every byte boundary;
-- [ ] `mtime=0`;
-- [ ] maximum uint32 `mtime`;
-- [ ] two members with distinct timestamps;
-- [ ] two members with identical timestamps still increment twice;
-- [ ] several members accepted in one `feed()`;
-- [ ] FEXTRA, FNAME, FCOMMENT, and FHCRC combinations;
-- [ ] header split before and after every optional-field terminator;
-- [ ] bad magic;
-- [ ] unsupported method;
-- [ ] reserved flags;
-- [ ] bad FHCRC;
-- [ ] truncated fixed header;
-- [ ] truncated optional field;
-- [ ] valid header then malformed DEFLATE body;
-- [ ] valid header then bad CRC;
-- [ ] valid header then bad ISIZE;
-- [ ] valid member followed by malformed next header;
-- [ ] NUL padding between members;
-- [ ] `collect_member_info=False` and `True` parity;
-- [ ] discard after a completed header;
-- [ ] operation close/poison behavior unchanged.
+- [x] fresh decoder: generation 0, timestamp `None`;
+- [x] fixed ten-byte header split at every byte boundary;
+- [x] `mtime=0`;
+- [x] maximum uint32 `mtime`;
+- [x] two members with distinct timestamps;
+- [x] two members with identical timestamps still increment twice;
+- [x] several members accepted in one `feed()`;
+- [x] FEXTRA, FNAME, FCOMMENT, and FHCRC combinations;
+- [x] header split before and after every optional-field terminator;
+- [x] bad magic;
+- [x] unsupported method;
+- [x] reserved flags;
+- [x] bad FHCRC;
+- [x] truncated fixed header;
+- [x] truncated optional field;
+- [x] valid header then malformed DEFLATE body;
+- [x] valid header then bad CRC;
+- [x] valid header then bad ISIZE;
+- [x] valid member followed by malformed next header;
+- [x] NUL padding between members;
+- [x] `collect_member_info=False` and `True` parity;
+- [x] discard after a completed header;
+- [x] operation close/poison behavior unchanged.
 
 #### Package checks
 
@@ -1132,12 +1132,12 @@ Use the repository's actual focused test selectors rather than relying blindly o
 
 #### Exit criteria
 
-- [ ] Header notifications satisfy D4.
-- [ ] No public API changed.
-- [ ] No gzip parsing logic is duplicated.
-- [ ] All existing codec/property tests pass.
-- [ ] `a2` direct decoder smoke benchmarks remain inside the no-regression guard.
-- [ ] Repository is green.
+- [x] Header notifications satisfy D4.
+- [x] No public API changed.
+- [x] No gzip parsing logic is duplicated.
+- [x] All existing codec/property tests pass.
+- [x] `a2` direct decoder smoke benchmarks remain inside the no-regression guard.
+- [x] Repository is green.
 
 #### Suggested commit
 
