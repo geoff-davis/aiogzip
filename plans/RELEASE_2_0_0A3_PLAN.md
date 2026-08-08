@@ -837,26 +837,26 @@ For incomplete-field timing, create the fixture outside the tracemalloc/timed re
 
 Hard structural gates:
 
-- [ ] `_header_probe_buffer` no longer exists.
-- [ ] `_try_parse_gzip_header_mtime` no longer exists.
-- [ ] `_binary.py` does not parse gzip magic, flags, optional fields, FHCRC, or NUL terminators.
-- [ ] Only `_GzipHeaderParser` owns header parsing.
+- [x] `_header_probe_buffer` no longer exists.
+- [x] `_try_parse_gzip_header_mtime` no longer exists.
+- [x] `_binary.py` does not parse gzip magic, flags, optional fields, FHCRC, or NUL terminators.
+- [x] Only `_GzipHeaderParser` owns header parsing.
 
 Hard functional gates:
 
-- [ ] all live-`mtime` cases pass;
-- [ ] 128 MiB safety-limit test passes under both engines;
-- [ ] malformed headers retain existing exception behavior;
-- [ ] complete header plus corrupt body/trailer retains the header timestamp;
-- [ ] concatenated members and rewind behave exactly as section 6 specifies.
+- [x] all live-`mtime` cases pass;
+- [x] 128 MiB safety-limit test passes under both engines;
+- [x] malformed headers retain existing exception behavior;
+- [x] complete header plus corrupt body/trailer retains the header timestamp;
+- [x] concatenated members and rewind behave exactly as section 6 specifies.
 
 Hard performance gates on the locked reference machine:
 
-- [ ] 16→32 MiB and 32→64 MiB wall-time ratios are each `<= 2.5x` for FNAME and FCOMMENT through the high-level file reader.
-- [ ] With metadata collection absent, a seekable source, and 1 MiB source chunks, incremental Python peak allocation for the 32 MiB incomplete FNAME and FCOMMENT cases is `< 8 MiB`.
-- [ ] Target peak for those cases is `< 4 MiB`.
-- [ ] The high-level 64 MiB case does not retain a header-sized compatibility copy after failure.
-- [ ] No candidate high-level header case is slower than the repaired direct decoder by more than a documented fixed wrapper cost plus transport I/O.
+- [x] 16→32 MiB and 32→64 MiB wall-time ratios are each `<= 2.5x` for FNAME and FCOMMENT through the high-level file reader.
+- [x] With metadata collection absent, a seekable source, and 1 MiB source chunks, incremental Python peak allocation for the 32 MiB incomplete FNAME and FCOMMENT cases is `< 8 MiB`.
+- [x] Target peak for those cases is `< 4 MiB`.
+- [x] The high-level 64 MiB case does not retain a header-sized compatibility copy after failure.
+- [x] No candidate high-level header case is slower than the repaired direct decoder by more than a documented fixed wrapper cost plus transport I/O.
 
 Comparisons against exact `a2`:
 
@@ -1284,46 +1284,46 @@ WP2 complete.
 
 #### Tasks
 
-- [ ] Run the full high-level header category against exact `a2` and candidate.
-- [ ] Run FNAME and FCOMMENT at 16, 32, and 64 MiB.
-- [ ] Run complete and incomplete forms.
-- [ ] Run 1 MiB and representative smaller source chunks.
-- [ ] Run fixed-header/terminator/FHCRC adversarial splits.
-- [ ] Run metadata-disabled direct-decoder control.
-- [ ] Run a seekable high-level binary memory source for parser-memory gates.
-- [ ] Run a separate non-seekable control and report the intentional rewind-cache allocation outside those gates.
-- [ ] Run one path-backed representative case.
-- [ ] Capture wall-time samples separately from tracemalloc peaks.
-- [ ] Capture peak allocation after fixture creation.
-- [ ] Verify no retained header-sized object remains after expected failure and garbage collection.
-- [ ] Run the real 128 MiB boundary test under both engines outside normal CI.
-- [ ] Run the 1,001-member throughput control.
-- [ ] Investigate every candidate delta over 5% versus exact `a2`.
-- [ ] Do not optimize `_GzipHeaderParser` unless the candidate itself misses a gate.
-- [ ] If a gate misses because another high-level layer retains input, stop and document the actual owner before changing architecture.
-- [ ] Commit raw candidate samples only after the implementation is stable.
+- [x] Run the full high-level header category against exact `a2` and candidate.
+- [x] Run FNAME and FCOMMENT at 16, 32, and 64 MiB.
+- [x] Run complete and incomplete forms.
+- [x] Run 1 MiB and representative smaller source chunks.
+- [x] Run fixed-header/terminator/FHCRC adversarial splits.
+- [x] Run metadata-disabled direct-decoder control.
+- [x] Run a seekable high-level binary memory source for parser-memory gates.
+- [x] Run a separate non-seekable control and report the intentional rewind-cache allocation outside those gates.
+- [x] Run one path-backed representative case.
+- [x] Capture wall-time samples separately from tracemalloc peaks.
+- [x] Capture peak allocation after fixture creation.
+- [x] Verify no retained header-sized object remains after expected failure and garbage collection.
+- [x] Run the real 128 MiB boundary test under both engines outside normal CI.
+- [x] Run the 1,001-member throughput control.
+- [x] Investigate every candidate delta over 5% versus exact `a2`.
+- [x] Do not optimize `_GzipHeaderParser` unless the candidate itself misses a gate.
+- [x] If a gate misses because another high-level layer retains input, stop and document the actual owner before changing architecture.
+- [x] Commit raw candidate samples only after the implementation is stable.
 
 #### Deterministic functional sentinels
 
 Timing gates must be backed by non-timing tests:
 
-- [ ] seekable memory source never returns more than requested and does not activate the compressed rewind cache;
-- [ ] fixture generator produces expected flag layout;
-- [ ] FHCRC fixture is valid before corruption variants;
-- [ ] incomplete field fails only at finalization/EOF;
-- [ ] over-limit field rejects before accepting the first byte beyond the limit;
-- [ ] public `mtime` is not committed for the over-limit header;
-- [ ] source read-count growth is linear in field size;
-- [ ] no whole-header compatibility buffer exists in the file object.
+- [x] seekable memory source never returns more than requested and does not activate the compressed rewind cache;
+- [x] fixture generator produces expected flag layout;
+- [x] FHCRC fixture is valid before corruption variants;
+- [x] incomplete field fails only at finalization/EOF;
+- [x] over-limit field rejects before accepting the first byte beyond the limit;
+- [x] public `mtime` is not committed for the over-limit header;
+- [x] source read-count growth is linear in field size;
+- [x] no whole-header compatibility buffer exists in the file object.
 
 #### Exit criteria
 
-- [ ] Every hard header gate in section 8.3 passes.
-- [ ] Many-member control stays inside the gate.
-- [ ] All `a2` decoder controls remain passing.
-- [ ] Raw data and investigation notes are committed.
-- [ ] No waiver is used for duplicate parsing or header-sized allocation.
-- [ ] Repository is green.
+- [x] Every hard header gate in section 8.3 passes.
+- [x] Many-member control stays inside the gate.
+- [x] All `a2` decoder controls remain passing.
+- [x] Raw data and investigation notes are committed.
+- [x] No waiver is used for duplicate parsing or header-sized allocation.
+- [x] Repository is green.
 
 #### Suggested commit
 
