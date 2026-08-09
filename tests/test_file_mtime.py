@@ -9,6 +9,7 @@ import os
 import zlib
 
 import pytest
+from conftest import FramedAsyncReader
 
 from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile, _codec_async
 
@@ -17,49 +18,11 @@ def _member(body: bytes, mtime: int) -> bytes:
     return gzip.compress(body, mtime=mtime)
 
 
-class _FramedAsyncReader:
-    """Async memory source that preserves caller-selected read boundaries."""
-
-    def __init__(self, *frames: bytes, seekable: bool = True) -> None:
-        self._frames = tuple(frames)
-        self._frame_index = 0
-        self._frame_offset = 0
-        self._seekable = seekable
-
-    async def read(self, size: int = -1) -> bytes:
-        if self._frame_index >= len(self._frames):
-            return b""
-        frame = self._frames[self._frame_index]
-        remaining = len(frame) - self._frame_offset
-        take = remaining if size < 0 else min(size, remaining)
-        start = self._frame_offset
-        self._frame_offset += take
-        if self._frame_offset == len(frame):
-            self._frame_index += 1
-            self._frame_offset = 0
-        return frame[start : start + take]
-
-    def seekable(self) -> bool:
-        return self._seekable
-
-    async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
-        if not self._seekable:
-            raise OSError("not seekable")
-        if offset != 0 or whence != os.SEEK_SET:
-            raise OSError("test reader only supports rewind")
-        self._frame_index = 0
-        self._frame_offset = 0
-        return 0
-
-    async def close(self) -> None:
-        pass
-
-
 class TestBinaryLiveMtime:
     async def test_initial_mtime_is_none_and_first_header_precedes_trailer(self):
         body = b"payload before its trailer"
         raw = _member(body, 123)
-        reader = _FramedAsyncReader(raw[:-8], raw[-8:])
+        reader = FramedAsyncReader(raw[:-8], raw[-8:])
 
         async with AsyncGzipBinaryFile(
             None, "rb", fileobj=reader, closefd=False, chunk_size=len(raw)
@@ -71,7 +34,7 @@ class TestBinaryLiveMtime:
     async def test_zero_mtime_is_not_confused_with_no_header(self):
         body = b"zero"
         raw = _member(body, 0)
-        reader = _FramedAsyncReader(raw)
+        reader = FramedAsyncReader(raw)
 
         async with AsyncGzipBinaryFile(
             None, "rb", fileobj=reader, closefd=False, chunk_size=len(raw)
@@ -83,7 +46,7 @@ class TestBinaryLiveMtime:
     async def test_concatenated_members_update_at_controlled_boundaries(self):
         body = b"same-sized member body"
         members = [_member(body, mtime) for mtime in (100, 200, 200)]
-        reader = _FramedAsyncReader(*members)
+        reader = FramedAsyncReader(*members)
 
         async with AsyncGzipBinaryFile(
             None,
@@ -103,7 +66,7 @@ class TestBinaryLiveMtime:
             _member(body, mtime)
             for body, mtime in zip(bodies, (11, 22, 33), strict=True)
         )
-        reader = _FramedAsyncReader(raw)
+        reader = FramedAsyncReader(raw)
 
         async with AsyncGzipBinaryFile(
             None, "rb", fileobj=reader, closefd=False, chunk_size=len(raw)
@@ -122,7 +85,7 @@ class TestBinaryLiveMtime:
             second = bytearray(_member(b"second member", 202))
             second[-8] ^= 0xFF
             second = bytes(second)
-        reader = _FramedAsyncReader(first, second)
+        reader = FramedAsyncReader(first, second)
 
         async with AsyncGzipBinaryFile(
             None,
@@ -148,7 +111,7 @@ class TestBinaryLiveMtime:
     async def test_invalid_or_incomplete_next_header_retains_prior_mtime(self, later):
         body = b"valid member"
         first = _member(body, 303)
-        reader = _FramedAsyncReader(first, later)
+        reader = FramedAsyncReader(first, later)
 
         async with AsyncGzipBinaryFile(
             None,
@@ -166,7 +129,7 @@ class TestBinaryLiveMtime:
     async def test_nul_padding_does_not_change_mtime(self):
         body = b"padded"
         raw = _member(body, 404)
-        reader = _FramedAsyncReader(raw, b"\x00" * 19)
+        reader = FramedAsyncReader(raw, b"\x00" * 19)
 
         async with AsyncGzipBinaryFile(
             None, "rb", fileobj=reader, closefd=False, chunk_size=len(raw)
@@ -179,7 +142,7 @@ class TestBinaryLiveMtime:
         body = b"fixed-size member"
         first = _member(body, 501)
         second = _member(body, 502)
-        reader = _FramedAsyncReader(first, second, seekable=seekable)
+        reader = FramedAsyncReader(first, second, seekable=seekable)
 
         async with AsyncGzipBinaryFile(
             None,
@@ -208,7 +171,7 @@ class TestBinaryLiveMtime:
     async def test_binary_read_surfaces_share_header_observation(self, method):
         body = b"line one\nline two\n"
         raw = _member(body, 606)
-        reader = _FramedAsyncReader(raw)
+        reader = FramedAsyncReader(raw)
 
         async with AsyncGzipBinaryFile(
             None, "rb", fileobj=reader, closefd=False, chunk_size=len(raw)
@@ -239,7 +202,7 @@ class TestBinaryLiveMtime:
         body = os.urandom(2 * threshold)
         raw = _member(body, 707)
         assert len(raw) > threshold
-        reader = _FramedAsyncReader(raw)
+        reader = FramedAsyncReader(raw)
         advanced = asyncio.Event()
         release = asyncio.Event()
 
@@ -277,7 +240,7 @@ class TestBinaryLiveMtime:
     ):
         threshold = _codec_async._DECODE_OFFLOAD_THRESHOLD
         incomplete = b"\x1f\x8b\x08\x08" + b"\x00" * 6 + b"x" * (threshold - 10)
-        reader = _FramedAsyncReader(incomplete)
+        reader = FramedAsyncReader(incomplete)
         started = asyncio.Event()
         release = asyncio.Event()
 
@@ -318,7 +281,7 @@ class TestTextLiveMtime:
         second_body = b"b" * 300_000
         first = _member(first_body, 0)
         second = _member(second_body, 802)
-        reader = _FramedAsyncReader(first, second)
+        reader = FramedAsyncReader(first, second)
 
         async with AsyncGzipTextFile(
             None,
@@ -340,7 +303,7 @@ class TestTextLiveMtime:
         body = b"x" * 300_000
         first = _member(body, 811)
         second = _member(body, 812)
-        reader = _FramedAsyncReader(first, second)
+        reader = FramedAsyncReader(first, second)
 
         async with AsyncGzipTextFile(
             None,
@@ -366,7 +329,7 @@ class TestTextLiveMtime:
             damaged = bytearray(_member(b"text", 821))
             damaged[-8] ^= 0xFF
             raw = bytes(damaged)
-        reader = _FramedAsyncReader(raw)
+        reader = FramedAsyncReader(raw)
 
         async with AsyncGzipTextFile(
             None, "rt", fileobj=reader, closefd=False, chunk_size=len(raw)

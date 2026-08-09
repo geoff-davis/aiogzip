@@ -392,20 +392,33 @@ class Sample:
 
 
 def _aggregate(name: str, category: str, samples: list[Sample]) -> dict[str, Any]:
-    durations = [sample.duration_seconds for sample in samples]
-    median = float(statistics.median(durations))
-    mad = float(statistics.median(abs(sample - median) for sample in durations))
+    summary = _aggregate_metrics(
+        [
+            {"duration_seconds": sample.duration_seconds, **sample.metrics}
+            for sample in samples
+        ]
+    )
     return {
         "name": name,
         "category": category,
         "status": "ok",
+        **summary,
+    }
+
+
+def _aggregate_metrics(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate timed metric dictionaries without dropping raw samples."""
+    durations = [float(sample["duration_seconds"]) for sample in samples]
+    median = float(statistics.median(durations))
+    mad = float(statistics.median(abs(sample - median) for sample in durations))
+    return {
         "duration_samples_seconds": durations,
         "median_seconds": median,
         "median_absolute_deviation_seconds": mad,
         "minimum_seconds": min(durations),
         "maximum_seconds": max(durations),
         "sample_count": len(samples),
-        "sample_metrics": [sample.metrics for sample in samples],
+        "sample_metrics": samples,
     }
 
 
@@ -416,6 +429,22 @@ def _unavailable(name: str, category: str, reason: str) -> dict[str, Any]:
         "status": "unavailable",
         "reason": reason,
     }
+
+
+def _verify_member_sample(
+    sample: Sample,
+    *,
+    expected_output_sha256: str,
+    expected_mtime: int,
+) -> None:
+    """Fail a members run when payload or live metadata is incorrect."""
+    if sample.metrics["output_sha256"] != expected_output_sha256:
+        raise AssertionError("many-member output mismatch")
+    if sample.metrics["mtime"] != expected_mtime:
+        raise AssertionError(
+            "many-member mtime mismatch: "
+            f"expected {expected_mtime}, observed {sample.metrics['mtime']}"
+        )
 
 
 async def _read_high_level(
@@ -707,6 +736,9 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
     if "members" in categories:
         for member_count in args.member_counts:
             wire, expected, expected_mtime = concatenated_fixture(member_count)
+            expected_observed_mtime = (
+                expected_mtime if args.members_mtime_policy == "last-header" else 0
+            )
             fixture_name = f"members-{member_count}"
             fixtures[fixture_name] = {
                 "generator_version": FIXTURE_GENERATOR_VERSION,
@@ -716,6 +748,8 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                 "expected_output_bytes": len(expected),
                 "expected_output_sha256": _sha256(expected),
                 "expected_final_mtime": expected_mtime,
+                "expected_observed_mtime": expected_observed_mtime,
+                "mtime_policy": args.members_mtime_policy,
             }
             samples = [
                 await _read_high_level(
@@ -727,9 +761,13 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                 )
                 for _ in range(args.repeat)
             ]
+            expected_output_sha256 = _sha256(expected)
             for sample in samples:
-                if sample.metrics["output_sha256"] != _sha256(expected):
-                    raise AssertionError("many-member output mismatch")
+                _verify_member_sample(
+                    sample,
+                    expected_output_sha256=expected_output_sha256,
+                    expected_mtime=expected_observed_mtime,
+                )
             results.append(
                 _aggregate(
                     f"high-level concatenated members {member_count}",
@@ -779,6 +817,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
             "fixture_sizes_mib": args.fixture_sizes_mib,
             "memory_fixture_size_mib": args.memory_fixture_size_mib,
             "member_counts": args.member_counts,
+            "members_mtime_policy": args.members_mtime_policy,
             "write_sizes": args.write_sizes,
             "total_write_bytes": args.total_write_bytes,
             "source_chunk_bytes": args.source_chunk_bytes,
@@ -828,6 +867,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated concatenated-member counts (default: 1,2,1001)",
     )
     parser.add_argument(
+        "--members-mtime-policy",
+        choices=("first-header", "last-header"),
+        default="last-header",
+        help=(
+            "expected high-level mtime contract: last-header for the a3 "
+            "candidate, first-header for historical a2 captures"
+        ),
+    )
+    parser.add_argument(
         "--memory-fixture-size-mib",
         type=_positive_int,
         default=32,
@@ -874,8 +922,9 @@ def main() -> int:
         parser.error("--repeat must be an odd integer of at least 5")
     if args.memory_repeat % 2 == 0:
         parser.error("--memory-repeat must be odd")
+    categories = tuple(item.strip() for item in args.categories.split(","))
     if (
-        "headers" in args.categories.split(",")
+        "headers" in categories
         and args.memory_fixture_size_mib not in args.fixture_sizes_mib
     ):
         parser.error("--memory-fixture-size-mib must appear in --fixture-sizes-mib")

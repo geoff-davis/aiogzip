@@ -23,43 +23,14 @@ from typing import Any
 
 from bench_a3_regressions import (
     _MIB,
+    SeekableMemorySource,
     _file_sha256,
+    _positive_int,
     collect_environment,
     combined_header_fixture,
     configure_source_root,
     optional_header_fixture,
 )
-
-
-class SeekableMemorySource:
-    """Bounded asynchronous source that never activates rewind caching."""
-
-    def __init__(self, data: bytes) -> None:
-        self.data = data
-        self.position = 0
-        self.read_calls = 0
-        self.max_requested = 0
-        self.max_returned = 0
-
-    def seekable(self) -> bool:
-        return True
-
-    async def read(self, size: int = -1) -> bytes:
-        self.read_calls += 1
-        self.max_requested = max(self.max_requested, size)
-        if size < 0:
-            size = len(self.data) - self.position
-        end = min(len(self.data), self.position + size)
-        result = self.data[self.position : end]
-        self.position = end
-        self.max_returned = max(self.max_returned, len(result))
-        return result
-
-    async def seek(self, offset: int, whence: int = 0) -> int:
-        if whence != 0 or offset < 0:
-            raise OSError("verification source only supports absolute seeks")
-        self.position = offset
-        return offset
 
 
 class NonSeekableMemorySource:
@@ -85,13 +56,6 @@ class NonSeekableMemorySource:
         return result
 
 
-def _positive_int(value: str) -> int:
-    parsed = int(value)
-    if parsed <= 0:
-        raise argparse.ArgumentTypeError("must be positive")
-    return parsed
-
-
 async def _expected_failure(
     aiogzip: Any,
     source: SeekableMemorySource | NonSeekableMemorySource,
@@ -114,52 +78,55 @@ async def _expected_failure(
     started = time.perf_counter()
     try:
         try:
-            await reader.read()
-        except (EOFError, OSError) as error:
-            failure = f"{type(error).__name__}: {error}"
-        else:
-            raise AssertionError("expected header failure was not raised")
-        duration = time.perf_counter() - started
-        if error_fragment not in failure:
-            raise AssertionError(
-                f"expected {error_fragment!r} in failure, observed {failure!r}"
-            )
-        cache_bytes = len(reader._compressed_cache)
-        cache_enabled = reader._cache_rewindable_reads
-        observed_mtime = reader.mtime
+            try:
+                await reader.read()
+            except (EOFError, OSError) as error:
+                failure = f"{type(error).__name__}: {error}"
+            else:
+                raise AssertionError("expected header failure was not raised")
+            duration = time.perf_counter() - started
+            if error_fragment not in failure:
+                raise AssertionError(
+                    f"expected {error_fragment!r} in failure, observed {failure!r}"
+                )
+            cache_bytes = len(reader._compressed_cache)
+            cache_enabled = reader._cache_rewindable_reads
+            observed_mtime = reader.mtime
+            if measure_memory:
+                current_before_close, peak = tracemalloc.get_traced_memory()
+            else:
+                current_before_close = peak = None
+        finally:
+            await reader.close()
+
+        del reader
+        gc.collect()
         if measure_memory:
-            current_before_close, peak = tracemalloc.get_traced_memory()
+            current_after_close_gc, final_peak = tracemalloc.get_traced_memory()
+            if final_peak != peak:
+                peak = final_peak
         else:
-            current_before_close = peak = None
+            current_after_close_gc = None
+
+        if source.max_returned > chunk_size:
+            raise AssertionError("source returned more bytes than requested")
+        return {
+            "duration_seconds": duration,
+            "failure": failure,
+            "mtime": observed_mtime,
+            "source_read_calls": source.read_calls,
+            "source_position": source.position,
+            "source_max_returned_bytes": source.max_returned,
+            "compressed_rewind_cache_bytes": cache_bytes,
+            "compressed_rewind_cache_enabled": cache_enabled,
+            "peak_python_bytes": peak,
+            "current_python_bytes_before_close": current_before_close,
+            "current_python_bytes_after_close_gc": current_after_close_gc,
+            "measurement_mode": "tracemalloc" if measure_memory else "wall_time",
+        }
     finally:
-        await reader.close()
-
-    del reader
-    gc.collect()
-    if measure_memory:
-        current_after_close_gc, final_peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-        if final_peak != peak:
-            peak = final_peak
-    else:
-        current_after_close_gc = None
-
-    if source.max_returned > chunk_size:
-        raise AssertionError("source returned more bytes than requested")
-    return {
-        "duration_seconds": duration,
-        "failure": failure,
-        "mtime": observed_mtime,
-        "source_read_calls": source.read_calls,
-        "source_position": source.position,
-        "source_max_returned_bytes": source.max_returned,
-        "compressed_rewind_cache_bytes": cache_bytes,
-        "compressed_rewind_cache_enabled": cache_enabled,
-        "peak_python_bytes": peak,
-        "current_python_bytes_before_close": current_before_close,
-        "current_python_bytes_after_close_gc": current_after_close_gc,
-        "measurement_mode": "tracemalloc" if measure_memory else "wall_time",
-    }
+        if measure_memory and tracemalloc.is_tracing():
+            tracemalloc.stop()
 
 
 async def _path_backed_samples(

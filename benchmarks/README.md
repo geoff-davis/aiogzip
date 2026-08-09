@@ -163,7 +163,10 @@ uv run --frozen python benchmarks/bench_a3_regressions.py \
 
 Use `--fixture-sizes-mib`, `--memory-fixture-size-mib`, `--member-counts`,
 `--write-sizes`, `--total-write-bytes`, and `--source-chunk-bytes` to select an
-explicitly recorded matrix. By default, tracemalloc is limited to the plan's
+explicitly recorded matrix. Members runs default to the a3
+`--members-mtime-policy last-header` contract; use `first-header` only for an
+explicitly identified historical a2 comparison whose wrapper retained the
+first header timestamp. By default, tracemalloc is limited to the plan's
 32 MiB incomplete FNAME/FCOMMENT allocation gates; the complete and larger
 cases remain ordinary wall-time measurements. Allocation peaks default to one
 sample via `--memory-repeat 1` because their durations are not used as timing

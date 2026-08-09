@@ -5,13 +5,14 @@ import gzip
 import hashlib
 import importlib
 import json
-import os
 import struct
 import sys
+import tracemalloc
 import zlib
 from pathlib import Path
 
 import pytest
+from conftest import FramedAsyncReader
 
 BENCHMARKS_DIR = Path(__file__).resolve().parents[1] / "benchmarks"
 sys.path.insert(0, str(BENCHMARKS_DIR))
@@ -21,6 +22,7 @@ bench_streaming = importlib.import_module("bench_streaming")
 bench_codec_regressions = importlib.import_module("bench_codec_regressions")
 bench_a3_regressions = importlib.import_module("bench_a3_regressions")
 verify_a3_writes = importlib.import_module("verify_a3_writes")
+verify_a3_headers = importlib.import_module("verify_a3_headers")
 BenchmarkResults = bench_common.BenchmarkResults
 COMPARISON_COMPRESSLEVEL = bench_common.COMPARISON_COMPRESSLEVEL
 DataGenerator = bench_common.DataGenerator
@@ -38,9 +40,13 @@ a3_combined_header_fixture = bench_a3_regressions.combined_header_fixture
 A3SeekableMemorySource = bench_a3_regressions.SeekableMemorySource
 a3_read_high_level = bench_a3_regressions._read_high_level
 a3_write_once = bench_a3_regressions._write_once
+a3_verify_member_sample = bench_a3_regressions._verify_member_sample
+A3Sample = bench_a3_regressions.Sample
 a3_concurrent_write_once = verify_a3_writes._concurrent_once
 a3_path_write_once = verify_a3_writes._path_once
 a3_allocation_write_once = verify_a3_writes._allocation_once
+a3_expected_header_failure = verify_a3_headers._expected_failure
+a3_expected_header_failure = verify_a3_headers._expected_failure
 
 
 def _result(name, duration, marker):
@@ -177,38 +183,6 @@ def test_a3_combined_header_fixture_has_expected_layout_and_valid_fhcrc():
     assert b"".join(decoder.feed(wire)) + b"".join(decoder.finish()) == expected
 
 
-class _A3FramedSource:
-    def __init__(self, *frames):
-        self.frames = tuple(frames)
-        self.frame_index = 0
-        self.frame_offset = 0
-        self.read_calls = 0
-
-    def seekable(self):
-        return True
-
-    async def read(self, size=-1):
-        self.read_calls += 1
-        if self.frame_index >= len(self.frames):
-            return b""
-        frame = self.frames[self.frame_index]
-        remaining = len(frame) - self.frame_offset
-        take = remaining if size < 0 else min(size, remaining)
-        start = self.frame_offset
-        self.frame_offset += take
-        if self.frame_offset == len(frame):
-            self.frame_index += 1
-            self.frame_offset = 0
-        return frame[start : start + take]
-
-    async def seek(self, offset, whence=os.SEEK_SET):
-        if offset != 0 or whence != os.SEEK_SET:
-            raise OSError("test source only supports rewind")
-        self.frame_index = 0
-        self.frame_offset = 0
-        return 0
-
-
 @pytest.mark.parametrize(
     "split_name",
     [
@@ -246,7 +220,7 @@ async def test_a3_high_level_combined_header_adversarial_splits(split_name):
         "fhcrc-1": landmarks["fhcrc_end"] - 1,
     }
     split = splits[split_name]
-    source = _A3FramedSource(wire[:split], wire[split:])
+    source = FramedAsyncReader(wire[:split], wire[split:])
 
     async with aiogzip.open(
         None,
@@ -266,7 +240,7 @@ async def test_a3_corrupt_fhcrc_is_rejected_before_mtime_commit():
     wire, _, landmarks = a3_combined_header_fixture(mtime=987654321)
     damaged = bytearray(wire)
     damaged[landmarks["fhcrc_end"] - 1] ^= 0xFF
-    source = _A3FramedSource(bytes(damaged))
+    source = FramedAsyncReader(bytes(damaged))
 
     async with aiogzip.open(
         None,
@@ -288,9 +262,9 @@ async def test_a3_incomplete_header_fails_only_when_source_reports_eof():
     eof_requested = asyncio.Event()
     release_eof = asyncio.Event()
 
-    class EofGateSource(_A3FramedSource):
+    class EofGateSource(FramedAsyncReader):
         async def read(self, size=-1):
-            if self.frame_index < len(self.frames):
+            if self._frame_index < len(self._frames):
                 return await super().read(size)
             eof_requested.set()
             await release_eof.wait()
@@ -327,7 +301,7 @@ async def test_a3_over_limit_header_does_not_commit_public_mtime(monkeypatch):
     monkeypatch.setattr(codec_module, "_MAX_CHUNK_SIZE", limit)
     fixed = b"\x1f\x8b\x08\x08" + struct.pack("<I", 777) + b"\x00\xff"
     wire = fixed + b"x" * (limit - len(fixed) + 1)
-    source = _A3FramedSource(wire[:limit], wire[limit:])
+    source = FramedAsyncReader(wire[:limit], wire[limit:])
 
     async with aiogzip.open(
         None,
@@ -489,6 +463,82 @@ async def test_a3_seekable_source_never_returns_more_than_requested():
     assert await source.seek(0) == 0
     assert await source.read(20) == b"0123456789"
     assert source.max_returned == 10
+
+
+def test_a3_members_gate_rejects_wrong_live_mtime():
+    sample = A3Sample(
+        0.1,
+        {
+            "output_sha256": "expected",
+            "mtime": 11,
+        },
+    )
+
+    with pytest.raises(AssertionError, match="many-member mtime mismatch"):
+        a3_verify_member_sample(
+            sample,
+            expected_output_sha256="expected",
+            expected_mtime=22,
+        )
+
+
+def test_a3_main_strips_categories_before_header_guard(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "bench_a3_regressions.py",
+            "--source-root",
+            str(BENCHMARKS_DIR.parent),
+            "--engine",
+            "stdlib",
+            "--categories",
+            " members, headers ",
+            "--fixture-sizes-mib",
+            "16,32",
+            "--memory-fixture-size-mib",
+            "64",
+            "--output",
+            str(tmp_path / "unused.json"),
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        bench_a3_regressions.main()
+
+
+@pytest.mark.asyncio
+async def test_a3_expected_failure_stops_tracemalloc_on_unexpected_success():
+    class SuccessfulReader:
+        _compressed_cache = b""
+        _cache_rewindable_reads = False
+        mtime = None
+
+        async def open(self):
+            return self
+
+        async def read(self):
+            return b"accepted"
+
+        async def close(self):
+            pass
+
+    class FakeAiogzip:
+        @staticmethod
+        def open(*args, **kwargs):
+            return SuccessfulReader()
+
+    source = A3SeekableMemorySource(b"not-used")
+    with pytest.raises(AssertionError, match="expected header failure"):
+        await a3_expected_header_failure(
+            FakeAiogzip,
+            source,
+            chunk_size=16,
+            error_fragment="truncated",
+            measure_memory=True,
+        )
+
+    assert not tracemalloc.is_tracing()
 
 
 def test_source_root_attestation_identifies_current_checkout():

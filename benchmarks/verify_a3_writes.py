@@ -9,7 +9,6 @@ import gc
 import gzip
 import hashlib
 import json
-import statistics
 import sys
 import tempfile
 import time
@@ -20,6 +19,7 @@ from typing import Any
 from bench_a3_regressions import (
     SCHEMA_VERSION,
     CountingMemorySink,
+    _aggregate_metrics,
     _csv_positive_ints,
     _file_sha256,
     _payload_for_write,
@@ -168,20 +168,6 @@ async def _allocation_once(
     }
 
 
-def _aggregate(samples: list[dict[str, Any]]) -> dict[str, Any]:
-    durations = [float(sample["duration_seconds"]) for sample in samples]
-    median = float(statistics.median(durations))
-    return {
-        "duration_samples_seconds": durations,
-        "median_seconds": median,
-        "median_absolute_deviation_seconds": float(
-            statistics.median(abs(sample - median) for sample in durations)
-        ),
-        "sample_count": len(samples),
-        "sample_metrics": samples,
-    }
-
-
 async def run(args: argparse.Namespace) -> dict[str, Any]:
     runner_root = Path(__file__).resolve().parents[1]
     aiogzip, identity = configure_source_root(args.source_root, args.engine)
@@ -200,8 +186,8 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                 )
                 for _ in range(args.repeat)
             ]
-            results[f"memory-{writer_count}-writers-{write_size}B"] = _aggregate(
-                samples
+            results[f"memory-{writer_count}-writers-{write_size}B"] = (
+                _aggregate_metrics(samples)
             )
 
     for write_size in args.path_write_sizes:
@@ -214,7 +200,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
             )
             for _ in range(args.repeat)
         ]
-        results[f"path-1-writer-{write_size}B"] = _aggregate(samples)
+        results[f"path-1-writer-{write_size}B"] = _aggregate_metrics(samples)
 
     for write_size in args.concurrent_write_sizes:
         results[f"allocation-1-writer-{write_size}B"] = await _allocation_once(
