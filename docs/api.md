@@ -45,6 +45,28 @@ await aiogzip.write("copy.bin.gz", data, mtime=0)
 Both helpers operate in binary mode and load the entire uncompressed payload
 into memory. Use `open()` for streaming large files.
 
+## Live member timestamps
+
+In read mode, `AsyncGzipBinaryFile.mtime` is `None` until the shared gzip
+parser completes the first valid member header. It then holds that header's
+32-bit timestamp. Each later valid header in a concatenated stream replaces
+the value, including repeated timestamps and zero.
+
+The property follows parser progress rather than only the bytes returned to
+the caller. If one compressed source chunk contains several members, decoder
+read-ahead can leave `mtime` at the last header in that chunk even when the
+current `read()` returned bytes from an earlier member. This means the exact
+point at which the property advances can depend on `chunk_size` and source read
+boundaries.
+
+A complete header updates `mtime` before its DEFLATE body or trailer is
+validated, so a later body, CRC, or ISIZE error does not roll the timestamp
+back. An invalid or incomplete header does not commit; a rejected first header
+therefore leaves `mtime=None`, while a rejected later header preserves the
+last valid value. After a rewind, the old value remains visible until a header
+is parsed again. `AsyncGzipTextFile.mtime` delegates to the same binary reader
+state.
+
 ## Synchronous codec
 
 Use `GzipEncoder` and `GzipDecoder` when an application owns a synchronous or

@@ -1943,12 +1943,12 @@ WP8 approved; production code frozen.
 
 #### Documentation tasks
 
-- [ ] Update `CHANGELOG.md` incrementally as behavior lands.
-- [ ] Document correct live `mtime` semantics for concatenated members and read-ahead.
-- [ ] Document that the file layer now uses the shared parser.
+- [x] Update `CHANGELOG.md` incrementally as behavior lands.
+- [x] Document correct live `mtime` semantics for concatenated members and read-ahead.
+- [x] Document that the file layer now uses the shared parser.
 - [ ] Update performance guidance with high-level optional-header evidence.
-- [ ] Add tiny-write guidance recommending `writelines()` or explicit batching.
-- [ ] State clearly whether the 10-byte diagnostic remains slower than `v1.11.0`.
+- [x] Add tiny-write guidance recommending `writelines()` or explicit batching.
+- [x] State clearly whether the 10-byte diagnostic remains slower than `v1.11.0`.
 - [ ] Link the direct-codec transport example.
 - [ ] Link the striped safe-upload example.
 - [ ] Explain staging and validation-at-completion.

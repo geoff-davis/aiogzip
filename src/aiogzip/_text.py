@@ -537,7 +537,7 @@ class AsyncGzipTextFile:
 
     @property
     def mtime(self) -> Optional[int]:
-        """Return the gzip member mtime after the header has been read."""
+        """Return the latest parsed member timestamp from the binary layer."""
         if self._binary_file is None:
             return None
         return self._binary_file.mtime

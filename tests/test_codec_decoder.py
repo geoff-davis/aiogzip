@@ -66,6 +66,10 @@ def test_header_notification_starts_empty_and_commits_at_fixed_header_boundary()
 
     assert decoder._header_generation == 0
     assert decoder._last_header_mtime is None
+    with pytest.raises(AttributeError):
+        decoder._header_generation = 1
+    with pytest.raises(AttributeError):
+        decoder._last_header_mtime = 1
     operation = decoder.feed(wire[:9])
     assert decoder._header_generation == 0
     assert list(operation) == []

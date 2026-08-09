@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Removed the binary reader's duplicate compatibility header parser. Live
+  `mtime` updates now come from the shared incremental gzip parser, avoiding a
+  second retained copy and repeated rescans of fragmented FNAME and FCOMMENT
+  fields.
+
+### Changed
+
+- `AsyncGzipBinaryFile.mtime` and `AsyncGzipTextFile.mtime` now follow the most
+  recently completed valid member header. On concatenated streams, read-ahead
+  can therefore advance `mtime` beyond the member containing the bytes returned
+  by the current read. Rewind preserves the last observed value until another
+  header is parsed; an invalid or incomplete later header does not invent a new
+  timestamp.
+
+### Performance
+
+- Reduced semantics-preserving per-call overhead for small binary writes. The
+  extreme 10-byte diagnostic improved over `2.0.0a2` but remains slower than
+  `v1.11.0`; use `writelines()` or explicit bounded batches when individual
+  per-record sink-failure boundaries are unnecessary.
+
 ## [2.0.0a2] - 2026-07-27
 
 ### Fixed

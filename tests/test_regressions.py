@@ -887,6 +887,7 @@ class TestMediumPriorityEdgeCases:
         """A write that lands exactly on the 4 GiB boundary is allowed."""
         async with AsyncGzipBinaryFile(temp_file, "wb", strict_size=True) as f:
             f._encoder._input_size = 0xFFFFFFFF - 3
+            f._position = f._encoder.input_size
             # Exactly three bytes leaves input_size == 0xFFFFFFFF, which
             # still fits the ISIZE field.
             await f.write(b"abc")
@@ -951,6 +952,7 @@ class TestMediumPriorityEdgeCases:
         match gzip.open() so we do not break existing callers."""
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             f._encoder._input_size = 0xFFFFFFFE
+            f._position = f._encoder.input_size
             # Should not raise.
             await f.write(b"abcdef")
 

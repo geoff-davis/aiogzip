@@ -278,6 +278,8 @@ class TestFileobjSupport:
         writer.release.set()
         assert await task == len(payload)
         assert await stream.tell() == len(payload)
+        assert stream._encoder is not None
+        assert await stream.tell() == stream._encoder.input_size
         await stream.close()
 
     async def test_flush_is_distinct_from_ordinary_small_write(self):

@@ -452,7 +452,12 @@ class AsyncGzipBinaryFile:
 
     @property
     def mtime(self) -> Optional[int]:
-        """Return the gzip member mtime after the header has been read."""
+        """Return the timestamp from the most recently parsed member header.
+
+        The value is ``None`` until the first complete valid header is read.
+        Decoder read-ahead can advance it beyond the bytes returned by the
+        current read call when concatenated members share one source chunk.
+        """
         return self._mtime
 
     def fileno(self) -> int:
@@ -880,14 +885,21 @@ class AsyncGzipBinaryFile:
                 # and must use the checkpointing async driver instead.
                 for compressed in operation:
                     await self._write_all(compressed)
+            committed_position = encoder.input_size
+            expected_position = self._position + length
+            if committed_position != expected_position:
+                raise RuntimeError(
+                    "gzip encoder input accounting diverged from file position "
+                    f"({committed_position} != {expected_position})"
+                )
         except BaseException:
             self._write_broken = True
             encoder.discard()
             raise
 
-        # The codec may account for input before yielding output. Expose the
-        # new file position only after every emitted byte reached the sink.
-        self._position += length
+        # The codec owns uncompressed-byte accounting. Expose its authoritative
+        # ledger only after every emitted byte reached the sink.
+        self._position = committed_position
 
         return length
 
