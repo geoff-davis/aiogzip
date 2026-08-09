@@ -138,9 +138,9 @@ Do not manufacture old-version measurements from prior prose. Run the exact harn
 
 After the first production-code change:
 
-- [ ] Never overwrite committed exact-tag baseline JSON.
-- [ ] Never rerun only the candidate after correcting a benchmark bug.
-- [ ] If the harness is wrong, fix it in a standalone benchmark commit, preserve the superseded files, and recapture baseline and candidate with the corrected identical harness.
+- [x] Never overwrite committed exact-tag baseline JSON.
+- [x] Never rerun only the candidate after correcting a benchmark bug.
+- [x] If the harness is wrong, fix it in a standalone benchmark commit, preserve the superseded files, and recapture baseline and candidate with the corrected identical harness.
 - [ ] Never change fixture sizes, fragmentation, write counts, thresholds, repeat counts, or formulas after seeing candidate results without explaining the change and recapturing all comparisons.
 - [ ] Never average a named regression away with unrelated wins.
 - [ ] Never describe a target as passed when the reference-machine baseline was not captured.
