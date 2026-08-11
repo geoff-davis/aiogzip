@@ -447,6 +447,17 @@ def _verify_member_sample(
         )
 
 
+def _verify_direct_sample(
+    sample: Sample,
+    *,
+    expected_output_sha256: str,
+    name: str,
+) -> None:
+    """Fail a direct-decoder header run when its payload is incorrect."""
+    if sample.metrics["output_sha256"] != expected_output_sha256:
+        raise AssertionError(f"direct decoder output mismatch for {name}")
+
+
 async def _read_high_level(
     aiogzip: Any,
     wire: bytes,
@@ -721,6 +732,13 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                             )
                             for _ in range(args.repeat)
                         ]
+                        expected_output_sha256 = _sha256(expected)
+                        for sample in samples:
+                            _verify_direct_sample(
+                                sample,
+                                expected_output_sha256=expected_output_sha256,
+                                name=direct_name,
+                            )
                         results.append(
                             _aggregate(direct_name, "headers-direct", samples)
                         )

@@ -41,6 +41,7 @@ A3SeekableMemorySource = bench_a3_regressions.SeekableMemorySource
 a3_read_high_level = bench_a3_regressions._read_high_level
 a3_write_once = bench_a3_regressions._write_once
 a3_verify_member_sample = bench_a3_regressions._verify_member_sample
+a3_verify_direct_sample = bench_a3_regressions._verify_direct_sample
 A3Sample = bench_a3_regressions.Sample
 a3_concurrent_write_once = verify_a3_writes._concurrent_once
 a3_path_write_once = verify_a3_writes._path_once
@@ -478,6 +479,23 @@ def test_a3_members_gate_rejects_wrong_live_mtime():
             sample,
             expected_output_sha256="expected",
             expected_mtime=22,
+        )
+
+
+def test_a3_direct_header_gate_rejects_wrong_output_digest():
+    sample = A3Sample(
+        0.1,
+        {
+            "output_sha256": "wrong",
+            "failure": None,
+        },
+    )
+
+    with pytest.raises(AssertionError, match="direct decoder output mismatch"):
+        a3_verify_direct_sample(
+            sample,
+            expected_output_sha256="expected",
+            name="direct fname complete throughput",
         )
 
 
