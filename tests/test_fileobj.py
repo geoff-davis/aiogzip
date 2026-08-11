@@ -317,7 +317,7 @@ class TestFileobjSupport:
 
         first = asyncio.create_task(stream.write(payload))
         await operation_released.wait()
-        with pytest.raises(RuntimeError, match="concurrent gzip writes"):
+        with pytest.raises(RuntimeError, match="active write or flush"):
             await stream.write(b"overlap")
         assert stream._write_broken is False
 
@@ -326,6 +326,43 @@ class TestFileobjSupport:
         assert await stream.write(b"after") == 5
         await stream.close()
         assert gzip.decompress(bytes(writer.buffer)) == payload + b"after"
+
+    async def test_write_during_underlying_flush_is_rejected_without_poisoning(self):
+        import asyncio
+
+        class BlockingFlushWriter:
+            def __init__(self):
+                self.buffer = bytearray()
+                self.flush_started = asyncio.Event()
+                self.release_flush = asyncio.Event()
+
+            async def write(self, data):
+                self.buffer.extend(data)
+                return len(data)
+
+            async def flush(self):
+                self.flush_started.set()
+                await self.release_flush.wait()
+
+            async def close(self):
+                pass
+
+        writer = BlockingFlushWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False, mtime=0)
+        await stream.open()
+        await stream.write(b"before flush")
+
+        flushing = asyncio.create_task(stream.flush())
+        await writer.flush_started.wait()
+        with pytest.raises(RuntimeError, match="active write or flush"):
+            await stream.write(b"overlap")
+        assert stream._write_broken is False
+
+        writer.release_flush.set()
+        await flushing
+        assert await stream.write(b" after flush") == 12
+        await stream.close()
+        assert gzip.decompress(bytes(writer.buffer)) == b"before flush after flush"
 
     async def test_flush_is_distinct_from_ordinary_small_write(self):
         class RecordingWriter:

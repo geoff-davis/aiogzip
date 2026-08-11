@@ -123,6 +123,7 @@ class AsyncGzipBinaryFile:
         "_underlying_seekable",
         "_max_rewind_cache_size",
         "_write_broken",
+        "_write_call_active",
         "_read_broken",
         "_read_validation_failed",
         "_max_decompressed_size",
@@ -223,6 +224,7 @@ class AsyncGzipBinaryFile:
         self._underlying_seekable: bool = True
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._write_broken: bool = False
+        self._write_call_active: bool = False
         self._read_broken: bool = False
         self._read_validation_failed: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
@@ -394,6 +396,13 @@ class AsyncGzipBinaryFile:
                     await self.write(chunk)
                     remaining -= len(chunk)
             return self._position
+
+        # A fresh decoder over the rewound source is the one supported recovery
+        # path for a poisoned reader. Other seeks cannot safely use state from
+        # the failed decoder, including relative seeks that happen to target 0.
+        if self._read_broken and whence == os.SEEK_SET and offset == 0:
+            await self._rewind_reader()
+            return 0
 
         self._check_read_usable()
 
@@ -873,45 +882,44 @@ class AsyncGzipBinaryFile:
         if encoder is None:
             raise RuntimeError("gzip writer encoder is not initialized")
 
-        # A handle belongs to one task at a time. Check the shared ledger
-        # before reserving this call so unsupported overlap in the narrow gap
-        # between codec completion and the prior task's position publication
-        # fails without reserving or poisoning the member.
-        input_size_before = encoder.input_size
-        position_before = self._position
-        if input_size_before != position_before:
-            raise RuntimeError(
-                "concurrent gzip writes observed an unpublished file position "
-                f"({input_size_before} != {position_before})"
-            )
-
-        # The writer already owns an exact snapshot. The private feed entry
-        # preserves call-time validation without normalizing it a second time.
-        operation = encoder._feed_snapshot(payload)
+        # A handle belongs to one task at a time. Keep the guard active through
+        # sink I/O and position publication, after the codec token is released;
+        # flush() uses the same guard for its underlying-file await.
+        if self._write_call_active:
+            raise RuntimeError("gzip writer already has an active write or flush call")
+        self._write_call_active = True
         try:
-            if length >= _ZLIB_OFFLOAD_THRESHOLD:
-                async for compressed in _drive_operation(
-                    operation,
-                    workload=payload,
-                ):
-                    await self._write_all(compressed)
-            else:
-                # Small writes bound the inline work by the caller's payload;
-                # a similarly small compressed read could expand enormously
-                # and must use the checkpointing async driver instead.
-                for compressed in operation:
-                    await self._write_all(compressed)
-            committed_position = input_size_before + length
-        except BaseException:
-            self._write_broken = True
-            encoder.discard()
-            raise
+            input_size_before = encoder.input_size
 
-        # The codec owns uncompressed-byte accounting. Expose its authoritative
-        # ledger only after every emitted byte reached the sink.
-        self._position = committed_position
+            # The writer already owns an exact snapshot. The private feed entry
+            # preserves call-time validation without normalizing it a second time.
+            operation = encoder._feed_snapshot(payload)
+            try:
+                if length >= _ZLIB_OFFLOAD_THRESHOLD:
+                    async for compressed in _drive_operation(
+                        operation,
+                        workload=payload,
+                    ):
+                        await self._write_all(compressed)
+                else:
+                    # Small writes bound the inline work by the caller's payload;
+                    # a similarly small compressed read could expand enormously
+                    # and must use the checkpointing async driver instead.
+                    for compressed in operation:
+                        await self._write_all(compressed)
+                committed_position = input_size_before + length
+            except BaseException:
+                self._write_broken = True
+                encoder.discard()
+                raise
 
-        return length
+            # The codec owns uncompressed-byte accounting. Expose its authoritative
+            # ledger only after every emitted byte reached the sink.
+            self._position = committed_position
+
+            return length
+        finally:
+            self._write_call_active = False
 
     @staticmethod
     def _coerce_byteslike(data: Any) -> bytes:
@@ -1076,30 +1084,21 @@ class AsyncGzipBinaryFile:
                     self._sync_decoder_mtime(decoder)
                 return pieces
             except asyncio.CancelledError:
-                self._read_broken = True
-                decoder.discard()
+                self._poison_read(decoder)
                 raise
             except gzip.BadGzipFile as error:
-                self._read_broken = True
-                self._read_validation_failed = True
-                decoder.discard()
+                self._poison_read(decoder, validation_failed=True)
                 raise gzip.BadGzipFile(_decompression_error_message(error)) from error
             except _engine.ZLIB_ERRORS as error:
-                self._read_broken = True
-                self._read_validation_failed = True
-                decoder.discard()
+                self._poison_read(decoder, validation_failed=True)
                 raise gzip.BadGzipFile(
                     f"Error finalizing gzip decompression: {error}"
                 ) from error
             except OSError:
-                self._read_broken = True
-                self._read_validation_failed = True
-                decoder.discard()
+                self._poison_read(decoder)
                 raise
             except Exception as error:
-                self._read_broken = True
-                self._read_validation_failed = True
-                decoder.discard()
+                self._poison_read(decoder)
                 raise OSError(
                     f"Unexpected error during decompression finalization: {error}"
                 ) from error
@@ -1121,14 +1120,16 @@ class AsyncGzipBinaryFile:
             # The driver waits for the executor worker to finish before it
             # closes the operation. Only then is it safe to discard the shared
             # decoder and expose cancellation to a caller that may reopen.
-            self._read_broken = True
-            decoder.discard()
+            self._poison_read(decoder)
             raise
         except gzip.BadGzipFile as error:
+            self._poison_read(decoder, validation_failed=True)
             raise gzip.BadGzipFile(_decompression_error_message(error)) from error
         except OSError:
+            self._poison_read(decoder)
             raise
         except Exception as error:
+            self._poison_read(decoder)
             raise OSError(f"Unexpected error during decompression: {error}") from error
 
     def _sync_decoder_mtime(self, decoder: GzipDecoder) -> None:
@@ -1139,13 +1140,27 @@ class AsyncGzipBinaryFile:
 
     def _check_read_usable(self, *, allow_buffered: bool = False) -> None:
         """Reject unsafe access, optionally allowing validated buffered bytes."""
-        buffered = len(self._buffer) - self._buffer_offset
-        can_salvage = self._read_validation_failed and allow_buffered and buffered > 0
-        if self._read_broken and not can_salvage:
-            raise OSError(
-                "read stream is broken after failed or cancelled decompression; "
-                "close and reopen the gzip file"
-            )
+        if not self._read_broken:
+            return
+        if self._read_validation_failed and allow_buffered:
+            if len(self._buffer) - self._buffer_offset > 0:
+                return
+        raise OSError(
+            "read stream is broken after failed or cancelled decompression; "
+            "seek to 0 to recover, or close and reopen the gzip file"
+        )
+
+    def _poison_read(
+        self,
+        decoder: GzipDecoder,
+        *,
+        validation_failed: bool = False,
+    ) -> None:
+        """Make a failed decoder terminal while retaining safe buffered output."""
+        self._read_broken = True
+        self._read_validation_failed = validation_failed
+        self._eof = True
+        decoder.discard()
 
     async def _fill_buffer(self) -> None:
         """Decompress the next compressed chunk into the read buffer.
@@ -1324,36 +1339,50 @@ class AsyncGzipBinaryFile:
             encoder = self._encoder
             if encoder is None:
                 raise RuntimeError("gzip writer encoder is not initialized")
-            operation = encoder.flush()
+            if self._write_call_active:
+                raise RuntimeError(
+                    "gzip writer already has an active write or flush call"
+                )
+            self._write_call_active = True
             try:
-                for flushed_data in operation:
-                    await self._write_all(flushed_data)
+                operation = encoder.flush()
+                try:
+                    for flushed_data in operation:
+                        await self._write_all(flushed_data)
 
-                # Also flush the underlying file if it has a flush method
-                flush_method = getattr(self._file, "flush", None)
-                if callable(flush_method):
-                    result = flush_method()
-                    if hasattr(result, "__await__"):
-                        await result
-            except asyncio.CancelledError:
-                self._write_broken = True
-                encoder.discard()
-                raise
-            except OSError as error:
-                self._write_broken = True
-                encoder.discard()
-                if str(error).startswith("Unexpected error during compression flush:"):
-                    detail = error.__cause__ if error.__cause__ is not None else error
-                    raise OSError(f"Unexpected error during flush: {detail}") from error
-                raise
-            except Exception as e:
-                self._write_broken = True
-                encoder.discard()
-                raise OSError(f"Unexpected error during flush: {e}") from e
-            except BaseException:
-                self._write_broken = True
-                encoder.discard()
-                raise
+                    # Also flush the underlying file if it has a flush method
+                    flush_method = getattr(self._file, "flush", None)
+                    if callable(flush_method):
+                        result = flush_method()
+                        if hasattr(result, "__await__"):
+                            await result
+                except asyncio.CancelledError:
+                    self._write_broken = True
+                    encoder.discard()
+                    raise
+                except OSError as error:
+                    self._write_broken = True
+                    encoder.discard()
+                    if str(error).startswith(
+                        "Unexpected error during compression flush:"
+                    ):
+                        detail = (
+                            error.__cause__ if error.__cause__ is not None else error
+                        )
+                        raise OSError(
+                            f"Unexpected error during flush: {detail}"
+                        ) from error
+                    raise
+                except Exception as e:
+                    self._write_broken = True
+                    encoder.discard()
+                    raise OSError(f"Unexpected error during flush: {e}") from e
+                except BaseException:
+                    self._write_broken = True
+                    encoder.discard()
+                    raise
+            finally:
+                self._write_call_active = False
 
     async def close(self) -> None:
         """Flushes any remaining compressed data and closes the file."""

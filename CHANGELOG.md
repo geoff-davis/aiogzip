@@ -10,11 +10,17 @@ All notable changes to this project will be documented in this file.
   `mtime` updates now come from the shared incremental gzip parser, avoiding a
   second retained copy and repeated rescans of fragmented FNAME and FCOMMENT
   fields.
-- A reader whose EOF validation fails is now poisoned consistently. Later
-  reads may still salvage bytes decoded before the failure, but once that
-  buffer is consumed, reads and seeks report that the handle must be closed
-  and reopened instead of returning clean EOF after a truncated or otherwise
-  invalid trailer.
+- A reader whose decompression or validation fails is now poisoned
+  consistently whether the error is detected while accepting input or at
+  underlying EOF. Integrity failures may still expose bytes decoded and
+  buffered before the failure; limits, cancellation, and unexpected internal
+  errors do not enable that salvage path. Once any safe buffer is consumed,
+  access reports the terminal failure instead of returning clean EOF. An
+  absolute `seek(0)` on a rewindable source recovers with a fresh decoder;
+  other seeks require closing and reopening the handle.
+- Concurrent `write()`/`flush()` calls on one handle are rejected before they
+  can reserve codec work or poison the gzip member, including the interval
+  while `flush()` awaits the underlying file.
 
 ### Changed
 
