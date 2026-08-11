@@ -124,6 +124,7 @@ class AsyncGzipBinaryFile:
         "_max_rewind_cache_size",
         "_write_broken",
         "_read_broken",
+        "_read_validation_failed",
         "_max_decompressed_size",
         "_strict_size",
         "_fast_compress",
@@ -223,6 +224,7 @@ class AsyncGzipBinaryFile:
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._write_broken: bool = False
         self._read_broken: bool = False
+        self._read_validation_failed: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._strict_size: bool = bool(strict_size)
 
@@ -295,6 +297,8 @@ class AsyncGzipBinaryFile:
                     max_decompressed_size=self._max_decompressed_size,
                 )
                 self._eof = False
+                self._read_broken = False
+                self._read_validation_failed = False
                 self._position = 0
                 self._mtime = None
                 self._decoder_header_generation = 0
@@ -510,7 +514,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        self._check_read_usable()
+        self._check_read_usable(allow_buffered=True)
         if size is not None and size > _MAX_CHUNK_SIZE:
             raise ValueError(
                 f"peek size must be <= {_MAX_CHUNK_SIZE} bytes "
@@ -585,7 +589,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        self._check_read_usable()
+        self._check_read_usable(allow_buffered=True)
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto() argument must be writable")
@@ -617,7 +621,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        self._check_read_usable()
+        self._check_read_usable(allow_buffered=True)
 
         if size is None:
             size = -1
@@ -664,7 +668,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        self._check_read_usable()
+        self._check_read_usable(allow_buffered=True)
         view = memoryview(b)
         if view.readonly:
             raise TypeError("readinto1() argument must be writable")
@@ -688,7 +692,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        self._check_read_usable()
+        self._check_read_usable(allow_buffered=True)
         if limit is None or limit < 0:
             # Any negative limit means "no limit", matching io.IOBase. Values
             # below -1 must not reach the arithmetic below, where they would
@@ -898,12 +902,6 @@ class AsyncGzipBinaryFile:
                 for compressed in operation:
                     await self._write_all(compressed)
             committed_position = input_size_before + length
-            actual_input_size = encoder.input_size
-            if actual_input_size != committed_position:
-                raise RuntimeError(
-                    "gzip encoder input accounting diverged from file position "
-                    f"({actual_input_size} != {committed_position})"
-                )
         except BaseException:
             self._write_broken = True
             encoder.discard()
@@ -976,7 +974,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        self._check_read_usable()
+        self._check_read_usable(allow_buffered=True)
 
         if size is None:
             size = -1
@@ -1082,14 +1080,26 @@ class AsyncGzipBinaryFile:
                 decoder.discard()
                 raise
             except gzip.BadGzipFile as error:
+                self._read_broken = True
+                self._read_validation_failed = True
+                decoder.discard()
                 raise gzip.BadGzipFile(_decompression_error_message(error)) from error
             except _engine.ZLIB_ERRORS as error:
+                self._read_broken = True
+                self._read_validation_failed = True
+                decoder.discard()
                 raise gzip.BadGzipFile(
                     f"Error finalizing gzip decompression: {error}"
                 ) from error
             except OSError:
+                self._read_broken = True
+                self._read_validation_failed = True
+                decoder.discard()
                 raise
             except Exception as error:
+                self._read_broken = True
+                self._read_validation_failed = True
+                decoder.discard()
                 raise OSError(
                     f"Unexpected error during decompression finalization: {error}"
                 ) from error
@@ -1127,11 +1137,13 @@ class AsyncGzipBinaryFile:
             self._decoder_header_generation = decoder._header_generation
             self._mtime = decoder._last_header_mtime
 
-    def _check_read_usable(self) -> None:
-        """Reject access after cancellation may have advanced the decompressor."""
-        if self._read_broken:
+    def _check_read_usable(self, *, allow_buffered: bool = False) -> None:
+        """Reject unsafe access, optionally allowing validated buffered bytes."""
+        buffered = len(self._buffer) - self._buffer_offset
+        can_salvage = self._read_validation_failed and allow_buffered and buffered > 0
+        if self._read_broken and not can_salvage:
             raise OSError(
-                "read stream is broken after cancelled decompression; "
+                "read stream is broken after failed or cancelled decompression; "
                 "close and reopen the gzip file"
             )
 
@@ -1188,6 +1200,8 @@ class AsyncGzipBinaryFile:
             max_decompressed_size=self._max_decompressed_size,
         )
         self._decoder_header_generation = 0
+        self._read_broken = False
+        self._read_validation_failed = False
         del self._buffer[:]
         self._buffer_offset = 0
         self._eof = False

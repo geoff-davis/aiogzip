@@ -10,6 +10,11 @@ All notable changes to this project will be documented in this file.
   `mtime` updates now come from the shared incremental gzip parser, avoiding a
   second retained copy and repeated rescans of fragmented FNAME and FCOMMENT
   fields.
+- A reader whose EOF validation fails is now poisoned consistently. Later
+  reads may still salvage bytes decoded before the failure, but once that
+  buffer is consumed, reads and seeks report that the handle must be closed
+  and reopened instead of returning clean EOF after a truncated or otherwise
+  invalid trailer.
 
 ### Changed
 

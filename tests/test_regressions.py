@@ -2,6 +2,7 @@
 # pyrefly: disable=all
 import io
 import os
+import zlib
 
 import pytest
 
@@ -59,10 +60,19 @@ class TestHighPriorityEdgeCases:
 
         await f.__aexit__(None, None, None)
 
-    async def test_decompression_finalization_error(self, temp_file):
+    @pytest.mark.parametrize(
+        ("error", "message"),
+        [
+            (zlib.error("Finalization error"), "Error finalizing gzip decompression"),
+            (OSError("Finalization I/O error"), "Finalization I/O error"),
+            (
+                RuntimeError("Unexpected finalization error"),
+                "Unexpected error during decompression finalization",
+            ),
+        ],
+    )
+    async def test_decompression_finalization_error(self, temp_file, error, message):
         """Test error handling when finalizing gzip decompression at EOF."""
-        import zlib
-
         # Write valid data
         async with AsyncGzipBinaryFile(temp_file, "wb") as f:
             await f.write(b"test data")
@@ -72,14 +82,17 @@ class TestHighPriorityEdgeCases:
 
         def fail_finish():
             def operation():
-                raise zlib.error("Finalization error")
+                raise error
                 yield b""  # pragma: no cover
 
             return operation()
 
         f._decoder.finish = fail_finish
 
-        with pytest.raises(OSError, match="Error finalizing gzip decompression"):
+        with pytest.raises(OSError, match=message):
+            await f.read()
+        assert f._read_broken is True
+        with pytest.raises(OSError, match="broken.*close and reopen"):
             await f.read()
 
         await f.__aexit__(None, None, None)
@@ -984,9 +997,16 @@ class TestMediumPriorityEdgeCases:
         with open(temp_file, "r+b") as fh:
             fh.truncate(size - 50)
 
-        with pytest.raises(_gzip.BadGzipFile):
-            async with AsyncGzipBinaryFile(temp_file, "rb") as gz:
+        async with AsyncGzipBinaryFile(temp_file, "rb") as gz:
+            with pytest.raises(_gzip.BadGzipFile):
                 await gz.read()
+            assert gz._read_broken is True
+            with pytest.raises(OSError, match="broken.*close and reopen"):
+                await gz.read()
+            with pytest.raises(OSError, match="broken.*close and reopen"):
+                await gz.peek(1)
+            with pytest.raises(OSError, match="broken.*close and reopen"):
+                await gz.seek(0)
 
     async def test_crc_is_masked_to_32_bits(self, temp_file):
         """The accumulated CRC must stay within the 32-bit range so that
