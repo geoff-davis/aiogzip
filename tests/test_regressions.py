@@ -1087,6 +1087,61 @@ class TestMediumPriorityEdgeCases:
             with pytest.raises(OSError, match="broken.*close and reopen"):
                 await stream.read(1)
 
+    @pytest.mark.parametrize("surface", ["readline", "readlines", "anext"])
+    async def test_line_read_failure_preserves_buffer_and_position(self, surface):
+        """All line-oriented entry points publish only a complete result."""
+        import gzip as _gzip
+
+        partial_line = b"partial line decoded before a corrupt trailer"
+        corrupt = bytearray(_gzip.compress(partial_line, mtime=1))
+        corrupt[-8] ^= 1
+        reader = FramedAsyncReader(bytes(corrupt[:-8]), bytes(corrupt[-8:]))
+
+        async with AsyncGzipBinaryFile(
+            None,
+            "rb",
+            fileobj=reader,
+            closefd=False,
+            chunk_size=len(corrupt),
+        ) as stream:
+            with pytest.raises(_gzip.BadGzipFile, match="CRC check failed"):
+                if surface == "readline":
+                    await stream.readline()
+                elif surface == "readlines":
+                    await stream.readlines()
+                else:
+                    await anext(stream)
+
+            assert await stream.tell() == 0
+            assert await stream.read() == partial_line
+            assert await stream.tell() == len(partial_line)
+
+    async def test_read_all_nonvalidation_poison_does_not_restore_dead_buffer(self):
+        """Unreachable bytes are not recopied after a terminal policy failure."""
+        import gzip as _gzip
+
+        first_body = b"within the cumulative limit"
+        first = _gzip.compress(first_body, mtime=1)
+        second = _gzip.compress(b"over the cumulative limit", mtime=2)
+        reader = FramedAsyncReader(first, second)
+
+        async with AsyncGzipBinaryFile(
+            None,
+            "rb",
+            fileobj=reader,
+            closefd=False,
+            chunk_size=max(len(first), len(second)),
+            max_decompressed_size=len(first_body),
+        ) as stream:
+            assert await stream.peek(1) == first_body[:1]
+            with pytest.raises(OSError, match="max_decompressed_size"):
+                await stream.read()
+
+            assert await stream.tell() == 0
+            assert len(stream._buffer) - stream._buffer_offset == 0
+            with pytest.raises(OSError, match="broken.*close and reopen"):
+                await stream.read()
+
     async def test_readline_does_not_turn_poisoned_remainder_into_clean_eof(self):
         """Only complete or explicitly bounded buffered lines are salvageable."""
         import gzip as _gzip

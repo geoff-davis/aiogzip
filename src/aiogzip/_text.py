@@ -18,7 +18,11 @@ from typing import (
     Union,
 )
 
-from ._binary import AsyncGzipBinaryFile
+from ._binary import (
+    AsyncGzipBinaryFile,
+    _ActiveReadCallError,
+    _ActiveWriteCallError,
+)
 from ._common import (
     _MAX_CHUNK_SIZE,
     WithAsyncRead,
@@ -341,7 +345,18 @@ class AsyncGzipTextFile:
         exc_tb: Optional[Any],
     ) -> None:
         """Exit the context manager, flushing and closing the file."""
-        await self.close()
+        try:
+            await self.close()
+        except (_ActiveReadCallError, _ActiveWriteCallError):
+            if exc_val is None:
+                raise
+            binary_file = self._binary_file
+            if binary_file is not None:
+                try:
+                    await binary_file._abort_active_call_on_exit()
+                except BaseException:
+                    pass
+                self._is_closed = binary_file.closed
 
     # Sync-protocol stubs. Without these, ``with`` / ``for`` fail with generic
     # "does not support the context manager protocol" / "is not iterable"
@@ -1635,12 +1650,15 @@ class AsyncGzipTextFile:
         if self._is_closed:
             return
 
-        # Mark as closed immediately to prevent concurrent close attempts
-        self._is_closed = True
-
         binary_file = self._binary_file
         if binary_file is None:
+            self._is_closed = True
             return
+
+        # Finalizing an incremental encoder mutates it. Reject an overlapping
+        # binary call before producing final bytes so a retry cannot lose them.
+        if self._writing_mode:
+            binary_file._check_write_call_available()
 
         encoder_failed = False
         try:
@@ -1659,3 +1677,7 @@ class AsyncGzipTextFile:
             except BaseException:
                 if not encoder_failed:
                     raise
+            finally:
+                # A preflight overlap leaves both layers open and retryable;
+                # terminal encoder/sink failures close both layers together.
+                self._is_closed = binary_file.closed

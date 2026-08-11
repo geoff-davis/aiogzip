@@ -378,6 +378,52 @@ class TestFileobjSupport:
         await stream.close()
         assert gzip.decompress(bytes(writer.buffer)) == b"before flush after flush"
 
+    async def test_overlapping_read_and_close_are_rejected_without_poisoning(self):
+        import asyncio
+
+        payload = b"one reader owns this gzip handle"
+
+        class BlockingReader:
+            def __init__(self, data):
+                self.buffer = io.BytesIO(data)
+                self.read_started = asyncio.Event()
+                self.release_read = asyncio.Event()
+                self.blocked = False
+
+            async def read(self, size=-1):
+                if not self.blocked:
+                    self.blocked = True
+                    self.read_started.set()
+                    await self.release_read.wait()
+                return self.buffer.read(size)
+
+            async def close(self):
+                pass
+
+        reader = BlockingReader(gzip.compress(payload, mtime=0))
+        stream = AsyncGzipBinaryFile(
+            None,
+            "rb",
+            fileobj=reader,
+            closefd=False,
+            chunk_size=1024,
+        )
+        await stream.open()
+
+        first = asyncio.create_task(stream.read(1))
+        await reader.read_started.wait()
+        with pytest.raises(OSError, match="active read call"):
+            await stream.read(1)
+        with pytest.raises(OSError, match="active read call"):
+            await stream.close()
+        assert stream.closed is False
+        assert stream._read_broken is False
+
+        reader.release_read.set()
+        assert await first == payload[:1]
+        assert await stream.read() == payload[1:]
+        await stream.close()
+
     async def test_flush_is_distinct_from_ordinary_small_write(self):
         class RecordingWriter:
             def __init__(self):
