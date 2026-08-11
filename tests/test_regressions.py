@@ -880,6 +880,7 @@ class TestMediumPriorityEdgeCases:
             # caller would have reached this via actual writes; simulating
             # it keeps the test cheap.
             f._encoder._input_size = 0xFFFFFFFF - 2
+            f._position = f._encoder.input_size
             with pytest.raises(OSError, match="4 GiB"):
                 await f.write(b"abcdef")
 

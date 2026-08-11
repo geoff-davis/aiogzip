@@ -149,9 +149,16 @@ async def _allocation_once(
     await writer.open()
     gc.collect()
     tracemalloc.start()
-    position = await _write_stream(writer, record, total_bytes)
-    current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+    try:
+        position = await _write_stream(writer, record, total_bytes)
+        current, peak = tracemalloc.get_traced_memory()
+    finally:
+        try:
+            if not writer.closed:
+                await writer.close()
+        finally:
+            if tracemalloc.is_tracing():
+                tracemalloc.stop()
 
     compressed = bytes(sink.output)
     if gzip.decompress(compressed) != expected:

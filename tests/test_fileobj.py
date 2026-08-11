@@ -282,6 +282,51 @@ class TestFileobjSupport:
         assert await stream.tell() == stream._encoder.input_size
         await stream.close()
 
+    async def test_overlapping_write_gap_is_rejected_without_poisoning(
+        self, monkeypatch
+    ):
+        import asyncio
+
+        import aiogzip._binary as binary_module
+
+        class BufferWriter:
+            def __init__(self):
+                self.buffer = bytearray()
+
+            async def write(self, data):
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                pass
+
+        operation_released = asyncio.Event()
+        publish_position = asyncio.Event()
+
+        async def controlled_drive(operation, **kwargs):
+            for piece in operation:
+                yield piece
+            operation_released.set()
+            await publish_position.wait()
+
+        monkeypatch.setattr(binary_module, "_drive_operation", controlled_drive)
+        payload = b"x" * (256 * 1024)
+        writer = BufferWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False, mtime=0)
+        await stream.open()
+
+        first = asyncio.create_task(stream.write(payload))
+        await operation_released.wait()
+        with pytest.raises(RuntimeError, match="concurrent gzip writes"):
+            await stream.write(b"overlap")
+        assert stream._write_broken is False
+
+        publish_position.set()
+        assert await first == len(payload)
+        assert await stream.write(b"after") == 5
+        await stream.close()
+        assert gzip.decompress(bytes(writer.buffer)) == payload + b"after"
+
     async def test_flush_is_distinct_from_ordinary_small_write(self):
         class RecordingWriter:
             def __init__(self):

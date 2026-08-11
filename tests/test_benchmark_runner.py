@@ -46,7 +46,6 @@ a3_concurrent_write_once = verify_a3_writes._concurrent_once
 a3_path_write_once = verify_a3_writes._path_once
 a3_allocation_write_once = verify_a3_writes._allocation_once
 a3_expected_header_failure = verify_a3_headers._expected_failure
-a3_expected_header_failure = verify_a3_headers._expected_failure
 
 
 def _result(name, duration, marker):
@@ -536,6 +535,26 @@ async def test_a3_expected_failure_stops_tracemalloc_on_unexpected_success():
             chunk_size=16,
             error_fragment="truncated",
             measure_memory=True,
+        )
+
+    assert not tracemalloc.is_tracing()
+
+
+@pytest.mark.asyncio
+async def test_a3_allocation_verifier_stops_tracemalloc_on_write_failure(monkeypatch):
+    import aiogzip
+
+    async def fail_write_stream(*args, **kwargs):
+        raise OSError("controlled allocation failure")
+
+    monkeypatch.setattr(verify_a3_writes, "_write_stream", fail_write_stream)
+
+    with pytest.raises(OSError, match="controlled allocation failure"):
+        await a3_allocation_write_once(
+            aiogzip,
+            write_size=10,
+            total_bytes=100,
+            fast_compress=False,
         )
 
     assert not tracemalloc.is_tracing()

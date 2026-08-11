@@ -869,6 +869,18 @@ class AsyncGzipBinaryFile:
         if encoder is None:
             raise RuntimeError("gzip writer encoder is not initialized")
 
+        # A handle belongs to one task at a time. Check the shared ledger
+        # before reserving this call so unsupported overlap in the narrow gap
+        # between codec completion and the prior task's position publication
+        # fails without reserving or poisoning the member.
+        input_size_before = encoder.input_size
+        position_before = self._position
+        if input_size_before != position_before:
+            raise RuntimeError(
+                "concurrent gzip writes observed an unpublished file position "
+                f"({input_size_before} != {position_before})"
+            )
+
         # The writer already owns an exact snapshot. The private feed entry
         # preserves call-time validation without normalizing it a second time.
         operation = encoder._feed_snapshot(payload)
@@ -885,12 +897,12 @@ class AsyncGzipBinaryFile:
                 # and must use the checkpointing async driver instead.
                 for compressed in operation:
                     await self._write_all(compressed)
-            committed_position = encoder.input_size
-            expected_position = self._position + length
-            if committed_position != expected_position:
+            committed_position = input_size_before + length
+            actual_input_size = encoder.input_size
+            if actual_input_size != committed_position:
                 raise RuntimeError(
                     "gzip encoder input accounting diverged from file position "
-                    f"({committed_position} != {expected_position})"
+                    f"({actual_input_size} != {committed_position})"
                 )
         except BaseException:
             self._write_broken = True
