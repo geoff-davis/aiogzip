@@ -13,14 +13,18 @@ All notable changes to this project will be documented in this file.
 - A reader whose decompression or validation fails is now poisoned
   consistently whether the error is detected while accepting input or at
   underlying EOF. Integrity failures may still expose bytes decoded and
-  buffered before the failure; limits, cancellation, and unexpected internal
-  errors do not enable that salvage path. Once any safe buffer is consumed,
-  access reports the terminal failure instead of returning clean EOF. An
-  absolute `seek(0)` on a rewindable source recovers with a fresh decoder;
-  other seeks require closing and reopening the handle.
-- Concurrent `write()`/`flush()` calls on one handle are rejected before they
-  can reserve codec work or poison the gzip member, including the interval
-  while `flush()` awaits the underlying file.
+  buffered before the failure. Those bytes are recovery data, not an integrity
+  guarantee: they may belong to a member whose later CRC/ISIZE check failed.
+  `read(-1)` preserves them and the prior position when a later source chunk
+  fails, while `readline()` does not turn an unterminated remainder into a
+  clean final line. Limits, cancellation, and unexpected internal errors do
+  not enable salvage. Once the buffer is consumed, access reports the terminal
+  failure instead of returning clean EOF. An absolute `seek(0)` on a rewindable
+  source recovers with a fresh decoder; non-rewindable sources recommend only
+  closing and reopening the handle.
+- Concurrent `write()`, `flush()`, and `close()` calls on one handle are
+  rejected before they can reserve or finalize codec work or poison the gzip
+  member, including sink and underlying-file awaits after codec completion.
 
 ### Changed
 

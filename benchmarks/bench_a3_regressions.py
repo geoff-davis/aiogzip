@@ -483,7 +483,7 @@ async def _read_high_level(
     try:
         try:
             output = await reader.read()
-        except (EOFError, OSError) as error:
+        except gzip.BadGzipFile as error:
             failure = f"{type(error).__name__}: {error}"
             if expect_complete:
                 raise
@@ -529,15 +529,15 @@ def _read_direct(
     failure: str | None = None
     started = time.perf_counter()
     try:
-        for offset in range(0, len(wire), chunk_size):
-            for piece in decoder.feed(wire[offset : offset + chunk_size]):
-                digest.update(piece)
-                output_bytes += len(piece)
         try:
+            for offset in range(0, len(wire), chunk_size):
+                for piece in decoder.feed(wire[offset : offset + chunk_size]):
+                    digest.update(piece)
+                    output_bytes += len(piece)
             for piece in decoder.finish():
                 digest.update(piece)
                 output_bytes += len(piece)
-        except (EOFError, OSError) as error:
+        except gzip.BadGzipFile as error:
             failure = f"{type(error).__name__}: {error}"
             if expect_complete:
                 raise

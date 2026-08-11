@@ -301,9 +301,13 @@ class TestFileobjSupport:
                 pass
 
         operation_released = asyncio.Event()
+        operation_reserved = asyncio.Event()
+        advance_operation = asyncio.Event()
         publish_position = asyncio.Event()
 
         async def controlled_drive(operation, **kwargs):
+            operation_reserved.set()
+            await advance_operation.wait()
             for piece in operation:
                 yield piece
             operation_released.set()
@@ -316,6 +320,13 @@ class TestFileobjSupport:
         await stream.open()
 
         first = asyncio.create_task(stream.write(payload))
+        await operation_reserved.wait()
+        with pytest.raises(RuntimeError, match="active write or flush"):
+            await stream.close()
+        assert stream.closed is False
+        assert stream._write_broken is False
+
+        advance_operation.set()
         await operation_released.wait()
         with pytest.raises(RuntimeError, match="active write or flush"):
             await stream.write(b"overlap")
@@ -356,6 +367,9 @@ class TestFileobjSupport:
         await writer.flush_started.wait()
         with pytest.raises(RuntimeError, match="active write or flush"):
             await stream.write(b"overlap")
+        with pytest.raises(RuntimeError, match="active write or flush"):
+            await stream.close()
+        assert stream.closed is False
         assert stream._write_broken is False
 
         writer.release_flush.set()

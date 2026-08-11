@@ -39,6 +39,7 @@ a3_header_fixture = bench_a3_regressions.optional_header_fixture
 a3_combined_header_fixture = bench_a3_regressions.combined_header_fixture
 A3SeekableMemorySource = bench_a3_regressions.SeekableMemorySource
 a3_read_high_level = bench_a3_regressions._read_high_level
+a3_read_direct = bench_a3_regressions._read_direct
 a3_write_once = bench_a3_regressions._write_once
 a3_verify_member_sample = bench_a3_regressions._verify_member_sample
 a3_verify_direct_sample = bench_a3_regressions._verify_direct_sample
@@ -393,6 +394,85 @@ async def test_a3_high_level_smoke_checks_complete_and_incomplete_headers():
     )
     assert complete_sample.metrics["source_max_returned_bytes"] <= 257
     assert incomplete_sample.metrics["failure"] is not None
+
+
+@pytest.mark.asyncio
+async def test_a3_high_level_incomplete_rejects_unexpected_oserror():
+    class WrongFailureReader:
+        mtime = None
+
+        async def open(self):
+            return self
+
+        async def read(self):
+            raise OSError("wrong failure class")
+
+        async def close(self):
+            pass
+
+    class FakeAiogzip:
+        @staticmethod
+        def open(*args, **kwargs):
+            return WrongFailureReader()
+
+    with pytest.raises(OSError, match="wrong failure class"):
+        await a3_read_high_level(
+            FakeAiogzip,
+            b"incomplete",
+            chunk_size=4,
+            expect_complete=False,
+            measure_memory=False,
+        )
+
+
+def test_a3_direct_incomplete_catches_feed_time_badgzipfile():
+    class FeedFailureDecoder:
+        def __init__(self, **kwargs):
+            self.discarded = False
+
+        def feed(self, data):
+            raise gzip.BadGzipFile("feed-time failure")
+
+        def finish(self):
+            raise AssertionError("finish must not run after feed failure")
+
+        def discard(self):
+            self.discarded = True
+
+    class FakeAiogzip:
+        GzipDecoder = FeedFailureDecoder
+
+    sample = a3_read_direct(
+        FakeAiogzip,
+        b"bad",
+        chunk_size=1,
+        expect_complete=False,
+    )
+
+    assert sample.metrics["failure"] == "BadGzipFile: feed-time failure"
+
+
+def test_a3_direct_incomplete_rejects_unexpected_oserror():
+    class WrongFailureDecoder:
+        def __init__(self, **kwargs):
+            pass
+
+        def feed(self, data):
+            raise OSError("wrong direct failure class")
+
+        def discard(self):
+            pass
+
+    class FakeAiogzip:
+        GzipDecoder = WrongFailureDecoder
+
+    with pytest.raises(OSError, match="wrong direct failure class"):
+        a3_read_direct(
+            FakeAiogzip,
+            b"bad",
+            chunk_size=1,
+            expect_complete=False,
+        )
 
 
 @pytest.mark.asyncio
