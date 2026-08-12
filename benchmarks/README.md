@@ -63,6 +63,7 @@ Practical use cases:
 
 - Read-only JSONL parsing from one identical fixture
 - Bounded-batch JSONL parsing with `readlines(1 MiB)`
+- Single-compressed-buffer `read1()` and `readinto1()` loops
 - JSON decoding and record validation with realistic data
 
 ### 6. 🛡️ Error Handling (`bench_errors.py`)
