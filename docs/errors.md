@@ -47,11 +47,15 @@ then retry the rejected operation. Because the exception subclasses
 `OSError`, existing general I/O handlers remain effective while callers that
 want to retry this case can catch it explicitly.
 
-On a clean `async with` exit, aiogzip waits for an in-flight call and then
-closes normally. If the context body is already raising, exit preserves that
-primary exception and aborts owned-resource cleanup. An active write or flush
-that resumes after this abort raises `OSError`; it never reports success for a
-gzip member that can no longer receive its trailer.
+On a clean `async with` exit, aiogzip waits until all calls from a looping
+producer finish and then closes normally. Concurrent close calls wait for the
+same binary or text finalization. If the context body is already raising, exit
+preserves that primary exception and attempts abortive owned-resource cleanup.
+An active read, write, or flush that resumes after this abort raises `OSError`;
+it never returns a truncated prefix or reports success for a gzip member that
+can no longer receive its trailer. Cancellation delivered during cleanup still
+propagates, and a failed abortive underlying close leaves the handle reportably
+open so `close()` can be retried.
 
 ## Telling the decompression cap apart from corruption
 

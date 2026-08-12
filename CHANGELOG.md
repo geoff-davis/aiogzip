@@ -28,13 +28,15 @@ All notable changes to this project will be documented in this file.
   failure instead of returning clean EOF. An absolute `seek(0)` on a rewindable
   source recovers with a fresh decoder; non-rewindable sources recommend only
   closing and reopening the handle.
-- Concurrent reads, seeks, writes, flushes, and closes on one handle are
+- Overlapping reads, seeks, writes, flushes, and closes on one handle are
   rejected before they can reserve or finalize codec work or poison the gzip
-  member. A clean context exit waits for an in-flight call before closing. If
-  an exceptional context exit aborts an active write or flush, that call now
-  raises instead of reporting success for an unterminated member. Concurrent
-  text closes are serialized through incremental-encoder and trailer
-  finalization.
+  member; concurrent close calls instead wait for the same finalization. A
+  clean context exit outwaits even a producer that immediately reserves the
+  handle again. If an exceptional context exit aborts an active read, write,
+  or flush, that call raises instead of returning truncated data or reporting
+  success for an unterminated member. Abort cleanup now propagates cancellation
+  and reports the handle closed only after its owned resource closes. Binary
+  and text closes are both serialized through their complete finalization.
 
 ### Changed
 

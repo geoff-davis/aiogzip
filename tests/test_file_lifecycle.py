@@ -284,6 +284,187 @@ class TestResourceCleanup:
         with pytest.raises(OSError, match="flush aborted"):
             await flush_task
 
+    @pytest.mark.parametrize(
+        "surface",
+        [
+            "read-all",
+            "read-sized",
+            "readinto",
+            "read1",
+            "readinto1",
+            "peek",
+            "readline",
+            "readlines",
+            "anext",
+            "seek-end",
+        ],
+    )
+    async def test_aborted_active_binary_read_never_publishes_success(self, surface):
+        import gzip
+        import io
+        import os
+
+        class CloseIgnoringReader:
+            def __init__(self, data):
+                self.buffer = io.BytesIO(data)
+                self.read_started = asyncio.Event()
+                self.release_read = asyncio.Event()
+                self.closed = False
+
+            async def read(self, size=-1):
+                self.read_started.set()
+                await self.release_read.wait()
+                return self.buffer.read(size)
+
+            async def close(self):
+                self.closed = True
+
+        payload = b"first line\nsecond line\n"
+        reader = CloseIgnoringReader(gzip.compress(payload, mtime=0))
+        stream = AsyncGzipBinaryFile(
+            None,
+            "rb",
+            fileobj=reader,
+            closefd=True,
+            chunk_size=1024,
+        )
+
+        async def run_surface():
+            if surface == "read-all":
+                return await stream.read()
+            if surface == "read-sized":
+                return await stream.read(len(payload))
+            if surface == "readinto":
+                return await stream.readinto(bytearray(len(payload)))
+            if surface == "read1":
+                return await stream.read1()
+            if surface == "readinto1":
+                return await stream.readinto1(bytearray(len(payload)))
+            if surface == "peek":
+                return await stream.peek(len(payload))
+            if surface == "readline":
+                return await stream.readline()
+            if surface == "readlines":
+                return await stream.readlines()
+            if surface == "anext":
+                return await anext(stream)
+            if surface == "seek-end":
+                return await stream.seek(0, os.SEEK_END)
+            raise AssertionError(f"unknown surface: {surface}")
+
+        read_task = None
+        with pytest.raises(ValueError, match="body failure"):
+            async with stream:
+                read_task = asyncio.create_task(run_surface())
+                await reader.read_started.wait()
+                raise ValueError("body failure")
+
+        assert stream.closed is True
+        assert reader.closed is True
+        assert read_task is not None
+        reader.release_read.set()
+        with pytest.raises(OSError, match="read aborted"):
+            await read_task
+        assert stream._position == 0
+
+    @pytest.mark.parametrize("surface", ["read", "readline", "readlines", "anext"])
+    async def test_aborted_active_text_read_never_publishes_success(self, surface):
+        import gzip
+        import io
+
+        class CloseIgnoringReader:
+            def __init__(self, data):
+                self.buffer = io.BytesIO(data)
+                self.read_started = asyncio.Event()
+                self.release_read = asyncio.Event()
+
+            async def read(self, size=-1):
+                self.read_started.set()
+                await self.release_read.wait()
+                return self.buffer.read(size)
+
+            async def close(self):
+                pass
+
+        reader = CloseIgnoringReader(gzip.compress(b"first\nsecond\n", mtime=0))
+        stream = AsyncGzipTextFile(
+            None,
+            "rt",
+            fileobj=reader,
+            closefd=True,
+            chunk_size=1024,
+        )
+
+        async def run_surface():
+            if surface == "read":
+                return await stream.read()
+            if surface == "readline":
+                return await stream.readline()
+            if surface == "readlines":
+                return await stream.readlines()
+            if surface == "anext":
+                return await anext(stream)
+            raise AssertionError(f"unknown surface: {surface}")
+
+        read_task = None
+        with pytest.raises(ValueError, match="body failure"):
+            async with stream:
+                read_task = asyncio.create_task(run_surface())
+                await reader.read_started.wait()
+                raise ValueError("body failure")
+
+        assert stream.closed is True
+        assert stream.buffer.closed is True
+        assert read_task is not None
+        reader.release_read.set()
+        with pytest.raises(OSError, match="read aborted"):
+            await read_task
+
+    async def test_aborted_rewind_seek_never_publishes_success(self):
+        import gzip
+        import io
+
+        class SeekBlockingReader:
+            def __init__(self, data):
+                self.buffer = io.BytesIO(data)
+                self.seek_started = asyncio.Event()
+                self.release_seek = asyncio.Event()
+
+            async def read(self, size=-1):
+                return self.buffer.read(size)
+
+            async def seek(self, offset, whence=0):
+                self.seek_started.set()
+                await self.release_seek.wait()
+                return self.buffer.seek(offset, whence)
+
+            async def seekable(self):
+                return True
+
+            async def close(self):
+                pass
+
+        reader = SeekBlockingReader(gzip.compress(b"rewind payload", mtime=0))
+        stream = AsyncGzipBinaryFile(
+            None,
+            "rb",
+            fileobj=reader,
+            closefd=True,
+            chunk_size=1024,
+        )
+        seek_task = None
+        with pytest.raises(ValueError, match="body failure"):
+            async with stream:
+                assert await stream.read(4) == b"rewi"
+                seek_task = asyncio.create_task(stream.seek(0))
+                await reader.seek_started.wait()
+                raise ValueError("body failure")
+
+        assert seek_task is not None
+        reader.release_seek.set()
+        with pytest.raises(OSError, match="read aborted"):
+            await seek_task
+
     async def test_clean_binary_context_exit_waits_for_active_write_and_closes(self):
         import gzip
         import os
@@ -321,6 +502,195 @@ class TestResourceCleanup:
         assert stream.closed is True
         assert writer.closed is True
         assert gzip.decompress(bytes(writer.buffer)) == payload
+
+    @pytest.mark.parametrize("text_mode", [False, True])
+    async def test_clean_context_exit_outwaits_a_looping_producer(
+        self, monkeypatch, text_mode
+    ):
+        import gzip
+
+        import aiogzip._binary as binary_module
+
+        class BufferWriter:
+            def __init__(self):
+                self.buffer = bytearray()
+                self.closed = False
+
+            async def write(self, data):
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                self.closed = True
+
+        call_started = asyncio.Queue()
+        release_call = asyncio.Queue()
+
+        async def controlled_drive(operation, **kwargs):
+            for piece in operation:
+                yield piece
+            call_started.put_nowait(None)
+            await release_call.get()
+
+        monkeypatch.setattr(binary_module, "_drive_operation", controlled_drive)
+        writer = BufferWriter()
+        if text_mode:
+            stream = AsyncGzipTextFile(
+                None,
+                "wt",
+                encoding="latin-1",
+                fileobj=writer,
+                closefd=True,
+                mtime=0,
+            )
+            payload = "x" * (256 * 1024)
+            expected = payload.encode("latin-1") * 3
+        else:
+            stream = AsyncGzipBinaryFile(
+                None,
+                "wb",
+                fileobj=writer,
+                closefd=True,
+                mtime=0,
+            )
+            payload = b"x" * (256 * 1024)
+            expected = payload * 3
+
+        async def produce():
+            for _ in range(3):
+                assert await stream.write(payload) == len(payload)
+
+        async def release_all_calls():
+            release_call.put_nowait(None)
+            for _ in range(2):
+                await call_started.get()
+                release_call.put_nowait(None)
+
+        producer = None
+        releaser = None
+        async with stream:
+            producer = asyncio.create_task(produce())
+            await call_started.get()
+            releaser = asyncio.create_task(release_all_calls())
+
+        assert producer is not None
+        assert releaser is not None
+        await asyncio.gather(producer, releaser)
+        assert stream.closed is True
+        assert writer.closed is True
+        assert gzip.decompress(bytes(writer.buffer)) == expected
+
+    async def test_abort_cleanup_cancellation_propagates_and_remains_retryable(self):
+        import gzip
+        import io
+
+        class CancellableCloseReader:
+            def __init__(self, data):
+                self.buffer = io.BytesIO(data)
+                self.read_started = asyncio.Event()
+                self.release_read = asyncio.Event()
+                self.close_started = asyncio.Event()
+                self.close_calls = 0
+                self.closed = False
+
+            async def read(self, size=-1):
+                self.read_started.set()
+                await self.release_read.wait()
+                return self.buffer.read(size)
+
+            async def close(self):
+                self.close_calls += 1
+                if self.close_calls == 1:
+                    self.close_started.set()
+                    await asyncio.Event().wait()
+                self.closed = True
+
+        reader = CancellableCloseReader(gzip.compress(b"payload", mtime=0))
+        stream = AsyncGzipBinaryFile(
+            None,
+            "rb",
+            fileobj=reader,
+            closefd=True,
+            chunk_size=1024,
+        )
+        read_task = None
+
+        async def use_stream():
+            nonlocal read_task
+            async with stream:
+                read_task = asyncio.create_task(stream.read())
+                await reader.read_started.wait()
+                raise ValueError("body failure")
+
+        context_task = asyncio.create_task(use_stream())
+        await reader.close_started.wait()
+        context_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await context_task
+
+        assert stream.closed is False
+        assert reader.closed is False
+        assert read_task is not None
+        reader.release_read.set()
+        with pytest.raises(OSError, match="read aborted"):
+            await read_task
+
+        await stream.close()
+        assert stream.closed is True
+        assert reader.closed is True
+        assert reader.close_calls == 2
+
+    async def test_failed_abort_close_preserves_body_error_and_open_state(self):
+        import gzip
+        import io
+
+        class RetryableCloseReader:
+            def __init__(self, data):
+                self.buffer = io.BytesIO(data)
+                self.read_started = asyncio.Event()
+                self.release_read = asyncio.Event()
+                self.close_calls = 0
+                self.closed = False
+
+            async def read(self, size=-1):
+                self.read_started.set()
+                await self.release_read.wait()
+                return self.buffer.read(size)
+
+            async def close(self):
+                self.close_calls += 1
+                if self.close_calls == 1:
+                    raise OSError("close failed")
+                self.closed = True
+
+        reader = RetryableCloseReader(gzip.compress(b"payload", mtime=0))
+        stream = AsyncGzipTextFile(
+            None,
+            "rt",
+            fileobj=reader,
+            closefd=True,
+            chunk_size=1024,
+        )
+        read_task = None
+        with pytest.raises(ValueError, match="body failure"):
+            async with stream:
+                read_task = asyncio.create_task(stream.read())
+                await reader.read_started.wait()
+                raise ValueError("body failure")
+
+        assert stream.closed is False
+        assert stream.buffer.closed is False
+        assert reader.closed is False
+        assert read_task is not None
+        reader.release_read.set()
+        with pytest.raises(OSError, match="read aborted"):
+            await read_task
+
+        await stream.close()
+        assert stream.closed is True
+        assert stream.buffer.closed is True
+        assert reader.closed is True
+        assert reader.close_calls == 2
 
     async def test_text_close_is_retryable_during_active_binary_write(self):
         import gzip
@@ -459,6 +829,49 @@ class TestResourceCleanup:
         assert stream.closed is True
         assert gzip.decompress(bytes(writer.buffer)) == b"payload"
 
+    async def test_concurrent_binary_close_waits_through_trailer_write(self):
+        import gzip
+
+        class BlockingTrailerWriter:
+            def __init__(self):
+                self.calls = 0
+                self.buffer = bytearray()
+                self.trailer_started = asyncio.Event()
+                self.release_trailer = asyncio.Event()
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls > 1:
+                    self.trailer_started.set()
+                    await self.release_trailer.wait()
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                pass
+
+        writer = BlockingTrailerWriter()
+        stream = AsyncGzipBinaryFile(
+            None,
+            "wb",
+            fileobj=writer,
+            closefd=False,
+            mtime=0,
+        )
+        await stream.open()
+        await stream.write(b"payload")
+
+        first_close = asyncio.create_task(stream.close())
+        await writer.trailer_started.wait()
+        second_close = asyncio.create_task(stream.close())
+        await asyncio.sleep(0)
+        assert second_close.done() is False
+
+        writer.release_trailer.set()
+        await asyncio.gather(first_close, second_close)
+        assert stream.closed is True
+        assert gzip.decompress(bytes(writer.buffer)) == b"payload"
+
     async def test_operations_after_close_raise_errors(self, temp_file):
         f = AsyncGzipBinaryFile(temp_file, "wb")
         async with f:
@@ -540,7 +953,8 @@ class TestResourceCleanup:
         f = AsyncGzipTextFile(p, "rt", encoding="utf-8", chunk_size=1)
         async with f:
             assert await f.read(1) == "a"
-        assert f._is_closed is True
+        assert f.closed is True
+        assert f.buffer.closed is True
 
 
 class TestOpenCloseLifecycle:

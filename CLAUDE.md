@@ -234,5 +234,5 @@ Always include:
 
 ---
 
-**Last Updated:** 2026-08-11
+**Last Updated:** 2026-08-12
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!

@@ -303,7 +303,7 @@ class AsyncGzipTextFile:
             ValueError: if the file is already open, or has already been closed
                 (a closed instance cannot be reopened, matching io objects).
         """
-        _check_can_open(self._is_closed, self._binary_file is not None)
+        _check_can_open(self.closed, self._binary_file is not None)
         filename = os.fspath(self._filename) if self._filename is not None else None
         self._binary_file = AsyncGzipBinaryFile(
             filename=filename,
@@ -344,22 +344,30 @@ class AsyncGzipTextFile:
         exc_tb: Optional[Any],
     ) -> None:
         """Exit the context manager, flushing and closing the file."""
+        if exc_val is None:
+            while True:
+                try:
+                    await self.close()
+                    return
+                except ConcurrentOperationError:
+                    binary_file = self._binary_file
+                    if (
+                        binary_file is None
+                        or not await binary_file._wait_for_active_call()
+                    ):
+                        raise
+
         try:
             await self.close()
         except ConcurrentOperationError:
-            if exc_val is None:
-                binary_file = self._binary_file
-                if binary_file is not None:
-                    await binary_file._wait_for_active_call()
-                await self.close()
-                return
             binary_file = self._binary_file
             if binary_file is not None:
                 try:
                     await binary_file._abort_active_call_on_exit()
-                except BaseException:
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
                     pass
-                self._is_closed = binary_file.closed
 
     # Sync-protocol stubs. Without these, ``with`` / ``for`` fail with generic
     # "does not support the context manager protocol" / "is not iterable"
@@ -394,7 +402,7 @@ class AsyncGzipTextFile:
 
     # File API compatibility helpers
     async def tell(self) -> int:
-        if self._is_closed:
+        if self.closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
@@ -424,7 +432,7 @@ class AsyncGzipTextFile:
         )
 
     async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
-        if self._is_closed:
+        if self.closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
@@ -516,6 +524,8 @@ class AsyncGzipTextFile:
     @property
     def closed(self) -> bool:
         """Return True when this file has been closed."""
+        if self._binary_file is not None:
+            return self._binary_file.closed
         return self._is_closed
 
     @property
@@ -584,7 +594,7 @@ class AsyncGzipTextFile:
         """
         if not self._writing_mode:
             raise OSError("File not open for writing")
-        if self._is_closed:
+        if self.closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
@@ -957,7 +967,7 @@ class AsyncGzipTextFile:
         """
         if self._mode_op != "r":
             raise OSError("File not open for reading")
-        if self._is_closed:
+        if self.closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
@@ -1363,7 +1373,7 @@ class AsyncGzipTextFile:
 
     async def __anext__(self) -> str:
         """Return the next line from the file."""
-        if self._is_closed:
+        if self.closed:
             raise StopAsyncIteration
 
         if self._line_term is not None:
@@ -1420,7 +1430,7 @@ class AsyncGzipTextFile:
                     print(line.rstrip())
                     line = await f.readline()
         """
-        if self._is_closed:
+        if self.closed:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
@@ -1495,7 +1505,7 @@ class AsyncGzipTextFile:
             async with AsyncGzipTextFile("file.gz", "rt") as f:
                 lines = await f.readlines(1024)  # Read ~1KB of lines
         """
-        if self._is_closed:
+        if self.closed:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
@@ -1587,7 +1597,7 @@ class AsyncGzipTextFile:
         """
         if not self._writing_mode:
             raise OSError("File not open for writing")
-        if self._is_closed:
+        if self.closed:
             raise ValueError("I/O operation on closed file.")
 
         pending: List[str] = []
@@ -1642,7 +1652,7 @@ class AsyncGzipTextFile:
                 await f.flush()  # Ensure data is written
                 await f.write(" World")
         """
-        if self._is_closed:
+        if self.closed:
             raise ValueError("I/O operation on closed file.")
 
         if self._binary_file is not None:
@@ -1655,7 +1665,7 @@ class AsyncGzipTextFile:
         # close cannot finalize the same encoder while the first awaits its
         # trailer write.
         async with self._close_lock:
-            if self._is_closed:
+            if self.closed:
                 return
 
             binary_file = self._binary_file
@@ -1682,10 +1692,8 @@ class AsyncGzipTextFile:
             finally:
                 try:
                     await binary_file.close()
+                except asyncio.CancelledError:
+                    raise
                 except BaseException:
                     if not encoder_failed:
                         raise
-                finally:
-                    # A preflight overlap leaves both layers open and retryable;
-                    # terminal encoder/sink failures close both layers together.
-                    self._is_closed = binary_file.closed

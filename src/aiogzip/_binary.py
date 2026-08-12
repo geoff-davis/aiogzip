@@ -134,6 +134,7 @@ class AsyncGzipBinaryFile:
         "_write_call_active",
         "_read_call_active",
         "_active_call_waiter",
+        "_close_lock",
         "_read_broken",
         "_read_validation_failed",
         "_max_decompressed_size",
@@ -237,6 +238,7 @@ class AsyncGzipBinaryFile:
         self._write_call_active: bool = False
         self._read_call_active: bool = False
         self._active_call_waiter: Optional[asyncio.Future[None]] = None
+        self._close_lock = asyncio.Lock()
         self._read_broken: bool = False
         self._read_validation_failed: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
@@ -341,22 +343,32 @@ class AsyncGzipBinaryFile:
         exc_tb: Optional[Any],
     ) -> None:
         """Exit the context manager, flushing and closing the file."""
+        if exc_val is None:
+            # A producer can reserve the handle again before this task resumes
+            # from its completion future. Keep retrying until normal close owns
+            # a genuinely idle handle; an infinite producer naturally keeps the
+            # clean exit pending rather than leaking the resource.
+            while True:
+                try:
+                    await self.close()
+                    return
+                except ConcurrentOperationError:
+                    if not await self._wait_for_active_call():
+                        raise
+
         try:
             await self.close()
         except ConcurrentOperationError:
-            if exc_val is None:
-                # A clean context exit owns normal finalization. Wait for the
-                # spawned call that still owns this handle, then close it here
-                # rather than leaking an open file and unterminated member.
-                await self._wait_for_active_call()
-                await self.close()
-                return
             # A task spawned from the body may still own the codec. Preserve
             # the body's exception and close resources without discarding the
             # live operation underneath that task.
             try:
                 await self._abort_active_call_on_exit()
-            except BaseException:
+            except asyncio.CancelledError:
+                # Cancellation delivered during cleanup is the current task's
+                # control flow (timeout/TaskGroup), not a secondary close error.
+                raise
+            except Exception:
                 # As in close()'s failed-write path, the primary exception wins
                 # after the underlying close has at least been attempted.
                 pass
@@ -431,6 +443,7 @@ class AsyncGzipBinaryFile:
         if self._read_call_active:
             self._check_read_call_usable()
 
+        position_before = self._position
         self._read_call_active = True
         try:
             # A fresh decoder over the rewound source is the one supported
@@ -439,6 +452,7 @@ class AsyncGzipBinaryFile:
             # happen to target 0.
             if self._read_broken and whence == os.SEEK_SET and offset == 0:
                 await self._rewind_reader()
+                self._check_read_call_not_aborted()
                 return 0
 
             self._check_read_usable()
@@ -471,7 +485,14 @@ class AsyncGzipBinaryFile:
                 await self._rewind_reader()
 
             await self._consume_bytes(target - self._position)
+            self._check_read_call_not_aborted()
             return self._position
+        except BaseException:
+            if self._is_closed or (
+                self._read_broken and not self._read_validation_failed
+            ):
+                self._position = position_before
+            raise
         finally:
             self._finish_read_call()
 
@@ -581,6 +602,7 @@ class AsyncGzipBinaryFile:
                     available = len(self._buffer) - self._buffer_offset
                     if available == 0 and self._eof:
                         break
+                self._check_read_call_not_aborted()
             finally:
                 self._finish_read_call()
         end = self._buffer_offset + min(target, available)
@@ -628,6 +650,16 @@ class AsyncGzipBinaryFile:
                 self._buffer_offset = 0
             await self._fill_buffer()
             available = len(self._buffer) - self._buffer_offset
+        self._check_read_call_not_aborted()
+        return available
+
+    async def _fill_one_buffer(self) -> int:
+        """Fill until at least one decoded byte is available, or clean EOF."""
+        available = len(self._buffer) - self._buffer_offset
+        while available <= 0 and not self._eof:
+            await self._fill_buffer()
+            available = len(self._buffer) - self._buffer_offset
+        self._check_read_call_not_aborted()
         return available
 
     async def readinto(self, b: Union[bytearray, memoryview]) -> int:
@@ -692,9 +724,7 @@ class AsyncGzipBinaryFile:
         if available <= 0 and not self._eof:
             self._read_call_active = True
             try:
-                while available <= 0 and not self._eof:
-                    await self._fill_buffer()
-                    available = len(self._buffer) - self._buffer_offset
+                available = await self._fill_one_buffer()
             finally:
                 self._finish_read_call()
 
@@ -748,9 +778,7 @@ class AsyncGzipBinaryFile:
         if available <= 0 and not self._eof:
             self._read_call_active = True
             try:
-                while available <= 0 and not self._eof:
-                    await self._fill_buffer()
-                    available = len(self._buffer) - self._buffer_offset
+                await self._fill_one_buffer()
             finally:
                 self._finish_read_call()
         return self._copy_into_view(view, 0)
@@ -810,6 +838,8 @@ class AsyncGzipBinaryFile:
                     await self._fill_buffer()
                     continue
 
+                if reserved:
+                    self._check_read_call_not_aborted()
                 result = bytes(memoryview(buf)[start:end])
                 consumed = end - start
                 self._buffer_offset = end
@@ -972,11 +1002,7 @@ class AsyncGzipBinaryFile:
 
             return length
         finally:
-            self._write_call_active = False
-            if self._active_call_waiter is not None:
-                self._notify_active_call_finished()
-            if self._is_closed and self._write_broken:
-                encoder.discard()
+            self._finish_write_call(encoder)
 
     @staticmethod
     def _coerce_byteslike(data: Any) -> bytes:
@@ -1078,6 +1104,7 @@ class AsyncGzipBinaryFile:
                             for piece in await self._decompress_next():
                                 chunks.append(piece)
                                 total_read += len(piece)
+                        self._check_read_call_not_aborted()
                     except BaseException:
                         # Validation failures expose decoded bytes for explicit
                         # salvage; transient source errors remain retryable. A
@@ -1226,6 +1253,14 @@ class AsyncGzipBinaryFile:
             )
         self._check_read_usable(allow_buffered=allow_buffered)
 
+    def _check_read_call_not_aborted(self) -> None:
+        """Prevent a context-aborted read from publishing partial success."""
+        if self._is_closed or (self._read_broken and not self._read_validation_failed):
+            raise OSError(
+                "read aborted because the gzip file was closed while "
+                "the call was active"
+            )
+
     def _finish_read_call(self) -> None:
         """Release a read reservation, discarding only after an abortive exit."""
         self._read_call_active = False
@@ -1234,15 +1269,16 @@ class AsyncGzipBinaryFile:
         if self._is_closed and self._decoder is not None:
             self._decoder.discard()
 
-    async def _wait_for_active_call(self) -> None:
-        """Wait until the single read or write reservation is released."""
+    async def _wait_for_active_call(self) -> bool:
+        """Wait for a reservation and report whether one was observed."""
         if not (self._read_call_active or self._write_call_active):
-            return
+            return False
         waiter = self._active_call_waiter
         if waiter is None or waiter.done():
             waiter = asyncio.get_running_loop().create_future()
             self._active_call_waiter = waiter
         await asyncio.shield(waiter)
+        return True
 
     def _notify_active_call_finished(self) -> None:
         """Wake a context exit waiting to perform normal finalization."""
@@ -1286,6 +1322,14 @@ class AsyncGzipBinaryFile:
             raise ConcurrentOperationError(
                 "gzip writer already has an active write or flush call"
             )
+
+    def _finish_write_call(self, encoder: GzipEncoder) -> None:
+        """Release a write reservation, discarding after an abortive exit."""
+        self._write_call_active = False
+        if self._active_call_waiter is not None:
+            self._notify_active_call_finished()
+        if self._is_closed and self._write_broken:
+            encoder.discard()
 
     async def _fill_buffer(self) -> None:
         """Decompress the next compressed chunk into the read buffer.
@@ -1469,11 +1513,7 @@ class AsyncGzipBinaryFile:
             try:
                 await self._flush_writer(encoder)
             finally:
-                self._write_call_active = False
-                if self._active_call_waiter is not None:
-                    self._notify_active_call_finished()
-                if self._is_closed and self._write_broken:
-                    encoder.discard()
+                self._finish_write_call(encoder)
 
     async def _flush_writer(self, encoder: GzipEncoder) -> None:
         """Drive one reserved encoder flush and normalize its failures."""
@@ -1519,6 +1559,11 @@ class AsyncGzipBinaryFile:
 
     async def close(self) -> None:
         """Flushes any remaining compressed data and closes the file."""
+        async with self._close_lock:
+            await self._close_locked()
+
+    async def _close_locked(self) -> None:
+        """Finalize and close while the binary close lock is held."""
         if self._is_closed:
             return
         if self._read_call_active:
@@ -1559,29 +1604,35 @@ class AsyncGzipBinaryFile:
                 # final-write exception if close() also fails.
                 try:
                     await self._close_underlying(close_file)
+                except asyncio.CancelledError:
+                    raise
                 except BaseException:
                     if not write_failed:
                         raise
 
     async def _abort_active_call_on_exit(self) -> None:
         """Close resources without touching a codec operation owned elsewhere."""
-        if self._is_closed:
-            return
-        self._is_closed = True
-        if self._writing_mode:
-            self._write_broken = True
-        else:
-            self._read_broken = True
-            self._read_validation_failed = False
-            self._eof = True
+        async with self._close_lock:
+            if self._is_closed:
+                return
+            if self._writing_mode:
+                self._write_broken = True
+            else:
+                self._read_broken = True
+                self._read_validation_failed = False
+                self._eof = True
 
-        close_file = (
-            self._file
-            if self._file is not None and (self._owns_file or self._closefd)
-            else None
-        )
-        if close_file is not None:
-            await self._close_underlying(close_file)
+            close_file = (
+                self._file
+                if self._file is not None and (self._owns_file or self._closefd)
+                else None
+            )
+            if close_file is not None:
+                # Do not latch closed until resource cleanup actually succeeds.
+                # A failure or cancellation leaves the broken handle reportably
+                # open so an explicit close() can retry the underlying close.
+                await self._close_underlying(close_file)
+            self._is_closed = True
 
     @staticmethod
     async def _close_underlying(file: Any) -> None:
