@@ -14,6 +14,8 @@
 - `decompress_chunks` — pull-driven decompression from an `AsyncIterable[bytes]` with bounded output chunks
 - `compress_chunks` — one-member gzip compression from an `AsyncIterable[bytes]` with bounded output chunks
 - `CodecOperation` — the closeable iterator returned by codec state changes
+- `ConcurrentOperationError` — an `OSError` subtype for operations that
+  overlap on one single-task-owned async file handle
 - `GzipEncoder` and `GzipDecoder` — synchronous sans-I/O state machines for
   transport-independent, bounded gzip encoding and decoding
 - `WithAsyncRead`, `WithAsyncWrite`, `WithAsyncReadWrite` — runtime-checkable protocols describing the async file objects accepted via `fileobj=`

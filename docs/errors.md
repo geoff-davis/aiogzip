@@ -14,6 +14,7 @@ working when the fast engine is installed.
 | Underlying I/O failure | `OSError` | Missing file, permission denied, disk errors — whatever the OS raised. |
 | `max_decompressed_size` exceeded | `OSError` (not `BadGzipFile`) | Message starts with `"decompressed output exceeded max_decompressed_size"`. |
 | Wrong argument types / values | `TypeError` / `ValueError` | Raised eagerly at the call with a corrective message. |
+| Overlapping operations on one async file | `aiogzip.ConcurrentOperationError` | An `OSError` subtype. Await the active call, then retry; one handle is single-task-owned. |
 | Codec operation still active | `RuntimeError` | Exhaust the returned iterator before starting another operation. |
 | Codec abandoned or partially closed | `OSError` on later use | The instance is unusable; call `discard()` and create a new codec. |
 | Codec used after successful decoder finalization | `ValueError` | `feed()` and repeated `finish()` are terminal-state misuse. |
@@ -35,6 +36,22 @@ except gzip.BadGzipFile:
 except OSError as exc:
     ...  # I/O failure, or the decompression cap tripped (see below)
 ```
+
+## Same-handle concurrency
+
+One `AsyncGzipBinaryFile` or `AsyncGzipTextFile` handle is intentionally owned
+by one task at a time. If a read, seek, write, flush, or close overlaps an
+operation already in flight on that handle, the rejected call raises the
+public `ConcurrentOperationError`. The active call is left intact; await it,
+then retry the rejected operation. Because the exception subclasses
+`OSError`, existing general I/O handlers remain effective while callers that
+want to retry this case can catch it explicitly.
+
+On a clean `async with` exit, aiogzip waits for an in-flight call and then
+closes normally. If the context body is already raising, exit preserves that
+primary exception and aborts owned-resource cleanup. An active write or flush
+that resumes after this abort raises `OSError`; it never reports success for a
+gzip member that can no longer receive its trailer.
 
 ## Telling the decompression cap apart from corruption
 

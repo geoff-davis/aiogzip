@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any, AsyncIterable, AsyncIterator, Literal, Optional, Union, overload
 
-from ._binary import AsyncGzipBinaryFile
+from ._binary import AsyncGzipBinaryFile, ConcurrentOperationError
 from ._common import (
     _MAX_CHUNK_SIZE,
     GZIP_FLAG_FCOMMENT,
@@ -456,6 +456,7 @@ __all__ = [
     "AsyncGzipFile",
     "AsyncGzipTextFile",
     "CodecOperation",
+    "ConcurrentOperationError",
     "EngineInfo",
     "GzipInfo",
     "GzipDecoder",

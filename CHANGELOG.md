@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Public `ConcurrentOperationError`, an `OSError` subtype raised when calls
+  overlap on one async file handle. Await the call that already owns the
+  handle before retrying the rejected operation.
+
 ### Fixed
 
 - Removed the binary reader's duplicate compatibility header parser. Live
@@ -22,9 +28,13 @@ All notable changes to this project will be documented in this file.
   failure instead of returning clean EOF. An absolute `seek(0)` on a rewindable
   source recovers with a fresh decoder; non-rewindable sources recommend only
   closing and reopening the handle.
-- Concurrent `write()`, `flush()`, and `close()` calls on one handle are
+- Concurrent reads, seeks, writes, flushes, and closes on one handle are
   rejected before they can reserve or finalize codec work or poison the gzip
-  member, including sink and underlying-file awaits after codec completion.
+  member. A clean context exit waits for an in-flight call before closing. If
+  an exceptional context exit aborts an active write or flush, that call now
+  raises instead of reporting success for an unterminated member. Concurrent
+  text closes are serialized through incremental-encoder and trailer
+  finalization.
 
 ### Changed
 

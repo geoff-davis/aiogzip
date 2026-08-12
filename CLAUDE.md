@@ -227,9 +227,10 @@ Always include:
   series; established asyncio APIs keep their compatibility contract.
 - **2.0.0a3 (in progress)** - Removes the file reader's duplicate gzip-header
   parser and drives live `mtime` from the shared decoder. The resulting
-  last-completed-header behavior is a deliberate, reviewed compatibility
-  correction to match `gzip.GzipFile`, and is the explicit exception to the
-  established-asyncio-API stability rule for this alpha.
+  last-completed-header behavior, terminal reader failure/recovery contract,
+  and same-handle overlap/context-exit behavior are deliberate, reviewed
+  compatibility corrections to the established asyncio API for this alpha;
+  their rationale and evidence are recorded in the a3 review record.
 
 ---
 

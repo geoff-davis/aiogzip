@@ -7,7 +7,7 @@ import zlib
 
 import pytest
 
-from aiogzip import AsyncGzipBinaryFile
+from aiogzip import AsyncGzipBinaryFile, ConcurrentOperationError
 
 
 class NonSeekableAsyncReader:
@@ -321,14 +321,14 @@ class TestFileobjSupport:
 
         first = asyncio.create_task(stream.write(payload))
         await operation_reserved.wait()
-        with pytest.raises(RuntimeError, match="active write or flush"):
+        with pytest.raises(ConcurrentOperationError, match="active write or flush"):
             await stream.close()
         assert stream.closed is False
         assert stream._write_broken is False
 
         advance_operation.set()
         await operation_released.wait()
-        with pytest.raises(RuntimeError, match="active write or flush"):
+        with pytest.raises(ConcurrentOperationError, match="active write or flush"):
             await stream.write(b"overlap")
         assert stream._write_broken is False
 
@@ -365,9 +365,9 @@ class TestFileobjSupport:
 
         flushing = asyncio.create_task(stream.flush())
         await writer.flush_started.wait()
-        with pytest.raises(RuntimeError, match="active write or flush"):
+        with pytest.raises(ConcurrentOperationError, match="active write or flush"):
             await stream.write(b"overlap")
-        with pytest.raises(RuntimeError, match="active write or flush"):
+        with pytest.raises(ConcurrentOperationError, match="active write or flush"):
             await stream.close()
         assert stream.closed is False
         assert stream._write_broken is False
@@ -412,9 +412,9 @@ class TestFileobjSupport:
 
         first = asyncio.create_task(stream.read(1))
         await reader.read_started.wait()
-        with pytest.raises(OSError, match="active read call"):
+        with pytest.raises(ConcurrentOperationError, match="active read call"):
             await stream.read(1)
-        with pytest.raises(OSError, match="active read call"):
+        with pytest.raises(ConcurrentOperationError, match="active read call"):
             await stream.close()
         assert stream.closed is False
         assert stream._read_broken is False

@@ -4,7 +4,11 @@ import asyncio
 
 import pytest
 
-from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
+from aiogzip import (
+    AsyncGzipBinaryFile,
+    AsyncGzipTextFile,
+    ConcurrentOperationError,
+)
 
 
 class TestClosefdParameter:
@@ -209,6 +213,115 @@ class TestResourceCleanup:
         with pytest.raises(OSError, match="underlying file is closed"):
             await write_task
 
+    async def test_aborted_active_write_cannot_report_success_after_sink_resumes(self):
+        import os
+
+        class CloseIgnoringWriter:
+            def __init__(self):
+                self.calls = 0
+                self.write_started = asyncio.Event()
+                self.release_write = asyncio.Event()
+                self.closed = False
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls > 1:
+                    self.write_started.set()
+                    await self.release_write.wait()
+                return len(data)
+
+            async def close(self):
+                self.closed = True
+
+        writer = CloseIgnoringWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=True, mtime=0)
+        write_task = None
+        with pytest.raises(ValueError, match="body failure"):
+            async with stream:
+                write_task = asyncio.create_task(stream.write(os.urandom(512 * 1024)))
+                await writer.write_started.wait()
+                raise ValueError("body failure")
+
+        assert stream.closed is True
+        assert writer.closed is True
+        assert write_task is not None
+        writer.release_write.set()
+        with pytest.raises(OSError, match="write aborted"):
+            await write_task
+        assert stream._position == 0
+
+    async def test_aborted_active_flush_cannot_report_success_after_sink_resumes(self):
+        class CloseIgnoringFlushWriter:
+            def __init__(self):
+                self.flush_started = asyncio.Event()
+                self.release_flush = asyncio.Event()
+                self.closed = False
+
+            async def write(self, data):
+                return len(data)
+
+            async def flush(self):
+                self.flush_started.set()
+                await self.release_flush.wait()
+
+            async def close(self):
+                self.closed = True
+
+        writer = CloseIgnoringFlushWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=True, mtime=0)
+        flush_task = None
+        with pytest.raises(ValueError, match="body failure"):
+            async with stream:
+                await stream.write(b"pending data")
+                flush_task = asyncio.create_task(stream.flush())
+                await writer.flush_started.wait()
+                raise ValueError("body failure")
+
+        assert stream.closed is True
+        assert writer.closed is True
+        assert flush_task is not None
+        writer.release_flush.set()
+        with pytest.raises(OSError, match="flush aborted"):
+            await flush_task
+
+    async def test_clean_binary_context_exit_waits_for_active_write_and_closes(self):
+        import gzip
+        import os
+
+        class BlockingWriter:
+            def __init__(self):
+                self.calls = 0
+                self.buffer = bytearray()
+                self.write_started = asyncio.Event()
+                self.release_write = asyncio.Event()
+                self.closed = False
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls > 1:
+                    self.write_started.set()
+                    await self.release_write.wait()
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                self.closed = True
+
+        payload = os.urandom(512 * 1024)
+        writer = BlockingWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=True, mtime=0)
+        write_task = None
+        async with stream:
+            write_task = asyncio.create_task(stream.write(payload))
+            await writer.write_started.wait()
+            asyncio.get_running_loop().call_soon(writer.release_write.set)
+
+        assert write_task is not None
+        assert await write_task == len(payload)
+        assert stream.closed is True
+        assert writer.closed is True
+        assert gzip.decompress(bytes(writer.buffer)) == payload
+
     async def test_text_close_is_retryable_during_active_binary_write(self):
         import gzip
         import os
@@ -246,7 +359,7 @@ class TestResourceCleanup:
 
         write_task = asyncio.create_task(stream.write(text))
         await writer.write_started.wait()
-        with pytest.raises(RuntimeError, match="active write or flush"):
+        with pytest.raises(ConcurrentOperationError, match="active write or flush"):
             await stream.close()
         assert stream.closed is False
         assert stream.buffer.closed is False
@@ -256,6 +369,95 @@ class TestResourceCleanup:
         await stream.close()
         assert stream.closed is True
         assert gzip.decompress(bytes(writer.buffer)) == raw
+
+    async def test_clean_text_context_exit_waits_for_active_write_and_closes(self):
+        import gzip
+        import os
+
+        class BlockingWriter:
+            def __init__(self):
+                self.calls = 0
+                self.buffer = bytearray()
+                self.write_started = asyncio.Event()
+                self.release_write = asyncio.Event()
+                self.closed = False
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls > 1:
+                    self.write_started.set()
+                    await self.release_write.wait()
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                self.closed = True
+
+        raw = os.urandom(512 * 1024)
+        text = raw.decode("latin-1")
+        writer = BlockingWriter()
+        stream = AsyncGzipTextFile(
+            None,
+            "wt",
+            encoding="latin-1",
+            fileobj=writer,
+            closefd=True,
+            mtime=0,
+        )
+        write_task = None
+        async with stream:
+            write_task = asyncio.create_task(stream.write(text))
+            await writer.write_started.wait()
+            asyncio.get_running_loop().call_soon(writer.release_write.set)
+
+        assert write_task is not None
+        assert await write_task == len(text)
+        assert stream.closed is True
+        assert writer.closed is True
+        assert gzip.decompress(bytes(writer.buffer)) == raw
+
+    async def test_concurrent_text_close_is_serialized_through_trailer_write(self):
+        import gzip
+
+        class BlockingTrailerWriter:
+            def __init__(self):
+                self.calls = 0
+                self.buffer = bytearray()
+                self.trailer_started = asyncio.Event()
+                self.release_trailer = asyncio.Event()
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls > 1:
+                    self.trailer_started.set()
+                    await self.release_trailer.wait()
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                pass
+
+        writer = BlockingTrailerWriter()
+        stream = AsyncGzipTextFile(
+            None,
+            "wt",
+            fileobj=writer,
+            closefd=False,
+            mtime=0,
+        )
+        await stream.open()
+        await stream.write("payload")
+
+        first_close = asyncio.create_task(stream.close())
+        await writer.trailer_started.wait()
+        second_close = asyncio.create_task(stream.close())
+        await asyncio.sleep(0)
+        assert second_close.done() is False
+
+        writer.release_trailer.set()
+        await asyncio.gather(first_close, second_close)
+        assert stream.closed is True
+        assert gzip.decompress(bytes(writer.buffer)) == b"payload"
 
     async def test_operations_after_close_raise_errors(self, temp_file):
         f = AsyncGzipBinaryFile(temp_file, "wb")

@@ -1,5 +1,6 @@
 """Text gzip stream implementation."""
 
+import asyncio
 import codecs
 import io
 import os
@@ -18,11 +19,7 @@ from typing import (
     Union,
 )
 
-from ._binary import (
-    AsyncGzipBinaryFile,
-    _ActiveReadCallError,
-    _ActiveWriteCallError,
-)
+from ._binary import AsyncGzipBinaryFile, ConcurrentOperationError
 from ._common import (
     _MAX_CHUNK_SIZE,
     WithAsyncRead,
@@ -112,6 +109,7 @@ class AsyncGzipTextFile:
         "_binary_mode",
         "_binary_file",
         "_is_closed",
+        "_close_lock",
         "_decoder",
         "_encoder",
         "_encoder_used",
@@ -228,6 +226,7 @@ class AsyncGzipTextFile:
 
         self._binary_file: Optional[AsyncGzipBinaryFile] = None
         self._is_closed: bool = False
+        self._close_lock = asyncio.Lock()
 
         # Decoder and buffer state. Constructed eagerly so an invalid
         # `encoding` raises LookupError at call site, matching stdlib
@@ -347,9 +346,13 @@ class AsyncGzipTextFile:
         """Exit the context manager, flushing and closing the file."""
         try:
             await self.close()
-        except (_ActiveReadCallError, _ActiveWriteCallError):
+        except ConcurrentOperationError:
             if exc_val is None:
-                raise
+                binary_file = self._binary_file
+                if binary_file is not None:
+                    await binary_file._wait_for_active_call()
+                await self.close()
+                return
             binary_file = self._binary_file
             if binary_file is not None:
                 try:
@@ -1647,37 +1650,42 @@ class AsyncGzipTextFile:
 
     async def close(self) -> None:
         """Closes the file."""
-        if self._is_closed:
-            return
+        # Unlike the binary layer, text close has incremental-encoder state to
+        # finalize before delegating. Serialize the whole sequence so a second
+        # close cannot finalize the same encoder while the first awaits its
+        # trailer write.
+        async with self._close_lock:
+            if self._is_closed:
+                return
 
-        binary_file = self._binary_file
-        if binary_file is None:
-            self._is_closed = True
-            return
+            binary_file = self._binary_file
+            if binary_file is None:
+                self._is_closed = True
+                return
 
-        # Finalizing an incremental encoder mutates it. Reject an overlapping
-        # binary call before producing final bytes so a retry cannot lose them.
-        if self._writing_mode:
-            binary_file._check_write_call_available()
+            # Finalizing an incremental encoder mutates it. Reject an overlapping
+            # binary call before producing final bytes so a retry cannot lose them.
+            if self._writing_mode:
+                binary_file._check_write_call_available()
 
-        encoder_failed = False
-        try:
-            if self._writing_mode and self._encoder_used:
-                encoder = self._encoder
-                assert encoder is not None
-                final_data = encoder.encode("", final=True)
-                if final_data:
-                    await binary_file.write(final_data)
-        except BaseException:
-            encoder_failed = True
-            raise
-        finally:
+            encoder_failed = False
             try:
-                await binary_file.close()
+                if self._writing_mode and self._encoder_used:
+                    encoder = self._encoder
+                    assert encoder is not None
+                    final_data = encoder.encode("", final=True)
+                    if final_data:
+                        await binary_file.write(final_data)
             except BaseException:
-                if not encoder_failed:
-                    raise
+                encoder_failed = True
+                raise
             finally:
-                # A preflight overlap leaves both layers open and retryable;
-                # terminal encoder/sink failures close both layers together.
-                self._is_closed = binary_file.closed
+                try:
+                    await binary_file.close()
+                except BaseException:
+                    if not encoder_failed:
+                        raise
+                finally:
+                    # A preflight overlap leaves both layers open and retryable;
+                    # terminal encoder/sink failures close both layers together.
+                    self._is_closed = binary_file.closed

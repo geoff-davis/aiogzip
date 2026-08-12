@@ -54,12 +54,12 @@ def _decompression_error_message(error: gzip.BadGzipFile) -> str:
     return f"Error decompressing gzip data: {detail}"
 
 
-class _ActiveReadCallError(OSError):
-    """Raised when one handle is read concurrently by multiple tasks."""
+class ConcurrentOperationError(OSError):
+    """Raised when overlapping operations use one file handle concurrently.
 
-
-class _ActiveWriteCallError(RuntimeError):
-    """Raised when one handle is written or closed concurrently."""
+    Await the operation that already owns the handle before retrying the
+    rejected call. One file handle is intentionally single-task-owned.
+    """
 
 
 class AsyncGzipBinaryFile:
@@ -133,6 +133,7 @@ class AsyncGzipBinaryFile:
         "_write_broken",
         "_write_call_active",
         "_read_call_active",
+        "_active_call_waiter",
         "_read_broken",
         "_read_validation_failed",
         "_max_decompressed_size",
@@ -235,6 +236,7 @@ class AsyncGzipBinaryFile:
         self._write_broken: bool = False
         self._write_call_active: bool = False
         self._read_call_active: bool = False
+        self._active_call_waiter: Optional[asyncio.Future[None]] = None
         self._read_broken: bool = False
         self._read_validation_failed: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
@@ -341,9 +343,14 @@ class AsyncGzipBinaryFile:
         """Exit the context manager, flushing and closing the file."""
         try:
             await self.close()
-        except (_ActiveReadCallError, _ActiveWriteCallError):
+        except ConcurrentOperationError:
             if exc_val is None:
-                raise
+                # A clean context exit owns normal finalization. Wait for the
+                # spawned call that still owns this handle, then close it here
+                # rather than leaking an open file and unterminated member.
+                await self._wait_for_active_call()
+                await self.close()
+                return
             # A task spawned from the body may still own the codec. Preserve
             # the body's exception and close resources without discarding the
             # live operation underneath that task.
@@ -950,6 +957,15 @@ class AsyncGzipBinaryFile:
                 encoder.discard()
                 raise
 
+            # Exceptional context exit can close an owned sink while this
+            # task is suspended in it. A sink that completes that await after
+            # close must not make this torn member look successfully written.
+            if self._is_closed or self._write_broken:
+                raise OSError(
+                    "write aborted because the gzip file was closed while "
+                    "the call was active"
+                )
+
             # The codec owns uncompressed-byte accounting. Expose its authoritative
             # ledger only after every emitted byte reached the sink.
             self._position = encoder.input_size
@@ -957,6 +973,8 @@ class AsyncGzipBinaryFile:
             return length
         finally:
             self._write_call_active = False
+            if self._active_call_waiter is not None:
+                self._notify_active_call_finished()
             if self._is_closed and self._write_broken:
                 encoder.discard()
 
@@ -1203,14 +1221,37 @@ class AsyncGzipBinaryFile:
     def _check_read_call_usable(self, allow_buffered: bool = False) -> None:
         """Reject overlapping calls before they can reserve the decoder."""
         if self._read_call_active:
-            raise _ActiveReadCallError("gzip reader already has an active read call")
+            raise ConcurrentOperationError(
+                "gzip reader already has an active read call"
+            )
         self._check_read_usable(allow_buffered=allow_buffered)
 
     def _finish_read_call(self) -> None:
         """Release a read reservation, discarding only after an abortive exit."""
         self._read_call_active = False
+        if self._active_call_waiter is not None:
+            self._notify_active_call_finished()
         if self._is_closed and self._decoder is not None:
             self._decoder.discard()
+
+    async def _wait_for_active_call(self) -> None:
+        """Wait until the single read or write reservation is released."""
+        if not (self._read_call_active or self._write_call_active):
+            return
+        waiter = self._active_call_waiter
+        if waiter is None or waiter.done():
+            waiter = asyncio.get_running_loop().create_future()
+            self._active_call_waiter = waiter
+        await asyncio.shield(waiter)
+
+    def _notify_active_call_finished(self) -> None:
+        """Wake a context exit waiting to perform normal finalization."""
+        waiter = self._active_call_waiter
+        if waiter is None:
+            return
+        self._active_call_waiter = None
+        if not waiter.done():
+            waiter.set_result(None)
 
     def _check_read_usable(self, *, allow_buffered: bool = False) -> None:
         """Reject unsafe access, optionally allowing pre-failure decoded bytes."""
@@ -1242,7 +1283,7 @@ class AsyncGzipBinaryFile:
     def _check_write_call_available(self) -> None:
         """Reject overlapping writer calls before they mutate codec state."""
         if self._write_call_active:
-            raise _ActiveWriteCallError(
+            raise ConcurrentOperationError(
                 "gzip writer already has an active write or flush call"
             )
 
@@ -1429,6 +1470,8 @@ class AsyncGzipBinaryFile:
                 await self._flush_writer(encoder)
             finally:
                 self._write_call_active = False
+                if self._active_call_waiter is not None:
+                    self._notify_active_call_finished()
                 if self._is_closed and self._write_broken:
                     encoder.discard()
 
@@ -1445,6 +1488,15 @@ class AsyncGzipBinaryFile:
                 result = flush_method()
                 if hasattr(result, "__await__"):
                     await result
+
+            # See write(): exceptional context exit can close the sink while
+            # this reserved call is awaiting it. Never report that as a
+            # successful durability boundary for an unterminated member.
+            if self._is_closed or self._write_broken:
+                raise OSError(
+                    "flush aborted because the gzip file was closed while "
+                    "the call was active"
+                )
         except asyncio.CancelledError:
             self._write_broken = True
             encoder.discard()
