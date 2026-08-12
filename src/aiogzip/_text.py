@@ -303,7 +303,7 @@ class AsyncGzipTextFile:
             ValueError: if the file is already open, or has already been closed
                 (a closed instance cannot be reopened, matching io objects).
         """
-        _check_can_open(self.closed, self._binary_file is not None)
+        _check_can_open(self._is_closed, self._binary_file is not None)
         filename = os.fspath(self._filename) if self._filename is not None else None
         self._binary_file = AsyncGzipBinaryFile(
             filename=filename,
@@ -368,6 +368,8 @@ class AsyncGzipTextFile:
                     raise
                 except Exception:
                     pass
+                finally:
+                    self._sync_closed_from_binary()
 
     # Sync-protocol stubs. Without these, ``with`` / ``for`` fail with generic
     # "does not support the context manager protocol" / "is not iterable"
@@ -402,7 +404,7 @@ class AsyncGzipTextFile:
 
     # File API compatibility helpers
     async def tell(self) -> int:
-        if self.closed:
+        if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
@@ -432,7 +434,7 @@ class AsyncGzipTextFile:
         )
 
     async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
-        if self.closed:
+        if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
@@ -528,6 +530,11 @@ class AsyncGzipTextFile:
             return self._binary_file.closed
         return self._is_closed
 
+    def _sync_closed_from_binary(self) -> None:
+        """Refresh the hot-path closed flag at a cold lifecycle boundary."""
+        if self._binary_file is not None:
+            self._is_closed = self._binary_file.closed
+
     @property
     def encoding(self) -> str:
         """Return the configured text encoding."""
@@ -594,7 +601,7 @@ class AsyncGzipTextFile:
         """
         if not self._writing_mode:
             raise OSError("File not open for writing")
-        if self.closed:
+        if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
@@ -967,7 +974,7 @@ class AsyncGzipTextFile:
         """
         if self._mode_op != "r":
             raise OSError("File not open for reading")
-        if self.closed:
+        if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
@@ -1373,7 +1380,7 @@ class AsyncGzipTextFile:
 
     async def __anext__(self) -> str:
         """Return the next line from the file."""
-        if self.closed:
+        if self._is_closed:
             raise StopAsyncIteration
 
         if self._line_term is not None:
@@ -1430,7 +1437,7 @@ class AsyncGzipTextFile:
                     print(line.rstrip())
                     line = await f.readline()
         """
-        if self.closed:
+        if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
@@ -1505,7 +1512,7 @@ class AsyncGzipTextFile:
             async with AsyncGzipTextFile("file.gz", "rt") as f:
                 lines = await f.readlines(1024)  # Read ~1KB of lines
         """
-        if self.closed:
+        if self._is_closed:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
@@ -1597,7 +1604,7 @@ class AsyncGzipTextFile:
         """
         if not self._writing_mode:
             raise OSError("File not open for writing")
-        if self.closed:
+        if self._is_closed:
             raise ValueError("I/O operation on closed file.")
 
         pending: List[str] = []
@@ -1652,7 +1659,7 @@ class AsyncGzipTextFile:
                 await f.flush()  # Ensure data is written
                 await f.write(" World")
         """
-        if self.closed:
+        if self._is_closed:
             raise ValueError("I/O operation on closed file.")
 
         if self._binary_file is not None:
@@ -1697,3 +1704,5 @@ class AsyncGzipTextFile:
                 except BaseException:
                     if not encoder_failed:
                         raise
+                finally:
+                    self._sync_closed_from_binary()
