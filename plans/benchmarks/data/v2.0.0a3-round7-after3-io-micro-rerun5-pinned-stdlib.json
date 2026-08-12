@@ -1,0 +1,471 @@
+{
+  "schema_version": 2,
+  "timestamp": 1786493417.7302995,
+  "categories": [
+    "io",
+    "micro"
+  ],
+  "data_size_mb": 8,
+  "repeat": 5,
+  "regression_profile": null,
+  "regression_mode": null,
+  "source": {
+    "source_root": "/home/geoff/Projects/personal/aiogzip",
+    "aiogzip_file": "/home/geoff/Projects/personal/aiogzip/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a3.dev0",
+    "target_commit": "753e8121a252a342b89618bda6aefc534aa30578",
+    "target_describe": "v2.0.0a2-40-g753e812",
+    "target_dirty": false
+  },
+  "environment": {
+    "source_root": "/home/geoff/Projects/personal/aiogzip",
+    "aiogzip_file": "/home/geoff/Projects/personal/aiogzip/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a3.dev0",
+    "target_commit": "753e8121a252a342b89618bda6aefc534aa30578",
+    "target_describe": "v2.0.0a2-40-g753e812",
+    "target_dirty": false,
+    "environment_label": "round7-after-3",
+    "runner_root": "/home/geoff/Projects/personal/aiogzip",
+    "runner_commit": "753e8121a252a342b89618bda6aefc534aa30578",
+    "regression_harness_sha256": "6cb2d3a9709fd905cbc7871c4cb80f9ae848668378d7bd08aeb070aeed2a112d",
+    "python_implementation": "CPython",
+    "python_version": "3.12.12 (main, Dec 17 2025, 21:10:06) [Clang 21.1.4 ]",
+    "python_executable": "/home/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+    "os_name": "Linux",
+    "os_release": "6.17.0-41-generic",
+    "kernel_version": "#41-Ubuntu SMP PREEMPT_DYNAMIC Sat Jun 20 18:01:40 UTC 2026",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.42"
+    ],
+    "processor": "",
+    "cpu_count": 32,
+    "ram_bytes": 131894407168,
+    "filesystem_temp_root": "/tmp",
+    "zlib_compile_version": "1.3.1",
+    "zlib_runtime_version": "1.3.1",
+    "zlib_ng_package_version": "1.0.0",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "stdlib-zlib",
+      "crc32": "stdlib-zlib"
+    },
+    "forced_engine": "stdlib",
+    "uv_version": "uv 0.9.22",
+    "uv_lock_sha256": "5956b3a0e8d4ea2d84706ee16275830f4431e629bce0cf0526e5410feab6bcf4",
+    "cpu_affinity": [
+      0
+    ],
+    "cpu_governor": "powersave",
+    "cpu_boost": "enabled",
+    "system_load": [
+      1.1884765625,
+      1.5634765625,
+      1.77099609375
+    ],
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      700,
+      10,
+      10
+    ]
+  },
+  "results": [
+    {
+      "name": "Binary I/O (10-byte chunks, stress test)",
+      "category": "io",
+      "duration": 0.9295439610723406,
+      "duration_samples": [
+        0.9907827409915626,
+        0.9273495390079916,
+        0.9295439610723406,
+        0.9350369281601161,
+        0.9278502060333267
+      ],
+      "median_absolute_deviation": 0.0021944220643490553,
+      "duration_min": 0.9273495390079916,
+      "duration_max": 0.9907827409915626,
+      "metrics": {
+        "aiogzip_write": "0.923s",
+        "aiogzip_read": "0.006s",
+        "gzip_write": "0.237s",
+        "gzip_read": "0.004s",
+        "speedup": "3.85x slower",
+        "chunks_written": 838860,
+        "chunks_per_sec": "908395",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Binary I/O (bulk, single write/read)",
+      "category": "io",
+      "duration": 0.1259403619915247,
+      "duration_samples": [
+        0.12690564803779125,
+        0.12575500109232962,
+        0.1259403619915247,
+        0.1265851620119065,
+        0.12565770593937486
+      ],
+      "median_absolute_deviation": 0.00028265605214983225,
+      "duration_min": 0.12565770593937486,
+      "duration_max": 0.12690564803779125,
+      "metrics": {
+        "aiogzip_write": "0.120s",
+        "aiogzip_read": "0.006s",
+        "gzip_write": "0.118s",
+        "gzip_read": "0.004s",
+        "speedup": "1.03x slower",
+        "aiogzip_throughput": "63.5 MB/s",
+        "gzip_throughput": "65.3 MB/s",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Binary I/O (64KB chunks, 128 chunks)",
+      "category": "io",
+      "duration": 0.12520695303101093,
+      "duration_samples": [
+        0.12456187198404223,
+        0.126059566042386,
+        0.12561567802913487,
+        0.12520695303101093,
+        0.12481711595319211
+      ],
+      "median_absolute_deviation": 0.0004087249981239438,
+      "duration_min": 0.12456187198404223,
+      "duration_max": 0.126059566042386,
+      "metrics": {
+        "aiogzip_write": "0.120s",
+        "aiogzip_read": "0.005s",
+        "gzip_write": "0.116s",
+        "gzip_read": "0.002s",
+        "speedup": "1.06x slower",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text write (bulk, compression level 6)",
+      "category": "io",
+      "duration": 0.18500385293737054,
+      "duration_samples": [
+        0.18535049993079156,
+        0.18451848591212183,
+        0.1853402809938416,
+        0.18500385293737054,
+        0.1847847190219909
+      ],
+      "median_absolute_deviation": 0.0003364280564710498,
+      "duration_min": 0.18451848591212183,
+      "duration_max": 0.18535049993079156,
+      "metrics": {
+        "aiogzip_time": "0.1850s",
+        "gzip_time": "0.1835s",
+        "speedup": "1.01x slower",
+        "aiogzip_throughput": "43.2 MB/s",
+        "gzip_throughput": "43.6 MB/s",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text read (bulk, identical fixture)",
+      "category": "io",
+      "duration": 0.013482616981491446,
+      "duration_samples": [
+        0.014456068980507553,
+        0.01177148800343275,
+        0.013219429063610733,
+        0.013899105950258672,
+        0.013482616981491446
+      ],
+      "median_absolute_deviation": 0.00041648896876722574,
+      "duration_min": 0.01177148800343275,
+      "duration_max": 0.014456068980507553,
+      "metrics": {
+        "aiogzip_time": "0.0135s",
+        "gzip_time": "0.0118s",
+        "speedup": "1.14x slower",
+        "aiogzip_throughput": "593.4 MB/s",
+        "gzip_throughput": "677.8 MB/s",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text line iteration (default, identical fixture)",
+      "category": "io",
+      "duration": 0.020316800917498767,
+      "duration_samples": [
+        0.020316800917498767,
+        0.020338602014817297,
+        0.020269160973839462,
+        0.02082939096726477,
+        0.020225808955729008
+      ],
+      "median_absolute_deviation": 4.763994365930557e-05,
+      "duration_min": 0.020225808955729008,
+      "duration_max": 0.02082939096726477,
+      "metrics": {
+        "aiogzip_time": "0.0203s",
+        "gzip_time": "0.0118s",
+        "speedup": "1.71x slower",
+        "aiogzip_lines_per_sec": "3634873",
+        "gzip_lines_per_sec": "6233634",
+        "lines": 73849,
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text line iteration (tuned, identical fixture)",
+      "category": "io",
+      "duration": 0.020303836092352867,
+      "duration_samples": [
+        0.020228202920407057,
+        0.020303836092352867,
+        0.020538109936751425,
+        0.02034241904038936,
+        0.020079571986570954
+      ],
+      "median_absolute_deviation": 7.563317194581032e-05,
+      "duration_min": 0.020079571986570954,
+      "duration_max": 0.020538109936751425,
+      "metrics": {
+        "aiogzip_time": "0.0203s",
+        "gzip_time": "0.0119s",
+        "speedup": "1.71x slower",
+        "aiogzip_lines_per_sec": "3637194",
+        "gzip_lines_per_sec": "6211267",
+        "lines": 73849,
+        "tuning": "newline=\"\\n\", chunk_size=512 KiB",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Flush operations (100 flushes)",
+      "category": "io",
+      "duration": 0.004084290005266666,
+      "duration_samples": [
+        0.0039084970485419035,
+        0.004084290005266666,
+        0.004022253095172346,
+        0.0042273299768567085,
+        0.0041215200908482075
+      ],
+      "median_absolute_deviation": 6.203691009432077e-05,
+      "duration_min": 0.0039084970485419035,
+      "duration_max": 0.0042273299768567085,
+      "metrics": {
+        "ops_per_sec": "24484",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Read-all isolated (compressible, read-only timing)",
+      "category": "io",
+      "duration": 0.013805988943204284,
+      "duration_samples": [
+        0.013781020999886096,
+        0.013849611976183951,
+        0.013804415939375758,
+        0.013960551004856825,
+        0.013805988943204284
+      ],
+      "median_absolute_deviation": 2.496794331818819e-05,
+      "duration_min": 0.013781020999886096,
+      "duration_max": 0.013960551004856825,
+      "metrics": {
+        "aiogzip_read_best": "13.81ms",
+        "gzip_read_best": "14.80ms",
+        "aiogzip_throughput": "579.5 MB/s",
+        "speedup": "1.07x faster",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text large reads (sized read + long line, O(n) accumulation)",
+      "category": "io",
+      "duration": 0.01565682201180607,
+      "duration_samples": [
+        0.014203450991772115,
+        0.015660037053748965,
+        0.01565682201180607,
+        0.014866736019030213,
+        0.015851098927669227
+      ],
+      "median_absolute_deviation": 0.00019427691586315632,
+      "duration_min": 0.014203450991772115,
+      "duration_max": 0.015851098927669227,
+      "metrics": {
+        "read_size_best": "15.66ms",
+        "readline_long_best": "16.06ms",
+        "read_size_throughput": "511.0 Mchar/s",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "read(-1) - 1MB file",
+      "category": "micro",
+      "duration": 0.0017707840143702924,
+      "duration_samples": [
+        0.0017619522823952138,
+        0.0017680730053689332,
+        0.0017707840143702924,
+        0.001813530792715028,
+        0.0017797587986569852
+      ],
+      "median_absolute_deviation": 8.831731975078583e-06,
+      "duration_min": 0.0017619522823952138,
+      "duration_max": 0.001813530792715028,
+      "metrics": {
+        "iterations": 100,
+        "avg_time_ms": "1.771ms",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Line iteration - 100K lines",
+      "category": "micro",
+      "duration": 0.016453472396824508,
+      "duration_samples": [
+        0.01638443363675227,
+        0.016649335409359384,
+        0.016369516937993468,
+        0.016554667226349313,
+        0.016453472396824508
+      ],
+      "median_absolute_deviation": 8.395545883103928e-05,
+      "duration_min": 0.016369516937993468,
+      "duration_max": 0.016649335409359384,
+      "metrics": {
+        "iterations": 30,
+        "avg_time_ms": "16.453ms",
+        "lines_per_sec": "6077744",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "readline() loop - 100K lines",
+      "category": "micro",
+      "duration": 0.022654421154099207,
+      "duration_samples": [
+        0.02380957465308408,
+        0.022589649939133476,
+        0.022691565519198775,
+        0.022654421154099207,
+        0.022614691072764495
+      ],
+      "median_absolute_deviation": 3.973008133471151e-05,
+      "duration_min": 0.022589649939133476,
+      "duration_max": 0.02380957465308408,
+      "metrics": {
+        "iterations": 30,
+        "avg_time_ms": "22.654ms",
+        "lines_per_sec": "4414149",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "readlines() - 100K lines",
+      "category": "micro",
+      "duration": 0.006227554854316016,
+      "duration_samples": [
+        0.006461911175089578,
+        0.006421717574509481,
+        0.006227554854316016,
+        0.006166790802186976,
+        0.005754104000516236
+      ],
+      "median_absolute_deviation": 0.0001941627201934651,
+      "duration_min": 0.005754104000516236,
+      "duration_max": 0.006461911175089578,
+      "metrics": {
+        "iterations": 30,
+        "avg_time_ms": "6.228ms",
+        "lines_per_sec": "16057667",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "readlines(1 MiB) batches - 100K lines",
+      "category": "micro",
+      "duration": 0.00612931076126794,
+      "duration_samples": [
+        0.006326242594514042,
+        0.0063015328370966016,
+        0.00612931076126794,
+        0.00594248316095521,
+        0.005565835170758268
+      ],
+      "median_absolute_deviation": 0.00018682760031272973,
+      "duration_min": 0.005565835170758268,
+      "duration_max": 0.006326242594514042,
+      "metrics": {
+        "iterations": 30,
+        "avg_time_ms": "6.129ms",
+        "lines_per_sec": "16315048",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Small writes (1000 x 120 bytes)",
+      "category": "micro",
+      "duration": 0.0013780680019408464,
+      "duration_samples": [
+        0.0013780680019408464,
+        0.0014500539982691407,
+        0.0013637710362672806,
+        0.0014082550769671798,
+        0.0013756930129602551
+      ],
+      "median_absolute_deviation": 1.4296965673565865e-05,
+      "duration_min": 0.0013637710362672806,
+      "duration_max": 0.0014500539982691407,
+      "metrics": {
+        "ops_per_sec": "725654",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Text writelines batching (10K lines)",
+      "category": "micro",
+      "duration": 0.0015468769706785679,
+      "duration_samples": [
+        0.0015468769706785679,
+        0.0015146160731092095,
+        0.0016184740234166384,
+        0.0015582300256937742,
+        0.0015142059419304132
+      ],
+      "median_absolute_deviation": 3.226089756935835e-05,
+      "duration_min": 0.0015142059419304132,
+      "duration_max": 0.0016184740234166384,
+      "metrics": {
+        "individual_time": "12.238ms",
+        "batched_time": "1.547ms",
+        "speedup": "7.91x",
+        "suite_repeats": 5
+      }
+    },
+    {
+      "name": "Binary readline (200KB line, 17-byte chunks)",
+      "category": "micro",
+      "duration": 0.0008088849857449532,
+      "duration_samples": [
+        0.0008116775192320347,
+        0.0008078604633919895,
+        0.0008088849857449532,
+        0.0008204293414019048,
+        0.0008069804031401873
+      ],
+      "median_absolute_deviation": 1.904582604765918e-06,
+      "duration_min": 0.0008069804031401873,
+      "duration_max": 0.0008204293414019048,
+      "metrics": {
+        "iterations": 50,
+        "avg_time_ms": "0.809ms",
+        "suite_repeats": 5
+      }
+    }
+  ]
+}
