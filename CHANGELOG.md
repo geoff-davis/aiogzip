@@ -21,28 +21,33 @@ All notable changes to this project will be documented in this file.
   underlying EOF. Integrity failures may still expose bytes decoded and
   buffered before the failure. Those bytes are recovery data, not an integrity
   guarantee: they may belong to a member whose later CRC/ISIZE check failed.
-  `read(-1)` preserves them and the prior position when a later source chunk
-  fails, while `readline()` does not turn an unterminated remainder into a
-  clean final line. Limits, cancellation, and unexpected internal errors do
-  not enable salvage. Once the buffer is consumed, access reports the terminal
-  failure instead of returning clean EOF. An absolute `seek(0)` on a rewindable
-  source recovers with a fresh decoder; non-rewindable sources recommend only
-  closing and reopening the handle.
+  This includes output emitted earlier by a decoder operation whose trailer is
+  rejected later in the same compressed chunk. Binary and text readers expose
+  that span with an error, then the decoded recovery data, then the terminal
+  error. `read(-1)` preserves recovery bytes and the prior position when a
+  later source chunk fails, while `readline()` does not turn an unterminated
+  remainder into a clean final line. Limits, cancellation, and unexpected
+  internal errors do not enable salvage or restore text into a healthy fast
+  path. Once the buffer is consumed, access reports the terminal failure
+  instead of returning clean EOF. An absolute `seek(0)` on a rewindable source
+  recovers with a fresh decoder; non-rewindable sources recommend only closing
+  and reopening the handle.
 - Overlapping reads, seeks, writes, flushes, and closes on one handle are
   rejected before they can reserve or finalize codec work or poison the gzip
   member. Text calls reserve decoder/encoder and decoded-buffer state as well
   as the binary codec, including results served from the text buffer. Composite
   `readlines()`, `writelines()`, and write-mode `seek()` calls hold one
   reservation across their complete logical operation, so another task cannot
-  consume or splice data between internal batches. Concurrent close calls
-  instead wait for the same finalization. A clean context exit outwaits even a
-  producer that immediately reserves the handle again; cancellation while it
-  waits still attempts abortive resource cleanup before propagating. If an
-  exceptional context exit aborts an active read, write, or flush, that call
-  raises instead of returning truncated data or reporting success for an
-  unterminated member. Abort cleanup reports the handle closed only after its
-  owned resource closes. Binary and text closes are both serialized through
-  their complete finalization.
+  consume or splice data between internal batches. A rejected composite read
+  cannot run rollback against state still owned by the active call. Concurrent
+  close calls instead wait for the same finalization. A clean context exit
+  outwaits even a producer that immediately reserves the handle again;
+  cancellation while it waits still attempts abortive resource cleanup before
+  propagating. If an exceptional context exit aborts an active read, write, or
+  flush, that call raises instead of returning truncated data or reporting
+  success for an unterminated member. Abort cleanup reports the handle closed
+  only after its owned resource closes. Binary and text closes are both
+  serialized through their complete finalization.
 - Text reads now retain already-decoded buffered characters until every
   fallible refill needed by that call succeeds. A rejected overlap or transient
   source failure can therefore be retried without silently skipping text.

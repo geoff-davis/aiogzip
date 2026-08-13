@@ -1,12 +1,17 @@
 """Cross-surface state-contract tests for binary and text file handles."""
 
+import asyncio
 import gzip
 import io
 
 import pytest
 from conftest import FramedAsyncReader
 
-from aiogzip import AsyncGzipBinaryFile, AsyncGzipTextFile
+from aiogzip import (
+    AsyncGzipBinaryFile,
+    AsyncGzipTextFile,
+    ConcurrentOperationError,
+)
 
 _BINARY_READ_SURFACES = (
     "read",
@@ -96,6 +101,9 @@ async def test_closed_read_surfaces_have_one_guard_contract(tmp_path, text_mode)
     await stream.open()
     await stream.close()
 
+    if text_mode:
+        assert stream.buffer._read_poison_observer is None
+
     for surface in surfaces:
         if surface == "anext":
             with pytest.raises(StopAsyncIteration):
@@ -182,6 +190,127 @@ async def test_binary_readlines_restores_lines_after_validation_failure():
 
         assert await stream.tell() == 0
         assert await stream.read() == complete + partial
+    finally:
+        await stream.close()
+
+
+async def test_rejected_binary_readlines_does_not_touch_active_call_state():
+    class BlockingTrailerReader:
+        def __init__(self, body, trailer):
+            self._frames = (body, trailer, b"")
+            self._index = 0
+            self.trailer_read_started = asyncio.Event()
+            self.release_trailer = asyncio.Event()
+
+        async def read(self, size=-1):
+            if self._index == 1:
+                self.trailer_read_started.set()
+                await self.release_trailer.wait()
+            frame = self._frames[self._index]
+            self._index += 1
+            return frame
+
+        def seekable(self):
+            return False
+
+        async def close(self):
+            pass
+
+    lines = [f"line {index:05d} payload\n".encode() for index in range(10_000)]
+    compressed = gzip.compress(b"".join(lines), mtime=0)
+    source = BlockingTrailerReader(compressed[:-8], compressed[-8:])
+    stream = AsyncGzipBinaryFile(
+        None,
+        "rb",
+        fileobj=source,
+        closefd=False,
+        chunk_size=len(compressed),
+    )
+
+    await stream.open()
+    active = asyncio.create_task(stream.readlines())
+    try:
+        await source.trailer_read_started.wait()
+        buffer_before = stream._buffer
+        offset_before = stream._buffer_offset
+        position_before = stream._position
+
+        with pytest.raises(ConcurrentOperationError, match="active read"):
+            await stream.readlines()
+
+        assert stream._buffer is buffer_before
+        assert stream._buffer_offset == offset_before
+        assert stream._position == position_before
+
+        source.release_trailer.set()
+        assert await active == lines
+    finally:
+        source.release_trailer.set()
+        if not active.done():
+            await active
+        await stream.close()
+
+
+@pytest.mark.parametrize("text_mode", [False, True])
+async def test_default_chunk_validation_salvage_sequence_is_error_data_error(
+    text_mode,
+):
+    payload = "small validation salvage" if text_mode else b"small validation salvage"
+    raw = payload.encode() if text_mode else payload
+    corrupt = bytearray(gzip.compress(raw, mtime=0))
+    corrupt[-8] ^= 1
+    source = FramedAsyncReader(bytes(corrupt), seekable=False)
+    if text_mode:
+        stream = AsyncGzipTextFile(None, "rt", fileobj=source, closefd=False)
+    else:
+        stream = AsyncGzipBinaryFile(None, "rb", fileobj=source, closefd=False)
+
+    await stream.open()
+    try:
+        with pytest.raises(gzip.BadGzipFile, match="CRC check failed"):
+            await stream.read(len(payload) + 1)
+        assert await stream.read(len(payload) + 1) == payload
+        with pytest.raises(OSError, match="broken.*close and reopen"):
+            await stream.read(1)
+    finally:
+        await stream.close()
+
+
+async def test_cancelled_text_sized_read_does_not_publish_restored_pieces(monkeypatch):
+    stream = AsyncGzipTextFile(
+        None,
+        "rt",
+        fileobj=FramedAsyncReader(gzip.compress(b"unused", mtime=0)),
+        closefd=False,
+    )
+    calls = 0
+
+    async def cancel_after_one_piece(file, *, capture_origin=True):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return "decoded before cancellation", True
+        binary_file = file._binary_file
+        assert binary_file is not None
+        decoder = binary_file._decoder
+        assert decoder is not None
+        binary_file._poison_read(decoder)
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(
+        AsyncGzipTextFile,
+        "_decode_next_chunk",
+        cancel_after_one_piece,
+    )
+
+    await stream.open()
+    try:
+        with pytest.raises(asyncio.CancelledError):
+            await stream.read(100)
+        assert stream._read_poisoned is True
+        assert stream._buffered_text_len() == 0
+        with pytest.raises(OSError, match="broken.*close and reopen"):
+            await stream.read(1)
     finally:
         await stream.close()
 

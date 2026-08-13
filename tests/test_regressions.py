@@ -1048,7 +1048,7 @@ class TestMediumPriorityEdgeCases:
 
             assert stream._read_broken is True
             assert stream._read_validation_failed is True
-            assert await stream.read() == first_body
+            assert await stream.read() == first_body + b"corrupt second member"
             with pytest.raises(OSError, match="broken.*close and reopen"):
                 await stream.read(1)
             with pytest.raises(OSError, match="broken.*close and reopen"):
