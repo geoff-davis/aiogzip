@@ -30,13 +30,25 @@ All notable changes to this project will be documented in this file.
   closing and reopening the handle.
 - Overlapping reads, seeks, writes, flushes, and closes on one handle are
   rejected before they can reserve or finalize codec work or poison the gzip
-  member; concurrent close calls instead wait for the same finalization. A
-  clean context exit outwaits even a producer that immediately reserves the
-  handle again. If an exceptional context exit aborts an active read, write,
-  or flush, that call raises instead of returning truncated data or reporting
-  success for an unterminated member. Abort cleanup now propagates cancellation
-  and reports the handle closed only after its owned resource closes. Binary
-  and text closes are both serialized through their complete finalization.
+  member. Text calls reserve decoder/encoder and decoded-buffer state as well
+  as the binary codec, including results served from the text buffer. Composite
+  `readlines()`, `writelines()`, and write-mode `seek()` calls hold one
+  reservation across their complete logical operation, so another task cannot
+  consume or splice data between internal batches. Concurrent close calls
+  instead wait for the same finalization. A clean context exit outwaits even a
+  producer that immediately reserves the handle again; cancellation while it
+  waits still attempts abortive resource cleanup before propagating. If an
+  exceptional context exit aborts an active read, write, or flush, that call
+  raises instead of returning truncated data or reporting success for an
+  unterminated member. Abort cleanup reports the handle closed only after its
+  owned resource closes. Binary and text closes are both serialized through
+  their complete finalization.
+- Text reads now retain already-decoded buffered characters until every
+  fallible refill needed by that call succeeds. A rejected overlap or transient
+  source failure can therefore be retried without silently skipping text.
+  Closing through the public `buffer` accessor no longer makes text `close()`
+  skip incremental-encoder finalization; any resulting closed-buffer error is
+  surfaced to the caller.
 
 ### Changed
 

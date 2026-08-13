@@ -54,6 +54,40 @@ _SPLITLINES_UNSAFE_LF = "\r\v\f\x1c\x1d\x1e\x85\u2028\u2029"
 _SPLITLINES_UNSAFE_CR = "\n\v\f\x1c\x1d\x1e\x85\u2028\u2029"
 
 
+class _TextReadReservation:
+    """Pair one text-state read reservation across every exit path."""
+
+    __slots__ = ("_file",)
+
+    def __init__(self, file: "AsyncGzipTextFile") -> None:
+        self._file = file
+
+    def __enter__(self) -> None:
+        file = self._file
+        file._check_text_read_call_available()
+        file._read_call_active = True
+
+    def __exit__(self, *exc_info: object) -> None:
+        self._file._read_call_active = False
+
+
+class _TextWriteReservation:
+    """Pair one text-state write reservation across every exit path."""
+
+    __slots__ = ("_file",)
+
+    def __init__(self, file: "AsyncGzipTextFile") -> None:
+        self._file = file
+
+    def __enter__(self) -> None:
+        file = self._file
+        file._check_text_write_call_available()
+        file._write_call_active = True
+
+    def __exit__(self, *exc_info: object) -> None:
+        self._file._write_call_active = False
+
+
 class AsyncGzipTextFile:
     """
     An asynchronous gzip file reader/writer for text data.
@@ -110,6 +144,10 @@ class AsyncGzipTextFile:
         "_binary_file",
         "_is_closed",
         "_close_lock",
+        "_read_call_active",
+        "_write_call_active",
+        "_read_call",
+        "_write_call",
         "_decoder",
         "_encoder",
         "_encoder_used",
@@ -227,6 +265,10 @@ class AsyncGzipTextFile:
         self._binary_file: Optional[AsyncGzipBinaryFile] = None
         self._is_closed: bool = False
         self._close_lock = asyncio.Lock()
+        self._read_call_active: bool = False
+        self._write_call_active: bool = False
+        self._read_call = _TextReadReservation(self)
+        self._write_call = _TextWriteReservation(self)
 
         # Decoder and buffer state. Constructed eagerly so an invalid
         # `encoding` raises LookupError at call site, matching stdlib
@@ -344,32 +386,14 @@ class AsyncGzipTextFile:
         exc_tb: Optional[Any],
     ) -> None:
         """Exit the context manager, flushing and closing the file."""
-        if exc_val is None:
-            while True:
-                try:
-                    await self.close()
-                    return
-                except ConcurrentOperationError:
-                    binary_file = self._binary_file
-                    if (
-                        binary_file is None
-                        or not await binary_file._wait_for_active_call()
-                    ):
-                        raise
-
-        try:
+        binary_file = self._binary_file
+        if binary_file is None:
             await self.close()
-        except ConcurrentOperationError:
-            binary_file = self._binary_file
-            if binary_file is not None:
-                try:
-                    await binary_file._abort_active_call_on_exit()
-                except asyncio.CancelledError:
-                    raise
-                except Exception:
-                    pass
-                finally:
-                    self._sync_closed_from_binary()
+            return
+        try:
+            await binary_file._close_on_context_exit(self.close, exc_val)
+        finally:
+            self._sync_closed_from_binary()
 
     # Sync-protocol stubs. Without these, ``with`` / ``for`` fail with generic
     # "does not support the context manager protocol" / "is not iterable"
@@ -438,6 +462,8 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        if self._read_call_active:
+            self._check_text_read_call_available()
         if whence == os.SEEK_CUR:
             if offset != 0:
                 raise io.UnsupportedOperation("can't do nonzero cur-relative seeks")
@@ -450,35 +476,36 @@ class AsyncGzipTextFile:
         if whence != os.SEEK_SET:
             raise ValueError("Invalid whence value")
 
-        if offset != 0:
-            if offset >= 0:
-                await self._seek_to_plain_position(offset)
+        with self._read_call:
+            if offset != 0:
+                if offset >= 0:
+                    await self._seek_to_plain_position(offset)
+                    return offset
+
+                (
+                    origin_offset,
+                    decoder_state,
+                    trailing_cr,
+                    seen_newlines,
+                    chars_to_skip,
+                ) = self._decode_cookie(offset)
+                await self._binary_file.seek(origin_offset)
+                self._decoder.setstate(decoder_state)
+                self._decoder_byte_position = origin_offset
+                self._trailing_cr = trailing_cr
+                self._seen_newline_types = seen_newlines
+                self._set_buffer("")
+                self._set_buffer_origin(
+                    origin_offset=origin_offset,
+                    decoder_state=decoder_state,
+                    trailing_cr=trailing_cr,
+                    seen_newlines=seen_newlines,
+                )
+                await self._replay_characters(chars_to_skip, strict=True)
                 return offset
 
-            (
-                origin_offset,
-                decoder_state,
-                trailing_cr,
-                seen_newlines,
-                chars_to_skip,
-            ) = self._decode_cookie(offset)
-            await self._binary_file.seek(origin_offset)
-            self._decoder.setstate(decoder_state)
-            self._decoder_byte_position = origin_offset
-            self._trailing_cr = trailing_cr
-            self._seen_newline_types = seen_newlines
-            self._set_buffer("")
-            self._set_buffer_origin(
-                origin_offset=origin_offset,
-                decoder_state=decoder_state,
-                trailing_cr=trailing_cr,
-                seen_newlines=seen_newlines,
-            )
-            await self._replay_characters(chars_to_skip, strict=True)
+            await self._reset_to_start()
             return offset
-
-        await self._reset_to_start()
-        return offset
 
     def fileno(self) -> int:
         if self._binary_file is None:
@@ -534,6 +561,20 @@ class AsyncGzipTextFile:
         """Refresh the hot-path closed flag at a cold lifecycle boundary."""
         if self._binary_file is not None:
             self._is_closed = self._binary_file.closed
+
+    def _check_text_read_call_available(self) -> None:
+        """Reject an operation that could mutate active text decoder state."""
+        if self._read_call_active:
+            raise ConcurrentOperationError(
+                "gzip text reader already has an active read call"
+            )
+
+    def _check_text_write_call_available(self) -> None:
+        """Reject an operation that could mutate active text encoder state."""
+        if self._write_call_active:
+            raise ConcurrentOperationError(
+                "gzip text writer already has an active write or flush call"
+            )
 
     @property
     def encoding(self) -> str:
@@ -620,6 +661,11 @@ class AsyncGzipTextFile:
             # newline == '' means no translation; any other value treat as no translation
             pass
 
+        with self._write_call:
+            return await self._write_reserved(data, text_to_encode)
+
+    async def _write_reserved(self, data: str, text_to_encode: str) -> int:
+        """Encode and write text while the caller owns text encoder state."""
         # Keep one encoder for the lifetime of the stream. Stateless str.encode()
         # would emit a fresh BOM or reset sequence on every write for encodings
         # such as UTF-16 and ISO-2022-JP.
@@ -630,7 +676,9 @@ class AsyncGzipTextFile:
         self._encoder_used = True
         try:
             encoded_data = encoder.encode(text_to_encode, final=False)
-            await self._binary_file.write(encoded_data)
+            binary_file = self._binary_file
+            assert binary_file is not None
+            await binary_file.write(encoded_data)
         except BaseException:
             # Preserve retryability when the binary layer rejected the write
             # before consuming it (for example strict_size validation).
@@ -638,6 +686,17 @@ class AsyncGzipTextFile:
             self._encoder_used = encoder_was_used
             raise
         return len(data)
+
+    async def _write_batch_reserved(self, data: Any) -> int:
+        """Validate and translate one composite-write batch under reservation."""
+        if not isinstance(data, str):
+            raise TypeError("write() argument must be str, not bytes")
+        text_to_encode = data
+        if self._newline is None:
+            text_to_encode = text_to_encode.replace("\n", os.linesep)
+        elif self._newline in ("\n", "\r", "\r\n"):
+            text_to_encode = text_to_encode.replace("\n", self._newline)
+        return await self._write_reserved(data, text_to_encode)
 
     def _buffered_text_len(self) -> int:
         """Return the number of unread characters in the decoded text buffer."""
@@ -916,7 +975,11 @@ class AsyncGzipTextFile:
 
         return True
 
-    async def _decode_next_chunk(self) -> Tuple[str, bool]:
+    async def _decode_next_chunk(
+        self,
+        *,
+        capture_origin: bool = True,
+    ) -> Tuple[str, bool]:
         """Decode the next binary chunk into newline-translated text.
 
         Mirrors :meth:`_read_chunk_and_decode` but returns the translated text
@@ -939,7 +1002,7 @@ class AsyncGzipTextFile:
             self._finalize_pending_newline_state()
             return "", False
 
-        if len(self._text_buffer) == self._text_buffer_offset:
+        if capture_origin and len(self._text_buffer) == self._text_buffer_offset:
             self._capture_buffer_origin()
 
         raw_chunk = await bf.read(self._chunk_size)
@@ -956,6 +1019,36 @@ class AsyncGzipTextFile:
         if decoded_chunk:
             return self._apply_newline_decoding(decoded_chunk), True
         return "", True
+
+    async def _fill_text_until(self, size: int) -> int:
+        """Buffer at least ``size`` unread characters or stop at clean EOF.
+
+        Freshly decoded pieces are committed to the shared text buffer even if
+        a later binary read fails. A retry therefore sees every character the
+        decoder accepted before the failure instead of a hole in the stream.
+        Joining once preserves the sized-read path's linear accumulation cost.
+        """
+        available = self._buffered_text_len()
+        if available >= size:
+            return available
+
+        if len(self._text_buffer) == self._text_buffer_offset:
+            self._capture_buffer_origin()
+
+        pieces: List[str] = []
+        added = 0
+        try:
+            while available + added < size:
+                text, more = await self._decode_next_chunk(capture_origin=False)
+                if text:
+                    pieces.append(text)
+                    added += len(text)
+                if not more:
+                    break
+        finally:
+            if pieces:
+                self._append_buffer("".join(pieces))
+        return self._buffered_text_len()
 
     async def read(self, size: int = -1) -> str:
         """
@@ -978,6 +1071,8 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        if self._read_call_active:
+            self._check_text_read_call_available()
 
         if size is None:
             size = -1
@@ -988,73 +1083,49 @@ class AsyncGzipTextFile:
         if size == 0:
             return ""
 
-        # read() consumes the buffer by character count; drop any batched
-        # pending lines so they cannot serve stale content afterwards. The
-        # synced offset means the buffer remainder is read correctly regardless.
-        if self._pending_lines:
-            self._pending_lines = []
-            self._pending_idx = 0
-
         if size == -1:
-            # Fast path: drain buffer, then read all remaining binary data
-            # in one shot to avoid per-chunk buffer append/consume overhead
-            chunks = []
+            # Keep the decoded prefix shared until the one fallible binary read
+            # succeeds. Concurrent-operation and transient source failures can
+            # then be retried without losing text already decoded above it.
             buf = self._text_buffer
             off = self._text_buffer_offset
-            if off < len(buf):
-                chunks.append(buf[off:] if off else buf)
-                self._text_buffer = ""
-                self._text_buffer_offset = 0
+            prefix = buf[off:] if off else buf
 
             bf = self._binary_file
             decoder = self._decoder
             apply_nl = self._apply_newline_decoding
+            with self._read_call:
+                raw_all = await bf.read(-1)
+                self._decoder_byte_position = bf._position
+                chunks = [prefix] if prefix else []
+                if raw_all:
+                    decoded = decoder.decode(raw_all, final=False)
+                    if decoded:
+                        chunks.append(apply_nl(decoded))
 
-            raw_all = await bf.read(-1)
-            if raw_all:
-                decoded = decoder.decode(raw_all, final=False)
-                if decoded:
-                    chunks.append(apply_nl(decoded))
-
-            final = decoder.decode(b"", final=True)
-            if final:
-                chunks.append(apply_nl(final))
-            self._finalize_pending_newline_state()
-
-            return "".join(chunks)
+                final = decoder.decode(b"", final=True)
+                if final:
+                    chunks.append(apply_nl(final))
+                self._finalize_pending_newline_state()
+                self._set_buffer("")
+                return "".join(chunks)
         else:
-            # Serve from already-buffered text first, then pull freshly decoded
-            # chunks into a local list and join once. Appending each chunk to
-            # the str buffer via _append_buffer is O(n^2) for large sized reads
-            # (CPython can't do in-place += on a slotted attribute); local
-            # accumulation keeps this O(n).
-            result_parts: List[str] = []
-            need = size
-
+            # A fully buffered result cannot overlap another task because it
+            # has no suspension point. Any refill reserves the text state and
+            # publishes only after all requested characters are recoverable.
             buffered = self._buffered_text_len()
-            if buffered:
-                take = min(need, buffered)
-                result_parts.append(self._consume_buffer(take))
-                need -= take
+            if buffered >= size:
+                if self._pending_lines:
+                    self._pending_lines = []
+                    self._pending_idx = 0
+                return self._consume_buffer(size)
 
-            while need > 0:
-                text, more = await self._decode_next_chunk()
-                if text:
-                    if len(text) <= need:
-                        result_parts.append(text)
-                        need -= len(text)
-                    else:
-                        # Keep the whole chunk in the buffer so its replay
-                        # origin stays valid for tell()/seek(), then consume
-                        # exactly `need` characters from it.
-                        self._set_buffer(text)
-                        result_parts.append(self._consume_buffer(need))
-                        need = 0
-                        break
-                if not more:
-                    break
-
-            return "".join(result_parts)
+            if self._pending_lines:
+                self._pending_lines = []
+                self._pending_idx = 0
+            with self._read_call:
+                available = await self._fill_text_until(size)
+                return self._consume_buffer(min(size, available))
 
     def _find_line_terminator(self, search_from: int = 0) -> Tuple[int, int]:
         """Find position of next line terminator in the buffered text.
@@ -1266,46 +1337,38 @@ class AsyncGzipTextFile:
             return self._take_first_refilled_line()
 
         # The remainder has no terminator: it is the head of a line that
-        # continues into later chunks (or the final unterminated line). Pull it
-        # out and gather decoded chunks until a terminator or EOF, keeping the
-        # whole terminating chunk buffered so its replay origin (captured by
-        # _decode_next_chunk before decoding) stays valid for tell()/seek().
-        prefix: List[str] = []
-        if start < len(buf):
-            prefix.append(buf[start:] if start else buf)
-        self._set_buffer("")
+        # continues into later chunks (or the final unterminated line). Leave
+        # it shared while awaiting input and commit every newly decoded piece
+        # before either publishing or propagating an error.
+        initial_available = len(buf) - start
+        if initial_available == 0:
+            self._capture_buffer_origin()
+        pieces: List[str] = []
+        added = 0
+        line_size: Optional[int] = None
+        try:
+            while True:
+                text, more = await self._decode_next_chunk(capture_origin=False)
+                if text:
+                    i = text.find(term)
+                    pieces.append(text)
+                    if i != -1:
+                        line_size = initial_available + added + i + 1
+                        break
+                    added += len(text)
+                if not more:
+                    break
+        finally:
+            if pieces:
+                self._append_buffer("".join(pieces))
 
-        while True:
-            text, more = await self._decode_next_chunk()
-            if text:
-                i = text.find(term)
-                if i != -1:
-                    if prefix:
-                        first_line = "".join(prefix) + text[: i + 1]
-                    else:
-                        first_line = text[: i + 1]
-                    # Keep the whole chunk buffered (its replay origin stays
-                    # valid) with the offset past this line; the next call
-                    # bulk-splits the rest of the chunk via the windowed path
-                    # above.
-                    self._set_buffer(text)
-                    self._text_buffer_offset = i + 1
-                    return first_line
-                prefix.append(text)
-            if not more:
-                tail = "".join(prefix)
-                return tail if tail else None
+        if line_size is not None:
+            return self._consume_buffer(line_size)
+        remaining = self._buffered_text_len()
+        return self._consume_buffer(remaining) if remaining else None
 
     async def _readline_fast(self) -> str:
-        """Single-line read for the single-character terminator modes.
-
-        Returns "" at end of input. Only valid when
-        ``self._line_term is not None``.
-        """
-        # Pending-line consumption is inlined in the two hot read paths because
-        # a per-line method call measurably (~7%) lowers iteration throughput.
-        # Keep this block in sync with __anext__; the refill-only helper has a
-        # narrower contract and cannot consume an arbitrary pending position.
+        """Single-line helper retained outside the inlined public hot path."""
         idx = self._pending_idx
         pending = self._pending_lines
         if idx < len(pending):
@@ -1382,6 +1445,8 @@ class AsyncGzipTextFile:
         """Return the next line from the file."""
         if self._is_closed:
             raise StopAsyncIteration
+        if self._read_call_active:
+            self._check_text_read_call_available()
 
         if self._line_term is not None:
             # Keep this inline block in sync with _readline_fast; a helper call
@@ -1393,7 +1458,8 @@ class AsyncGzipTextFile:
                 self._pending_idx = idx + 1
                 self._text_buffer_offset += len(line)
                 return line
-            refilled = await self._next_fast_line()
+            with self._read_call:
+                refilled = await self._next_fast_line()
             if refilled is None:
                 raise StopAsyncIteration
             return refilled
@@ -1407,12 +1473,23 @@ class AsyncGzipTextFile:
             # Track how far we've scanned before reading more data.
             # Back up 1 char in case a \r at the boundary pairs with a new \n.
             buf_len = len(self._text_buffer) - self._text_buffer_offset
+            with self._read_call:
+                return await self._anext_buffered_reserved(buf_len)
+
+    async def _anext_buffered_reserved(self, buf_len: int) -> str:
+        """Finish generic-newline iteration under the text reservation."""
+        search_from = max(0, buf_len - 1)
+        while True:
             has_more = await self._read_chunk_and_decode()
             if not has_more:
                 remaining = len(self._text_buffer) - self._text_buffer_offset
                 if remaining > 0:
                     return self._consume_buffer(remaining)
                 raise StopAsyncIteration
+            pos, length = self._find_line_terminator(search_from)
+            if pos != -1:
+                return self._consume_buffer(pos + length)
+            buf_len = len(self._text_buffer) - self._text_buffer_offset
             search_from = max(0, buf_len - 1)
 
     async def readline(self, limit: int = -1) -> str:
@@ -1441,6 +1518,8 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
+        if self._read_call_active:
+            self._check_text_read_call_available()
 
         if limit is None or limit < 0:
             # Any negative limit means "no limit", matching io.TextIOBase.
@@ -1454,7 +1533,16 @@ class AsyncGzipTextFile:
         # pending-line path. Bounded reads (limit != -1) cap the work at `limit`
         # characters anyway, so they stay on the buffer path below.
         if limit == -1 and self._line_term is not None:
-            return await self._readline_fast()
+            idx = self._pending_idx
+            pending = self._pending_lines
+            if idx < len(pending):
+                line = pending[idx]
+                self._pending_idx = idx + 1
+                self._text_buffer_offset += len(line)
+                return line
+            with self._read_call:
+                refilled = await self._next_fast_line()
+            return refilled if refilled is not None else ""
 
         # Bounded reads consume the buffer by character count, which would leave
         # any batched pending lines pointing at stale offsets; drop them first.
@@ -1462,30 +1550,58 @@ class AsyncGzipTextFile:
             self._pending_lines = []
             self._pending_idx = 0
 
-        # Try to get a line from our buffer using newline-aware search
-        search_from = 0
-        while True:
-            pos, length = self._find_line_terminator(search_from)
+        pos, length = self._find_line_terminator(0)
+        if pos != -1:
+            end = pos + length
+            if limit != -1 and end > limit:
+                return self._consume_buffer(limit)
+            return self._consume_buffer(end)
 
+        buf_len = len(self._text_buffer) - self._text_buffer_offset
+        if limit != -1 and buf_len >= limit:
+            return self._consume_buffer(limit)
+        if self._binary_file is not None and self._binary_file._eof:
+            if buf_len == 0:
+                return ""
+            return self._consume_buffer(min(limit, buf_len) if limit != -1 else buf_len)
+
+        with self._read_call:
+            return await self._readline_buffered_reserved(limit, buf_len)
+
+    async def _readline_buffered_reserved(self, limit: int, buf_len: int) -> str:
+        """Finish a generic-newline text line under the read reservation."""
+        search_from = max(0, buf_len - 1)
+        while True:
+            has_more = await self._read_chunk_and_decode()
+            pos, length = self._find_line_terminator(search_from)
             if pos != -1:
                 end = pos + length
                 if limit != -1 and end > limit:
                     return self._consume_buffer(limit)
                 return self._consume_buffer(end)
 
-            buf_len = len(self._text_buffer) - self._text_buffer_offset
-            if limit != -1 and buf_len >= limit:
+            current = self._buffered_text_len()
+            if limit != -1 and current >= limit:
                 return self._consume_buffer(limit)
-
-            has_more = await self._read_chunk_and_decode()
             if not has_more:
-                if buf_len == 0:
-                    return ""
-                remaining = len(self._text_buffer) - self._text_buffer_offset
-                if limit != -1 and remaining > limit:
-                    return self._consume_buffer(limit)
-                return self._consume_buffer(remaining)
-            search_from = max(0, buf_len - 1)
+                return self._consume_buffer(current) if current else ""
+            search_from = max(0, current - 1)
+
+    async def _readline_generic_reserved(self, limit: int) -> str:
+        """Read one generic-newline line while already reserved."""
+        pos, length = self._find_line_terminator(0)
+        if pos != -1:
+            end = pos + length
+            if limit != -1 and end > limit:
+                return self._consume_buffer(limit)
+            return self._consume_buffer(end)
+        current = self._buffered_text_len()
+        if limit != -1 and current >= limit:
+            return self._consume_buffer(limit)
+        binary_file = self._binary_file
+        if binary_file is not None and binary_file._eof:
+            return self._consume_buffer(current) if current else ""
+        return await self._readline_buffered_reserved(limit, current)
 
     async def readlines(self, hint: int = -1) -> List[str]:
         """
@@ -1516,23 +1632,24 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
+        if self._read_call_active:
+            self._check_text_read_call_available()
 
-        if self._line_term is not None:
-            return await self._readlines_fast(hint)
+        with self._read_call:
+            if self._line_term is not None:
+                return await self._readlines_fast(hint)
 
-        lines: List[str] = []
-        total_size = 0
-
-        while True:
-            line = await self.readline()
-            if not line:
-                break
-            lines.append(line)
-            total_size += len(line)
-            if hint > 0 and total_size >= hint:
-                break
-
-        return lines
+            lines: List[str] = []
+            total_size = 0
+            while True:
+                line = await self._readline_generic_reserved(-1)
+                if not line:
+                    break
+                lines.append(line)
+                total_size += len(line)
+                if hint > 0 and total_size >= hint:
+                    break
+            return lines
 
     def iter_batches(self, hint: int = DEFAULT_BATCH_HINT) -> AsyncIterator[List[str]]:
         """
@@ -1606,43 +1723,46 @@ class AsyncGzipTextFile:
             raise OSError("File not open for writing")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
+        if self._binary_file is None:
+            raise ValueError("File not opened. Call await open() or use async with.")
 
         pending: List[str] = []
         pending_chars = 0
         iterator = iter(lines)
-        while True:
-            try:
-                line = next(iterator)
-            except StopIteration:
-                break
-            except BaseException:
-                if pending:
-                    await self.write("".join(pending))
-                raise
+        with self._write_call:
+            while True:
+                try:
+                    line = next(iterator)
+                except StopIteration:
+                    break
+                except BaseException:
+                    if pending:
+                        await self._write_batch_reserved("".join(pending))
+                    raise
 
-            if not isinstance(line, str):
-                if pending:
-                    await self.write("".join(pending))
-                await self.write(line)
-                continue
+                if not isinstance(line, str):
+                    if pending:
+                        await self._write_batch_reserved("".join(pending))
+                    await self._write_batch_reserved(line)
+                    continue
 
-            length = len(line)
-            if length >= self._chunk_size:
-                if pending:
-                    await self.write("".join(pending))
-                    pending = []
-                    pending_chars = 0
-                await self.write(line)
-            else:
-                if pending and pending_chars + length > self._chunk_size:
-                    await self.write("".join(pending))
-                    pending = []
-                    pending_chars = 0
-                pending.append(line)
-                pending_chars += length
+                length = len(line)
+                if length >= self._chunk_size:
+                    if pending:
+                        await self._write_batch_reserved("".join(pending))
+                        pending = []
+                        pending_chars = 0
+                    await self._write_batch_reserved(line)
+                else:
+                    if pending and pending_chars + length > self._chunk_size:
+                        await self._write_batch_reserved("".join(pending))
+                        pending = []
+                        pending_chars = 0
+                    pending.append(line)
+                    pending_chars += length
 
-        if pending:
-            await self.write("".join(pending))
+            if pending:
+                await self._write_batch_reserved("".join(pending))
 
     async def flush(self) -> None:
         """
@@ -1663,7 +1783,13 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
 
         if self._binary_file is not None:
-            await self._binary_file.flush()
+            if self._writing_mode:
+                with self._write_call:
+                    await self._binary_file.flush()
+            else:
+                if self._read_call_active:
+                    self._check_text_read_call_available()
+                await self._binary_file.flush()
 
     async def close(self) -> None:
         """Closes the file."""
@@ -1672,7 +1798,11 @@ class AsyncGzipTextFile:
         # close cannot finalize the same encoder while the first awaits its
         # trailer write.
         async with self._close_lock:
-            if self.closed:
+            # `_is_closed` records completion of text-layer cleanup. The public
+            # property delegates to `buffer.closed`, which can become true when
+            # callers close the exposed binary layer first; that must not skip
+            # incremental-encoder finalization (and its missing-shift error).
+            if self._is_closed:
                 return
 
             binary_file = self._binary_file
@@ -1680,29 +1810,44 @@ class AsyncGzipTextFile:
                 self._is_closed = True
                 return
 
-            # Finalizing an incremental encoder mutates it. Reject an overlapping
-            # binary call before producing final bytes so a retry cannot lose them.
-            if self._writing_mode:
-                binary_file._check_write_call_available()
+            if self._read_call_active:
+                self._check_text_read_call_available()
+            if self._write_call_active:
+                self._check_text_write_call_available()
 
-            encoder_failed = False
+            if self._writing_mode:
+                # Reserve text encoder state through final bytes and the binary
+                # trailer. A concurrent write is rejected before mutation.
+                binary_file._check_write_call_available()
+                with self._write_call:
+                    await self._close_text_writer(binary_file)
+                return
+
             try:
-                if self._writing_mode and self._encoder_used:
-                    encoder = self._encoder
-                    assert encoder is not None
-                    final_data = encoder.encode("", final=True)
-                    if final_data:
-                        await binary_file.write(final_data)
-            except BaseException:
-                encoder_failed = True
-                raise
+                await binary_file.close()
             finally:
-                try:
-                    await binary_file.close()
-                except asyncio.CancelledError:
+                self._sync_closed_from_binary()
+
+    async def _close_text_writer(self, binary_file: AsyncGzipBinaryFile) -> None:
+        """Finalize both writer layers while text encoder state is reserved."""
+        encoder_failed = False
+        try:
+            if self._encoder_used:
+                encoder = self._encoder
+                assert encoder is not None
+                final_data = encoder.encode("", final=True)
+                if final_data:
+                    await binary_file.write(final_data)
+        except BaseException:
+            encoder_failed = True
+            raise
+        finally:
+            try:
+                await binary_file.close()
+            except asyncio.CancelledError:
+                raise
+            except BaseException:
+                if not encoder_failed:
                     raise
-                except BaseException:
-                    if not encoder_failed:
-                        raise
-                finally:
-                    self._sync_closed_from_binary()
+            finally:
+                self._sync_closed_from_binary()

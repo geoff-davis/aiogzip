@@ -47,6 +47,13 @@ then retry the rejected operation. Because the exception subclasses
 `OSError`, existing general I/O handlers remain effective while callers that
 want to retry this case can catch it explicitly.
 
+The reservation covers text already decoded into the wrapper's buffer as well
+as binary codec work. Composite `readlines()`, `writelines()`, and write-mode
+`seek()` calls retain ownership across all of their internal reads or writes;
+another task cannot consume a buffered prefix or splice data between batches.
+If a text refill fails before the call can publish a result, characters decoded
+before that failure remain buffered for the documented retry.
+
 On a clean `async with` exit, aiogzip waits until all calls from a looping
 producer finish and then closes normally. Concurrent close calls wait for the
 same binary or text finalization. If the context body is already raising, exit
@@ -56,6 +63,9 @@ it never returns a truncated prefix or reports success for a gzip member that
 can no longer receive its trailer. Cancellation delivered during cleanup still
 propagates, and a failed abortive underlying close leaves the handle reportably
 open so `close()` can be retried.
+
+Cancellation while a clean context exit is waiting for an active call also
+attempts abortive owned-resource cleanup before the cancellation propagates.
 
 ## Telling the decompression cap apart from corruption
 
