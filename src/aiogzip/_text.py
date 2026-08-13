@@ -661,8 +661,28 @@ class AsyncGzipTextFile:
             # newline == '' means no translation; any other value treat as no translation
             pass
 
-        with self._write_call:
-            return await self._write_reserved(data, text_to_encode)
+        # Like the binary primitive, keep this path inline: one helper/context
+        # boundary per small text write is a measured hot-path regression.
+        self._check_text_write_call_available()
+        self._write_call_active = True
+        try:
+            encoder = self._encoder
+            assert encoder is not None
+            encoder_state = encoder.getstate()
+            encoder_was_used = self._encoder_used
+            self._encoder_used = True
+            try:
+                encoded_data = encoder.encode(text_to_encode, final=False)
+                binary_file = self._binary_file
+                assert binary_file is not None
+                await binary_file.write(encoded_data)
+            except BaseException:
+                encoder.setstate(encoder_state)
+                self._encoder_used = encoder_was_used
+                raise
+            return len(data)
+        finally:
+            self._write_call_active = False
 
     async def _write_reserved(self, data: str, text_to_encode: str) -> int:
         """Encode and write text while the caller owns text encoder state."""
