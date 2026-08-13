@@ -94,11 +94,10 @@ class _BinaryReadReservation:
 class _BinaryWriteReservation:
     """Pair one binary write reservation structurally across every exit path."""
 
-    __slots__ = ("_file", "_encoder")
+    __slots__ = ("_file",)
 
     def __init__(self, file: "AsyncGzipBinaryFile") -> None:
         self._file = file
-        self._encoder: Optional[GzipEncoder] = None
 
     def __enter__(self) -> GzipEncoder:
         file = self._file
@@ -107,14 +106,19 @@ class _BinaryWriteReservation:
         if encoder is None:
             raise RuntimeError("gzip writer encoder is not initialized")
         file._write_call_active = True
-        self._encoder = encoder
         return encoder
 
     def __exit__(self, *exc_info: object) -> None:
-        encoder = self._encoder
-        self._encoder = None
-        assert encoder is not None
-        self._file._finish_write_call(encoder)
+        file = self._file
+        encoder = file._encoder
+        if encoder is not None:
+            file._finish_write_call(encoder)
+            return
+        # Defensive lifecycle corruption must still release ownership; the old
+        # encoder-None branch silently wedged every later writer operation.
+        file._write_call_active = False
+        if file._active_call_waiter is not None:
+            file._notify_active_call_finished()
 
 
 class AsyncGzipBinaryFile:

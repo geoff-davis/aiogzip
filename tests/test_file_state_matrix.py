@@ -264,3 +264,17 @@ async def test_zero_fill_seek_reports_the_broken_writer_contract():
     with pytest.raises(OSError, match="write stream is broken.*member is unusable"):
         await stream.seek(1)
     await stream.close()
+
+
+async def test_missing_encoder_during_reservation_exit_does_not_wedge_writer(tmp_path):
+    stream = AsyncGzipBinaryFile(tmp_path / "reservation-exit.gz", "wb", mtime=0)
+    await stream.open()
+    encoder = stream._encoder
+    assert encoder is not None
+
+    with stream._write_call:
+        stream._encoder = None
+
+    assert stream._write_call_active is False
+    stream._encoder = encoder
+    await stream.close()
