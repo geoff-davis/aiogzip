@@ -46,9 +46,14 @@ All notable changes to this project will be documented in this file.
 - Text reads now retain already-decoded buffered characters until every
   fallible refill needed by that call succeeds. A rejected overlap or transient
   source failure can therefore be retried without silently skipping text.
+  Binary and text `readlines()` likewise roll back complete lines accumulated
+  by a failed composite call, and sized text reads preserve the replay origin
+  needed for exact `tell()`/`seek()` cookies across buffer compaction.
+  A poisoned binary stream is no longer mistaken for clean EOF by the text
+  wrapper, including final partial-line and trailing-CR cases.
   Closing through the public `buffer` accessor no longer makes text `close()`
-  skip incremental-encoder finalization; any resulting closed-buffer error is
-  surfaced to the caller.
+  skip incremental-encoder finalization or leaves text reads usable; any
+  resulting closed-buffer error is surfaced to the caller.
 
 ### Changed
 

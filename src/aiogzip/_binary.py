@@ -94,10 +94,11 @@ class _BinaryReadReservation:
 class _BinaryWriteReservation:
     """Pair one binary write reservation structurally across every exit path."""
 
-    __slots__ = ("_file",)
+    __slots__ = ("_file", "_encoder")
 
     def __init__(self, file: "AsyncGzipBinaryFile") -> None:
         self._file = file
+        self._encoder: Optional[GzipEncoder] = None
 
     def __enter__(self) -> GzipEncoder:
         file = self._file
@@ -106,13 +107,14 @@ class _BinaryWriteReservation:
         if encoder is None:
             raise RuntimeError("gzip writer encoder is not initialized")
         file._write_call_active = True
+        self._encoder = encoder
         return encoder
 
     def __exit__(self, *exc_info: object) -> None:
-        file = self._file
-        encoder = file._encoder
-        if encoder is not None:
-            file._finish_write_call(encoder)
+        encoder = self._encoder
+        self._encoder = None
+        assert encoder is not None
+        self._file._finish_write_call(encoder)
 
 
 class AsyncGzipBinaryFile:
@@ -186,12 +188,12 @@ class AsyncGzipBinaryFile:
         "_write_broken",
         "_write_call_active",
         "_read_call_active",
-        "_read_call",
         "_salvage_read_call",
         "_recovery_read_call",
         "_write_call",
         "_active_call_waiter",
         "_close_lock",
+        "_closed_observer",
         "_read_broken",
         "_read_validation_failed",
         "_max_decompressed_size",
@@ -294,7 +296,6 @@ class AsyncGzipBinaryFile:
         self._write_broken: bool = False
         self._write_call_active: bool = False
         self._read_call_active: bool = False
-        self._read_call = _BinaryReadReservation(self, allow_buffered=False)
         self._salvage_read_call = _BinaryReadReservation(
             self,
             allow_buffered=True,
@@ -306,6 +307,7 @@ class AsyncGzipBinaryFile:
         self._write_call = _BinaryWriteReservation(self)
         self._active_call_waiter: Optional[asyncio.Future[None]] = None
         self._close_lock = asyncio.Lock()
+        self._closed_observer: Optional[Callable[[], None]] = None
         self._read_broken: bool = False
         self._read_validation_failed: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
@@ -494,6 +496,8 @@ class AsyncGzipBinaryFile:
         """Return the current uncompressed file position."""
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
+        if self._file is None:
+            raise ValueError("File not opened. Call await open() or use async with.")
         return self._position
 
     async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
@@ -503,6 +507,11 @@ class AsyncGzipBinaryFile:
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
         if self._writing_mode:
+            if self._write_broken:
+                raise OSError(
+                    "write stream is broken after a prior write failure; "
+                    "the gzip member is unusable"
+                )
             if whence == os.SEEK_CUR:
                 target = self._position + offset
             elif whence == os.SEEK_SET:
@@ -939,18 +948,33 @@ class AsyncGzipBinaryFile:
             raise OSError("File not open for reading")
         if self._is_closed:
             raise ValueError("I/O operation on closed file.")
+        if self._file is None:
+            raise ValueError("File not opened. Call await open() or use async with.")
 
         lines: List[bytes] = []
         total = 0
-        with self._salvage_read_call:
-            while True:
-                line = await self._readline_reserved(-1)
-                if not line:
-                    break
-                lines.append(line)
-                total += len(line)
-                if hint > 0 and total >= hint:
-                    break
+        position_before = self._position
+        try:
+            with self._salvage_read_call:
+                while True:
+                    line = await self._readline_reserved(-1)
+                    if not line:
+                        break
+                    lines.append(line)
+                    total += len(line)
+                    if hint > 0 and total >= hint:
+                        break
+        except BaseException:
+            # A composite call publishes nothing when it fails. Put complete
+            # lines consumed by earlier loop iterations back ahead of the
+            # current unread span for retry or validation-failure salvage.
+            if self._read_validation_failed or not self._read_broken:
+                unread = self._buffer[self._buffer_offset :]
+                restored = bytearray().join((*lines, unread))
+                self._buffer = restored
+                self._buffer_offset = 0
+                self._position = position_before
+            raise
         return lines
 
     async def writelines(self, lines: Iterable[bytes]) -> None:
@@ -1443,6 +1467,14 @@ class AsyncGzipBinaryFile:
         if self._is_closed and self._write_broken:
             encoder.discard()
 
+    def _mark_closed(self) -> None:
+        """Latch closure and synchronously notify an owning text wrapper."""
+        self._is_closed = True
+        observer = self._closed_observer
+        self._closed_observer = None
+        if observer is not None:
+            observer()
+
     async def _fill_buffer(self) -> None:
         """Decompress the next compressed chunk into the read buffer.
 
@@ -1681,8 +1713,8 @@ class AsyncGzipBinaryFile:
         if self._writing_mode:
             self._check_write_call_available()
 
-        # Mark as closed immediately to prevent concurrent close attempts
-        self._is_closed = True
+        # Mark as closed immediately to prevent concurrent close attempts.
+        self._mark_closed()
 
         close_file = (
             self._file
@@ -1742,7 +1774,7 @@ class AsyncGzipBinaryFile:
                 # A failure or cancellation leaves the broken handle reportably
                 # open so an explicit close() can retry the underlying close.
                 await self._close_underlying(close_file)
-            self._is_closed = True
+            self._mark_closed()
 
     @staticmethod
     async def _close_underlying(file: Any) -> None:
