@@ -537,6 +537,7 @@ class AsyncGzipBinaryFile:
             return self._position
 
         position_before = self._position
+        rewound = False
         with self._recovery_read_call:
             try:
                 # A fresh decoder over the rewound source is the one supported
@@ -545,6 +546,7 @@ class AsyncGzipBinaryFile:
                 # happen to target 0.
                 if self._read_broken and whence == os.SEEK_SET and offset == 0:
                     await self._rewind_reader()
+                    rewound = True
                     self._check_read_call_not_aborted()
                     return 0
 
@@ -576,12 +578,15 @@ class AsyncGzipBinaryFile:
 
                 if target < self._position:
                     await self._rewind_reader()
+                    rewound = True
 
                 await self._consume_bytes(target - self._position)
                 self._check_read_call_not_aborted()
                 return self._position
             except BaseException:
-                if self._is_closed or not self._can_restore_failed_read():
+                if not rewound and (
+                    self._is_closed or not self._can_restore_failed_read()
+                ):
                     self._position = position_before
                 raise
 
@@ -965,6 +970,11 @@ class AsyncGzipBinaryFile:
                     total += len(line)
                     if hint > 0 and total >= hint:
                         break
+                    if self._validation_line_salvage_complete():
+                        # Publish every complete recovery line exactly once.
+                        # A trailing unterminated span stays buffered so the
+                        # next line call reports the terminal validation error.
+                        break
             except BaseException:
                 # A composite call publishes nothing when it fails. Put complete
                 # lines consumed by earlier loop iterations back ahead of the
@@ -1066,41 +1076,16 @@ class AsyncGzipBinaryFile:
         # the overwhelmingly common path here so each small write does not
         # pay a second Python method call merely to repeat the type check.
         payload = data if type(data) is bytes else self._coerce_byteslike(data)
-        length = len(payload)
         encoder = self._encoder
         if encoder is None:
             raise RuntimeError("gzip writer encoder is not initialized")
 
-        # Keep this primitive hot path inline: the release benchmark makes
-        # hundreds of thousands of calls, and routing it through the structural
-        # composite helper measurably exceeds the 5% regression threshold.
+        # Reserve inline so the primitive path avoids the measured context-
+        # manager cost; the codec/sink work itself is shared with composites.
         self._check_write_call_available()
         self._write_call_active = True
         try:
-            operation = encoder._feed_snapshot(payload)
-            try:
-                if length >= _ZLIB_OFFLOAD_THRESHOLD:
-                    async for compressed in _drive_operation(
-                        operation,
-                        workload=payload,
-                    ):
-                        await self._write_all(compressed)
-                else:
-                    for compressed in operation:
-                        await self._write_all(compressed)
-            except BaseException:
-                self._write_broken = True
-                encoder.discard()
-                raise
-
-            if self._is_closed or self._write_broken:
-                raise OSError(
-                    "write aborted because the gzip file was closed while "
-                    "the call was active"
-                )
-
-            self._position = encoder.input_size
-            return length
+            return await self._write_reserved(payload, encoder)
         finally:
             self._finish_write_call(encoder)
 
@@ -1422,6 +1407,13 @@ class AsyncGzipBinaryFile:
         """Return whether validation salvage has no binary bytes left to serve."""
         return self._has_validation_failure() and (
             len(self._buffer) == self._buffer_offset
+        )
+
+    def _validation_line_salvage_complete(self) -> bool:
+        """Return whether no complete recovery line remains buffered."""
+        return (
+            self._has_validation_failure()
+            and self._buffer.find(b"\n", self._buffer_offset) == -1
         )
 
     def _check_read_call_not_aborted(self) -> None:

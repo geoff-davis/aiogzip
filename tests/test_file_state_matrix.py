@@ -158,9 +158,10 @@ async def test_validation_poison_is_not_masked_as_text_eof(surface):
             with pytest.raises(OSError, match="broken.*close and reopen"):
                 await stream.readline()
         elif surface == "readlines":
+            assert await stream.readlines() == [complete.decode()]
             with pytest.raises(OSError, match="broken.*close and reopen"):
                 await stream.readlines()
-            assert await stream.read() == (complete + partial).decode()
+            assert await stream.read() == partial.decode()
         else:
             assert await anext(stream) == complete.decode()
             with pytest.raises(OSError, match="broken.*close and reopen"):
@@ -276,6 +277,39 @@ async def test_default_chunk_validation_salvage_sequence_is_error_data_error(
         await stream.close()
 
 
+@pytest.mark.parametrize("surface", ["binary", "text-fast", "text-generic"])
+async def test_default_chunk_readlines_salvage_sequence_is_error_data_error(
+    surface,
+):
+    raw_lines = [b"first recovery line\n", b"second recovery line\n"]
+    corrupt = bytearray(gzip.compress(b"".join(raw_lines), mtime=0))
+    corrupt[-8] ^= 1
+    source = FramedAsyncReader(bytes(corrupt), seekable=False)
+    if surface == "binary":
+        stream = AsyncGzipBinaryFile(None, "rb", fileobj=source, closefd=False)
+        expected = raw_lines
+    else:
+        newline = None if surface == "text-fast" else ""
+        stream = AsyncGzipTextFile(
+            None,
+            "rt",
+            newline=newline,
+            fileobj=source,
+            closefd=False,
+        )
+        expected = [line.decode() for line in raw_lines]
+
+    await stream.open()
+    try:
+        with pytest.raises(gzip.BadGzipFile, match="CRC check failed"):
+            await stream.readlines()
+        assert await stream.readlines() == expected
+        with pytest.raises(OSError, match="broken.*close and reopen"):
+            await stream.readlines()
+    finally:
+        await stream.close()
+
+
 async def test_cancelled_text_sized_read_does_not_publish_restored_pieces(monkeypatch):
     stream = AsyncGzipTextFile(
         None,
@@ -285,7 +319,7 @@ async def test_cancelled_text_sized_read_does_not_publish_restored_pieces(monkey
     )
     calls = 0
 
-    async def cancel_after_one_piece(file, *, capture_origin=True):
+    async def cancel_after_one_piece(file):
         nonlocal calls
         calls += 1
         if calls == 1:
@@ -311,6 +345,54 @@ async def test_cancelled_text_sized_read_does_not_publish_restored_pieces(monkey
         assert stream._buffered_text_len() == 0
         with pytest.raises(OSError, match="broken.*close and reopen"):
             await stream.read(1)
+    finally:
+        await stream.close()
+
+
+async def test_failed_backward_seek_reports_the_post_rewind_position():
+    payload = b"0123456789" * 2000
+    valid = gzip.compress(payload, mtime=0)
+    corrupt = bytearray(valid)
+    corrupt[-8] ^= 1
+
+    class CorruptAfterRewindReader:
+        def __init__(self):
+            self._buffer = io.BytesIO(valid)
+            self.rewound = False
+
+        async def read(self, size=-1):
+            return self._buffer.read(size)
+
+        async def seek(self, offset, whence=io.SEEK_SET):
+            if offset == 0 and whence == io.SEEK_SET:
+                self._buffer = io.BytesIO(bytes(corrupt))
+                self.rewound = True
+            return self._buffer.seek(offset, whence)
+
+        def seekable(self):
+            return True
+
+        async def close(self):
+            pass
+
+    source = CorruptAfterRewindReader()
+    stream = AsyncGzipBinaryFile(
+        None,
+        "rb",
+        fileobj=source,
+        closefd=False,
+        chunk_size=len(valid),
+    )
+    await stream.open()
+    try:
+        assert await stream.read(5000) == payload[:5000]
+        assert await stream.tell() == 5000
+
+        with pytest.raises(gzip.BadGzipFile, match="CRC check failed"):
+            await stream.seek(1000)
+
+        assert source.rewound is True
+        assert await stream.tell() == 0
     finally:
         await stream.close()
 

@@ -59,6 +59,9 @@ All notable changes to this project will be documented in this file.
   Closing through the public `buffer` accessor no longer makes text `close()`
   skip incremental-encoder finalization or leaves text reads usable; any
   resulting closed-buffer error is surfaced to the caller.
+- `tell()` on a constructed but unopened binary or text file now raises the
+  same `ValueError` as the other unopened I/O surfaces instead of returning an
+  apparent position of zero.
 
 ### Changed
 

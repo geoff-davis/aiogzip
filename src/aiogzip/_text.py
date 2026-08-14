@@ -707,8 +707,9 @@ class AsyncGzipTextFile:
             # newline == '' means no translation; any other value treat as no translation
             pass
 
-        # Like the binary primitive, keep this path inline: one helper/context
-        # boundary per small text write is a measured hot-path regression.
+        # Keep the primitive encoder/sink body inline: both the reservation
+        # context manager and a direct helper call exceeded the 5% small-write
+        # threshold in pinned release measurements.
         self._check_text_write_call_available()
         self._write_call_active = True
         try:
@@ -797,6 +798,7 @@ class AsyncGzipTextFile:
         end = start + size
         if end >= len(buf):
             # Consuming everything — return without slice when possible
+            self._buffer_origin_chars_to_skip += len(buf)
             self._text_buffer = ""
             self._text_buffer_offset = 0
             return buf if start == 0 else buf[start:]
@@ -1047,18 +1049,12 @@ class AsyncGzipTextFile:
 
         return True
 
-    async def _decode_next_chunk(
-        self,
-        *,
-        capture_origin: bool = True,
-    ) -> Tuple[str, bool]:
+    async def _decode_next_chunk(self) -> Tuple[str, bool]:
         """Decode the next binary chunk into newline-translated text.
 
         Mirrors :meth:`_read_chunk_and_decode` but returns the translated text
         instead of appending it to the buffer, so callers can accumulate it in
         a local list (avoiding the quadratic ``str +=`` for large reads).
-        Captures the replay origin when the buffer is empty, exactly as the
-        append path does, so ``tell()``/``seek()`` cookies stay valid.
 
         Returns:
             (text, more): ``text`` is the translated text decoded this round
@@ -1069,9 +1065,6 @@ class AsyncGzipTextFile:
         bf = self._binary_file
         if bf is None:
             return "", False
-
-        if capture_origin and len(self._text_buffer) == self._text_buffer_offset:
-            self._capture_buffer_origin()
 
         raw_chunk = await bf.read(self._chunk_size)
         self._decoder_byte_position = bf._position
@@ -1106,29 +1099,28 @@ class AsyncGzipTextFile:
             # The binary salvage buffer is exhausted, but decoded text from it
             # remains publishable. Return that short final span exactly once;
             # the next call reaches the binary broken-stream error.
+            self._buffer_origin_chars_to_skip += len(buffer)
             self._set_buffer("")
             return prefix
-        fresh_origin = (
-            bf._position,
-            self._decoder.getstate(),
-            self._trailing_cr,
-            self._seen_newline_types,
-        )
-        if available == 0:
-            self._text_buffer = ""
-            self._text_buffer_offset = 0
-            self._set_buffer_origin(
-                origin_offset=fresh_origin[0],
-                decoder_state=fresh_origin[1],
-                trailing_cr=fresh_origin[2],
-                seen_newlines=fresh_origin[3],
-            )
-
         pieces: List[str] = []
         added = 0
+        fresh_origin: Optional[Tuple[int, Tuple[Any, int], bool, int]] = None
+        origin_chars = 0
         try:
             while added < needed:
-                text, more = await self._decode_next_chunk(capture_origin=False)
+                # Snapshot only the decode round that can leave fresh text
+                # buffered. Exact full-chunk reads avoid decoder.getstate();
+                # unusual expanding codecs fall back to the older replay
+                # origin below without weakening cookie correctness.
+                if fresh_origin is None and needed - added < self._chunk_size:
+                    fresh_origin = (
+                        bf._position,
+                        self._decoder.getstate(),
+                        self._trailing_cr,
+                        self._seen_newline_types,
+                    )
+                    origin_chars = added
+                text, more = await self._decode_next_chunk()
                 if text:
                     pieces.append(text)
                     added += len(text)
@@ -1150,15 +1142,34 @@ class AsyncGzipTextFile:
         consumed_fresh = min(needed, len(fresh))
         result = prefix + fresh[:consumed_fresh]
         if consumed_fresh < len(fresh):
-            self._set_buffer(fresh)
-            self._text_buffer_offset = consumed_fresh
-            self._set_buffer_origin(
-                origin_offset=fresh_origin[0],
-                decoder_state=fresh_origin[1],
-                trailing_cr=fresh_origin[2],
-                seen_newlines=fresh_origin[3],
-            )
+            if fresh_origin is not None:
+                self._set_buffer(fresh[origin_chars:])
+                self._text_buffer_offset = consumed_fresh - origin_chars
+                self._set_buffer_origin(
+                    origin_offset=fresh_origin[0],
+                    decoder_state=fresh_origin[1],
+                    trailing_cr=fresh_origin[2],
+                    seen_newlines=fresh_origin[3],
+                )
+            else:
+                # A custom expanding codec can cross the requested character
+                # boundary before the normal one-chunk look-ahead point. Keep
+                # the prior replay origin and append in that exceptional case.
+                self._text_buffer += fresh
+                self._text_buffer_offset = offset + size
         else:
+            # Keep the historical replay origin valid without taking a fresh
+            # decoder snapshot that no buffered text will use.
+            if fresh_origin is not None:
+                self._set_buffer_origin(
+                    origin_offset=fresh_origin[0],
+                    decoder_state=fresh_origin[1],
+                    trailing_cr=fresh_origin[2],
+                    seen_newlines=fresh_origin[3],
+                )
+                self._buffer_origin_chars_to_skip = len(fresh) - origin_chars
+            else:
+                self._buffer_origin_chars_to_skip += len(buffer) + len(fresh)
             self._set_buffer("")
         return result
 
@@ -1454,33 +1465,79 @@ class AsyncGzipTextFile:
         # continues into later chunks (or the final unterminated line). Leave
         # it shared while awaiting input and commit every newly decoded piece
         # before either publishing or propagating an error.
-        initial_available = len(buf) - start
-        if initial_available == 0:
-            self._capture_buffer_origin()
+        prefix = buf[start:]
+        bf = self._binary_file
+        assert bf is not None
+        fresh_origin = (
+            bf._position,
+            self._decoder.getstate(),
+            self._trailing_cr,
+            self._seen_newline_types,
+        )
         pieces: List[str] = []
         added = 0
-        line_size: Optional[int] = None
+        fresh_line_size: Optional[int] = None
         try:
             while True:
-                text, more = await self._decode_next_chunk(capture_origin=False)
+                text, more = await self._decode_next_chunk()
                 if text:
                     i = text.find(term)
                     pieces.append(text)
                     if i != -1:
-                        line_size = initial_available + added + i + 1
+                        fresh_line_size = added + i + 1
                         break
                     added += len(text)
                 if not more:
                     break
-        finally:
+        except BaseException:
             bf = self._binary_file
             if pieces and (bf is None or bf._can_restore_failed_read()):
                 self._append_buffer("".join(pieces))
+            raise
 
-        if line_size is not None:
-            return self._consume_buffer(line_size)
-        remaining = self._buffered_text_len()
-        return self._consume_buffer(remaining) if remaining else None
+        fresh = "".join(pieces)
+        if fresh_line_size is not None:
+            result = prefix + fresh[:fresh_line_size]
+            if fresh_line_size < len(fresh):
+                self._set_buffer(fresh)
+                self._text_buffer_offset = fresh_line_size
+                self._set_buffer_origin(
+                    origin_offset=fresh_origin[0],
+                    decoder_state=fresh_origin[1],
+                    trailing_cr=fresh_origin[2],
+                    seen_newlines=fresh_origin[3],
+                )
+            else:
+                self._set_buffer("")
+                self._set_buffer_origin(
+                    origin_offset=fresh_origin[0],
+                    decoder_state=fresh_origin[1],
+                    trailing_cr=fresh_origin[2],
+                    seen_newlines=fresh_origin[3],
+                )
+                self._buffer_origin_chars_to_skip = len(fresh)
+            return result
+
+        result = prefix + fresh
+        self._set_buffer("")
+        self._set_buffer_origin(
+            origin_offset=fresh_origin[0],
+            decoder_state=fresh_origin[1],
+            trailing_cr=fresh_origin[2],
+            seen_newlines=fresh_origin[3],
+        )
+        self._buffer_origin_chars_to_skip = len(fresh)
+        return result if result else None
+
+    def _validation_line_salvage_complete(self) -> bool:
+        """Return whether no complete decoded recovery line remains."""
+        bf = self._binary_file
+        if bf is None or not bf._validation_salvage_exhausted():
+            return False
+        if self._pending_idx < len(self._pending_lines):
+            return False
+        position, _ = self._find_line_terminator()
+        return position == -1
 
     async def _readlines_fast(self, hint: int, lines: List[str]) -> List[str]:
         """Return lines while draining pre-split batches without per-line awaits.
@@ -1530,6 +1587,13 @@ class AsyncGzipTextFile:
                 # unusual comparison value such as float("nan").
                 self._pending_idx = idx
                 self._text_buffer_offset = text_offset
+
+            if (
+                lines
+                and self._read_poisoned
+                and self._validation_line_salvage_complete()
+            ):
+                return lines
 
             refilled = await self._next_fast_line()
             if refilled is None:
@@ -1789,6 +1853,8 @@ class AsyncGzipTextFile:
                     lines.append(line)
                     total_size += len(line)
                     if hint > 0 and total_size >= hint:
+                        break
+                    if self._read_poisoned and self._validation_line_salvage_complete():
                         break
                 return lines
         except BaseException:
