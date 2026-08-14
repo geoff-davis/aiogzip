@@ -1076,41 +1076,16 @@ class AsyncGzipBinaryFile:
         # the overwhelmingly common path here so each small write does not
         # pay a second Python method call merely to repeat the type check.
         payload = data if type(data) is bytes else self._coerce_byteslike(data)
-        length = len(payload)
         encoder = self._encoder
         if encoder is None:
             raise RuntimeError("gzip writer encoder is not initialized")
 
-        # Keep the primitive codec/sink body inline: both the reservation
-        # context manager and a direct helper call exceeded the 5% small-write
-        # threshold in pinned release measurements.
+        # Reserve inline so the primitive path avoids the measured context-
+        # manager cost; the codec/sink work itself is shared with composites.
         self._check_write_call_available()
         self._write_call_active = True
         try:
-            operation = encoder._feed_snapshot(payload)
-            try:
-                if length >= _ZLIB_OFFLOAD_THRESHOLD:
-                    async for compressed in _drive_operation(
-                        operation,
-                        workload=payload,
-                    ):
-                        await self._write_all(compressed)
-                else:
-                    for compressed in operation:
-                        await self._write_all(compressed)
-            except BaseException:
-                self._write_broken = True
-                encoder.discard()
-                raise
-
-            if self._is_closed or self._write_broken:
-                raise OSError(
-                    "write aborted because the gzip file was closed while "
-                    "the call was active"
-                )
-
-            self._position = encoder.input_size
-            return length
+            return await self._write_reserved(payload, encoder)
         finally:
             self._finish_write_call(encoder)
 
