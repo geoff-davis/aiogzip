@@ -192,6 +192,10 @@ async def test_readinto_error_leaves_position_and_buffer_intact(temp_file):
         assert await f.tell() == 0
         # ...and the decoded prefix is still available to salvage.
         assert await f.read(10) == payload[:10]
+        salvaged = payload[:10] + await f.read()
+        assert payload.startswith(salvaged)
+        with pytest.raises(OSError, match="broken.*close and reopen"):
+            await f.read(1)
 
 
 @pytest.mark.parametrize("chunk_size", [1, 2, 3])

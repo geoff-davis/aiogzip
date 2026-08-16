@@ -4,7 +4,9 @@ Micro-benchmarks for aiogzip.
 Tests specific optimizations and low-level operations.
 """
 
+import random
 import time
+import zlib
 
 from bench_common import BenchmarkBase
 
@@ -242,6 +244,70 @@ class MicroBenchmarks(BenchmarkBase):
             avg_time_ms=f"{avg_time * 1000:.3f}ms",
         )
 
+    async def benchmark_single_buffer_reads(self):
+        """Benchmark the one-compressed-buffer read1/readinto1 paths."""
+        binary_file = self.temp_mgr.get_path("micro_single_buffer.gz")
+        test_data = random.Random(0).randbytes(2 * 1024 * 1024)
+        expected_crc = zlib.crc32(test_data)
+        chunk_size = 4096
+
+        async with AsyncGzipBinaryFile(binary_file, "wb") as f:
+            await f.write(test_data)
+
+        async def consume_read1():
+            total = 0
+            checksum = 0
+            async with AsyncGzipBinaryFile(
+                binary_file, "rb", chunk_size=chunk_size
+            ) as f:
+                while chunk := await f.read1(chunk_size):
+                    total += len(chunk)
+                    checksum = zlib.crc32(chunk, checksum)
+            assert total == len(test_data)
+            assert checksum == expected_crc
+
+        async def consume_readinto1():
+            total = 0
+            checksum = 0
+            buffer = bytearray(chunk_size)
+            async with AsyncGzipBinaryFile(
+                binary_file, "rb", chunk_size=chunk_size
+            ) as f:
+                while read := await f.readinto1(buffer):
+                    total += read
+                    checksum = zlib.crc32(memoryview(buffer)[:read], checksum)
+            assert total == len(test_data)
+            assert checksum == expected_crc
+
+        iterations = 30
+        read1_total = 0.0
+        readinto1_total = 0.0
+        for _ in range(iterations):
+            start = time.perf_counter()
+            await consume_read1()
+            read1_total += time.perf_counter() - start
+
+            start = time.perf_counter()
+            await consume_readinto1()
+            readinto1_total += time.perf_counter() - start
+
+        read1_avg = read1_total / iterations
+        readinto1_avg = readinto1_total / iterations
+        self.add_result(
+            "Binary read1 (2MiB, 4KiB buffers)",
+            "micro",
+            read1_avg,
+            iterations=iterations,
+            avg_time_ms=f"{read1_avg * 1000:.3f}ms",
+        )
+        self.add_result(
+            "Binary readinto1 (2MiB, 4KiB buffers)",
+            "micro",
+            readinto1_avg,
+            iterations=iterations,
+            avg_time_ms=f"{readinto1_avg * 1000:.3f}ms",
+        )
+
     async def run_all(self):
         """Run all micro-benchmarks."""
         await self.benchmark_read_all()
@@ -251,3 +317,4 @@ class MicroBenchmarks(BenchmarkBase):
         await self.benchmark_small_writes()
         await self.benchmark_text_writelines_batching()
         await self.benchmark_binary_readline_long_line_small_chunks()
+        await self.benchmark_single_buffer_reads()

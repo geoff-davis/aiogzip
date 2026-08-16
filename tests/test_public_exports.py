@@ -22,6 +22,7 @@ def test_key_re_exports_are_stable():
         AsyncGzipBinaryFile,
         AsyncGzipFile,
         AsyncGzipTextFile,
+        ConcurrentOperationError,
         EngineInfo,
         GzipInfo,
         GzipMemberInfo,
@@ -42,6 +43,8 @@ def test_key_re_exports_are_stable():
     assert AsyncGzipBinaryFile is aiogzip.AsyncGzipBinaryFile
     assert AsyncGzipTextFile is aiogzip.AsyncGzipTextFile
     assert AsyncGzipFile is aiogzip.AsyncGzipFile
+    assert ConcurrentOperationError is aiogzip.ConcurrentOperationError
+    assert issubclass(ConcurrentOperationError, OSError)
     assert EngineInfo is aiogzip.EngineInfo
     assert GzipInfo is aiogzip.GzipInfo
     assert GzipMemberInfo is aiogzip.GzipMemberInfo

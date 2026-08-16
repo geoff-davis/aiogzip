@@ -4,8 +4,7 @@
 
 Covers:
 - gzip header parsing of the optional FEXTRA / FNAME / FCOMMENT / FHCRC fields,
-  including the incomplete-header (split across reads) early-return branches in
-  ``_try_parse_gzip_header_mtime`` (``_common.py``);
+  including incremental parsing across small transport reads;
 - ``mtime`` / ``original_filename`` constructor validation;
 - the close() path that propagates an underlying ``close()`` failure, and binary
   ``__anext__`` on an already-closed file.

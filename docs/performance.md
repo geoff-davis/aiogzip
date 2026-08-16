@@ -114,7 +114,11 @@ tracking and translation path.
 For writing many small records, prefer `writelines()` over an explicit loop of
 `await f.write(line)`. It combines inputs into bounded `chunk_size` batches,
 reducing Python coroutine and compressor-call overhead without loading the full
-iterable into memory.
+iterable into memory. For records produced asynchronously, collect a bounded
+application batch before each `write()`; about 64 KiB was the best of the
+measured 64 KiB and 256 KiB batches, but tune the bound for the workload. These
+batching approaches combine failure boundaries: use individual awaited writes
+when each record must report its own sink failure.
 
 ### Binary operations
 

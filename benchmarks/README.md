@@ -63,6 +63,7 @@ Practical use cases:
 
 - Read-only JSONL parsing from one identical fixture
 - Bounded-batch JSONL parsing with `readlines(1 MiB)`
+- Single-compressed-buffer `read1()` and `readinto1()` loops
 - JSON decoding and record validation with realistic data
 
 ### 6. 🛡️ Error Handling (`bench_errors.py`)
@@ -145,6 +146,64 @@ uv run --frozen python benchmarks/run_benchmarks.py \
 The public codec cases are emitted as explicit skips for targets such as
 `v1.11.0` that predate `GzipDecoder`; supported high-level streaming cases
 still run normally.
+
+### 10. 2.0.0a3 file-header and write harness (`bench_a3_regressions.py`)
+
+The `a3` harness targets an explicit checkout and captures the high-level
+optional-header path, concatenated-member metadata overhead, and a fixed-total
+write-size curve. It retains individual samples, medians, MAD/min/max values,
+fixture and output digests, source/sink counts, tracemalloc peaks, and complete
+environment/source attestations:
+
+```bash
+uv run --frozen python benchmarks/bench_a3_regressions.py \
+  --source-root /tmp/aiogzip-v2.0.0a2-a3 \
+  --engine stdlib --repeat 5 \
+  --output /tmp/v2.0.0a2-a3-stdlib.json
+```
+
+Use `--fixture-sizes-mib`, `--memory-fixture-size-mib`, `--member-counts`,
+`--write-sizes`, `--total-write-bytes`, and `--source-chunk-bytes` to select an
+explicitly recorded matrix. Members runs default to the a3
+`--members-mtime-policy last-header` contract; use `first-header` only for an
+explicitly identified historical a2 comparison whose wrapper retained the
+first header timestamp. By default, tracemalloc is limited to the plan's
+32 MiB incomplete FNAME/FCOMMENT allocation gates; the complete and larger
+cases remain ordinary wall-time measurements. Allocation peaks default to one
+sample via `--memory-repeat 1` because their durations are not used as timing
+claims; primary wall-time comparisons retain five or more samples.
+`profile_small_writes.py`
+captures cProfile tables and hot-path call counts for the diagnostic 10 B,
+1 KiB, and 64 KiB write sizes. Correctness checks and fixture construction are
+kept outside ordinary wall-time regions; tracemalloc cases are labeled
+separately and are not used as wall-time claims.
+`verify_a3_writes.py` complements that memory-sink matrix with 1, 4, and 10
+independent writers, all seven sizes through temporary path-backed files, and
+separate tracemalloc samples for 10 B, 1 KiB, and 64 KiB writes. Concurrent
+cases keep aggregate input fixed at 8 MiB and verify every independent gzip
+member after timing:
+
+```bash
+uv run --frozen python benchmarks/verify_a3_writes.py \
+  --source-root . --engine stdlib \
+  --output /tmp/v2.0.0a3-write-surfaces-stdlib.json
+```
+
+`verify_a3_headers.py` is the release-only structural companion. It leaves the
+locked exact-a2 comparison harness unchanged while checking 64 MiB post-failure
+retention, reporting the intentional non-seekable rewind cache separately,
+sampling a path-backed 16 MiB case, exercising combined optional fields through
+text mode, and testing the real 128 MiB boundary:
+
+```bash
+uv run --frozen python benchmarks/verify_a3_headers.py \
+  --source-root . --engine stdlib \
+  --output /tmp/v2.0.0a3-header-verification-stdlib.json
+```
+
+Run it once with each engine outside normal CI. Fixture creation and reader
+opening precede tracemalloc, and the JSON reports both peak allocation and
+current allocation after close plus garbage collection.
 
 ## Running Benchmarks
 

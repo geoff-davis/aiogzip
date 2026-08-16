@@ -1,0 +1,813 @@
+{
+  "schema_version": 1,
+  "benchmark": "aiogzip-2.0.0a3-regressions",
+  "created_at_unix": 1786220812.286172,
+  "command": [
+    "/home/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+    "--source-root",
+    "/tmp/aiogzip-v2.0.0a2-a3",
+    "--engine",
+    "stdlib",
+    "--categories",
+    "headers",
+    "--fixture-sizes-mib",
+    "16",
+    "--memory-fixture-size-mib",
+    "16",
+    "--source-chunk-bytes",
+    "65536",
+    "--repeat",
+    "5",
+    "--memory-repeat",
+    "1",
+    "--output",
+    "plans/benchmarks/data/v2.0.0a2-wp3-headers-64k-stdlib.json"
+  ],
+  "configuration": {
+    "categories": [
+      "headers"
+    ],
+    "fixture_sizes_mib": [
+      16
+    ],
+    "memory_fixture_size_mib": 16,
+    "member_counts": [
+      1,
+      2,
+      1001
+    ],
+    "write_sizes": [
+      10,
+      100,
+      1024,
+      4096,
+      16384,
+      65536,
+      262144
+    ],
+    "total_write_bytes": 8388608,
+    "source_chunk_bytes": 65536,
+    "repeat": 5,
+    "memory_repeat": 1,
+    "warm_up_policy": "one 64KiB 1KiB-write run and one 4KiB header read",
+    "garbage_collection_policy": "normal interpreter policy; recorded in environment",
+    "ordering_policy": "fixed category/size/method order; no randomization"
+  },
+  "source": {
+    "source_root": "/tmp/aiogzip-v2.0.0a2-a3",
+    "aiogzip_file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a2",
+    "commit": "9534eb31da15417126233eda225d8f897908e3bb",
+    "describe": "v2.0.0a2",
+    "dirty_tracked": false,
+    "requested_engine": "stdlib",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "stdlib-zlib",
+      "crc32": "stdlib-zlib"
+    }
+  },
+  "environment": {
+    "source_root": "/tmp/aiogzip-v2.0.0a2-a3",
+    "aiogzip_file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a2",
+    "commit": "9534eb31da15417126233eda225d8f897908e3bb",
+    "describe": "v2.0.0a2",
+    "dirty_tracked": false,
+    "requested_engine": "stdlib",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "stdlib-zlib",
+      "crc32": "stdlib-zlib"
+    },
+    "runner_root": "/home/geoff/Projects/personal/aiogzip",
+    "runner_commit": "50f87f09d0f9015603aa67aa2008cbe3a3627213",
+    "harness_sha256": "813e99de16c95d0f2805de5f07903d58ca31370f630406e1c7dd7e6c68762a89",
+    "fixture_generator_version": "a3-fixtures-v1",
+    "python_implementation": "CPython",
+    "python_version": "3.12.12 (main, Dec 17 2025, 21:10:06) [Clang 21.1.4 ]",
+    "python_executable": "/home/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "python_build": [
+      "main",
+      "Dec 17 2025 21:10:06"
+    ],
+    "python_config_args": "'--build=x86_64-unknown-linux-gnu' '--host=x86_64-unknown-linux-gnu' '--prefix=/install' '--with-openssl=/tools/deps' '--with-system-expat' '--with-system-libmpdec' '--without-ensurepip' '--with-readline=editline' '--enable-static-libpython-for-interpreter' '--enable-shared' '--enable-optimizations' '--enable-bolt' '--with-lto' '--with-build-python=/tools/host/bin/python3.12' '--with-dbmliborder=bdb' 'build_alias=x86_64-unknown-linux-gnu' 'host_alias=x86_64-unknown-linux-gnu' 'PKG_CONFIG=pkg-config --static' 'PKG_CONFIG_PATH=/tools/deps/share/pkgconfig:/tools/deps/lib/pkgconfig' 'CC=clang' 'CFLAGS=-O3 -fPIC ' 'LDFLAGS= -Wl,--exclude-libs,ALL -LModules/_hacl' 'CPPFLAGS=-O3 -fPIC ' 'PROFILE_TASK=-m test --pgo'",
+    "python_compiler": "Clang 21.1.4 ",
+    "os": "Linux",
+    "os_release": "6.17.0-41-generic",
+    "kernel": "#41-Ubuntu SMP PREEMPT_DYNAMIC Sat Jun 20 18:01:40 UTC 2026",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.42"
+    ],
+    "processor": "",
+    "logical_cores": 32,
+    "physical_cores": 16,
+    "ram_bytes": 131894407168,
+    "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "cpu_policy": {
+      "governors": [
+        "powersave"
+      ],
+      "boost": "enabled"
+    },
+    "system_load": [
+      2.4033203125,
+      3.18701171875,
+      2.61083984375
+    ],
+    "power_source": "ACAD:1,ucsi-source-psy-USBC000:001:0,ucsi-source-psy-USBC000:002:0",
+    "benchmark_filesystem": {
+      "path": "/tmp/aiogzip-v2.0.0a2-a3",
+      "device": "tmpfs",
+      "type": "tmpfs",
+      "mount": "/tmp"
+    },
+    "temporary_filesystem": {
+      "path": "/tmp",
+      "device": "tmpfs",
+      "type": "tmpfs",
+      "mount": "/tmp"
+    },
+    "temporary_directory": "/tmp",
+    "zlib_compile_version": "1.3.1",
+    "zlib_runtime_version": "1.3.1",
+    "zlib_ng_package_version": "1.0.0",
+    "uv_version": "uv 0.9.22",
+    "uv_lock_sha256": "e7b91a8c8b42c1ad455ac2d48b20a84d5e07fcb657bb48797baba8686ffa6871",
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      700,
+      10,
+      10
+    ]
+  },
+  "fixtures": {
+    "fname-16MiB-complete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fname",
+      "field_bytes": 16777216,
+      "complete": true,
+      "fixture_bytes": 16777263,
+      "fixture_sha256": "7ec0e4612a892ac9129dd955195ca519acfbfd3e664b4088c3a4869ad4bef32c",
+      "expected_output_bytes": 26,
+      "expected_output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023"
+    },
+    "fname-16MiB-incomplete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fname",
+      "field_bytes": 16777216,
+      "complete": false,
+      "fixture_bytes": 16777226,
+      "fixture_sha256": "ef0c3dba81e17d7fb3cf9b0ee6056d826f8f0d74d51ca137a6d668e38cc474d0",
+      "expected_output_bytes": 0,
+      "expected_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fcomment-16MiB-complete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fcomment",
+      "field_bytes": 16777216,
+      "complete": true,
+      "fixture_bytes": 16777263,
+      "fixture_sha256": "8cc1e48bb545b6bd34fd8fbc69874280a052579bb10885630e6d976414794e32",
+      "expected_output_bytes": 26,
+      "expected_output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023"
+    },
+    "fcomment-16MiB-incomplete": {
+      "generator_version": "a3-fixtures-v1",
+      "field": "fcomment",
+      "field_bytes": 16777216,
+      "complete": false,
+      "fixture_bytes": 16777226,
+      "fixture_sha256": "c712b3cc13193164197ed04d322620bbb73f684287585e4e332c2c65b0e63ca1",
+      "expected_output_bytes": 0,
+      "expected_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "results": [
+    {
+      "name": "high-level fname-16MiB-complete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.06684194703120738,
+        0.06663970509544015,
+        0.06580236100126058,
+        0.06842463102657348,
+        0.06632661202456802
+      ],
+      "median_seconds": 0.06663970509544015,
+      "median_absolute_deviation_seconds": 0.000313093070872128,
+      "minimum_seconds": 0.06580236100126058,
+      "maximum_seconds": 0.06842463102657348,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fname-16MiB-complete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0013867230154573917,
+        0.0012843499425798655,
+        0.001193298026919365,
+        0.0010965450201183558,
+        0.0010190079919993877
+      ],
+      "median_seconds": 0.001193298026919365,
+      "median_absolute_deviation_seconds": 9.675300680100918e-05,
+      "minimum_seconds": 0.0010190079919993877,
+      "maximum_seconds": 0.0013867230154573917,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fname-16MiB-incomplete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.06929238303564489,
+        0.06420464802067727,
+        0.06523845402989537,
+        0.06514901504851878,
+        0.0644740880234167
+      ],
+      "median_seconds": 0.06514901504851878,
+      "median_absolute_deviation_seconds": 0.0006749270251020789,
+      "minimum_seconds": 0.06420464802067727,
+      "maximum_seconds": 0.06929238303564489,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fname-16MiB-incomplete memory",
+      "category": "headers-memory",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.06962430104613304
+      ],
+      "median_seconds": 0.06962430104613304,
+      "median_absolute_deviation_seconds": 0.0,
+      "minimum_seconds": 0.06962430104613304,
+      "maximum_seconds": 0.06962430104613304,
+      "sample_count": 1,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": 35275657,
+          "current_python_bytes": 18432647,
+          "measurement_mode": "tracemalloc"
+        }
+      ]
+    },
+    {
+      "name": "direct fname-16MiB-incomplete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0013167309807613492,
+        0.001280131982639432,
+        0.0013040669728070498,
+        0.0012027459451928735,
+        0.0011287248926237226
+      ],
+      "median_seconds": 0.001280131982639432,
+      "median_absolute_deviation_seconds": 3.659899812191725e-05,
+      "minimum_seconds": 0.0011287248926237226,
+      "maximum_seconds": 0.0013167309807613492,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fcomment-16MiB-complete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.068514761980623,
+        0.06282798398751765,
+        0.06404407392255962,
+        0.06403678096830845,
+        0.06434479402378201
+      ],
+      "median_seconds": 0.06404407392255962,
+      "median_absolute_deviation_seconds": 0.0003007201012223959,
+      "minimum_seconds": 0.06282798398751765,
+      "maximum_seconds": 0.068514761980623,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "mtime": 0,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777263,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "direct fcomment-16MiB-complete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0013644610298797488,
+        0.0013202079571783543,
+        0.0012699429644271731,
+        0.0011848720023408532,
+        0.0010741919977590442
+      ],
+      "median_seconds": 0.0012699429644271731,
+      "median_absolute_deviation_seconds": 8.507096208631992e-05,
+      "minimum_seconds": 0.0010741919977590442,
+      "maximum_seconds": 0.0013644610298797488,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 26,
+          "output_sha256": "ea9d28c87f389a165bb91698a08e1bab3bf71cf40ba92a66b80de986e9b68023",
+          "failure": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fcomment-16MiB-incomplete throughput",
+      "category": "headers-throughput",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.07480347796808928,
+        0.07213208498433232,
+        0.0649491959484294,
+        0.06846690096426755,
+        0.06994370510801673
+      ],
+      "median_seconds": 0.06994370510801673,
+      "median_absolute_deviation_seconds": 0.0021883798763155937,
+      "minimum_seconds": 0.0649491959484294,
+      "maximum_seconds": 0.07480347796808928,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": null,
+          "current_python_bytes": null,
+          "measurement_mode": "wall_time"
+        }
+      ]
+    },
+    {
+      "name": "high-level fcomment-16MiB-incomplete memory",
+      "category": "headers-memory",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.07074356800876558
+      ],
+      "median_seconds": 0.07074356800876558,
+      "median_absolute_deviation_seconds": 0.0,
+      "minimum_seconds": 0.07074356800876558,
+      "maximum_seconds": 0.07074356800876558,
+      "sample_count": 1,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: Error decompressing gzip data: truncated gzip member header",
+          "mtime": null,
+          "source_read_calls": 258,
+          "source_max_requested_bytes": 65536,
+          "source_max_returned_bytes": 65536,
+          "source_position": 16777226,
+          "peak_python_bytes": 35275657,
+          "current_python_bytes": 18432647,
+          "measurement_mode": "tracemalloc"
+        }
+      ]
+    },
+    {
+      "name": "direct fcomment-16MiB-incomplete throughput",
+      "category": "headers-direct",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.0013225519796833396,
+        0.0012629299890249968,
+        0.0012564469361677766,
+        0.001200029975734651,
+        0.0010934589663520455
+      ],
+      "median_seconds": 0.0012564469361677766,
+      "median_absolute_deviation_seconds": 5.6416960433125496e-05,
+      "minimum_seconds": 0.0010934589663520455,
+      "maximum_seconds": 0.0013225519796833396,
+      "sample_count": 5,
+      "sample_metrics": [
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        },
+        {
+          "output_bytes": 0,
+          "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "failure": "BadGzipFile: truncated gzip member header",
+          "measurement_mode": "wall_time"
+        }
+      ]
+    }
+  ],
+  "discarded_or_excluded_runs": []
+}

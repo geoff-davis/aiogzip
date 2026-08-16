@@ -14,6 +14,7 @@ working when the fast engine is installed.
 | Underlying I/O failure | `OSError` | Missing file, permission denied, disk errors — whatever the OS raised. |
 | `max_decompressed_size` exceeded | `OSError` (not `BadGzipFile`) | Message starts with `"decompressed output exceeded max_decompressed_size"`. |
 | Wrong argument types / values | `TypeError` / `ValueError` | Raised eagerly at the call with a corrective message. |
+| Overlapping operations on one async file | `aiogzip.ConcurrentOperationError` | An `OSError` subtype. Await the active call, then retry; one handle is single-task-owned. |
 | Codec operation still active | `RuntimeError` | Exhaust the returned iterator before starting another operation. |
 | Codec abandoned or partially closed | `OSError` on later use | The instance is unusable; call `discard()` and create a new codec. |
 | Codec used after successful decoder finalization | `ValueError` | `feed()` and repeated `finish()` are terminal-state misuse. |
@@ -35,6 +36,36 @@ except gzip.BadGzipFile:
 except OSError as exc:
     ...  # I/O failure, or the decompression cap tripped (see below)
 ```
+
+## Same-handle concurrency
+
+One `AsyncGzipBinaryFile` or `AsyncGzipTextFile` handle is intentionally owned
+by one task at a time. If a read, seek, write, flush, or close overlaps an
+operation already in flight on that handle, the rejected call raises the
+public `ConcurrentOperationError`. The active call is left intact; await it,
+then retry the rejected operation. Because the exception subclasses
+`OSError`, existing general I/O handlers remain effective while callers that
+want to retry this case can catch it explicitly.
+
+The reservation covers text already decoded into the wrapper's buffer as well
+as binary codec work. Composite `readlines()`, `writelines()`, and write-mode
+`seek()` calls retain ownership across all of their internal reads or writes;
+another task cannot consume a buffered prefix or splice data between batches.
+If a text refill fails before the call can publish a result, characters decoded
+before that failure remain buffered for the documented retry.
+
+On a clean `async with` exit, aiogzip waits until all calls from a looping
+producer finish and then closes normally. Concurrent close calls wait for the
+same binary or text finalization. If the context body is already raising, exit
+preserves that primary exception and attempts abortive owned-resource cleanup.
+An active read, write, or flush that resumes after this abort raises `OSError`;
+it never returns a truncated prefix or reports success for a gzip member that
+can no longer receive its trailer. Cancellation delivered during cleanup still
+propagates, and a failed abortive underlying close leaves the handle reportably
+open so `close()` can be retried.
+
+Cancellation while a clean context exit is waiting for an active call also
+attempts abortive owned-resource cleanup before the cancellation propagates.
 
 ## Telling the decompression cap apart from corruption
 

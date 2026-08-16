@@ -355,13 +355,17 @@ class TestNewAPIMethods:
     async def test_text_writelines_batches_small_inputs(self, temp_file, monkeypatch):
         lines = [f"{i:03d}\n" for i in range(100)]
         calls = []
-        original = AsyncGzipTextFile.write
+        original = AsyncGzipTextFile._write_batch_reserved
 
         async def tracking_write(self, data):
             calls.append(len(data))
             return await original(self, data)
 
-        monkeypatch.setattr(AsyncGzipTextFile, "write", tracking_write)
+        monkeypatch.setattr(
+            AsyncGzipTextFile,
+            "_write_batch_reserved",
+            tracking_write,
+        )
         async with AsyncGzipTextFile(temp_file, "wt", chunk_size=32) as f:
             await f.writelines(lines)
 
@@ -373,13 +377,13 @@ class TestNewAPIMethods:
     async def test_binary_writelines_batches_small_inputs(self, temp_file, monkeypatch):
         lines = [f"{i:03d}\n".encode() for i in range(100)]
         calls = []
-        original = AsyncGzipBinaryFile.write
+        original = AsyncGzipBinaryFile._write_reserved
 
-        async def tracking_write(self, data):
+        async def tracking_write(self, data, encoder):
             calls.append(len(data))
-            return await original(self, data)
+            return await original(self, data, encoder)
 
-        monkeypatch.setattr(AsyncGzipBinaryFile, "write", tracking_write)
+        monkeypatch.setattr(AsyncGzipBinaryFile, "_write_reserved", tracking_write)
         async with AsyncGzipBinaryFile(temp_file, "wb", chunk_size=32) as f:
             await f.writelines(lines)
 
@@ -405,6 +409,21 @@ class TestNewAPIMethods:
 
         async with AsyncGzipTextFile(temp_file, "rt") as f:
             assert await f.read() == "first\nsecond\n"
+
+    async def test_binary_writelines_flushes_prefix_before_coercion_error(
+        self, temp_file
+    ):
+        def broken_lines():
+            yield b"first\n"
+            yield bytearray(b"second\n")
+            yield object()
+
+        async with AsyncGzipBinaryFile(temp_file, "wb", chunk_size=64) as f:
+            with pytest.raises(TypeError, match="bytes-like"):
+                await f.writelines(broken_lines())
+
+        async with AsyncGzipBinaryFile(temp_file, "rb") as f:
+            assert await f.read() == b"first\nsecond\n"
 
 
 class TestSyncProtocolStubs:

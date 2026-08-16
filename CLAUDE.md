@@ -141,6 +141,14 @@ Notes:
 - CRLF sequences can split across chunk boundaries
 - Must track `_trailing_cr` state to prevent `\r\n` → `\n\n`
 - Use `_find_line_terminator()` helper for newline-aware searching
+- Tests that write arbitrary/random text and assert a byte-exact round-trip
+  must pass `newline=""`: default `newline=None` translates `\n` to
+  `os.linesep` on write, which is a no-op on Linux/macOS but breaks the
+  assertion on Windows CI. Worse, a failing `==` between multi-hundred-KB
+  blobs sends pytest's assertion introspection into a difflib comparison
+  that runs for many minutes — the job dies at its time cap looking like a
+  hang, not a failure (`faulthandler_timeout` in pyproject exists to make
+  such hangs identify themselves).
 
 ### Unicode Handling
 
@@ -225,8 +233,14 @@ Always include:
   `output_chunk_size`, and cooperative event-loop checkpoints. Adds the public
   typed `CodecOperation`. The codec API remains provisional through the alpha
   series; established asyncio APIs keep their compatibility contract.
+- **2.0.0a3 (in progress)** - Removes the file reader's duplicate gzip-header
+  parser and drives live `mtime` from the shared decoder. The resulting
+  last-completed-header behavior, terminal reader failure/recovery contract,
+  and same-handle overlap/context-exit behavior are deliberate, reviewed
+  compatibility corrections to the established asyncio API for this alpha;
+  their rationale and evidence are recorded in the a3 review record.
 
 ---
 
-**Last Updated:** 2026-07-27
+**Last Updated:** 2026-08-13
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!

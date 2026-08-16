@@ -4,6 +4,81 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Public `ConcurrentOperationError`, an `OSError` subtype raised when calls
+  overlap on one async file handle. Await the call that already owns the
+  handle before retrying the rejected operation.
+
+### Fixed
+
+- Removed the binary reader's duplicate compatibility header parser. Live
+  `mtime` updates now come from the shared incremental gzip parser, avoiding a
+  second retained copy and repeated rescans of fragmented FNAME and FCOMMENT
+  fields.
+- A reader whose decompression or validation fails is now poisoned
+  consistently whether the error is detected while accepting input or at
+  underlying EOF. Integrity failures may still expose bytes decoded and
+  buffered before the failure. Those bytes are recovery data, not an integrity
+  guarantee: they may belong to a member whose later CRC/ISIZE check failed.
+  This includes output emitted earlier by a decoder operation whose trailer is
+  rejected later in the same compressed chunk. Binary and text readers expose
+  that span with an error, then the decoded recovery data, then the terminal
+  error. `read(-1)` preserves recovery bytes and the prior position when a
+  later source chunk fails, while `readline()` does not turn an unterminated
+  remainder into a clean final line. Limits, cancellation, and unexpected
+  internal errors do not enable salvage or restore text into a healthy fast
+  path. Once the buffer is consumed, access reports the terminal failure
+  instead of returning clean EOF. An absolute `seek(0)` on a rewindable source
+  recovers with a fresh decoder; non-rewindable sources recommend only closing
+  and reopening the handle.
+- Overlapping reads, seeks, writes, flushes, and closes on one handle are
+  rejected before they can reserve or finalize codec work or poison the gzip
+  member. Text calls reserve decoder/encoder and decoded-buffer state as well
+  as the binary codec, including results served from the text buffer. Composite
+  `readlines()`, `writelines()`, and write-mode `seek()` calls hold one
+  reservation across their complete logical operation, so another task cannot
+  consume or splice data between internal batches. A rejected composite read
+  cannot run rollback against state still owned by the active call. Concurrent
+  close calls instead wait for the same finalization. A clean context exit
+  outwaits even a producer that immediately reserves the handle again;
+  cancellation while it waits still attempts abortive resource cleanup before
+  propagating. If an exceptional context exit aborts an active read, write, or
+  flush, that call raises instead of returning truncated data or reporting
+  success for an unterminated member. Abort cleanup reports the handle closed
+  only after its owned resource closes. Binary and text closes are both
+  serialized through their complete finalization.
+- Text reads now retain already-decoded buffered characters until every
+  fallible refill needed by that call succeeds. A rejected overlap or transient
+  source failure can therefore be retried without silently skipping text.
+  Binary and text `readlines()` likewise roll back complete lines accumulated
+  by a failed composite call, and sized text reads preserve the replay origin
+  needed for exact `tell()`/`seek()` cookies across buffer compaction.
+  A poisoned binary stream is no longer mistaken for clean EOF by the text
+  wrapper, including final partial-line and trailing-CR cases.
+  Closing through the public `buffer` accessor no longer makes text `close()`
+  skip incremental-encoder finalization or leaves text reads usable; any
+  resulting closed-buffer error is surfaced to the caller.
+- `tell()` on a constructed but unopened binary or text file now raises the
+  same `ValueError` as the other unopened I/O surfaces instead of returning an
+  apparent position of zero.
+
+### Changed
+
+- `AsyncGzipBinaryFile.mtime` and `AsyncGzipTextFile.mtime` now follow the most
+  recently completed valid member header. On concatenated streams, read-ahead
+  can therefore advance `mtime` beyond the member containing the bytes returned
+  by the current read. Rewind preserves the last observed value until another
+  header is parsed; an invalid or incomplete later header does not invent a new
+  timestamp.
+
+### Performance
+
+- Reduced semantics-preserving per-call overhead for small binary writes. The
+  extreme 10-byte diagnostic improved over `2.0.0a2` but remains slower than
+  `v1.11.0`; use `writelines()` or explicit bounded batches when individual
+  per-record sink-failure boundaries are unnecessary.
+
 ## [2.0.0a2] - 2026-07-27
 
 ### Fixed

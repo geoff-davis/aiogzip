@@ -3,10 +3,11 @@
 import gzip
 import io
 import os
+import zlib
 
 import pytest
 
-from aiogzip import AsyncGzipBinaryFile
+from aiogzip import AsyncGzipBinaryFile, ConcurrentOperationError
 
 
 class NonSeekableAsyncReader:
@@ -212,6 +213,247 @@ class TestFileobjSupport:
         f = AsyncGzipBinaryFile(None, "wb", fileobj=InvalidWriter(), closefd=False)
         with pytest.raises(OSError, match="invalid byte count|no progress|requested"):
             await f.open()
+
+    @pytest.mark.parametrize("invalid_count", [None, -1, True, 10**9])
+    async def test_invalid_data_write_count_poisoning_is_call_local(
+        self, invalid_count
+    ):
+        class InvalidDataWriter:
+            def __init__(self):
+                self.calls = 0
+                self.buffer = bytearray()
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls > 1:
+                    return invalid_count
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                pass
+
+        writer = InvalidDataWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False)
+        await stream.open()
+        header = bytes(writer.buffer)
+
+        with pytest.raises(OSError, match="invalid byte count|no progress|requested"):
+            await stream.write(os.urandom(512 * 1024))
+        assert await stream.tell() == 0
+        assert stream._write_broken is True
+        with pytest.raises(OSError, match="broken"):
+            await stream.write(b"later")
+
+        await stream.close()
+        assert bytes(writer.buffer) == header
+
+    async def test_position_and_return_value_commit_after_sink_completion(self):
+        import asyncio
+
+        class BlockingDataWriter:
+            def __init__(self):
+                self.calls = 0
+                self.started = asyncio.Event()
+                self.release = asyncio.Event()
+
+            async def write(self, data):
+                self.calls += 1
+                if self.calls > 1:
+                    self.started.set()
+                    await self.release.wait()
+                return len(data)
+
+            async def close(self):
+                pass
+
+        payload = os.urandom(512 * 1024)
+        writer = BlockingDataWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False)
+        await stream.open()
+        task = asyncio.create_task(stream.write(payload))
+        await writer.started.wait()
+        assert await stream.tell() == 0
+
+        writer.release.set()
+        assert await task == len(payload)
+        assert await stream.tell() == len(payload)
+        assert stream._encoder is not None
+        assert await stream.tell() == stream._encoder.input_size
+        await stream.close()
+
+    async def test_overlapping_write_gap_is_rejected_without_poisoning(
+        self, monkeypatch
+    ):
+        import asyncio
+
+        import aiogzip._binary as binary_module
+
+        class BufferWriter:
+            def __init__(self):
+                self.buffer = bytearray()
+
+            async def write(self, data):
+                self.buffer.extend(data)
+                return len(data)
+
+            async def close(self):
+                pass
+
+        operation_released = asyncio.Event()
+        operation_reserved = asyncio.Event()
+        advance_operation = asyncio.Event()
+        publish_position = asyncio.Event()
+
+        async def controlled_drive(operation, **kwargs):
+            operation_reserved.set()
+            await advance_operation.wait()
+            for piece in operation:
+                yield piece
+            operation_released.set()
+            await publish_position.wait()
+
+        monkeypatch.setattr(binary_module, "_drive_operation", controlled_drive)
+        payload = b"x" * (256 * 1024)
+        writer = BufferWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False, mtime=0)
+        await stream.open()
+
+        first = asyncio.create_task(stream.write(payload))
+        await operation_reserved.wait()
+        with pytest.raises(ConcurrentOperationError, match="active write or flush"):
+            await stream.close()
+        assert stream.closed is False
+        assert stream._write_broken is False
+
+        advance_operation.set()
+        await operation_released.wait()
+        with pytest.raises(ConcurrentOperationError, match="active write or flush"):
+            await stream.write(b"overlap")
+        assert stream._write_broken is False
+
+        publish_position.set()
+        assert await first == len(payload)
+        assert await stream.write(b"after") == 5
+        await stream.close()
+        assert gzip.decompress(bytes(writer.buffer)) == payload + b"after"
+
+    async def test_write_during_underlying_flush_is_rejected_without_poisoning(self):
+        import asyncio
+
+        class BlockingFlushWriter:
+            def __init__(self):
+                self.buffer = bytearray()
+                self.flush_started = asyncio.Event()
+                self.release_flush = asyncio.Event()
+
+            async def write(self, data):
+                self.buffer.extend(data)
+                return len(data)
+
+            async def flush(self):
+                self.flush_started.set()
+                await self.release_flush.wait()
+
+            async def close(self):
+                pass
+
+        writer = BlockingFlushWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False, mtime=0)
+        await stream.open()
+        await stream.write(b"before flush")
+
+        flushing = asyncio.create_task(stream.flush())
+        await writer.flush_started.wait()
+        with pytest.raises(ConcurrentOperationError, match="active write or flush"):
+            await stream.write(b"overlap")
+        with pytest.raises(ConcurrentOperationError, match="active write or flush"):
+            await stream.close()
+        assert stream.closed is False
+        assert stream._write_broken is False
+
+        writer.release_flush.set()
+        await flushing
+        assert await stream.write(b" after flush") == 12
+        await stream.close()
+        assert gzip.decompress(bytes(writer.buffer)) == b"before flush after flush"
+
+    async def test_overlapping_read_and_close_are_rejected_without_poisoning(self):
+        import asyncio
+
+        payload = b"one reader owns this gzip handle"
+
+        class BlockingReader:
+            def __init__(self, data):
+                self.buffer = io.BytesIO(data)
+                self.read_started = asyncio.Event()
+                self.release_read = asyncio.Event()
+                self.blocked = False
+
+            async def read(self, size=-1):
+                if not self.blocked:
+                    self.blocked = True
+                    self.read_started.set()
+                    await self.release_read.wait()
+                return self.buffer.read(size)
+
+            async def close(self):
+                pass
+
+        reader = BlockingReader(gzip.compress(payload, mtime=0))
+        stream = AsyncGzipBinaryFile(
+            None,
+            "rb",
+            fileobj=reader,
+            closefd=False,
+            chunk_size=1024,
+        )
+        await stream.open()
+
+        first = asyncio.create_task(stream.read(1))
+        await reader.read_started.wait()
+        with pytest.raises(ConcurrentOperationError, match="active read call"):
+            await stream.read(1)
+        with pytest.raises(ConcurrentOperationError, match="active read call"):
+            await stream.close()
+        assert stream.closed is False
+        assert stream._read_broken is False
+
+        reader.release_read.set()
+        assert await first == payload[:1]
+        assert await stream.read() == payload[1:]
+        await stream.close()
+
+    async def test_flush_is_distinct_from_ordinary_small_write(self):
+        class RecordingWriter:
+            def __init__(self):
+                self.buffer = bytearray()
+                self.calls = 0
+
+            async def write(self, data):
+                self.calls += 1
+                self.buffer.extend(data)
+                return len(data)
+
+            async def flush(self):
+                pass
+
+            async def close(self):
+                pass
+
+        writer = RecordingWriter()
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=writer, closefd=False, mtime=0)
+        await stream.open()
+        calls_after_header = writer.calls
+        assert await stream.write(b"small pending payload") == 21
+        assert writer.calls == calls_after_header
+
+        await stream.flush()
+        assert writer.calls > calls_after_header
+        decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        assert decompressor.decompress(bytes(writer.buffer)) == b"small pending payload"
+        assert decompressor.eof is False
+        await stream.close()
 
     async def test_non_seekable_fileobj_supports_backward_seek(self):
         payload = b"abcdefghijklmnopqrstuvwxyz"

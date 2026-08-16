@@ -7,6 +7,46 @@ from typing import Dict, Union
 import pytest
 
 
+class FramedAsyncReader:
+    """Async memory source that preserves caller-selected read boundaries."""
+
+    def __init__(self, *frames: bytes, seekable: bool = True) -> None:
+        self._frames = tuple(frames)
+        self._frame_index = 0
+        self._frame_offset = 0
+        self._seekable = seekable
+        self.read_calls = 0
+
+    async def read(self, size: int = -1) -> bytes:
+        self.read_calls += 1
+        if self._frame_index >= len(self._frames):
+            return b""
+        frame = self._frames[self._frame_index]
+        remaining = len(frame) - self._frame_offset
+        take = remaining if size < 0 else min(size, remaining)
+        start = self._frame_offset
+        self._frame_offset += take
+        if self._frame_offset == len(frame):
+            self._frame_index += 1
+            self._frame_offset = 0
+        return frame[start : start + take]
+
+    def seekable(self) -> bool:
+        return self._seekable
+
+    async def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
+        if not self._seekable:
+            raise OSError("not seekable")
+        if offset != 0 or whence != os.SEEK_SET:
+            raise OSError("test reader only supports rewind")
+        self._frame_index = 0
+        self._frame_offset = 0
+        return 0
+
+    async def close(self) -> None:
+        pass
+
+
 @pytest.fixture
 def temp_file():
     """Create a temporary gzip file path for tests."""

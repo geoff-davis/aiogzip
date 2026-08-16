@@ -9,6 +9,12 @@ import pytest
 from aiogzip import GzipDecoder, GzipEncoder
 
 
+def _advance_operation(operation, driver):
+    if driver == "public-next":
+        return next(operation)
+    return operation._advance_raw()
+
+
 def test_encoder_requires_start_and_transitions_once():
     encoder = GzipEncoder(mtime=0)
 
@@ -136,7 +142,8 @@ def test_early_close_poisons_codec(kind, partially_advanced):
         next_call()
 
 
-def test_reentrant_advancement_raises_runtime_error_at_inner_call():
+@pytest.mark.parametrize("driver", ["public-next", "private-raw"])
+def test_reentrant_advancement_raises_runtime_error_at_inner_call(driver):
     encoder = GzipEncoder(mtime=0)
     list(encoder.start())
     operation_holder = {}
@@ -145,7 +152,7 @@ def test_reentrant_advancement_raises_runtime_error_at_inner_call():
     class ReentrantEngine:
         def compress(self, data):
             try:
-                next(operation_holder["operation"])
+                _advance_operation(operation_holder["operation"], driver)
             except RuntimeError as error:
                 caught.append(str(error))
             return b""
@@ -156,6 +163,41 @@ def test_reentrant_advancement_raises_runtime_error_at_inner_call():
 
     assert list(operation) == []
     assert caught == ["gzip codec operation cannot be advanced reentrantly"]
+    encoder.discard()
+
+
+@pytest.mark.parametrize("driver", ["public-next", "private-raw"])
+def test_closed_operation_guard_matches_between_drivers(driver):
+    encoder = GzipEncoder(mtime=0)
+    operation = encoder.start()
+    list(operation)
+
+    with pytest.raises(StopIteration):
+        _advance_operation(operation, driver)
+
+    encoder.discard()
+
+
+@pytest.mark.parametrize("driver", ["public-next", "private-raw"])
+def test_invalidated_operation_guard_matches_between_drivers(driver):
+    encoder = GzipEncoder(mtime=0)
+    operation = encoder.start()
+    encoder.discard()
+
+    with pytest.raises(RuntimeError, match="invalidated"):
+        _advance_operation(operation, driver)
+
+
+@pytest.mark.parametrize("driver", ["public-next", "private-raw"])
+def test_inactive_operation_guard_matches_between_drivers(driver):
+    encoder = GzipEncoder(mtime=0)
+    operation = encoder.start()
+    encoder._active_token = object()
+
+    with pytest.raises(RuntimeError, match="no longer active"):
+        _advance_operation(operation, driver)
+
+    encoder._active_token = operation
     encoder.discard()
 
 
@@ -189,6 +231,24 @@ def test_discard_releases_unadvanced_feed_snapshot():
     assert sys.getrefcount(payload) > initial_references
 
     decoder.discard()
+
+    assert sys.getrefcount(payload) == initial_references
+    with pytest.raises(RuntimeError, match="invalidated"):
+        next(operation)
+    operation.close()
+    operation.close()
+
+
+def test_encoder_discard_releases_unadvanced_feed_snapshot():
+    payload = b"x" * (8 * 1024 * 1024)
+    encoder = GzipEncoder(mtime=0)
+    list(encoder.start())
+    initial_references = sys.getrefcount(payload)
+
+    operation = encoder.feed(payload)
+    assert sys.getrefcount(payload) > initial_references
+
+    encoder.discard()
 
     assert sys.getrefcount(payload) == initial_references
     with pytest.raises(RuntimeError, match="invalidated"):

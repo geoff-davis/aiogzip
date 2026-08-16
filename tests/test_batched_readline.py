@@ -190,10 +190,14 @@ class TestBatchedReadlines:
         path = tmp_path / "readlines-fast.gz"
         path.write_bytes(gzip.compress("".join(lines).encode("utf-8")))
 
-        async def unexpected_readline(self):
+        async def unexpected_readline(self, limit):
             raise AssertionError("readlines() awaited the per-line helper")
 
-        monkeypatch.setattr(AsyncGzipTextFile, "_readline_fast", unexpected_readline)
+        monkeypatch.setattr(
+            AsyncGzipTextFile,
+            "_readline_generic_reserved",
+            unexpected_readline,
+        )
         async with AsyncGzipTextFile(path, "rt", newline="\n") as f:
             assert await f.readlines() == lines
 

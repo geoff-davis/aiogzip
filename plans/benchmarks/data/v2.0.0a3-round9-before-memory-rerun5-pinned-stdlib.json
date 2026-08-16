@@ -1,0 +1,97 @@
+{
+  "schema_version": 2,
+  "timestamp": 1786642141.843812,
+  "categories": [
+    "memory"
+  ],
+  "data_size_mb": 8,
+  "repeat": 5,
+  "regression_profile": null,
+  "regression_mode": null,
+  "source": {
+    "source_root": "/tmp/aiogzip-round9-baseline",
+    "aiogzip_file": "/tmp/aiogzip-round9-baseline/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a3.dev0",
+    "target_commit": "f38dcb4fc63643000c2dac0dd2eb6def572d5426",
+    "target_describe": "v2.0.0a2-45-gf38dcb4",
+    "target_dirty": false
+  },
+  "environment": {
+    "source_root": "/tmp/aiogzip-round9-baseline",
+    "aiogzip_file": "/tmp/aiogzip-round9-baseline/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a3.dev0",
+    "target_commit": "f38dcb4fc63643000c2dac0dd2eb6def572d5426",
+    "target_describe": "v2.0.0a2-45-gf38dcb4",
+    "target_dirty": false,
+    "environment_label": "round9-memory-before",
+    "runner_root": "/home/geoff/Projects/personal/aiogzip",
+    "runner_commit": "54d108ddabdf7607613e706d1328d3aca39cf94d",
+    "regression_harness_sha256": "6cb2d3a9709fd905cbc7871c4cb80f9ae848668378d7bd08aeb070aeed2a112d",
+    "python_implementation": "CPython",
+    "python_version": "3.12.12 (main, Dec 17 2025, 21:10:06) [Clang 21.1.4 ]",
+    "python_executable": "/home/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+    "os_name": "Linux",
+    "os_release": "6.17.0-41-generic",
+    "kernel_version": "#41-Ubuntu SMP PREEMPT_DYNAMIC Sat Jun 20 18:01:40 UTC 2026",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.42"
+    ],
+    "processor": "",
+    "cpu_count": 32,
+    "ram_bytes": 131894407168,
+    "filesystem_temp_root": "/tmp",
+    "zlib_compile_version": "1.3.1",
+    "zlib_runtime_version": "1.3.1",
+    "zlib_ng_package_version": "1.0.0",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "stdlib-zlib",
+      "crc32": "stdlib-zlib"
+    },
+    "forced_engine": "stdlib",
+    "uv_version": "uv 0.9.22",
+    "uv_lock_sha256": "5956b3a0e8d4ea2d84706ee16275830f4431e629bce0cf0526e5410feab6bcf4",
+    "cpu_affinity": [
+      0
+    ],
+    "cpu_governor": "powersave",
+    "cpu_boost": "enabled",
+    "system_load": [
+      0.705078125,
+      1.19482421875,
+      1.16162109375
+    ],
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      700,
+      10,
+      10
+    ]
+  },
+  "results": [
+    {
+      "name": "Memory efficiency (5MB)",
+      "category": "memory",
+      "duration": 0.10980253107845783,
+      "duration_samples": [
+        0.11231322097592056,
+        0.11025514802895486,
+        0.10980253107845783,
+        0.10737287299707532,
+        0.08145654108375311
+      ],
+      "median_absolute_deviation": 0.002429658081382513,
+      "duration_min": 0.08145654108375311,
+      "duration_max": 0.11231322097592056,
+      "metrics": {
+        "memory_increase_mb": "10.7",
+        "memory_ratio": "2.13x",
+        "status": "OK",
+        "suite_repeats": 5
+      }
+    }
+  ]
+}

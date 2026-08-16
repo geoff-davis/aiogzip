@@ -1,0 +1,3001 @@
+{
+  "schema_version": 1,
+  "profile": "aiogzip-2.0.0a3-small-writes",
+  "command": [
+    "/home/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "/home/geoff/Projects/personal/aiogzip/benchmarks/profile_small_writes.py",
+    "--source-root",
+    "/tmp/aiogzip-v2.0.0a2-a3",
+    "--engine",
+    "zlib-ng",
+    "--write-sizes",
+    "10,1024,65536",
+    "--total-write-bytes",
+    "8388608",
+    "--output",
+    "plans/benchmarks/data/v2.0.0a2-a3-small-write-profile-zlib-ng.json"
+  ],
+  "source": {
+    "source_root": "/tmp/aiogzip-v2.0.0a2-a3",
+    "aiogzip_file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a2",
+    "commit": "9534eb31da15417126233eda225d8f897908e3bb",
+    "describe": "v2.0.0a2",
+    "dirty_tracked": false,
+    "requested_engine": "zlib-ng",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "zlib-ng",
+      "crc32": "zlib-ng"
+    }
+  },
+  "environment": {
+    "source_root": "/tmp/aiogzip-v2.0.0a2-a3",
+    "aiogzip_file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a2",
+    "commit": "9534eb31da15417126233eda225d8f897908e3bb",
+    "describe": "v2.0.0a2",
+    "dirty_tracked": false,
+    "requested_engine": "zlib-ng",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "zlib-ng",
+      "crc32": "zlib-ng"
+    },
+    "runner_root": "/home/geoff/Projects/personal/aiogzip",
+    "runner_commit": "b9f6e285a5f3b6e90105c1d2071af214e10ca9d1",
+    "harness_sha256": "d0661d1f2f15f0a40896f3b3eeb0dbffda647c2256a583fa164552c155349a8f",
+    "fixture_generator_version": "a3-fixtures-v1",
+    "python_implementation": "CPython",
+    "python_version": "3.12.12 (main, Dec 17 2025, 21:10:06) [Clang 21.1.4 ]",
+    "python_executable": "/home/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "python_build": [
+      "main",
+      "Dec 17 2025 21:10:06"
+    ],
+    "python_config_args": "'--build=x86_64-unknown-linux-gnu' '--host=x86_64-unknown-linux-gnu' '--prefix=/install' '--with-openssl=/tools/deps' '--with-system-expat' '--with-system-libmpdec' '--without-ensurepip' '--with-readline=editline' '--enable-static-libpython-for-interpreter' '--enable-shared' '--enable-optimizations' '--enable-bolt' '--with-lto' '--with-build-python=/tools/host/bin/python3.12' '--with-dbmliborder=bdb' 'build_alias=x86_64-unknown-linux-gnu' 'host_alias=x86_64-unknown-linux-gnu' 'PKG_CONFIG=pkg-config --static' 'PKG_CONFIG_PATH=/tools/deps/share/pkgconfig:/tools/deps/lib/pkgconfig' 'CC=clang' 'CFLAGS=-O3 -fPIC ' 'LDFLAGS= -Wl,--exclude-libs,ALL -LModules/_hacl' 'CPPFLAGS=-O3 -fPIC ' 'PROFILE_TASK=-m test --pgo'",
+    "python_compiler": "Clang 21.1.4 ",
+    "os": "Linux",
+    "os_release": "6.17.0-41-generic",
+    "kernel": "#41-Ubuntu SMP PREEMPT_DYNAMIC Sat Jun 20 18:01:40 UTC 2026",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.42"
+    ],
+    "processor": "",
+    "logical_cores": 32,
+    "physical_cores": 16,
+    "ram_bytes": 131894407168,
+    "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "cpu_policy": {
+      "governors": [
+        "powersave"
+      ],
+      "boost": "enabled"
+    },
+    "system_load": [
+      1.53564453125,
+      1.69482421875,
+      1.8681640625
+    ],
+    "power_source": "ACAD:1,ucsi-source-psy-USBC000:001:0,ucsi-source-psy-USBC000:002:0",
+    "benchmark_filesystem": {
+      "path": "/tmp/aiogzip-v2.0.0a2-a3",
+      "device": "tmpfs",
+      "type": "tmpfs",
+      "mount": "/tmp"
+    },
+    "temporary_filesystem": {
+      "path": "/tmp",
+      "device": "tmpfs",
+      "type": "tmpfs",
+      "mount": "/tmp"
+    },
+    "temporary_directory": "/tmp",
+    "zlib_compile_version": "1.3.1",
+    "zlib_runtime_version": "1.3.1",
+    "zlib_ng_package_version": "1.0.0",
+    "uv_version": "uv 0.9.22",
+    "uv_lock_sha256": "e7b91a8c8b42c1ad455ac2d48b20a84d5e07fcb657bb48797baba8686ffa6871",
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      700,
+      10,
+      10
+    ]
+  },
+  "profiler": "cProfile deterministic single run per requested size",
+  "profile_harness_sha256": "e69b832e1b735d8baac2b64422d9092da483ceb406fd2d21949460ed4984eb7a",
+  "cases": [
+    {
+      "write_size_bytes": 10,
+      "profiled_duration_seconds": 3.2691369539825246,
+      "sample": {
+        "method": "write",
+        "write_size_bytes": 10,
+        "logical_record_count": 838861,
+        "payload_bytes": 8388608,
+        "payload_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+        "compressed_bytes": 51364,
+        "compressed_sha256": "f9e6235d6d9bc61c2a8fb04602a54512d18fc8764287bf287597a36d99720b99",
+        "output_bytes": 8388608,
+        "output_sha256": "bf6ef08bd78579ae71f2ff93a6c1dc9cee9817bb0c6090f8b627f51d901d3bf8",
+        "sink_write_calls": 6,
+        "sink_flush_calls": 0,
+        "position_before_close": 8388608,
+        "measurement_mode": "wall_time"
+      },
+      "counts": {
+        "operation_constructions": 838863,
+        "operation_reservations": 838863,
+        "operation_next_calls": 838869,
+        "operation_raw_advance_calls": 838869,
+        "public_snapshot_calls": 0,
+        "file_payload_coercions": 838861,
+        "internal_feed_calls": 838861,
+        "feed_generator_calls": 838864,
+        "binary_write_calls": 838861,
+        "compressor_calls": 838861,
+        "crc32_calls": 838862,
+        "codec_output_chunks": 6,
+        "write_all_calls": 6,
+        "sink_write_calls": 6
+      },
+      "cost_centers": {
+        "binary_write_self_seconds": 0.598274944,
+        "payload_coercion_self_seconds": 0.06923794200000001,
+        "feed_snapshot_self_seconds": 0.446767754,
+        "reservation_self_seconds": 0.156760386,
+        "operation_next_self_seconds": 0.131383106,
+        "operation_raw_advance_self_seconds": 0.308533877,
+        "feed_generator_self_seconds": 0.28537856300000003,
+        "crc32_self_seconds": 0.073475126,
+        "compressor_self_seconds": 0.149105486,
+        "write_all_self_seconds": 1.8336000000000002e-05,
+        "sink_write_self_seconds": 1.552e-05
+      },
+      "top_by_cumulative": [
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 160,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.0418e-05,
+          "cumulative_seconds": 3.269075367
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 86,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.2673e-05,
+          "cumulative_seconds": 3.268550965
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 655,
+          "function": "run_until_complete",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 2.3115e-05,
+          "cumulative_seconds": 3.268530756
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 631,
+          "function": "run_forever",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 2.5916e-05,
+          "cumulative_seconds": 3.268466956
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 1922,
+          "function": "_run_once",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 3.1527000000000005e-05,
+          "cumulative_seconds": 3.268422401
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/events.py",
+          "line": 86,
+          "function": "_run",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 9.881e-06,
+          "cumulative_seconds": 3.2683572890000003
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'run' of '_contextvars.Context' objects>",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 0.001436365,
+          "cumulative_seconds": 3.2683474080000003
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 537,
+          "function": "_write_once",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.27030722100000004,
+          "cumulative_seconds": 3.2668727200000003
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 836,
+          "function": "write",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.598274944,
+          "cumulative_seconds": 2.881169453
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 101,
+          "function": "__next__",
+          "primitive_calls": 838869,
+          "total_calls": 838869,
+          "self_seconds": 0.131383106,
+          "cumulative_seconds": 1.1716542140000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 107,
+          "function": "_advance_raw",
+          "primitive_calls": 838869,
+          "total_calls": 838869,
+          "self_seconds": 0.308533877,
+          "cumulative_seconds": 1.040268935
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 322,
+          "function": "_feed_snapshot",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.446767754,
+          "cumulative_seconds": 0.9250994260000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.next>",
+          "primitive_calls": 838869,
+          "total_calls": 838869,
+          "self_seconds": 0.13496525,
+          "cumulative_seconds": 0.6754818960000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 331,
+          "function": "_feed",
+          "primitive_calls": 838864,
+          "total_calls": 838864,
+          "self_seconds": 0.28537856300000003,
+          "cumulative_seconds": 0.540437285
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 176,
+          "function": "_reserve",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.156760386,
+          "cumulative_seconds": 0.206623623
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 286,
+          "function": "_check_encoder_available",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.11316587500000001,
+          "cumulative_seconds": 0.158352016
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'compress' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.149105486,
+          "cumulative_seconds": 0.149105486
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.len>",
+          "primitive_calls": 3355514,
+          "total_calls": 3355518,
+          "self_seconds": 0.145445516,
+          "cumulative_seconds": 0.145447228
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib_ng.zlib_ng.crc32>",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.072368132,
+          "cumulative_seconds": 0.072368132
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 892,
+          "function": "_coerce_byteslike",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.06923794200000001,
+          "cumulative_seconds": 0.06923794200000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 184,
+          "function": "_operation_succeeded",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.056253162,
+          "cumulative_seconds": 0.056253162
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 529,
+          "function": "_records",
+          "primitive_calls": 838862,
+          "total_calls": 838862,
+          "self_seconds": 0.052493696000000006,
+          "cumulative_seconds": 0.052494108000000005
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 87,
+          "function": "__init__",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.049863237000000005,
+          "cumulative_seconds": 0.049863237000000005
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 170,
+          "function": "_check_available",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.045186141000000006,
+          "cumulative_seconds": 0.045186141000000006
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 263,
+          "function": "input_size",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.045114661,
+          "cumulative_seconds": 0.045114661
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 291,
+          "function": "_check_feed_size",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.043163612000000004,
+          "cumulative_seconds": 0.043163612000000004
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 98,
+          "function": "__iter__",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.038454084,
+          "cumulative_seconds": 0.038454084
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/typing.py",
+          "line": 2187,
+          "function": "cast",
+          "primitive_calls": 838862,
+          "total_calls": 838862,
+          "self_seconds": 0.037914585,
+          "cumulative_seconds": 0.037914585
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 58,
+          "function": "_sha256",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.3915000000000001e-05,
+          "cumulative_seconds": 0.006771952
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 0.006753979,
+          "cumulative_seconds": 0.006753979
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/gzip.py",
+          "line": 637,
+          "function": "decompress",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.5759e-05,
+          "cumulative_seconds": 0.005450872000000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'decompress' of 'zlib.Decompress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.00427616,
+          "cumulative_seconds": 0.00427616
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 520,
+          "function": "_payload_for_write",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.00391763,
+          "cumulative_seconds": 0.003936697
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib.crc32>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.001106994,
+          "cumulative_seconds": 0.001106994
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 230,
+          "function": "open",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.5940000000000002e-05,
+          "cumulative_seconds": 0.00040681
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/warnings.py",
+          "line": 133,
+          "function": "filterwarnings",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 7.073000000000001e-06,
+          "cumulative_seconds": 0.000272896
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/re/__init__.py",
+          "line": 226,
+          "function": "compile",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.916e-06,
+          "cumulative_seconds": 0.00025878
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/re/__init__.py",
+          "line": 280,
+          "function": "_compile",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.0567e-05,
+          "cumulative_seconds": 0.000255864
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 57,
+          "function": "__enter__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.034e-06,
+          "cumulative_seconds": 0.00025374
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 131,
+          "function": "_lazy_init",
+          "primitive_calls": 2,
+          "total_calls": 2,
+          "self_seconds": 6.482000000000001e-06,
+          "cumulative_seconds": 0.000252217
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/events.py",
+          "line": 821,
+          "function": "new_event_loop",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 6.113000000000001e-06,
+          "cumulative_seconds": 0.00023801100000000002
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 61,
+          "function": "__exit__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 7.574000000000001e-06,
+          "cumulative_seconds": 0.00023622700000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 64,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.2393000000000001e-05,
+          "cumulative_seconds": 0.00022826200000000002
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/re/_compiler.py",
+          "line": 745,
+          "function": "compile",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 7.966000000000001e-06,
+          "cumulative_seconds": 0.000213985
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/events.py",
+          "line": 714,
+          "function": "new_event_loop",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.075e-06,
+          "cumulative_seconds": 0.000200098
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/unix_events.py",
+          "line": 63,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.306e-06,
+          "cumulative_seconds": 0.000197023
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 59,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.449e-05,
+          "cumulative_seconds": 0.00019371700000000002
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/re/_parser.py",
+          "line": 969,
+          "function": "parse",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 8.776e-06,
+          "cumulative_seconds": 0.00010268400000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/re/_compiler.py",
+          "line": 578,
+          "function": "_code",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.6832e-05,
+          "cumulative_seconds": 9.9789e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 118,
+          "function": "_make_self_pipe",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.116e-05,
+          "cumulative_seconds": 9.6512e-05
+        }
+      ],
+      "top_by_self": [
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 836,
+          "function": "write",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.598274944,
+          "cumulative_seconds": 2.881169453
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 322,
+          "function": "_feed_snapshot",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.446767754,
+          "cumulative_seconds": 0.9250994260000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 107,
+          "function": "_advance_raw",
+          "primitive_calls": 838869,
+          "total_calls": 838869,
+          "self_seconds": 0.308533877,
+          "cumulative_seconds": 1.040268935
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 331,
+          "function": "_feed",
+          "primitive_calls": 838864,
+          "total_calls": 838864,
+          "self_seconds": 0.28537856300000003,
+          "cumulative_seconds": 0.540437285
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 537,
+          "function": "_write_once",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.27030722100000004,
+          "cumulative_seconds": 3.2668727200000003
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 176,
+          "function": "_reserve",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.156760386,
+          "cumulative_seconds": 0.206623623
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'compress' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.149105486,
+          "cumulative_seconds": 0.149105486
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.len>",
+          "primitive_calls": 3355514,
+          "total_calls": 3355518,
+          "self_seconds": 0.145445516,
+          "cumulative_seconds": 0.145447228
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.next>",
+          "primitive_calls": 838869,
+          "total_calls": 838869,
+          "self_seconds": 0.13496525,
+          "cumulative_seconds": 0.6754818960000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 101,
+          "function": "__next__",
+          "primitive_calls": 838869,
+          "total_calls": 838869,
+          "self_seconds": 0.131383106,
+          "cumulative_seconds": 1.1716542140000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 286,
+          "function": "_check_encoder_available",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.11316587500000001,
+          "cumulative_seconds": 0.158352016
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib_ng.zlib_ng.crc32>",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.072368132,
+          "cumulative_seconds": 0.072368132
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 892,
+          "function": "_coerce_byteslike",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.06923794200000001,
+          "cumulative_seconds": 0.06923794200000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 184,
+          "function": "_operation_succeeded",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.056253162,
+          "cumulative_seconds": 0.056253162
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 529,
+          "function": "_records",
+          "primitive_calls": 838862,
+          "total_calls": 838862,
+          "self_seconds": 0.052493696000000006,
+          "cumulative_seconds": 0.052494108000000005
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 87,
+          "function": "__init__",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.049863237000000005,
+          "cumulative_seconds": 0.049863237000000005
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 170,
+          "function": "_check_available",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.045186141000000006,
+          "cumulative_seconds": 0.045186141000000006
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 263,
+          "function": "input_size",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.045114661,
+          "cumulative_seconds": 0.045114661
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 291,
+          "function": "_check_feed_size",
+          "primitive_calls": 838861,
+          "total_calls": 838861,
+          "self_seconds": 0.043163612000000004,
+          "cumulative_seconds": 0.043163612000000004
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 98,
+          "function": "__iter__",
+          "primitive_calls": 838863,
+          "total_calls": 838863,
+          "self_seconds": 0.038454084,
+          "cumulative_seconds": 0.038454084
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/typing.py",
+          "line": 2187,
+          "function": "cast",
+          "primitive_calls": 838862,
+          "total_calls": 838862,
+          "self_seconds": 0.037914585,
+          "cumulative_seconds": 0.037914585
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 0.006753979,
+          "cumulative_seconds": 0.006753979
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'decompress' of 'zlib.Decompress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.00427616,
+          "cumulative_seconds": 0.00427616
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 520,
+          "function": "_payload_for_write",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.00391763,
+          "cumulative_seconds": 0.003936697
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'run' of '_contextvars.Context' objects>",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 0.001436365,
+          "cumulative_seconds": 3.2683474080000003
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib.crc32>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.001106994,
+          "cumulative_seconds": 0.001106994
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib_ng.zlib_ng.compressobj>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.9054e-05,
+          "cumulative_seconds": 3.9054e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/re/_compiler.py",
+          "line": 37,
+          "function": "_compile",
+          "primitive_calls": 1,
+          "total_calls": 2,
+          "self_seconds": 3.62e-05,
+          "cumulative_seconds": 5.4703e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/gzip.py",
+          "line": 637,
+          "function": "decompress",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.5759e-05,
+          "cumulative_seconds": 0.005450872000000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'extend' of 'bytearray' objects>",
+          "primitive_calls": 8,
+          "total_calls": 8,
+          "self_seconds": 3.2552e-05,
+          "cumulative_seconds": 3.2552e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/re/_parser.py",
+          "line": 512,
+          "function": "_parse",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.2373e-05,
+          "cumulative_seconds": 6.6716e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 1922,
+          "function": "_run_once",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 3.1527000000000005e-05,
+          "cumulative_seconds": 3.268422401
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'flush' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.9225000000000002e-05,
+          "cumulative_seconds": 2.9225000000000002e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 230,
+          "function": "open",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.5940000000000002e-05,
+          "cumulative_seconds": 0.00040681
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 631,
+          "function": "run_forever",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 2.5916e-05,
+          "cumulative_seconds": 3.268466956
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 655,
+          "function": "run_until_complete",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 2.3115e-05,
+          "cumulative_seconds": 3.268530756
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 148,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.3004000000000002e-05,
+          "cumulative_seconds": 3.2401000000000004e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 86,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.2673e-05,
+          "cumulative_seconds": 3.268550965
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/re/_parser.py",
+          "line": 452,
+          "function": "_parse_sub",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.2363000000000003e-05,
+          "cumulative_seconds": 9.0241e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 450,
+          "function": "create_task",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 2.1812e-05,
+          "cumulative_seconds": 3.5617e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/re/__init__.py",
+          "line": 280,
+          "function": "_compile",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.0567e-05,
+          "cumulative_seconds": 0.000255864
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 160,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.0418e-05,
+          "cumulative_seconds": 3.269075367
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 410,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.8825e-05,
+          "cumulative_seconds": 4.1298e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.isinstance>",
+          "primitive_calls": 103,
+          "total_calls": 103,
+          "self_seconds": 1.8343e-05,
+          "cumulative_seconds": 1.8343e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 908,
+          "function": "_write_all",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 1.8336000000000002e-05,
+          "cumulative_seconds": 7.0944e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<function socket.close at 0x7d61e03c0ae0>",
+          "primitive_calls": 2,
+          "total_calls": 2,
+          "self_seconds": 1.7873e-05,
+          "cumulative_seconds": 1.7873e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _socket.socketpair>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.7774e-05,
+          "cumulative_seconds": 1.7774e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.7222000000000002e-05,
+          "cumulative_seconds": 1.7222000000000002e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 369,
+          "function": "_finish",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.7194000000000002e-05,
+          "cumulative_seconds": 5.828100000000001e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/re/_compiler.py",
+          "line": 578,
+          "function": "_code",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.6832e-05,
+          "cumulative_seconds": 9.9789e-05
+        }
+      ]
+    },
+    {
+      "write_size_bytes": 1024,
+      "profiled_duration_seconds": 0.04861576796974987,
+      "sample": {
+        "method": "write",
+        "write_size_bytes": 1024,
+        "logical_record_count": 8192,
+        "payload_bytes": 8388608,
+        "payload_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+        "compressed_bytes": 74639,
+        "compressed_sha256": "76163d915d3b38d8c666c49a7c1871aa48eeddf7b8456809e0f962267872676e",
+        "output_bytes": 8388608,
+        "output_sha256": "1e91b2f7ad7eaeb6352cced407d324dd9724df7841ef63ba34a9a00e4f2b634a",
+        "sink_write_calls": 5,
+        "sink_flush_calls": 0,
+        "position_before_close": 8388608,
+        "measurement_mode": "wall_time"
+      },
+      "counts": {
+        "operation_constructions": 8194,
+        "operation_reservations": 8194,
+        "operation_next_calls": 8199,
+        "operation_raw_advance_calls": 8199,
+        "public_snapshot_calls": 0,
+        "file_payload_coercions": 8192,
+        "internal_feed_calls": 8192,
+        "feed_generator_calls": 8194,
+        "binary_write_calls": 8192,
+        "compressor_calls": 8192,
+        "crc32_calls": 8193,
+        "codec_output_chunks": 5,
+        "write_all_calls": 5,
+        "sink_write_calls": 5
+      },
+      "cost_centers": {
+        "binary_write_self_seconds": 0.005981873,
+        "payload_coercion_self_seconds": 0.000688049,
+        "feed_snapshot_self_seconds": 0.004482094000000001,
+        "reservation_self_seconds": 0.001553467,
+        "operation_next_self_seconds": 0.0013123660000000001,
+        "operation_raw_advance_self_seconds": 0.0030744820000000003,
+        "feed_generator_self_seconds": 0.002917261,
+        "crc32_self_seconds": 0.001915451,
+        "compressor_self_seconds": 0.002571809,
+        "write_all_self_seconds": 5.601e-06,
+        "sink_write_self_seconds": 3.345e-06
+      },
+      "top_by_cumulative": [
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 160,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.1311e-05,
+          "cumulative_seconds": 0.048579299000000006
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 655,
+          "function": "run_until_complete",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.561e-05,
+          "cumulative_seconds": 0.048251269000000006
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 86,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.3597e-05,
+          "cumulative_seconds": 0.048225991
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 631,
+          "function": "run_forever",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.6012000000000002e-05,
+          "cumulative_seconds": 0.048201185
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 1922,
+          "function": "_run_once",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 2.0264e-05,
+          "cumulative_seconds": 0.048173121000000006
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/events.py",
+          "line": 86,
+          "function": "_run",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 6.8330000000000005e-06,
+          "cumulative_seconds": 0.048129529000000004
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'run' of '_contextvars.Context' objects>",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 0.0011773200000000001,
+          "cumulative_seconds": 0.048122696000000006
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 537,
+          "function": "_write_once",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.002977092,
+          "cumulative_seconds": 0.046912747000000005
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 836,
+          "function": "write",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.005981873,
+          "cumulative_seconds": 0.029913964
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 101,
+          "function": "__next__",
+          "primitive_calls": 8199,
+          "total_calls": 8199,
+          "self_seconds": 0.0013123660000000001,
+          "cumulative_seconds": 0.012977385000000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 107,
+          "function": "_advance_raw",
+          "primitive_calls": 8199,
+          "total_calls": 8199,
+          "self_seconds": 0.0030744820000000003,
+          "cumulative_seconds": 0.011664668000000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 322,
+          "function": "_feed_snapshot",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.004482094000000001,
+          "cumulative_seconds": 0.009184764
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.next>",
+          "primitive_calls": 8199,
+          "total_calls": 8199,
+          "self_seconds": 0.001319536,
+          "cumulative_seconds": 0.008050412
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 58,
+          "function": "_sha256",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 7.293e-06,
+          "cumulative_seconds": 0.006778463
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 0.00676604,
+          "cumulative_seconds": 0.00676604
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 331,
+          "function": "_feed",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.002917261,
+          "cumulative_seconds": 0.006651857000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/gzip.py",
+          "line": 637,
+          "function": "decompress",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.6430000000000003e-05,
+          "cumulative_seconds": 0.004972627
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'decompress' of 'zlib.Decompress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.0038232830000000002,
+          "cumulative_seconds": 0.0038232830000000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'compress' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.002571809,
+          "cumulative_seconds": 0.002571809
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 176,
+          "function": "_reserve",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.001553467,
+          "cumulative_seconds": 0.002042344
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 286,
+          "function": "_check_encoder_available",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.001107611,
+          "cumulative_seconds": 0.0015423470000000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.len>",
+          "primitive_calls": 32811,
+          "total_calls": 32813,
+          "self_seconds": 0.001524842,
+          "cumulative_seconds": 0.001525574
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib.crc32>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.001108087,
+          "cumulative_seconds": 0.001108087
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 520,
+          "function": "_payload_for_write",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.0010331440000000002,
+          "cumulative_seconds": 0.0010456480000000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib_ng.zlib_ng.crc32>",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.0008073640000000001,
+          "cumulative_seconds": 0.0008073640000000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 892,
+          "function": "_coerce_byteslike",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.000688049,
+          "cumulative_seconds": 0.000688049
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 184,
+          "function": "_operation_succeeded",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.000539774,
+          "cumulative_seconds": 0.000539774
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 529,
+          "function": "_records",
+          "primitive_calls": 8193,
+          "total_calls": 8193,
+          "self_seconds": 0.000510376,
+          "cumulative_seconds": 0.000510596
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 87,
+          "function": "__init__",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.0004888770000000001,
+          "cumulative_seconds": 0.0004888770000000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 170,
+          "function": "_check_available",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.000434736,
+          "cumulative_seconds": 0.000434736
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 263,
+          "function": "input_size",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.00043459700000000005,
+          "cumulative_seconds": 0.00043459700000000005
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 291,
+          "function": "_check_feed_size",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.00041037,
+          "cumulative_seconds": 0.00041037
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 98,
+          "function": "__iter__",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.000374825,
+          "cumulative_seconds": 0.000374825
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/typing.py",
+          "line": 2187,
+          "function": "cast",
+          "primitive_calls": 8193,
+          "total_calls": 8193,
+          "self_seconds": 0.00037148000000000004,
+          "cumulative_seconds": 0.00037148000000000004
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 61,
+          "function": "__exit__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 4.819e-06,
+          "cumulative_seconds": 0.00020772300000000002
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 64,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.0681e-05,
+          "cumulative_seconds": 0.00020208200000000002
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 57,
+          "function": "__enter__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 8.720000000000001e-07,
+          "cumulative_seconds": 0.00012668
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 131,
+          "function": "_lazy_init",
+          "primitive_calls": 2,
+          "total_calls": 2,
+          "self_seconds": 2.635e-06,
+          "cumulative_seconds": 0.000125988
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/events.py",
+          "line": 821,
+          "function": "new_event_loop",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.2620000000000002e-06,
+          "cumulative_seconds": 0.00011997700000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/events.py",
+          "line": 714,
+          "function": "new_event_loop",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.633e-06,
+          "cumulative_seconds": 0.00011848400000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/unix_events.py",
+          "line": 63,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.974e-06,
+          "cumulative_seconds": 0.00011685100000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 59,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 8.546000000000001e-06,
+          "cumulative_seconds": 0.000114877
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 230,
+          "function": "open",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.741e-05,
+          "cumulative_seconds": 0.00011099
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 1316,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.887e-06,
+          "cumulative_seconds": 8.2055e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/unix_events.py",
+          "line": 67,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 6.082e-06,
+          "cumulative_seconds": 8.037200000000001e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 99,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 5.47e-06,
+          "cumulative_seconds": 7.398e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 369,
+          "function": "_finish",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 5.680000000000001e-06,
+          "cumulative_seconds": 6.5914e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 118,
+          "function": "_make_self_pipe",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 6.002e-06,
+          "cumulative_seconds": 5.998400000000001e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'flush' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 5.6567e-05,
+          "cumulative_seconds": 5.6567e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 110,
+          "function": "_close_self_pipe",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 5.139e-06,
+          "cumulative_seconds": 5.5735e-05
+        }
+      ],
+      "top_by_self": [
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 0.00676604,
+          "cumulative_seconds": 0.00676604
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 836,
+          "function": "write",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.005981873,
+          "cumulative_seconds": 0.029913964
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 322,
+          "function": "_feed_snapshot",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.004482094000000001,
+          "cumulative_seconds": 0.009184764
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'decompress' of 'zlib.Decompress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.0038232830000000002,
+          "cumulative_seconds": 0.0038232830000000002
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 107,
+          "function": "_advance_raw",
+          "primitive_calls": 8199,
+          "total_calls": 8199,
+          "self_seconds": 0.0030744820000000003,
+          "cumulative_seconds": 0.011664668000000001
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 537,
+          "function": "_write_once",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.002977092,
+          "cumulative_seconds": 0.046912747000000005
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 331,
+          "function": "_feed",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.002917261,
+          "cumulative_seconds": 0.006651857000000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'compress' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.002571809,
+          "cumulative_seconds": 0.002571809
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 176,
+          "function": "_reserve",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.001553467,
+          "cumulative_seconds": 0.002042344
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.len>",
+          "primitive_calls": 32811,
+          "total_calls": 32813,
+          "self_seconds": 0.001524842,
+          "cumulative_seconds": 0.001525574
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.next>",
+          "primitive_calls": 8199,
+          "total_calls": 8199,
+          "self_seconds": 0.001319536,
+          "cumulative_seconds": 0.008050412
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 101,
+          "function": "__next__",
+          "primitive_calls": 8199,
+          "total_calls": 8199,
+          "self_seconds": 0.0013123660000000001,
+          "cumulative_seconds": 0.012977385000000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'run' of '_contextvars.Context' objects>",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 0.0011773200000000001,
+          "cumulative_seconds": 0.048122696000000006
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib.crc32>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.001108087,
+          "cumulative_seconds": 0.001108087
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 286,
+          "function": "_check_encoder_available",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.001107611,
+          "cumulative_seconds": 0.0015423470000000001
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 520,
+          "function": "_payload_for_write",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.0010331440000000002,
+          "cumulative_seconds": 0.0010456480000000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib_ng.zlib_ng.crc32>",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.0008073640000000001,
+          "cumulative_seconds": 0.0008073640000000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 892,
+          "function": "_coerce_byteslike",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.000688049,
+          "cumulative_seconds": 0.000688049
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 184,
+          "function": "_operation_succeeded",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.000539774,
+          "cumulative_seconds": 0.000539774
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 529,
+          "function": "_records",
+          "primitive_calls": 8193,
+          "total_calls": 8193,
+          "self_seconds": 0.000510376,
+          "cumulative_seconds": 0.000510596
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 87,
+          "function": "__init__",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.0004888770000000001,
+          "cumulative_seconds": 0.0004888770000000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 170,
+          "function": "_check_available",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.000434736,
+          "cumulative_seconds": 0.000434736
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 263,
+          "function": "input_size",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.00043459700000000005,
+          "cumulative_seconds": 0.00043459700000000005
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 291,
+          "function": "_check_feed_size",
+          "primitive_calls": 8192,
+          "total_calls": 8192,
+          "self_seconds": 0.00041037,
+          "cumulative_seconds": 0.00041037
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 98,
+          "function": "__iter__",
+          "primitive_calls": 8194,
+          "total_calls": 8194,
+          "self_seconds": 0.000374825,
+          "cumulative_seconds": 0.000374825
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/typing.py",
+          "line": 2187,
+          "function": "cast",
+          "primitive_calls": 8193,
+          "total_calls": 8193,
+          "self_seconds": 0.00037148000000000004,
+          "cumulative_seconds": 0.00037148000000000004
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'flush' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 5.6567e-05,
+          "cumulative_seconds": 5.6567e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib_ng.zlib_ng.compressobj>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.2872e-05,
+          "cumulative_seconds": 3.2872e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/gzip.py",
+          "line": 637,
+          "function": "decompress",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 2.6430000000000003e-05,
+          "cumulative_seconds": 0.004972627
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 1922,
+          "function": "_run_once",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 2.0264e-05,
+          "cumulative_seconds": 0.048173121000000006
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<function socket.close at 0x7d61e03c0ae0>",
+          "primitive_calls": 2,
+          "total_calls": 2,
+          "self_seconds": 1.8515e-05,
+          "cumulative_seconds": 1.8515e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'extend' of 'bytearray' objects>",
+          "primitive_calls": 7,
+          "total_calls": 7,
+          "self_seconds": 1.7675000000000003e-05,
+          "cumulative_seconds": 1.7675000000000003e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 230,
+          "function": "open",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.741e-05,
+          "cumulative_seconds": 0.00011099
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 631,
+          "function": "run_forever",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.6012000000000002e-05,
+          "cumulative_seconds": 0.048201185
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 148,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.5831e-05,
+          "cumulative_seconds": 2.3354e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 655,
+          "function": "run_until_complete",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.561e-05,
+          "cumulative_seconds": 0.048251269000000006
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.4717000000000002e-05,
+          "cumulative_seconds": 1.4717000000000002e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _socket.socketpair>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.4297e-05,
+          "cumulative_seconds": 1.4297e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 86,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.3597e-05,
+          "cumulative_seconds": 0.048225991
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 450,
+          "function": "create_task",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.1632000000000001e-05,
+          "cumulative_seconds": 2.1942e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 160,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.1311e-05,
+          "cumulative_seconds": 0.048579299000000006
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 64,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.0681e-05,
+          "cumulative_seconds": 0.00020208200000000002
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 818,
+          "function": "_call_soon",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 1.036e-05,
+          "cumulative_seconds": 1.5209000000000001e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 181,
+          "function": "_run_until_complete_cb",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.0255000000000001e-05,
+          "cumulative_seconds": 1.5528e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 410,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 9.929000000000001e-06,
+          "cumulative_seconds": 2.9486000000000002e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'digest' of '_hashlib.HASHXOF' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 9.147e-06,
+          "cumulative_seconds": 9.147e-06
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/tasks.py",
+          "line": 43,
+          "function": "all_tasks",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 9.128000000000001e-06,
+          "cumulative_seconds": 2.5869000000000003e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 59,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 8.546000000000001e-06,
+          "cumulative_seconds": 0.000114877
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/signal.py",
+          "line": 36,
+          "function": "_enum_to_int",
+          "primitive_calls": 4,
+          "total_calls": 4,
+          "self_seconds": 7.996000000000001e-06,
+          "cumulative_seconds": 7.996000000000001e-06
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 58,
+          "function": "_sha256",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 7.293e-06,
+          "cumulative_seconds": 0.006778463
+        }
+      ]
+    },
+    {
+      "write_size_bytes": 65536,
+      "profiled_duration_seconds": 0.11026778805535287,
+      "sample": {
+        "method": "write",
+        "write_size_bytes": 65536,
+        "logical_record_count": 128,
+        "payload_bytes": 8388608,
+        "payload_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+        "compressed_bytes": 8391191,
+        "compressed_sha256": "f7f199b6d4877d5c70de9af914f844f175b705066e87b053ad8bc32e2e85188c",
+        "output_bytes": 8388608,
+        "output_sha256": "2207741bf5d4677330ac6bfc558e66280651bd57b713d81e8c1756ed37f766fe",
+        "sink_write_calls": 131,
+        "sink_flush_calls": 0,
+        "position_before_close": 8388608,
+        "measurement_mode": "wall_time"
+      },
+      "counts": {
+        "operation_constructions": 130,
+        "operation_reservations": 130,
+        "operation_next_calls": 261,
+        "operation_raw_advance_calls": 261,
+        "public_snapshot_calls": 0,
+        "file_payload_coercions": 128,
+        "internal_feed_calls": 128,
+        "feed_generator_calls": 256,
+        "binary_write_calls": 128,
+        "compressor_calls": 128,
+        "crc32_calls": 129,
+        "codec_output_chunks": 131,
+        "write_all_calls": 131,
+        "sink_write_calls": 131
+      },
+      "cost_centers": {
+        "binary_write_self_seconds": 0.000181175,
+        "payload_coercion_self_seconds": 1.4819000000000002e-05,
+        "feed_snapshot_self_seconds": 9.4466e-05,
+        "reservation_self_seconds": 3.6087e-05,
+        "operation_next_self_seconds": 6.5367e-05,
+        "operation_raw_advance_self_seconds": 0.000100773,
+        "feed_generator_self_seconds": 0.000117799,
+        "crc32_self_seconds": 0.0012421280000000001,
+        "compressor_self_seconds": 0.08551489400000001,
+        "write_all_self_seconds": 8.4904e-05,
+        "sink_write_self_seconds": 5.7118000000000004e-05
+      },
+      "top_by_cumulative": [
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 160,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.0189e-05,
+          "cumulative_seconds": 0.110227452
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 655,
+          "function": "run_until_complete",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.5779000000000003e-05,
+          "cumulative_seconds": 0.10991234500000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 86,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.0571000000000001e-05,
+          "cumulative_seconds": 0.10989172700000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 631,
+          "function": "run_forever",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.581e-05,
+          "cumulative_seconds": 0.109863524
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 1922,
+          "function": "_run_once",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 2.0898000000000002e-05,
+          "cumulative_seconds": 0.109833707
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/events.py",
+          "line": 86,
+          "function": "_run",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 8.224000000000001e-06,
+          "cumulative_seconds": 0.109784063
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'run' of '_contextvars.Context' objects>",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 0.002317476,
+          "cumulative_seconds": 0.109775839
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 537,
+          "function": "_write_once",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.001886178,
+          "cumulative_seconds": 0.107425221
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 836,
+          "function": "write",
+          "primitive_calls": 128,
+          "total_calls": 128,
+          "self_seconds": 0.000181175,
+          "cumulative_seconds": 0.08791394200000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 101,
+          "function": "__next__",
+          "primitive_calls": 261,
+          "total_calls": 261,
+          "self_seconds": 6.5367e-05,
+          "cumulative_seconds": 0.086081762
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 107,
+          "function": "_advance_raw",
+          "primitive_calls": 261,
+          "total_calls": 261,
+          "self_seconds": 0.000100773,
+          "cumulative_seconds": 0.086008649
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.next>",
+          "primitive_calls": 261,
+          "total_calls": 261,
+          "self_seconds": 5.9505e-05,
+          "cumulative_seconds": 0.085897399
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 331,
+          "function": "_feed",
+          "primitive_calls": 256,
+          "total_calls": 256,
+          "self_seconds": 0.000117799,
+          "cumulative_seconds": 0.085777931
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'compress' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 128,
+          "total_calls": 128,
+          "self_seconds": 0.08551489400000001,
+          "cumulative_seconds": 0.08551489400000001
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 58,
+          "function": "_sha256",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 8.134e-06,
+          "cumulative_seconds": 0.010139551
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 0.010123933,
+          "cumulative_seconds": 0.010123933
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/gzip.py",
+          "line": 637,
+          "function": "decompress",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.0018741950000000002,
+          "cumulative_seconds": 0.006153291
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'decompress' of 'zlib.Decompress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.0031371750000000003,
+          "cumulative_seconds": 0.0031371750000000003
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 908,
+          "function": "_write_all",
+          "primitive_calls": 131,
+          "total_calls": 131,
+          "self_seconds": 8.4904e-05,
+          "cumulative_seconds": 0.001496534
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 378,
+          "function": "write",
+          "primitive_calls": 131,
+          "total_calls": 131,
+          "self_seconds": 5.7118000000000004e-05,
+          "cumulative_seconds": 0.0013874620000000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'extend' of 'bytearray' objects>",
+          "primitive_calls": 133,
+          "total_calls": 133,
+          "self_seconds": 0.001324007,
+          "cumulative_seconds": 0.001324007
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 520,
+          "function": "_payload_for_write",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.001023646,
+          "cumulative_seconds": 0.0011176040000000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib.crc32>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.001110431,
+          "cumulative_seconds": 0.001110431
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 61,
+          "function": "__exit__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 5.11e-06,
+          "cumulative_seconds": 0.00020148100000000002
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 64,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 8.156000000000001e-06,
+          "cumulative_seconds": 0.00019596000000000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 322,
+          "function": "_feed_snapshot",
+          "primitive_calls": 128,
+          "total_calls": 128,
+          "self_seconds": 9.4466e-05,
+          "cumulative_seconds": 0.000193484
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib_ng.zlib_ng.crc32>",
+          "primitive_calls": 128,
+          "total_calls": 128,
+          "self_seconds": 0.000131697,
+          "cumulative_seconds": 0.000131697
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 57,
+          "function": "__enter__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 7.110000000000001e-07,
+          "cumulative_seconds": 0.000117763
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 131,
+          "function": "_lazy_init",
+          "primitive_calls": 2,
+          "total_calls": 2,
+          "self_seconds": 2.0440000000000003e-06,
+          "cumulative_seconds": 0.00011722300000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/events.py",
+          "line": 821,
+          "function": "new_event_loop",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 6.210000000000001e-07,
+          "cumulative_seconds": 0.00011153100000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/events.py",
+          "line": 714,
+          "function": "new_event_loop",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.6620000000000001e-06,
+          "cumulative_seconds": 0.00011066900000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/unix_events.py",
+          "line": 63,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.6740000000000002e-06,
+          "cumulative_seconds": 0.00010900700000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 59,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 6.894e-06,
+          "cumulative_seconds": 0.00010733300000000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 230,
+          "function": "open",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.3907000000000001e-05,
+          "cumulative_seconds": 0.00010270400000000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'digest' of '_hashlib.HASHXOF' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 9.1433e-05,
+          "cumulative_seconds": 9.1433e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/unix_events.py",
+          "line": 67,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 5.439e-06,
+          "cumulative_seconds": 8.2185e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 99,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 4.649e-06,
+          "cumulative_seconds": 7.611400000000001e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 1316,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.356e-06,
+          "cumulative_seconds": 6.1957e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 110,
+          "function": "_close_self_pipe",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.897e-06,
+          "cumulative_seconds": 5.813e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.len>",
+          "primitive_calls": 933,
+          "total_calls": 935,
+          "self_seconds": 5.6373000000000004e-05,
+          "cumulative_seconds": 5.6964000000000006e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/selector_events.py",
+          "line": 118,
+          "function": "_make_self_pipe",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 4.739000000000001e-06,
+          "cumulative_seconds": 5.5104000000000006e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 369,
+          "function": "_finish",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 9.038e-06,
+          "cumulative_seconds": 4.8091000000000004e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 176,
+          "function": "_reserve",
+          "primitive_calls": 130,
+          "total_calls": 130,
+          "self_seconds": 3.6087e-05,
+          "cumulative_seconds": 4.5788e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 226,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 4.847e-06,
+          "cumulative_seconds": 4.2420000000000004e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_engine.py",
+          "line": 207,
+          "function": "compressobj",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.8940000000000002e-06,
+          "cumulative_seconds": 3.5688e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 286,
+          "function": "_check_encoder_available",
+          "primitive_calls": 130,
+          "total_calls": 130,
+          "self_seconds": 2.4695e-05,
+          "cumulative_seconds": 3.5336e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib_ng.zlib_ng.compressobj>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.3794e-05,
+          "cumulative_seconds": 3.3794e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'flush' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.189e-05,
+          "cumulative_seconds": 3.189e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/socket.py",
+          "line": 501,
+          "function": "close",
+          "primitive_calls": 2,
+          "total_calls": 2,
+          "self_seconds": 1.193e-06,
+          "cumulative_seconds": 3.0358000000000003e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.isinstance>",
+          "primitive_calls": 425,
+          "total_calls": 425,
+          "self_seconds": 3.0179e-05,
+          "cumulative_seconds": 3.0179e-05
+        }
+      ],
+      "top_by_self": [
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'compress' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 128,
+          "total_calls": 128,
+          "self_seconds": 0.08551489400000001,
+          "cumulative_seconds": 0.08551489400000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 0.010123933,
+          "cumulative_seconds": 0.010123933
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'decompress' of 'zlib.Decompress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.0031371750000000003,
+          "cumulative_seconds": 0.0031371750000000003
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'run' of '_contextvars.Context' objects>",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 0.002317476,
+          "cumulative_seconds": 0.109775839
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 537,
+          "function": "_write_once",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.001886178,
+          "cumulative_seconds": 0.107425221
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/gzip.py",
+          "line": 637,
+          "function": "decompress",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.0018741950000000002,
+          "cumulative_seconds": 0.006153291
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'extend' of 'bytearray' objects>",
+          "primitive_calls": 133,
+          "total_calls": 133,
+          "self_seconds": 0.001324007,
+          "cumulative_seconds": 0.001324007
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib.crc32>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.001110431,
+          "cumulative_seconds": 0.001110431
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 520,
+          "function": "_payload_for_write",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 0.001023646,
+          "cumulative_seconds": 0.0011176040000000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 836,
+          "function": "write",
+          "primitive_calls": 128,
+          "total_calls": 128,
+          "self_seconds": 0.000181175,
+          "cumulative_seconds": 0.08791394200000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib_ng.zlib_ng.crc32>",
+          "primitive_calls": 128,
+          "total_calls": 128,
+          "self_seconds": 0.000131697,
+          "cumulative_seconds": 0.000131697
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 331,
+          "function": "_feed",
+          "primitive_calls": 256,
+          "total_calls": 256,
+          "self_seconds": 0.000117799,
+          "cumulative_seconds": 0.085777931
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 107,
+          "function": "_advance_raw",
+          "primitive_calls": 261,
+          "total_calls": 261,
+          "self_seconds": 0.000100773,
+          "cumulative_seconds": 0.086008649
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 322,
+          "function": "_feed_snapshot",
+          "primitive_calls": 128,
+          "total_calls": 128,
+          "self_seconds": 9.4466e-05,
+          "cumulative_seconds": 0.000193484
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'digest' of '_hashlib.HASHXOF' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 9.1433e-05,
+          "cumulative_seconds": 9.1433e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 908,
+          "function": "_write_all",
+          "primitive_calls": 131,
+          "total_calls": 131,
+          "self_seconds": 8.4904e-05,
+          "cumulative_seconds": 0.001496534
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 101,
+          "function": "__next__",
+          "primitive_calls": 261,
+          "total_calls": 261,
+          "self_seconds": 6.5367e-05,
+          "cumulative_seconds": 0.086081762
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.next>",
+          "primitive_calls": 261,
+          "total_calls": 261,
+          "self_seconds": 5.9505e-05,
+          "cumulative_seconds": 0.085897399
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 378,
+          "function": "write",
+          "primitive_calls": 131,
+          "total_calls": 131,
+          "self_seconds": 5.7118000000000004e-05,
+          "cumulative_seconds": 0.0013874620000000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.len>",
+          "primitive_calls": 933,
+          "total_calls": 935,
+          "self_seconds": 5.6373000000000004e-05,
+          "cumulative_seconds": 5.6964000000000006e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 176,
+          "function": "_reserve",
+          "primitive_calls": 130,
+          "total_calls": 130,
+          "self_seconds": 3.6087e-05,
+          "cumulative_seconds": 4.5788e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method zlib_ng.zlib_ng.compressobj>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.3794e-05,
+          "cumulative_seconds": 3.3794e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'flush' of 'zlib_ng._Compress' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 3.189e-05,
+          "cumulative_seconds": 3.189e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method builtins.isinstance>",
+          "primitive_calls": 425,
+          "total_calls": 425,
+          "self_seconds": 3.0179e-05,
+          "cumulative_seconds": 3.0179e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 286,
+          "function": "_check_encoder_available",
+          "primitive_calls": 130,
+          "total_calls": 130,
+          "self_seconds": 2.4695e-05,
+          "cumulative_seconds": 3.5336e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<function socket.close at 0x7d61e03c0ae0>",
+          "primitive_calls": 2,
+          "total_calls": 2,
+          "self_seconds": 2.1381e-05,
+          "cumulative_seconds": 2.1381e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 1922,
+          "function": "_run_once",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 2.0898000000000002e-05,
+          "cumulative_seconds": 0.109833707
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.8976000000000003e-05,
+          "cumulative_seconds": 1.8976000000000003e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/gzip.py",
+          "line": 463,
+          "function": "_read_gzip_header",
+          "primitive_calls": 2,
+          "total_calls": 2,
+          "self_seconds": 1.634e-05,
+          "cumulative_seconds": 2.0689e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 631,
+          "function": "run_forever",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.581e-05,
+          "cumulative_seconds": 0.109863524
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 655,
+          "function": "run_until_complete",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.5779000000000003e-05,
+          "cumulative_seconds": 0.10991234500000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 892,
+          "function": "_coerce_byteslike",
+          "primitive_calls": 128,
+          "total_calls": 128,
+          "self_seconds": 1.4819000000000002e-05,
+          "cumulative_seconds": 1.4819000000000002e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/_binary.py",
+          "line": 230,
+          "function": "open",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.3907000000000001e-05,
+          "cumulative_seconds": 0.00010270400000000001
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 450,
+          "function": "create_task",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.3345e-05,
+          "cumulative_seconds": 2.3925000000000002e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _socket.socketpair>",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.1702e-05,
+          "cumulative_seconds": 1.1702e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 818,
+          "function": "_call_soon",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 1.1644e-05,
+          "cumulative_seconds": 1.6493e-05
+        },
+        {
+          "file": "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a3_regressions.py",
+          "line": 529,
+          "function": "_records",
+          "primitive_calls": 129,
+          "total_calls": 129,
+          "self_seconds": 1.1277e-05,
+          "cumulative_seconds": 1.1478000000000001e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 170,
+          "function": "_check_available",
+          "primitive_calls": 130,
+          "total_calls": 130,
+          "self_seconds": 1.0641e-05,
+          "cumulative_seconds": 1.0641e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 86,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.0571000000000001e-05,
+          "cumulative_seconds": 0.10989172700000001
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 184,
+          "function": "_operation_succeeded",
+          "primitive_calls": 130,
+          "total_calls": 130,
+          "self_seconds": 1.0477e-05,
+          "cumulative_seconds": 1.0477e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/signal.py",
+          "line": 36,
+          "function": "_enum_to_int",
+          "primitive_calls": 4,
+          "total_calls": 4,
+          "self_seconds": 1.02e-05,
+          "cumulative_seconds": 1.02e-05
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 160,
+          "function": "run",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 1.0189e-05,
+          "cumulative_seconds": 0.110227452
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/base_events.py",
+          "line": 181,
+          "function": "_run_until_complete_cb",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 1.01e-05,
+          "cumulative_seconds": 1.5489e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 87,
+          "function": "__init__",
+          "primitive_calls": 130,
+          "total_calls": 130,
+          "self_seconds": 9.701e-06,
+          "cumulative_seconds": 9.701e-06
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/selectors.py",
+          "line": 347,
+          "function": "__init__",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 9.659e-06,
+          "cumulative_seconds": 1.1843e-05
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 369,
+          "function": "_finish",
+          "primitive_calls": 3,
+          "total_calls": 3,
+          "self_seconds": 9.038e-06,
+          "cumulative_seconds": 4.8091000000000004e-05
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'poll' of 'select.epoll' objects>",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 8.584000000000001e-06,
+          "cumulative_seconds": 8.584000000000001e-06
+        },
+        {
+          "file": "/tmp/aiogzip-v2.0.0a2-a3/src/aiogzip/codec.py",
+          "line": 263,
+          "function": "input_size",
+          "primitive_calls": 128,
+          "total_calls": 128,
+          "self_seconds": 8.385e-06,
+          "cumulative_seconds": 8.385e-06
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/events.py",
+          "line": 86,
+          "function": "_run",
+          "primitive_calls": 6,
+          "total_calls": 6,
+          "self_seconds": 8.224000000000001e-06,
+          "cumulative_seconds": 0.109784063
+        },
+        {
+          "file": "/home/geoff/.local/share/mise/installs/python/3.12.12/lib/python3.12/asyncio/runners.py",
+          "line": 64,
+          "function": "close",
+          "primitive_calls": 1,
+          "total_calls": 1,
+          "self_seconds": 8.156000000000001e-06,
+          "cumulative_seconds": 0.00019596000000000001
+        }
+      ]
+    }
+  ]
+}

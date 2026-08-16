@@ -100,7 +100,36 @@ class _Operation(Iterator[bytes]):
 
     def __next__(self) -> bytes:
         while True:
-            output = self._advance_raw()
+            # Keep the public synchronous hot path inline. Calling
+            # ``_advance_raw()`` here adds a Python frame to every operation
+            # advancement; tiny encoder feeds commonly complete without
+            # yielding bytes, so that frame was pure per-call overhead. The
+            # ownership block intentionally mirrors _advance_raw(); lifecycle
+            # tests cover both drivers so changes must keep them equivalent.
+            if self._invalidated or self._owner._discarded:
+                raise RuntimeError("gzip codec operation was invalidated by discard()")
+            if self._closed:
+                raise StopIteration
+            if self._advancing:
+                raise RuntimeError(
+                    "gzip codec operation cannot be advanced reentrantly"
+                )
+            if self._owner._active_token is not self:
+                raise RuntimeError("gzip codec operation is no longer active")
+
+            self._advancing = True
+            try:
+                output = next(self._iterator)
+            except StopIteration:
+                self._closed = True
+                self._owner._operation_succeeded(self)
+                raise
+            except BaseException:
+                self._closed = True
+                self._owner._operation_failed(self)
+                raise
+            finally:
+                self._advancing = False
             if isinstance(output, bytes):
                 return output
 
@@ -290,12 +319,16 @@ class GzipEncoder(_CodecBase):
 
     def _check_feed_size(self, size: int) -> None:
         if self._strict_size and self._input_size + size > 0xFFFFFFFF:
-            raise OSError(
-                f"uncompressed member size would exceed the gzip ISIZE "
-                f"field's 4 GiB limit ({self._input_size} + {size} > "
-                f"{0xFFFFFFFF}); drop strict_size to allow ISIZE "
-                f"truncation or split the payload into multiple members"
-            )
+            raise self._feed_size_error(size)
+
+    def _feed_size_error(self, size: int) -> OSError:
+        """Build the shared strict-ISIZE error on its cold failure path."""
+        return OSError(
+            f"uncompressed member size would exceed the gzip ISIZE "
+            f"field's 4 GiB limit ({self._input_size} + {size} > "
+            f"{0xFFFFFFFF}); drop strict_size to allow ISIZE "
+            f"truncation or split the payload into multiple members"
+        )
 
     def start(self) -> CodecOperation:
         """Start the member and lazily emit its gzip header exactly once."""
@@ -321,11 +354,20 @@ class GzipEncoder(_CodecBase):
 
     def _feed_snapshot(self, snapshot: bytes) -> _AsyncDrivableOperation:
         """Feed an exact bytes snapshot already owned by an internal caller."""
-        self._check_encoder_available()
+        # This internal path is the file writer's per-call hot path. Preserve
+        # every public feed() precondition inline, avoiding three helper frames
+        # whose checks are otherwise repeated for every tiny write.
+        if self._active_token is not None:
+            raise RuntimeError("gzip encoder has an active operation")
+        if self._unusable:
+            raise OSError("gzip encoder is unusable after a prior failure")
+        if self._finished:
+            raise ValueError("gzip encoder is already finalized")
         if not self._started:
             raise ValueError("gzip encoder must be started before feeding data")
         size = len(snapshot)
-        self._check_feed_size(size)
+        if self._strict_size and self._input_size + size > 0xFFFFFFFF:
+            raise self._feed_size_error(size)
         return cast(_AsyncDrivableOperation, self._reserve(self._feed(snapshot)))
 
     def _feed(self, data: bytes) -> _CodecIterator:
@@ -414,6 +456,11 @@ class GzipDecoder(_CodecBase):
         self._engine: ZlibEngine = None
         self._header: _ParsedHeader | None = None
         self._header_parser: _GzipHeaderParser | None = self._new_header_parser()
+        # Generation distinguishes repeated timestamps and mtime=0 from no
+        # completed header. Package-internal file readers observe these two
+        # scalars without retaining or reparsing header bytes.
+        self.__header_generation = 0
+        self.__last_header_mtime: int | None = None
         self._members: list[GzipMemberInfo] = []
         self._member_count = 0
         self._member_offset = 0
@@ -429,6 +476,16 @@ class GzipDecoder(_CodecBase):
     def members(self) -> tuple[GzipMemberInfo, ...]:
         """Completed, trailer-validated members when collection is enabled."""
         return tuple(self._members)
+
+    @property
+    def _header_generation(self) -> int:
+        """Package-private count of completely validated member headers."""
+        return self.__header_generation
+
+    @property
+    def _last_header_mtime(self) -> int | None:
+        """Package-private timestamp from the latest validated header."""
+        return self.__last_header_mtime
 
     @property
     def member_count(self) -> int:
@@ -599,6 +656,8 @@ class GzipDecoder(_CodecBase):
                 if parsed is None:
                     break
                 self._header = parsed
+                self.__header_generation += 1
+                self.__last_header_mtime = parsed.mtime
                 self._engine = _engine.decompressobj(-_engine.MAX_WBITS)
                 self._member_crc = 0
                 self._member_size = 0

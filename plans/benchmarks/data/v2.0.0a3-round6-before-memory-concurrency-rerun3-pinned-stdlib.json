@@ -1,0 +1,136 @@
+{
+  "schema_version": 2,
+  "timestamp": 1786486443.5078323,
+  "categories": [
+    "memory",
+    "concurrency"
+  ],
+  "data_size_mb": 8,
+  "repeat": 3,
+  "regression_profile": null,
+  "regression_mode": null,
+  "source": {
+    "source_root": "/tmp/aiogzip-a3-round6-baseline",
+    "aiogzip_file": "/tmp/aiogzip-a3-round6-baseline/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a3.dev0",
+    "target_commit": "6ca86b27c7577f3ddf2d6d0ba046252fc6e97c75",
+    "target_describe": "v2.0.0a2-36-g6ca86b2",
+    "target_dirty": false
+  },
+  "environment": {
+    "source_root": "/tmp/aiogzip-a3-round6-baseline",
+    "aiogzip_file": "/tmp/aiogzip-a3-round6-baseline/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a3.dev0",
+    "target_commit": "6ca86b27c7577f3ddf2d6d0ba046252fc6e97c75",
+    "target_describe": "v2.0.0a2-36-g6ca86b2",
+    "target_dirty": false,
+    "environment_label": null,
+    "runner_root": "/home/geoff/Projects/personal/aiogzip",
+    "runner_commit": "247484faf11d324e715743bb4c041a374192be81",
+    "regression_harness_sha256": "6cb2d3a9709fd905cbc7871c4cb80f9ae848668378d7bd08aeb070aeed2a112d",
+    "python_implementation": "CPython",
+    "python_version": "3.12.12 (main, Dec 17 2025, 21:10:06) [Clang 21.1.4 ]",
+    "python_executable": "/home/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+    "os_name": "Linux",
+    "os_release": "6.17.0-41-generic",
+    "kernel_version": "#41-Ubuntu SMP PREEMPT_DYNAMIC Sat Jun 20 18:01:40 UTC 2026",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.42"
+    ],
+    "processor": "",
+    "cpu_count": 32,
+    "ram_bytes": 131894407168,
+    "filesystem_temp_root": "/tmp",
+    "zlib_compile_version": "1.3.1",
+    "zlib_runtime_version": "1.3.1",
+    "zlib_ng_package_version": "1.0.0",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "stdlib-zlib",
+      "crc32": "stdlib-zlib"
+    },
+    "forced_engine": "stdlib",
+    "uv_version": "uv 0.9.22",
+    "uv_lock_sha256": "5956b3a0e8d4ea2d84706ee16275830f4431e629bce0cf0526e5410feab6bcf4",
+    "cpu_affinity": [
+      0
+    ],
+    "cpu_governor": "powersave",
+    "cpu_boost": "enabled",
+    "system_load": [
+      1.63232421875,
+      1.69921875,
+      1.55078125
+    ],
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      700,
+      10,
+      10
+    ]
+  },
+  "results": [
+    {
+      "name": "Memory efficiency (5MB)",
+      "category": "memory",
+      "duration": 0.1147339700255543,
+      "duration_samples": [
+        0.1147339700255543,
+        0.11315459001343697,
+        0.1168781069573015
+      ],
+      "median_absolute_deviation": 0.0015793800121173263,
+      "duration_min": 0.11315459001343697,
+      "duration_max": 0.1168781069573015,
+      "metrics": {
+        "memory_increase_mb": "11.3",
+        "memory_ratio": "2.25x",
+        "status": "OK",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Concurrent I/O (10 files, 10ms delay each)",
+      "category": "concurrency",
+      "duration": 0.16994224803056568,
+      "duration_samples": [
+        0.18129175098147243,
+        0.16142534697428346,
+        0.16994224803056568
+      ],
+      "median_absolute_deviation": 0.008516901056282222,
+      "duration_min": 0.16142534697428346,
+      "duration_max": 0.18129175098147243,
+      "metrics": {
+        "async_time": "0.170s",
+        "sync_time": "0.253s",
+        "speedup": "1.49x",
+        "delay_saved": "0.083s",
+        "async_efficiency": "6%",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Mixed operations (5 read/write)",
+      "category": "concurrency",
+      "duration": 0.03196254896465689,
+      "duration_samples": [
+        0.03196254896465689,
+        0.03197267802897841,
+        0.031678452040068805
+      ],
+      "median_absolute_deviation": 1.0129064321517944e-05,
+      "duration_min": 0.031678452040068805,
+      "duration_max": 0.03197267802897841,
+      "metrics": {
+        "async_time": "0.032s",
+        "sync_time": "0.030s",
+        "speedup": "0.93x",
+        "suite_repeats": 3
+      }
+    }
+  ]
+}

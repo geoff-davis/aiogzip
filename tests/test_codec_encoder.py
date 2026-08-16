@@ -196,24 +196,60 @@ def test_sync_flush_makes_input_recoverable_before_finish():
     encoder.discard()
 
 
-@pytest.mark.parametrize("feed_method", ["feed", "_feed_snapshot"])
-def test_strict_size_fails_before_engine_advances(feed_method):
-    encoder = GzipEncoder(mtime=0, strict_size=True)
-    list(encoder.start())
-    encoder._input_size = 0xFFFFFFFF
-    calls = []
+def test_strict_size_feed_snapshot_matches_public_feed_before_engine_advances():
+    errors = []
+    for feed_method in ("feed", "_feed_snapshot"):
+        encoder = GzipEncoder(mtime=0, strict_size=True)
+        list(encoder.start())
+        encoder._input_size = 0xFFFFFFFF
 
-    class SpyEngine:
-        def compress(self, data):
-            calls.append(data)
+        class SpyEngine:
+            def __init__(self):
+                self.calls = []
 
-    encoder._engine = SpyEngine()
+            def compress(self, data):
+                self.calls.append(data)
 
-    with pytest.raises(OSError, match="4 GiB limit"):
-        getattr(encoder, feed_method)(b"x")
+        spy = SpyEngine()
+        encoder._engine = spy
 
-    assert calls == []
-    encoder.discard()
+        with pytest.raises(OSError, match="4 GiB limit") as caught:
+            getattr(encoder, feed_method)(b"x")
+
+        errors.append((type(caught.value), str(caught.value)))
+        assert spy.calls == []
+        encoder.discard()
+
+    assert errors[0] == errors[1]
+
+
+@pytest.mark.parametrize(
+    "state",
+    ["not-started", "active", "finalized", "discarded"],
+)
+def test_feed_snapshot_preconditions_match_public_feed(state):
+    """The optimized file-writer entry must preserve public feed guards."""
+
+    def configured_encoder():
+        encoder = GzipEncoder(mtime=0)
+        if state == "active":
+            encoder.start()
+        elif state == "finalized":
+            list(encoder.start())
+            list(encoder.finish())
+        elif state == "discarded":
+            encoder.discard()
+        return encoder
+
+    errors = []
+    for feed_method in ("feed", "_feed_snapshot"):
+        encoder = configured_encoder()
+        with pytest.raises((OSError, RuntimeError, ValueError)) as caught:
+            getattr(encoder, feed_method)(b"x")
+        errors.append((type(caught.value), str(caught.value)))
+        encoder.discard()
+
+    assert errors[0] == errors[1]
 
 
 def test_strict_size_accepts_exact_isize_boundary_without_large_allocation():
