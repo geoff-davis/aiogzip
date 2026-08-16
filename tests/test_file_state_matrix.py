@@ -310,6 +310,32 @@ async def test_default_chunk_readlines_salvage_sequence_is_error_data_error(
         await stream.close()
 
 
+async def test_validation_salvage_does_not_finalize_a_trailing_cr():
+    payload = b"uncertain terminator\r"
+    corrupt = bytearray(gzip.compress(payload, mtime=0))
+    corrupt[-8] ^= 1
+    stream = AsyncGzipTextFile(
+        None,
+        "rt",
+        newline="",
+        fileobj=FramedAsyncReader(bytes(corrupt), seekable=False),
+        closefd=False,
+    )
+
+    await stream.open()
+    try:
+        with pytest.raises(gzip.BadGzipFile, match="CRC check failed"):
+            await stream.readline()
+        with pytest.raises(OSError, match="broken.*close and reopen"):
+            await stream.readline()
+
+        assert stream.newlines is None
+        assert await stream.read() == payload.decode()
+        assert stream.newlines is None
+    finally:
+        await stream.close()
+
+
 async def test_cancelled_text_sized_read_does_not_publish_restored_pieces(monkeypatch):
     stream = AsyncGzipTextFile(
         None,
@@ -395,6 +421,99 @@ async def test_failed_backward_seek_reports_the_post_rewind_position():
         assert await stream.tell() == 0
     finally:
         await stream.close()
+
+
+async def test_cookie_recovery_clears_the_text_poison_mirror(tmp_path):
+    payload = "alpha\nbeta\ngamma\n"
+    path = tmp_path / "cookie-poison-recovery.gz"
+    path.write_bytes(gzip.compress(payload.encode(), mtime=0))
+    stream = AsyncGzipTextFile(path, "rt", chunk_size=4)
+
+    await stream.open()
+    try:
+        assert await stream.read(1) == payload[:1]
+        cookie = await stream.tell()
+        assert cookie < 0
+
+        binary_file = stream.buffer
+        decoder = binary_file._decoder
+        assert decoder is not None
+        binary_file._poison_read(decoder, validation_failed=True)
+        assert binary_file._read_broken is True
+        assert stream._read_poisoned is True
+
+        assert await stream.seek(cookie) == cookie
+        assert binary_file._read_broken is False
+        assert stream._read_poisoned is False
+        assert await stream.read() == payload[1:]
+    finally:
+        await stream.close()
+
+
+@pytest.mark.parametrize("reject_binary_write", [False, True])
+async def test_text_inline_write_matches_reserved_helper(
+    tmp_path,
+    monkeypatch,
+    reject_binary_write,
+):
+    data = "first line\n日本語"
+    translated = data.replace("\n", "\r\n")
+    original_binary_write = AsyncGzipBinaryFile.write
+
+    async def exercise(path, *, public):
+        stream = AsyncGzipTextFile(
+            path,
+            "wt",
+            encoding="iso2022_jp",
+            newline="\r\n",
+            mtime=0,
+        )
+        await stream.open()
+        encoder = stream._encoder
+        assert encoder is not None
+        binary_file = stream.buffer
+
+        if reject_binary_write:
+
+            async def reject_target_write(file, payload):
+                if file is binary_file:
+                    raise OSError("controlled binary rejection")
+                return await original_binary_write(file, payload)
+
+            monkeypatch.setattr(
+                AsyncGzipBinaryFile,
+                "write",
+                reject_target_write,
+            )
+
+        result = None
+        error = None
+        try:
+            if public:
+                result = await stream.write(data)
+            else:
+                with stream._write_call:
+                    result = await stream._write_reserved(data, translated)
+        except OSError as exc:
+            error = (type(exc), str(exc))
+
+        state = (
+            encoder.getstate(),
+            stream._encoder_used,
+            stream._write_call_active,
+        )
+        monkeypatch.setattr(
+            AsyncGzipBinaryFile,
+            "write",
+            original_binary_write,
+        )
+        await stream.close()
+        return result, error, state, gzip.decompress(path.read_bytes())
+
+    public = await exercise(tmp_path / "public-write.gz", public=True)
+    reserved = await exercise(tmp_path / "reserved-write.gz", public=False)
+
+    assert public == reserved
 
 
 @pytest.mark.parametrize("newline", [None, ""])

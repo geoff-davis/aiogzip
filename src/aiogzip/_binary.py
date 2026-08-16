@@ -970,7 +970,7 @@ class AsyncGzipBinaryFile:
                     total += len(line)
                     if hint > 0 and total >= hint:
                         break
-                    if self._validation_line_salvage_complete():
+                    if self._read_broken and self._validation_line_salvage_complete():
                         # Publish every complete recovery line exactly once.
                         # A trailing unterminated span stays buffered so the
                         # next line call reports the terminal validation error.
@@ -1403,11 +1403,13 @@ class AsyncGzipBinaryFile:
         """Return whether failed-call bytes remain reachable by retry or salvage."""
         return not self._read_broken or self._has_validation_failure()
 
+    def _read_buffer_exhausted(self) -> bool:
+        """Return whether no decoded binary bytes remain buffered."""
+        return len(self._buffer) == self._buffer_offset
+
     def _validation_salvage_exhausted(self) -> bool:
         """Return whether validation salvage has no binary bytes left to serve."""
-        return self._has_validation_failure() and (
-            len(self._buffer) == self._buffer_offset
-        )
+        return self._has_validation_failure() and self._read_buffer_exhausted()
 
     def _validation_line_salvage_complete(self) -> bool:
         """Return whether no complete recovery line remains buffered."""

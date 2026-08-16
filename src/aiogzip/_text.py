@@ -511,6 +511,7 @@ class AsyncGzipTextFile:
                     chars_to_skip,
                 ) = self._decode_cookie(offset)
                 await self._binary_file.seek(origin_offset)
+                self._read_poisoned = False
                 self._decoder.setstate(decoder_state)
                 self._decoder_byte_position = origin_offset
                 self._trailing_cr = trailing_cr
@@ -1044,7 +1045,7 @@ class AsyncGzipTextFile:
         if decoded_chunk:
             self._append_buffer(self._apply_newline_decoding(decoded_chunk))
 
-        if bf._eof and len(bf._buffer) == bf._buffer_offset:
+        if bf._eof and bf._read_buffer_exhausted():
             self._finalize_pending_newline_state()
 
         return True
@@ -1079,7 +1080,7 @@ class AsyncGzipTextFile:
         decoded_chunk = self._decoder.decode(raw_chunk, final=False)
         if decoded_chunk:
             translated = self._apply_newline_decoding(decoded_chunk)
-            if bf._eof and len(bf._buffer) == bf._buffer_offset:
+            if bf._eof and bf._read_buffer_exhausted():
                 self._finalize_pending_newline_state()
             return translated, True
         return "", True
@@ -1292,7 +1293,7 @@ class AsyncGzipTextFile:
                 self._newline == ""
                 and cr_length == 1
                 and cr_is_trailing
-                and not bf._eof
+                and (not bf._eof or bf._read_broken)
             )
             rel_pos = pos_r - base
             if should_wait_for_lf:
@@ -1394,7 +1395,12 @@ class AsyncGzipTextFile:
 
     def _finalize_pending_newline_state(self) -> None:
         """Record a trailing standalone CR when EOF resolves the ambiguity."""
-        if self._universal_newlines and self._trailing_cr:
+        bf = self._binary_file
+        if (
+            self._universal_newlines
+            and self._trailing_cr
+            and (bf is None or not bf._read_broken)
+        ):
             self._seen_newline_types |= self._SEEN_CR
             self._trailing_cr = False
 
@@ -1716,10 +1722,17 @@ class AsyncGzipTextFile:
             self._pending_lines = []
             self._pending_idx = 0
 
-        buffered_line = self._take_buffered_line(limit)
-        if buffered_line is not None:
-            return buffered_line
-        buf_len = self._buffered_text_len()
+        # Keep the bounded hot path inline: this avoids a helper frame and
+        # computes the buffered length only once before a refill.
+        pos, length = self._find_line_terminator(0)
+        if pos != -1:
+            end = pos + length
+            if limit != -1 and end > limit:
+                end = limit
+            return self._consume_buffer(end)
+        buf_len = len(self._text_buffer) - self._text_buffer_offset
+        if limit != -1 and buf_len >= limit:
+            return self._consume_buffer(limit)
         with self._read_call:
             return await self._readline_buffered_reserved(limit, buf_len)
 
