@@ -121,6 +121,9 @@ check_untyped_defs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# Dump all thread stacks when any single test exceeds this limit, so a CI
+# hang identifies itself in the log instead of dying silently at the job cap.
+faulthandler_timeout = 120
 markers = [
     "slow: long-running performance/memory tests (deselect with '-m \"not slow\"')",
 ]
