@@ -1163,7 +1163,11 @@ tracking and translation path.</p>
 <p>For writing many small records, prefer <code>writelines()</code> over an explicit loop of
 <code>await f.write(line)</code>. It combines inputs into bounded <code>chunk_size</code> batches,
 reducing Python coroutine and compressor-call overhead without loading the full
-iterable into memory.</p>
+iterable into memory. For records produced asynchronously, collect a bounded
+application batch before each <code>write()</code>; about 64 KiB was the best of the
+measured 64 KiB and 256 KiB batches, but tune the bound for the workload. These
+batching approaches combine failure boundaries: use individual awaited writes
+when each record must report its own sink failure.</p>
 <h3 id="binary-operations">Binary operations</h3>
 <p>Bulk binary I/O with stdlib zlib is close to <code>gzip</code>; many tiny awaited calls are
 slower. Whole-file reads of highly compressible input are where the optional
