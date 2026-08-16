@@ -1038,6 +1038,9 @@ class TestResourceCleanup:
             None,
             "wt",
             encoding="latin-1",
+            # Random text contains \n bytes; disable newline translation so
+            # the byte-exact round-trip assertion holds on Windows.
+            newline="",
             fileobj=writer,
             closefd=False,
             mtime=0,
@@ -1087,6 +1090,9 @@ class TestResourceCleanup:
             None,
             "wt",
             encoding="latin-1",
+            # Random text contains \n bytes; disable newline translation so
+            # the byte-exact round-trip assertion holds on Windows.
+            newline="",
             fileobj=writer,
             closefd=True,
             mtime=0,

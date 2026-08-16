@@ -141,6 +141,14 @@ Notes:
 - CRLF sequences can split across chunk boundaries
 - Must track `_trailing_cr` state to prevent `\r\n` → `\n\n`
 - Use `_find_line_terminator()` helper for newline-aware searching
+- Tests that write arbitrary/random text and assert a byte-exact round-trip
+  must pass `newline=""`: default `newline=None` translates `\n` to
+  `os.linesep` on write, which is a no-op on Linux/macOS but breaks the
+  assertion on Windows CI. Worse, a failing `==` between multi-hundred-KB
+  blobs sends pytest's assertion introspection into a difflib comparison
+  that runs for many minutes — the job dies at its time cap looking like a
+  hang, not a failure (`faulthandler_timeout` in pyproject exists to make
+  such hangs identify themselves).
 
 ### Unicode Handling
 
