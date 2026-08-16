@@ -52,20 +52,37 @@ def test_py_typed_marker_shipped():
     assert marker.exists(), "py.typed marker missing from installed package"
 
 
-def test_2_0_a3_development_metadata_is_synchronized():
+def test_release_metadata_is_synchronized():
+    """The version, changelog, and packaging posture must agree.
+
+    A ``.devN`` version means the release is not cut yet, so its base version
+    must not appear as a released changelog heading. A plain version means the
+    release is cut, so the newest changelog heading must match it exactly.
+    This holds across release-prep and next-dev-version bumps without pinning
+    either state.
+    """
     root = Path(__file__).resolve().parents[1]
     data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     project = data["project"]
 
-    assert aiogzip.__version__ == "2.0.0a3.dev0"
     assert "## [Unreleased]" in changelog
-    release = re.search(
+    newest = re.search(
         r"^## \[([^]]+)\] - (\d{4}-\d{2}-\d{2})$", changelog, re.MULTILINE
     )
-    assert release is not None
-    assert release.group(1) == "2.0.0a2"
-    assert release.group(2) == "2026-07-27"
+    assert newest is not None, "changelog has no dated release heading"
+
+    version = aiogzip.__version__
+    dev = re.fullmatch(r"(?P<base>.+?)\.dev\d+", version)
+    if dev is not None:
+        assert f"## [{dev.group('base')}]" not in changelog, (
+            "development version's release already has a changelog heading"
+        )
+    else:
+        assert newest.group(1) == version, (
+            "released version must match the newest changelog heading"
+        )
+
     assert project["requires-python"] == ">=3.11"
     assert "Development Status :: 3 - Alpha" in project["classifiers"]
     assert any(

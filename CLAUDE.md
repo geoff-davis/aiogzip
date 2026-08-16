@@ -227,13 +227,13 @@ Always include:
 - **2.0.0a1** - Requires Python 3.11+ and adds the public synchronous
   sans-I/O `GzipEncoder` and `GzipDecoder`. File, iterable-streaming, inspection,
   and verification paths now share that one gzip state machine.
-- **2.0.0a2 (current)** - Repairs the decoder performance regressions from
+- **2.0.0a2** - Repairs the decoder performance regressions from
   the codec unification: bounded input spans and 256 KiB inflate windows,
   incremental header parsing, internal output batches decoupled from public
   `output_chunk_size`, and cooperative event-loop checkpoints. Adds the public
   typed `CodecOperation`. The codec API remains provisional through the alpha
   series; established asyncio APIs keep their compatibility contract.
-- **2.0.0a3 (in progress)** - Removes the file reader's duplicate gzip-header
+- **2.0.0a3 (current)** - Removes the file reader's duplicate gzip-header
   parser and drives live `mtime` from the shared decoder. The resulting
   last-completed-header behavior, terminal reader failure/recovery contract,
   and same-handle overlap/context-exit behavior are deliberate, reviewed
@@ -242,5 +242,5 @@ Always include:
 
 ---
 
-**Last Updated:** 2026-08-13
+**Last Updated:** 2026-08-16
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!

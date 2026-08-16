@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0a3] - 2026-08-16
+
 ### Added
 
 - Public `ConcurrentOperationError`, an `OSError` subtype raised when calls
