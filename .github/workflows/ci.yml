@@ -38,7 +38,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.0.1
 
       # Deliberately unpinned (uv.lock is not consulted): CI exercises fresh
       # dependency releases before users hit them. uv just installs faster.
@@ -89,7 +89,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.0.1
 
       # Step 3: Install dependencies. The [test] extra skips lint-only
       # tooling (ruff, ty, prek); deliberately unpinned (uv.lock is
@@ -134,7 +134,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install dependencies (with fast extra)
         run: uv pip install --system -e ".[test,csv,fast]"
