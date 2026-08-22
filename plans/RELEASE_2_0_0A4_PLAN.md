@@ -72,17 +72,17 @@ git diff --name-only \
 
 Preflight checklist:
 
-- [ ] The working tree is clean.
-- [ ] `v2.0.0a3^{commit}` is exactly `3e95073581be7cba437da45dacd9724f649e54d0`.
-- [ ] `v2.0.0a2^{commit}` is exactly `9534eb31da15417126233eda225d8f897908e3bb`.
-- [ ] `v2.0.0a1^{commit}` is exactly `920004672bbb5e76fb2088358d1cb7051290576d`.
-- [ ] `v1.11.0^{commit}` is exactly `3f23eadb524c8dba840c4fd855ad5acf84486048`.
-- [ ] `HEAD` satisfies one of the two allowed starting states.
-- [ ] `src/aiogzip/__init__.py` reports `2.0.0a4.dev0`.
-- [ ] `pyproject.toml` still declares Python `>=3.11`.
-- [ ] `pyproject.toml` still uses the Alpha development-status classifier.
-- [ ] `AGENTS.md` and repository-local instructions have been read in full.
-- [ ] The project-prescribed commit checks are known before implementation begins.
+- [x] The working tree is clean.
+- [x] `v2.0.0a3^{commit}` is exactly `3e95073581be7cba437da45dacd9724f649e54d0`.
+- [x] `v2.0.0a2^{commit}` is exactly `9534eb31da15417126233eda225d8f897908e3bb`.
+- [x] `v2.0.0a1^{commit}` is exactly `920004672bbb5e76fb2088358d1cb7051290576d`.
+- [x] `v1.11.0^{commit}` is exactly `3f23eadb524c8dba840c4fd855ad5acf84486048`.
+- [x] `HEAD` satisfies one of the two allowed starting states.
+- [x] `src/aiogzip/__init__.py` reports `2.0.0a4.dev0`.
+- [x] `pyproject.toml` still declares Python `>=3.11`.
+- [x] `pyproject.toml` still uses the Alpha development-status classifier.
+- [x] `AGENTS.md` and repository-local instructions have been read in full.
+- [x] The project-prescribed commit checks are known before implementation begins.
 - [ ] The actual implementation-base commit is recorded in the preflight report.
 
 If `main` has advanced with any non-plan change:
@@ -100,18 +100,18 @@ Codex must not create, push, delete, or rename remote branches. Remote issues, l
 
 Record these facts in the preflight report after confirming them from the checkout:
 
-- [ ] Current development version is `2.0.0a4.dev0`.
-- [ ] Current published release is `v2.0.0a3`.
-- [ ] The public codec is still documented as provisional during the alpha series.
-- [ ] Open issue #86 covers small-write overhead.
-- [ ] Open issue #71 covers a possible AnyIO substrate.
-- [ ] Open issue #72 covers indexed random access.
-- [ ] Python 3.11 through 3.14 remain the intended 2.0 interpreter matrix.
-- [ ] The engine matrix remains stdlib zlib, zlib-ng active, and stdlib forced while zlib-ng is installed.
-- [ ] The configured coverage floor remains unchanged.
-- [ ] Release publication remains tag-triggered Trusted Publishing.
-- [ ] No top-level maintained integration examples already satisfy this plan's two integration gates.
-- [ ] The `2.0.0a3` release plan still needs an honest closeout rather than retroactive checkbox inflation.
+- [x] Current development version is `2.0.0a4.dev0`.
+- [x] Current published release is `v2.0.0a3`.
+- [x] The public codec is still documented as provisional during the alpha series.
+- [x] Open issue #86 covers small-write overhead.
+- [x] Open issue #71 covers a possible AnyIO substrate.
+- [x] Open issue #72 covers indexed random access.
+- [x] Python 3.11 through 3.14 remain the intended 2.0 interpreter matrix.
+- [x] The engine matrix remains stdlib zlib, zlib-ng active, and stdlib forced while zlib-ng is installed.
+- [x] The configured coverage floor remains unchanged.
+- [x] Release publication remains tag-triggered Trusted Publishing.
+- [x] No top-level maintained integration examples already satisfy this plan's two integration gates.
+- [x] The `2.0.0a3` release plan received an honest closeout without retroactive checkbox inflation.
 
 Do not fold routine dependency updates, workflow modernization, style-only cleanup, or unrelated documentation changes into `a4` merely because they are nearby.
 
@@ -798,10 +798,10 @@ List work that was neither shipped nor deliberately deferred. Do not hide omitte
 Closeout rules:
 
 - [ ] Do not edit hundreds of old checkboxes merely to make the plan look complete.
-- [ ] Add a status note near the top of the `a3` plan linking to the closeout.
-- [ ] Do not mark an item completed when only a related but different activity occurred.
-- [ ] Record contradictions between the old plan and shipped behavior explicitly.
-- [ ] Keep the closeout factual and concise enough to audit.
+- [x] Add a status note near the top of the `a3` plan linking to the closeout.
+- [x] Do not mark an item completed when only a related but different activity occurred.
+- [x] Record contradictions between the old plan and shipped behavior explicitly.
+- [x] Keep the closeout factual and concise enough to audit.
 
 ### 6.4 Repair changelog comparison links
 
@@ -820,10 +820,10 @@ At final release preparation, add:
 
 Checklist:
 
-- [ ] `[Unreleased]` starts from `v2.0.0a3`.
-- [ ] A `2.0.0a3` comparison link exists.
-- [ ] No existing historical comparison link is silently rewritten incorrectly.
-- [ ] Link targets are checked syntactically.
+- [x] `[Unreleased]` starts from `v2.0.0a3`.
+- [x] A `2.0.0a3` comparison link exists.
+- [x] No existing historical comparison link is silently rewritten incorrectly.
+- [x] Link targets are checked syntactically.
 
 ### 6.5 Capture pre-change benchmarks
 

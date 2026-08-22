@@ -5,6 +5,12 @@
 > **Repository destination:** `plans/RELEASE_2_0_0A3_PLAN.md`
 > **Primary objective:** remove the file reader's duplicate gzip-header parser, restore correct live `mtime` behavior across concatenated members and rewinds, make a deliberate evidence-backed disposition on the remaining small-write regression, and validate the provisional 2.0 codec in realistic integrations without reopening the successful `2.0.0a2` decoder architecture.
 
+**Closeout:** `2.0.0a3` was published on 2026-08-16. The factual release
+reconciliation is recorded in
+[`RELEASE_2_0_0A3_CLOSEOUT.md`](RELEASE_2_0_0A3_CLOSEOUT.md). Unchecked
+historical items below remain unchanged; the closeout classifies them as
+shipped, deferred, superseded, maintainer-only, or not performed.
+
 This document is the living implementation checklist for aiogzip `2.0.0a3`. It is intentionally prescriptive. Codex must treat the locked commits, fixed design decisions, regression gates, scope boundaries, and work-package order as authoritative unless the maintainer edits this plan in a reviewed plan-only commit.
 
 The release is a **beta-readiness alpha**, not a feature release. The central decoder scaling and scheduler work from `2.0.0a2` is considered successful and must be preserved. The remaining release work is concentrated in one high-level correctness/performance defect, one known diagnostic write regression, realistic integration evidence, and contract hardening before beta.
