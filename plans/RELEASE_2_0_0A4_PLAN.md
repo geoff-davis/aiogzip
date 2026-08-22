@@ -83,7 +83,7 @@ Preflight checklist:
 - [x] `pyproject.toml` still uses the Alpha development-status classifier.
 - [x] `AGENTS.md` and repository-local instructions have been read in full.
 - [x] The project-prescribed commit checks are known before implementation begins.
-- [ ] The actual implementation-base commit is recorded in the preflight report.
+- [x] The actual implementation-base commit is recorded in the preflight report.
 
 If `main` has advanced with any non-plan change:
 
@@ -150,39 +150,39 @@ plans/benchmarks/data/v1.11.0-a4-comparable-zlib-ng.json
 
 The baseline suite must retain at least these established cases:
 
-- [ ] representative `decompress_chunks()` 512 KiB input / 256 KiB output;
-- [ ] representative `decompress_chunks()` 64 KiB input / 64 KiB output;
-- [ ] representative `compress_chunks()` cases already pinned by `a3`;
-- [ ] direct one-large-feed decoding and transport-sized-feed decoding;
-- [ ] one-item async-source scheduler responsiveness;
-- [ ] fragmented optional-header time and peak allocation;
-- [ ] concurrent independent-file throughput;
-- [ ] JSONL bounded-batch reading;
-- [ ] full binary read peak allocation;
-- [ ] write-size curve at 10 B, 100 B, 1 KiB, 4 KiB, 16 KiB, 64 KiB, and 256 KiB;
-- [ ] the extreme one-call-per-10-byte-write diagnostic;
-- [ ] output lengths and digests for every timed correctness-bearing case.
+- [x] representative `decompress_chunks()` 512 KiB input / 256 KiB output;
+- [x] representative `decompress_chunks()` 64 KiB input / 64 KiB output;
+- [x] representative `compress_chunks()` cases already pinned by `a3`;
+- [x] direct one-large-feed decoding and transport-sized-feed decoding;
+- [x] one-item async-source scheduler responsiveness;
+- [x] fragmented optional-header time and peak allocation;
+- [x] concurrent independent-file throughput;
+- [x] JSONL bounded-batch reading;
+- [x] full binary read peak allocation;
+- [x] write-size curve at 10 B, 100 B, 1 KiB, 4 KiB, 16 KiB, 64 KiB, and 256 KiB;
+- [x] the extreme one-call-per-10-byte-write diagnostic;
+- [x] output lengths and digests for every timed correctness-bearing case.
 
 The Markdown preflight record must include:
 
-- [ ] exact source commits and clean-worktree status;
-- [ ] benchmark harness commit and SHA-256;
-- [ ] fixture generator version and fixture hashes;
-- [ ] Python implementation, full version, executable, and build details;
-- [ ] operating system, kernel, architecture, libc, CPU, core count, and RAM;
-- [ ] filesystem and temporary-directory locations;
-- [ ] stdlib zlib compile-time and runtime versions;
-- [ ] zlib-ng package version and selected engine;
-- [ ] `uv` version and `uv.lock` SHA-256;
-- [ ] material machine conditions such as power state, CPU governor, affinity, and system load;
-- [ ] exact commands;
-- [ ] warm-up, repeat, ordering, and garbage-collection policies;
-- [ ] every timing sample, not only medians;
-- [ ] medians, median absolute deviation, minima, maxima, and sample counts;
-- [ ] peak-allocation method and values;
-- [ ] source-read, compressor, codec-operation, and sink-write counts where available;
-- [ ] output byte counts and SHA-256 digests;
-- [ ] every excluded, interrupted, or invalid run and the reason for exclusion.
+- [x] exact source commits and clean-worktree status;
+- [x] benchmark harness commit and SHA-256;
+- [x] fixture generator version and fixture hashes;
+- [x] Python implementation, full version, executable, and build details;
+- [x] operating system, kernel, architecture, libc, CPU, core count, and RAM;
+- [x] filesystem and temporary-directory locations;
+- [x] stdlib zlib compile-time and runtime versions;
+- [x] zlib-ng package version and selected engine;
+- [x] `uv` version and `uv.lock` SHA-256;
+- [x] material machine conditions such as power state, CPU governor, affinity, and system load;
+- [x] exact commands;
+- [x] warm-up, repeat, ordering, and garbage-collection policies;
+- [x] every timing sample, not only medians;
+- [x] medians, median absolute deviation, minima, maxima, and sample counts;
+- [x] peak-allocation method and values;
+- [x] source-read, compressor, codec-operation, and sink-write counts where available;
+- [x] output byte counts and SHA-256 digests;
+- [x] every excluded, interrupted, or invalid run and the reason for exclusion.
 
 Do not reconstruct exact-tag measurements from prose. Run the harness or mark the comparison unavailable.
 
@@ -740,14 +740,14 @@ Establish immutable evidence before behavior changes and reconcile the prior rel
 
 Before editing production source:
 
-- [ ] Read `AGENTS.md` and all repository-local contributor instructions.
-- [ ] Read the complete `2.0.0a3` release plan.
-- [ ] Read the final `2.0.0a3` review record.
-- [ ] Read the `2.0.0a3` changelog and release notes.
-- [ ] Inspect every unchecked `a3` checklist item related to integrations, boolean validation, benchmarks, packaging, and review.
-- [ ] Inspect the existing benchmark harness and raw result schema.
-- [ ] Inspect current changelog comparison links.
-- [ ] Confirm the current development-version-only commit after the tag.
+- [x] Read `AGENTS.md` and all repository-local contributor instructions.
+- [x] Read the complete `2.0.0a3` release plan.
+- [x] Read the final `2.0.0a3` review record.
+- [x] Read the `2.0.0a3` changelog and release notes.
+- [x] Inspect every unchecked `a3` checklist item related to integrations, boolean validation, benchmarks, packaging, and review.
+- [x] Inspect the existing benchmark harness and raw result schema.
+- [x] Inspect current changelog comparison links.
+- [x] Confirm the current development-version-only commit after the tag.
 
 ### 6.3 Create the `a3` closeout record
 
@@ -797,7 +797,7 @@ List work that was neither shipped nor deliberately deferred. Do not hide omitte
 
 Closeout rules:
 
-- [ ] Do not edit hundreds of old checkboxes merely to make the plan look complete.
+- [x] Do not edit hundreds of old checkboxes merely to make the plan look complete.
 - [x] Add a status note near the top of the `a3` plan linking to the closeout.
 - [x] Do not mark an item completed when only a related but different activity occurred.
 - [x] Record contradictions between the old plan and shipped behavior explicitly.
@@ -828,16 +828,16 @@ Checklist:
 ### 6.5 Capture pre-change benchmarks
 
 - [x] Extend or add the smallest necessary benchmark harness.
-- [ ] Commit the harness before production-code changes.
-- [ ] Capture exact `v2.0.0a3` stdlib-zlib samples.
-- [ ] Capture exact `v2.0.0a3` zlib-ng samples.
-- [ ] Capture pre-change `main` stdlib-zlib samples.
-- [ ] Capture pre-change `main` zlib-ng samples.
-- [ ] Capture exact `v1.11.0` small-write comparables where valid.
-- [ ] Verify output digests.
+- [x] Commit the harness before production-code changes.
+- [x] Capture exact `v2.0.0a3` stdlib-zlib samples.
+- [x] Capture exact `v2.0.0a3` zlib-ng samples.
+- [x] Capture pre-change `main` stdlib-zlib samples.
+- [x] Capture pre-change `main` zlib-ng samples.
+- [x] Capture exact `v1.11.0` small-write comparables where valid.
+- [x] Verify output digests.
 - [ ] Commit raw samples.
 - [ ] Commit the Markdown preflight record.
-- [ ] Record unavailable rows rather than inventing adapters that alter semantics.
+- [x] Record unavailable rows rather than inventing adapters that alter semantics.
 
 ### 6.6 Pre-change test baseline
 
@@ -856,21 +856,21 @@ uv run prek run --all-files
 
 Use repository-defined variants when commands differ. Do not claim a command passed unless it ran.
 
-- [ ] Test count, skips, xfails, duration, and coverage are recorded.
-- [ ] Selected compression engine is recorded.
-- [ ] Any existing failure is investigated before implementation.
-- [ ] No new waiver is created merely to begin the release.
+- [x] Test count, skips, xfails, duration, and coverage are recorded.
+- [x] Selected compression engine is recorded.
+- [x] Any existing failure is investigated before implementation.
+- [x] No new waiver is created merely to begin the release.
 
 ### 6.7 Exit criteria
 
 WP0 is complete when:
 
-- [ ] the exact starting state is verified;
-- [ ] the prior plan has an honest closeout;
-- [ ] changelog links are correct for the current development state;
-- [ ] immutable baseline evidence exists for exact `a3` and pre-change `main`;
-- [ ] the repository is green;
-- [ ] no production source has changed before baseline capture;
+- [x] the exact starting state is verified;
+- [x] the prior plan has an honest closeout;
+- [x] changelog links are correct for the current development state;
+- [x] immutable baseline evidence exists for exact `a3` and pre-change `main`;
+- [x] the repository is green;
+- [x] no production source has changed before baseline capture;
 - [ ] all WP0 checklist changes are committed with their evidence.
 
 Suggested commit sequence:
