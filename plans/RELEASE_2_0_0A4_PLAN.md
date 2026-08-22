@@ -835,8 +835,8 @@ Checklist:
 - [x] Capture pre-change `main` zlib-ng samples.
 - [x] Capture exact `v1.11.0` small-write comparables where valid.
 - [x] Verify output digests.
-- [ ] Commit raw samples.
-- [ ] Commit the Markdown preflight record.
+- [x] Commit raw samples.
+- [x] Commit the Markdown preflight record.
 - [x] Record unavailable rows rather than inventing adapters that alter semantics.
 
 ### 6.6 Pre-change test baseline
@@ -871,7 +871,7 @@ WP0 is complete when:
 - [x] immutable baseline evidence exists for exact `a3` and pre-change `main`;
 - [x] the repository is green;
 - [x] no production source has changed before baseline capture;
-- [ ] all WP0 checklist changes are committed with their evidence.
+- [x] all WP0 checklist changes are committed with their evidence.
 
 Suggested commit sequence:
 
