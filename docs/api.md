@@ -120,6 +120,14 @@ The codec API is provisional during the 2.0 alpha series. See the
 [synchronous codec guide](codec.md) for constructor validation, immutable
 input snapshots, lifecycle hazards, thread safety, and error behavior.
 
+With `collect_member_info=True`, `GzipDecoder.members` contains immutable
+records only for members whose trailers validated. Those completed records
+remain available if a later member fails or the codec is explicitly discarded;
+the incomplete member is absent and the codec remains unusable. Retained
+records prove only those members, not the entire concatenated stream. Use
+`decoder.finished` as the whole-stream completion indicator. Collection is
+opt-in because its memory use grows with the member count.
+
 ::: aiogzip.codec.CodecOperation
 
 ::: aiogzip.codec.GzipEncoder

@@ -250,8 +250,8 @@ def test_exact_limit_is_emitted_before_later_overflow_error():
     with pytest.raises(OSError, match="max_decompressed_size"):
         next(operation)
     assert decoder.uncompressed_size == limit
-    assert decoder._member_size == limit
-    assert decoder._member_crc == zlib.crc32(payload[:limit])
+    assert decoder._member_size == 0
+    assert decoder._member_crc == 0
 
 
 def test_fake_engine_output_with_zero_consumption_makes_progress(monkeypatch):

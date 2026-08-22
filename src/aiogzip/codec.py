@@ -432,7 +432,9 @@ class GzipDecoder(_CodecBase):
 
     Payload bytes may be emitted before their member trailer is available, so
     integrity is established only after :meth:`finish` is exhausted. Completed
-    metadata is retained only when ``collect_member_info=True``.
+    metadata is retained only when ``collect_member_info=True``. Records for
+    trailer-validated members survive a later failure or explicit discard;
+    :attr:`finished` remains the whole-stream validation indicator.
 
     Methods return bounded lazy iterators that must be exhausted. This class
     performs no I/O or executor offload and is not thread-safe.
@@ -480,7 +482,7 @@ class GzipDecoder(_CodecBase):
 
     @property
     def members(self) -> tuple[GzipMemberInfo, ...]:
-        """Completed, trailer-validated members when collection is enabled."""
+        """Collected completed members, retained after failure or discard."""
         return tuple(self._members)
 
     @property
@@ -521,7 +523,11 @@ class GzipDecoder(_CodecBase):
         self._engine = None
         self._header = None
         self._header_parser = None
-        self._members.clear()
+        self._state = "header"
+        self._member_offset = 0
+        self._member_crc = 0
+        self._member_size = 0
+        self._allow_padding = False
 
     def _new_header_parser(self) -> _GzipHeaderParser:
         return _GzipHeaderParser(

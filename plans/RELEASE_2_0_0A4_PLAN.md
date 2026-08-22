@@ -1089,14 +1089,14 @@ Retain:
 
 Implementation checklist:
 
-- [ ] Remove `_members.clear()` from the ordinary decoder failure/discard release path.
-- [ ] Do not retain `_header` for an incomplete or failed member.
-- [ ] Do not synthesize metadata for a member whose trailer failed.
-- [ ] Do not mark `finished=True` after failure.
-- [ ] Keep the decoder unusable after operation failure or discard.
-- [ ] Keep `discard()` idempotent.
-- [ ] Keep active-operation invalidation deterministic.
-- [ ] Avoid adding a second metadata collection path.
+- [x] Remove `_members.clear()` from the ordinary decoder failure/discard release path.
+- [x] Do not retain `_header` for an incomplete or failed member.
+- [x] Do not synthesize metadata for a member whose trailer failed.
+- [x] Do not mark `finished=True` after failure.
+- [x] Keep the decoder unusable after operation failure or discard.
+- [x] Keep `discard()` idempotent.
+- [x] Keep active-operation invalidation deterministic.
+- [x] Avoid adding a second metadata collection path.
 
 If a separate “destroy absolutely everything” helper is proposed, justify why normal Python object disposal is insufficient. Do not add public reset/reuse behavior.
 
@@ -1104,45 +1104,45 @@ If a separate “destroy absolutely everything” helper is proposed, justify wh
 
 Use a concatenated stream with at least one validated first member and then test:
 
-- [ ] corrupt CRC in the second member;
-- [ ] corrupt ISIZE in the second member;
-- [ ] truncated second-member header;
-- [ ] malformed optional second-member header;
-- [ ] reserved flags in the second member;
-- [ ] truncated second-member DEFLATE body;
-- [ ] truncated second-member trailer;
-- [ ] decompression limit exceeded in the second member;
-- [ ] trailing junk under the current strictness behavior;
-- [ ] explicit `operation.close()` during the second member;
-- [ ] codec-wide `discard()` during the second member;
-- [ ] discard after one member validates and before a second header starts;
-- [ ] repeated discard.
+- [x] corrupt CRC in the second member;
+- [x] corrupt ISIZE in the second member;
+- [x] truncated second-member header;
+- [x] malformed optional second-member header;
+- [x] reserved flags in the second member;
+- [x] truncated second-member DEFLATE body;
+- [x] truncated second-member trailer;
+- [x] decompression limit exceeded in the second member;
+- [x] trailing junk under the current strictness behavior;
+- [x] explicit `operation.close()` during the second member;
+- [x] codec-wide `discard()` during the second member;
+- [x] discard after one member validates and before a second header starts;
+- [x] repeated discard.
 
 For every case with `collect_member_info=True`:
 
-- [ ] `member_count` equals the number of trailer-validated members.
-- [ ] `len(members) == member_count`.
-- [ ] the retained record fields exactly describe the validated member.
-- [ ] no partial second-member record appears.
-- [ ] retained tuples remain immutable snapshots.
-- [ ] later codec calls still raise the established unusable-codec error.
+- [x] `member_count` equals the number of trailer-validated members.
+- [x] `len(members) == member_count`.
+- [x] the retained record fields exactly describe the validated member.
+- [x] no partial second-member record appears.
+- [x] retained tuples remain immutable snapshots.
+- [x] later codec calls still raise the established unusable-codec error.
 
 For `collect_member_info=False`:
 
-- [ ] `members == ()` after the same failures.
-- [ ] `member_count` still counts validated members.
-- [ ] metadata collection allocations are not introduced.
+- [x] `members == ()` after the same failures.
+- [x] `member_count` still counts validated members.
+- [x] metadata collection allocations are not introduced.
 
 ### 8.5 Successful-stream and multi-member regressions
 
-- [ ] Successful one-member behavior is unchanged.
-- [ ] Successful many-member behavior is unchanged.
-- [ ] Empty members are represented correctly.
-- [ ] NUL padding does not create records.
-- [ ] Member offsets and compressed sizes remain exact.
-- [ ] Headers with filename, comment, extra, FHCRC, and `mtime=0` retain correct fields.
-- [ ] `inspect()` and `verify()` behavior is unchanged unless they directly depend on this public decoder contract.
-- [ ] Cross-engine records are identical.
+- [x] Successful one-member behavior is unchanged.
+- [x] Successful many-member behavior is unchanged.
+- [x] Empty members are represented correctly.
+- [x] NUL padding does not create records.
+- [x] Member offsets and compressed sizes remain exact.
+- [x] Headers with filename, comment, extra, FHCRC, and `mtime=0` retain correct fields.
+- [x] `inspect()` and `verify()` behavior is unchanged unless they directly depend on this public decoder contract.
+- [x] Cross-engine records are identical.
 
 ### 8.6 Documentation
 
@@ -1172,13 +1172,13 @@ Do not imply that output from the failed member is validated.
 
 WP2 is complete when:
 
-- [ ] `members` and `member_count` remain coherent after failure and discard;
-- [ ] incomplete member metadata is never committed;
-- [ ] mutable codec state is still released;
-- [ ] operation ownership and unusable-state behavior are unchanged;
-- [ ] both collection modes have full tests;
-- [ ] docs describe whole-stream versus per-member validation accurately;
-- [ ] full codec, malformed-stream, property, type, lint, and hook suites pass.
+- [x] `members` and `member_count` remain coherent after failure and discard;
+- [x] incomplete member metadata is never committed;
+- [x] mutable codec state is still released;
+- [x] operation ownership and unusable-state behavior are unchanged;
+- [x] both collection modes have full tests;
+- [x] docs describe whole-stream versus per-member validation accurately;
+- [x] full codec, malformed-stream, property, type, lint, and hook suites pass.
 
 Suggested commit:
 

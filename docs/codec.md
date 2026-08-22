@@ -105,6 +105,31 @@ committed.
 `collect_member_info` likewise requires exact `True` or `False`; `0`, `1`, and
 other truthy or falsy substitutes are rejected before decoder state is built.
 
+Completed records survive a later member failure, an abandoned operation, or
+an explicit `discard()`. They describe only members whose CRC and ISIZE
+trailers validated; they do not mean the complete concatenated stream is
+valid, and no record is created for the failed member. Check `finished` to
+distinguish successful whole-stream completion. Collection remains opt-in
+because retained records consume memory proportional to the member count.
+
+```python
+import gzip
+
+import aiogzip
+
+decoder = aiogzip.GzipDecoder(collect_member_info=True)
+try:
+    # Feed transport chunks and exhaust decoder.finish().
+    ...
+except gzip.BadGzipFile:
+    for member in decoder.members:
+        report_already_validated_member(member)
+```
+
+Payload emitted from the failed member is recovery data, not validated output.
+The decoder remains unusable after the failure or discard even though earlier
+metadata remains available.
+
 After successful completion, another decoder `feed()` or `finish()` raises
 `ValueError`. Repeated encoder finalization and invalid method ordering also
 raise `ValueError`; create a new codec for another stream.

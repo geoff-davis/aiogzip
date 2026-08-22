@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `GzipDecoder.members` now retains immutable records for earlier
+  trailer-validated members when a later member fails or the decoder is
+  explicitly discarded. The failing or incomplete member never receives a
+  record, `member_count` remains coherent with collected metadata, and the
+  decoder still releases transient state and remains unusable. `finished`
+  continues to distinguish whole-stream validation from partial progress.
+
 ### Changed
 
 - Public boolean configuration is now exact during the 2.0 alpha series.
