@@ -200,6 +200,10 @@ replacement.
   that limit.
 - **Compression metadata:** `mtime` and the embedded original filename affect
   output bytes. Set both explicitly when reproducibility across paths matters.
+- **Boolean options:** Pass exact `True` or `False` for `fast_compress` and
+  `strict_size`; `closefd` also accepts `None` for its ownership default.
+  Integer substitutes such as `0` and `1` raise `TypeError` before a resource
+  is opened. The direct codec applies the same rule to `collect_member_info`.
 
 ## Performance and optional acceleration
 

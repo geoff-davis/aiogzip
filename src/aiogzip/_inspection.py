@@ -13,6 +13,7 @@ from ._common import (
     WithAsyncReadWrite,
     _validate_chunk_size,
     _validate_filename,
+    _validate_optional_bool,
     _validate_optional_positive_int,
 )
 from ._metadata import GzipInfo, GzipMemberInfo, VerificationResult
@@ -42,6 +43,7 @@ async def _scan_gzip(
     collect_members: bool,
 ) -> _ScanResult:
     """Read and validate a complete gzip source without retaining payload."""
+    validated_closefd = _validate_optional_bool(closefd, "closefd")
     _validate_filename(filename, fileobj)
     _validate_chunk_size(chunk_size)
     _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")
@@ -53,7 +55,7 @@ async def _scan_gzip(
         source = await aiofiles.open(filename, "rb")
     else:
         source = fileobj
-    should_close = owns_source or bool(closefd)
+    should_close = owns_source or validated_closefd is True
 
     decoder = GzipDecoder(
         max_decompressed_size=max_decompressed_size,

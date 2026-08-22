@@ -908,9 +908,9 @@ Create a table in the WP1 implementation note containing:
 | `collect_member_info` | ... | truthiness/coercion | exact `bool` |
 | `closefd` | ... | `None` or unvalidated value | `None` or exact `bool` |
 
-- [ ] Every public occurrence is listed.
-- [ ] Internal constants and ordinary `bool(...)` result conversions such as `isatty()` are distinguished from configuration validation.
-- [ ] No unrelated boolean-returning code is changed.
+- [x] Every public occurrence is listed.
+- [x] Internal constants and ordinary `bool(...)` result conversions such as `isatty()` are distinguished from configuration validation.
+- [x] No unrelated boolean-returning code is changed.
 
 ### 7.3 Shared validators
 
@@ -933,27 +933,27 @@ def _validate_optional_bool(value: object, name: str) -> bool | None:
 
 Implementation requirements:
 
-- [ ] Use `type(value) is bool`.
-- [ ] Return the validated original boolean.
-- [ ] Do not call `bool(value)`.
-- [ ] Do not inspect `__bool__`, `__len__`, equality, or integer value.
-- [ ] Error messages contain the parameter name.
-- [ ] Helpers are package-private.
-- [ ] Type annotations pass both project type checkers.
+- [x] Use `type(value) is bool`.
+- [x] Return the validated original boolean.
+- [x] Do not call `bool(value)`.
+- [x] Do not inspect `__bool__`, `__len__`, equality, or integer value.
+- [x] Error messages contain the parameter name.
+- [x] Helpers are package-private.
+- [x] Type annotations pass both project type checkers.
 
 ### 7.4 Apply validation at public boundaries
 
 For every affected public constructor or function:
 
-- [ ] Validate before resource acquisition.
-- [ ] Validate before zlib-ng warning logic.
-- [ ] Validate before a compressor/decompressor engine is constructed where practical.
-- [ ] Validate before returning a lazy async generator.
-- [ ] Validate even when the current mode does not actively use the option, so behavior is not mode-dependent.
-- [ ] Preserve all default values.
-- [ ] Preserve `closefd=None` defaulting.
-- [ ] Avoid duplicate warning emission between wrappers and codecs.
-- [ ] Pass already validated exact booleans through wrappers without reinterpreting them.
+- [x] Validate before resource acquisition.
+- [x] Validate before zlib-ng warning logic.
+- [x] Validate before a compressor/decompressor engine is constructed where practical.
+- [x] Validate before returning a lazy async generator.
+- [x] Validate even when the current mode does not actively use the option, so behavior is not mode-dependent.
+- [x] Preserve all default values.
+- [x] Preserve `closefd=None` defaulting.
+- [x] Avoid duplicate warning emission between wrappers and codecs.
+- [x] Pass already validated exact booleans through wrappers without reinterpreting them.
 
 Expected implementation shape:
 
@@ -971,65 +971,65 @@ Add a focused matrix rather than duplicating dozens of ad hoc tests.
 
 Accepted values:
 
-- [ ] `True` works on every applicable surface.
-- [ ] `False` works on every applicable surface.
-- [ ] `None` works only for `closefd`.
+- [x] `True` works on every applicable surface.
+- [x] `False` works on every applicable surface.
+- [x] `None` works only for `closefd`.
 
 Rejected values for each applicable parameter:
 
-- [ ] `0`;
-- [ ] `1`;
-- [ ] `""`;
-- [ ] `"false"`;
-- [ ] `[]`;
-- [ ] a truthy custom object;
-- [ ] a falsy custom object;
-- [ ] an object whose `__bool__` raises, proving the validator does not invoke it;
-- [ ] a NumPy-like scalar test double.
+- [x] `0`;
+- [x] `1`;
+- [x] `""`;
+- [x] `"false"`;
+- [x] `[]`;
+- [x] a truthy custom object;
+- [x] a falsy custom object;
+- [x] an object whose `__bool__` raises, proving the validator does not invoke it;
+- [x] a NumPy-like scalar test double.
 
 For each surface, assert:
 
-- [ ] `TypeError` occurs immediately for synchronous constructors/factories and on first await for coroutine functions, always before side effects.
-- [ ] The message includes the exact parameter name.
-- [ ] No file was created or opened.
-- [ ] No external file method was called.
-- [ ] No async source item was requested.
-- [ ] No unavailable-fast-engine warning was emitted first.
-- [ ] No codec operation was reserved.
+- [x] `TypeError` occurs immediately for synchronous constructors/factories and on first await for coroutine functions, always before side effects.
+- [x] The message includes the exact parameter name.
+- [x] No file was created or opened.
+- [x] No external file method was called.
+- [x] No async source item was requested.
+- [x] No unavailable-fast-engine warning was emitted first.
+- [x] No codec operation was reserved.
 
 ### 7.6 Compatibility documentation
 
 Document this as an intentional alpha compatibility tightening:
 
-- [ ] Add a changelog entry.
-- [ ] Update codec API docs.
-- [ ] Update file API docs for `closefd`, `strict_size`, and `fast_compress`.
-- [ ] Update streaming docs.
-- [ ] Update API-reference parameter text.
-- [ ] Mention that `0` and `1` are no longer accepted as booleans.
-- [ ] Do not overstate this as a security fix.
+- [x] Add a changelog entry.
+- [x] Update codec API docs.
+- [x] Update file API docs for `closefd`, `strict_size`, and `fast_compress`.
+- [x] Update streaming docs.
+- [x] Update API-reference parameter text.
+- [x] Mention that `0` and `1` are no longer accepted as booleans.
+- [x] Do not overstate this as a security fix.
 
 ### 7.7 Regression checks
 
-- [ ] Exact valid-boolean behavior is unchanged.
-- [ ] zlib-ng fallback warnings still occur only for `fast_compress=True` when unavailable.
-- [ ] `closefd=None` still follows ownership defaults.
-- [ ] Explicit `closefd=False` preserves an external file object.
-- [ ] Explicit `closefd=True` closes an external file object.
-- [ ] Text wrappers and factories behave identically to binary wrappers.
-- [ ] Streaming functions fail before source iteration on invalid booleans.
-- [ ] Existing tests that intentionally passed integers are updated only with a documented rationale.
+- [x] Exact valid-boolean behavior is unchanged.
+- [x] zlib-ng fallback warnings still occur only for `fast_compress=True` when unavailable.
+- [x] `closefd=None` still follows ownership defaults.
+- [x] Explicit `closefd=False` preserves an external file object.
+- [x] Explicit `closefd=True` closes an external file object.
+- [x] Text wrappers and factories behave identically to binary wrappers.
+- [x] Streaming functions fail before source iteration on invalid booleans.
+- [x] Existing tests that intentionally passed integers are updated only with a documented rationale.
 
 ### 7.8 Exit criteria
 
 WP1 is complete when:
 
-- [ ] all affected public surfaces share the exact contract;
-- [ ] no configuration path still performs `bool(fast_compress)`, `bool(strict_size)`, or `bool(collect_member_info)`;
-- [ ] `closefd` is exact `bool | None`;
-- [ ] tests prove validation timing and lack of side effects;
-- [ ] docs and changelog are updated;
-- [ ] full unit, lint, formatting, type, and hook checks pass.
+- [x] all affected public surfaces share the exact contract;
+- [x] no configuration path still performs `bool(fast_compress)`, `bool(strict_size)`, or `bool(collect_member_info)`;
+- [x] `closefd` is exact `bool | None`;
+- [x] tests prove validation timing and lack of side effects;
+- [x] docs and changelog are updated;
+- [x] full unit, lint, formatting, type, and hook checks pass.
 
 Suggested commit:
 

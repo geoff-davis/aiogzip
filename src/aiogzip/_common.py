@@ -42,6 +42,20 @@ ZlibEngine = Any
 
 
 # Validation helper functions
+def _validate_bool(value: object, name: str) -> bool:
+    """Return an exact bool or raise a parameter-specific TypeError."""
+    if type(value) is not bool:
+        raise TypeError(f"{name} must be a bool")
+    return value
+
+
+def _validate_optional_bool(value: object, name: str) -> bool | None:
+    """Return None or an exact bool."""
+    if value is None:
+        return None
+    return _validate_bool(value, name)
+
+
 def _check_can_open(is_closed: bool, is_open: bool) -> None:
     """Validate the open() precondition shared by the binary and text classes.
 
@@ -305,6 +319,8 @@ __all__ = [
     "GZIP_METHOD_DEFLATE",
     "GZIP_OS_UNKNOWN",
     "ZlibEngine",
+    "_validate_bool",
+    "_validate_optional_bool",
     "_validate_filename",
     "_validate_chunk_size",
     "_validate_compresslevel",

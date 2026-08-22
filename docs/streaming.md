@@ -178,6 +178,12 @@ requires. Set `strict_size=True` to reject a member that would exceed the
 32-bit `ISIZE` field. `fast_compress=True` opts into zlib-ng when installed and
 otherwise emits the same fallback warning as the file writer.
 
+Both options require the exact built-in values `True` or `False`. Values such
+as `0`, `1`, strings, and custom truthy or falsy objects raise a
+parameter-specific `TypeError` when `compress_chunks()` is called, before its
+lazy iterator is returned, zlib-ng warning logic runs, or the async source is
+iterated.
+
 ### Failure, cancellation, and early exit
 
 The final deflate bytes and eight-byte trailer are emitted only after the

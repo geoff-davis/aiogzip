@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Public boolean configuration is now exact during the 2.0 alpha series.
+  `fast_compress`, `strict_size`, and `collect_member_info` accept only the
+  built-in `True` and `False` values; `closefd` accepts those values or `None`
+  for its ownership default. Integer stand-ins such as `0` and `1` and other
+  truthy or falsy objects now raise a parameter-specific `TypeError` before
+  files, engines, warnings, source iterators, or codec operations are touched.
+
 ## [2.0.0a3] - 2026-08-16
 
 ### Added

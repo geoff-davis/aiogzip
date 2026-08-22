@@ -10,6 +10,7 @@ from ._codec_async import (
     _drive_operation,
 )
 from ._common import (
+    _validate_bool,
     _validate_chunk_size,
     _validate_optional_positive_int,
 )
@@ -110,17 +111,19 @@ def _compress_chunks(
     output_chunk_size: int,
 ) -> AsyncIterator[bytes]:
     """Validate arguments and return the one-member compression generator."""
+    validated_fast_compress = _validate_bool(fast_compress, "fast_compress")
+    validated_strict_size = _validate_bool(strict_size, "strict_size")
     if not callable(getattr(source, "__aiter__", None)):
         raise TypeError("source must be an asynchronous iterable of bytes")
     options: dict[str, Any] = {
         "compresslevel": compresslevel,
         "mtime": mtime,
         "original_filename": original_filename,
-        "fast_compress": fast_compress,
-        "strict_size": strict_size,
+        "fast_compress": validated_fast_compress,
+        "strict_size": validated_strict_size,
         "output_chunk_size": output_chunk_size,
     }
-    if fast_compress and not _engine.have_fast_engine():
+    if validated_fast_compress and not _engine.have_fast_engine():
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             encoder = GzipEncoder(**options)

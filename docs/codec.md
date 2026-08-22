@@ -45,6 +45,12 @@ the file writer:
 - `strict_size=True` rejects input beyond gzip's 4 GiB `ISIZE` range; and
 - `output_chunk_size` is an integer from 1 through 128 MiB.
 
+`fast_compress` and `strict_size` require the exact built-in values `True` or
+`False`. Integer stand-ins such as `0` and `1`, strings, and custom truthy or
+falsy objects raise `TypeError`; aiogzip does not call their `__bool__` or
+`__len__` methods. Validation happens before the compression engine is
+constructed or an unavailable-zlib-ng warning can be emitted.
+
 ## Decoding complete streams
 
 A decoder accepts zero or more concatenated gzip members plus permitted NUL
@@ -95,6 +101,9 @@ Pass `collect_member_info=True` when member metadata is needed. After each
 member's trailer is validated, `members` gains a `GzipMemberInfo` entry and
 `member_count` advances. Metadata for an incomplete or corrupt member is never
 committed.
+
+`collect_member_info` likewise requires exact `True` or `False`; `0`, `1`, and
+other truthy or falsy substitutes are rejected before decoder state is built.
 
 After successful completion, another decoder `feed()` or `finish()` raises
 `ValueError`. Repeated encoder finalization and invalid method ordering also
