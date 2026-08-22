@@ -827,7 +827,7 @@ Checklist:
 
 ### 6.5 Capture pre-change benchmarks
 
-- [ ] Extend or add the smallest necessary benchmark harness.
+- [x] Extend or add the smallest necessary benchmark harness.
 - [ ] Commit the harness before production-code changes.
 - [ ] Capture exact `v2.0.0a3` stdlib-zlib samples.
 - [ ] Capture exact `v2.0.0a3` zlib-ng samples.

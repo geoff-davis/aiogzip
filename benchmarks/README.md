@@ -205,6 +205,28 @@ Run it once with each engine outside normal CI. Fixture creation and reader
 opening precede tracemalloc, and the JSON reports both peak allocation and
 current allocation after close plus garbage collection.
 
+### 11. 2.0.0a4 high-level supplement (`bench_a4_supplement.py`)
+
+The `a4` supplement leaves the established `a3` and decoder-regression
+harnesses unchanged. It adds only the release rows they do not represent:
+bounded `iter_batches()` JSONL reading, whole binary-read throughput and peak
+Python allocation, and concurrent independent-file reads. It targets an
+explicit checkout, records fixture and output hashes, retains every timing
+sample, and uses one verified untimed warm-up per throughput row:
+
+```bash
+uv run --frozen python benchmarks/bench_a4_supplement.py \
+  --source-root /tmp/aiogzip-v2.0.0a3-a4 \
+  --engine stdlib --repeat 5 \
+  --output /tmp/v2.0.0a3-a4-supplement-stdlib.json
+```
+
+Run this supplement beside `bench_a3_regressions.py` and the `release` profile
+of `bench_codec_regressions.py`; it does not replace either historical
+comparison surface. The JSONL digest is updated incrementally inside the timed
+region so the benchmark does not retain all decoded rows. Binary and
+concurrent digests are calculated after each bounded library read completes.
+
 ## Running Benchmarks
 
 ### Command Line Options

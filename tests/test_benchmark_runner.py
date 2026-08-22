@@ -21,6 +21,7 @@ run_benchmarks = importlib.import_module("run_benchmarks")
 bench_streaming = importlib.import_module("bench_streaming")
 bench_codec_regressions = importlib.import_module("bench_codec_regressions")
 bench_a3_regressions = importlib.import_module("bench_a3_regressions")
+bench_a4_supplement = importlib.import_module("bench_a4_supplement")
 verify_a3_writes = importlib.import_module("verify_a3_writes")
 verify_a3_headers = importlib.import_module("verify_a3_headers")
 BenchmarkResults = bench_common.BenchmarkResults
@@ -48,6 +49,10 @@ a3_concurrent_write_once = verify_a3_writes._concurrent_once
 a3_path_write_once = verify_a3_writes._path_once
 a3_allocation_write_once = verify_a3_writes._allocation_once
 a3_expected_header_failure = verify_a3_headers._expected_failure
+a4_bounded_jsonl_once = bench_a4_supplement._bounded_jsonl_once
+a4_concurrent_reads_once = bench_a4_supplement._concurrent_reads_once
+a4_full_binary_read_once = bench_a4_supplement._full_binary_read_once
+a4_jsonl_fixture = bench_a4_supplement._jsonl_fixture
 
 
 def _result(name, duration, marker):
@@ -656,6 +661,56 @@ async def test_a3_allocation_verifier_stops_tracemalloc_on_write_failure(monkeyp
         )
 
     assert not tracemalloc.is_tracing()
+
+
+@pytest.mark.asyncio
+async def test_a4_supplement_validates_bounded_jsonl(tmp_path):
+    import aiogzip
+
+    payload = a4_jsonl_fixture(16 * 1024)
+    path = tmp_path / "events.jsonl.gz"
+    path.write_bytes(gzip.compress(payload, mtime=0))
+
+    sample = await a4_bounded_jsonl_once(aiogzip, path, batch_hint=1024)
+
+    assert sample.metrics["output_bytes"] == len(payload)
+    assert sample.metrics["output_sha256"] == hashlib.sha256(payload).hexdigest()
+    assert sample.metrics["line_count"] == payload.count(b"\n")
+    assert sample.metrics["batch_count"] > 1
+
+
+@pytest.mark.asyncio
+async def test_a4_supplement_measures_full_read_peak(tmp_path):
+    import aiogzip
+
+    payload = b"bounded-full-read" * 4096
+    path = tmp_path / "binary.gz"
+    path.write_bytes(gzip.compress(payload, mtime=0))
+
+    sample = await a4_full_binary_read_once(aiogzip, path, measure_memory=True)
+
+    assert sample.metrics["output_bytes"] == len(payload)
+    assert sample.metrics["output_sha256"] == hashlib.sha256(payload).hexdigest()
+    assert sample.metrics["peak_python_bytes"] > 0
+    assert not tracemalloc.is_tracing()
+
+
+@pytest.mark.asyncio
+async def test_a4_supplement_validates_concurrent_independent_reads(tmp_path):
+    import aiogzip
+
+    payloads = (b"stream-zero" * 1024, b"stream-one" * 1024, b"stream-two" * 1024)
+    paths = tuple(tmp_path / f"stream-{index}.gz" for index in range(len(payloads)))
+    for path, payload in zip(paths, payloads, strict=True):
+        path.write_bytes(gzip.compress(payload, mtime=0))
+
+    sample = await a4_concurrent_reads_once(aiogzip, paths)
+
+    assert sample.metrics["stream_count"] == len(paths)
+    assert sample.metrics["maximum_active_handles"] == len(paths)
+    assert sample.metrics["output_sha256_by_stream"] == [
+        hashlib.sha256(payload).hexdigest() for payload in payloads
+    ]
 
 
 def test_source_root_attestation_identifies_current_checkout():
