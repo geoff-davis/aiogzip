@@ -104,6 +104,22 @@ See the [recipes](https://geoff-davis.github.io/aiogzip/recipes/) for JSON
 Lines, untrusted input, reproducible output, append mode, seeking,
 cancellation recovery, and external async streams.
 
+## Maintained integration examples
+
+Two credential-free examples exercise complete application workflows using
+only aiogzip's public API:
+
+- [`fragmented_transport.py`](examples/fragmented_transport.py) drives the
+  synchronous codec over bounded, explicitly length-prefixed transport frames
+  and keeps decoded records provisional until trailer validation succeeds.
+- [`concurrent_jsonl_ingest.py`](examples/concurrent_jsonl_ingest.py) processes
+  independent gzip shards with bounded concurrency and publishes staged JSONL
+  output only after every shard validates.
+
+See the [example runbook](examples/README.md) for requirements, clean-checkout
+commands, wheel-installed commands, failure scenarios, and the boundary
+between example application code and supported aiogzip API.
+
 ## Why use aiogzip?
 
 - Async file I/O built on `asyncio` and `aiofiles`, so independent streams can
@@ -162,8 +178,9 @@ Important differences and caveats:
   `fileobj=...`; their `read()` or `write()` methods must be async.
 - Append modes (`"ab"` and `"at"`) create a new gzip member. Both libraries
   transparently read concatenated members as one decompressed stream.
-- An open file object is stateful and is not safe for simultaneous use by
-  multiple tasks. Use one handle per task or serialize access.
+- One logical task should own an open handle at a time. Separate handles may
+  progress concurrently; serialize intentional shared-handle access with an
+  application lock covering the complete logical operation.
 - Gzip has no random-access index. Backward seeks rewind and replay
   decompression, so mixed-direction access can be O(n).
 - Cancelling an executor-backed decompression can leave that reader unusable;
@@ -187,8 +204,11 @@ replacement.
 - **Untrusted input:** `max_decompressed_size` caps cumulative decompressed
   output for a read pass. Overflow raises `OSError` without first materializing
   the complete expansion.
-- **Task safety:** Do not operate on one open handle concurrently from several
-  tasks; internal codec and buffer state is mutable and intentionally unlocked.
+- **Task safety:** One logical task owns one open handle at a time. Separate
+  handles may progress concurrently. An overlapping call raises
+  `ConcurrentOperationError` before state corruption; it is a misuse signal,
+  not a lock or retry-based synchronization primitive. Use an application lock
+  around the complete shared operation when ownership cannot be separated.
 - **Cancellation:** If cancellation occurs during executor-backed
   decompression, later reads and seeks raise `OSError`. Close and reopen the
   reader. A similarly cancelled compression makes that output member unusable;

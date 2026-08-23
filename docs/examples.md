@@ -2,9 +2,16 @@
 
 This guide provides practical examples for using `aiogzip` in various scenarios.
 
+The repository's [maintained-example runbook](https://github.com/geoff-davis/aiogzip/tree/main/examples)
+states the Python/dependency requirements and gives exact clean-checkout and
+wheel-installed commands. Helpers, framing, staging, manifests, and status
+labels defined by those scripts are application code, not aiogzip API.
+
 ## Maintained fragmented-transport example
 
-The repository includes a deterministic, credential-free demonstration of the
+The repository includes
+[`examples/fragmented_transport.py`](https://github.com/geoff-davis/aiogzip/blob/main/examples/fragmented_transport.py),
+a deterministic, credential-free demonstration of the
 public `GzipEncoder`, `GzipDecoder`, and `CodecOperation` APIs over a bounded
 local bidirectional asyncio byte transport. Its application-level two-byte
 length prefix makes gzip fragmentation explicit instead of incorrectly relying
@@ -32,7 +39,8 @@ scenario list.
 
 ## Maintained concurrent JSONL ingest
 
-The staged-ingest example generates ordinary independent gzip files with the
+[`examples/concurrent_jsonl_ingest.py`](https://github.com/geoff-davis/aiogzip/blob/main/examples/concurrent_jsonl_ingest.py)
+generates ordinary independent gzip files with the
 standard library, processes them through bounded `asyncio.TaskGroup`
 concurrency, and publishes one dataset only after every shard validates:
 

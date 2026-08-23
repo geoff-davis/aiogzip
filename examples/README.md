@@ -1,7 +1,57 @@
 # Maintained examples
 
-The examples are credential-free, generate their own deterministic fixtures,
-and use only aiogzip's public API.
+Maintained examples are credential-free, deterministic, bounded, exercised by
+the test and platform matrix, and restricted to aiogzip's public API. They are
+complete application workflows rather than copy-only snippets: success,
+integrity failure, cancellation, and cleanup behavior are part of their
+contract.
+
+Both examples require Python 3.11 or newer. `fragmented_transport.py` needs
+only aiogzip and the standard library. `concurrent_jsonl_ingest.py` also uses
+`aiofiles`, which is an aiogzip runtime dependency and is installed with the
+wheel. Neither requires credentials, services, zlib-ng, HTTPX, or a
+development-only runtime package.
+
+Functions and classes whose names start with `_`, the frame format,
+`DatasetBudget`, staging layout, manifest schema, and status labels are
+example-owned application code. They are not aiogzip API. Only names imported
+from the top-level `aiogzip` package are library contracts.
+
+## Run from a clean checkout
+
+From the repository root:
+
+```bash
+uv sync --all-extras
+uv run python examples/fragmented_transport.py --self-test
+uv run python examples/concurrent_jsonl_ingest.py \
+  --generate-fixtures ./demo-input \
+  --output ./demo-published
+```
+
+The ingest command requires new `demo-input` and `demo-published` paths. Remove
+or rename an earlier demo run before repeating it.
+
+## Run against the built wheel
+
+Build from the repository root, create an isolated environment, and invoke the
+repository-owned example files with that environment's interpreter. Because
+the scripts live under `examples/`, the checkout's `src/` directory is not on
+their import path; `aiogzip` resolves from the installed wheel.
+
+```bash
+uv build
+python -m venv .venv-example
+.venv-example/bin/python -m pip install \
+  dist/aiogzip-2.0.0a4.dev0-py3-none-any.whl
+.venv-example/bin/python examples/fragmented_transport.py --self-test
+.venv-example/bin/python examples/concurrent_jsonl_ingest.py \
+  --generate-fixtures ./wheel-demo-input \
+  --output ./wheel-demo-published
+```
+
+On Windows, replace `.venv-example/bin/python` with
+`.venv-example\\Scripts\\python.exe`.
 
 ## Fragmented transport
 

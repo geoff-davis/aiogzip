@@ -14,7 +14,7 @@ working when the fast engine is installed.
 | Underlying I/O failure | `OSError` | Missing file, permission denied, disk errors — whatever the OS raised. |
 | `max_decompressed_size` exceeded | `OSError` (not `BadGzipFile`) | Message starts with `"decompressed output exceeded max_decompressed_size"`. |
 | Wrong argument types / values | `TypeError` / `ValueError` | Raised eagerly at the call with a corrective message. |
-| Overlapping operations on one async file | `aiogzip.ConcurrentOperationError` | An `OSError` subtype. Await the active call, then retry; one handle is single-task-owned. |
+| Overlapping operations on one async file | `aiogzip.ConcurrentOperationError` | An `OSError` subtype reporting a shared-handle ownership bug before state corruption. |
 | Codec operation still active | `RuntimeError` | Exhaust the returned iterator before starting another operation. |
 | Codec abandoned or partially closed | `OSError` on later use | The instance is unusable; call `discard()` and create a new codec. |
 | Codec used after successful decoder finalization | `ValueError` | `feed()` and repeated `finish()` are terminal-state misuse. |
@@ -42,10 +42,22 @@ except OSError as exc:
 One `AsyncGzipBinaryFile` or `AsyncGzipTextFile` handle is intentionally owned
 by one task at a time. If a read, seek, write, flush, or close overlaps an
 operation already in flight on that handle, the rejected call raises the
-public `ConcurrentOperationError`. The active call is left intact; await it,
-then retry the rejected operation. Because the exception subclasses
-`OSError`, existing general I/O handlers remain effective while callers that
-want to retry this case can catch it explicitly.
+public `ConcurrentOperationError`. The active call is left intact. Treat the
+exception as a programming error: it is not a lock, and catching it in a retry
+loop is not supported synchronization. Separate handles may progress
+concurrently because they do not share gzip or buffer state.
+
+When several tasks intentionally share a handle, use an application lock that
+covers the complete logical operation, not only the first low-level call:
+
+```python
+import asyncio
+
+lock = asyncio.Lock()
+
+async with lock:
+    batch = await stream.readlines(1024 * 1024)
+```
 
 The reservation covers text already decoded into the wrapper's buffer as well
 as binary codec work. Composite `readlines()`, `writelines()`, and write-mode
@@ -66,6 +78,10 @@ open so `close()` can be retried.
 
 Cancellation while a clean context exit is waiting for an active call also
 attempts abortive owned-resource cleanup before the cancellation propagates.
+
+The maintained examples avoid same-handle overlap entirely: each shard task
+owns a separate file handle, and each transport codec operation is exhausted
+before the next begins.
 
 ## Telling the decompression cap apart from corruption
 
@@ -104,6 +120,39 @@ is exhausted. `verify()` and `inspect()` scan the whole stream eagerly and
 raise before returning a result. See
 [Processing untrusted gzip input](recipes.md#processing-untrusted-gzip-input)
 for a full defensive-reading recipe.
+
+## Recovery data after an integrity failure
+
+High-level binary and text readers distinguish clean EOF from a poisoned
+terminal state. Their integrity-failure lifecycle is:
+
+```text
+healthy
+  -> integrity failure raised
+  -> previously decoded recovery data may remain readable
+  -> recovery data is drained
+  -> stable terminal OSError
+
+rewindable source:
+  absolute seek(0) may construct a fresh decoder and recover
+
+non-rewindable source:
+  close and reopen/recreate the source
+```
+
+Recovery data is not proof that its gzip member is valid. Deflate output can
+be emitted before a later CRC-32 or `ISIZE` trailer check fails, so applications
+must not publish or trust that member's bytes merely because they were
+readable. When codec metadata collection is enabled, trailer-validated prior
+members remain in `GzipDecoder.members`; the failing member is absent. Those
+records validate only the completed prefix, not the full concatenated stream.
+
+After the recovery buffer is empty, later reads raise the same terminal
+`OSError` instead of returning clean EOF. An absolute `seek(0)` can rebuild the
+decoder only when the source can rewind (directly or through its replay cache).
+Close and recreate a non-rewindable source. Decompression-limit failures,
+cancellation, and unexpected internal failures poison the reader without
+automatically enabling the integrity-failure salvage path.
 
 ## Codec finalization and operation abandonment
 

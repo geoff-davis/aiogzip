@@ -35,6 +35,12 @@ All notable changes to this project will be documented in this file.
   truthy or falsy objects now raise a parameter-specific `TypeError` before
   files, engines, warnings, source iterators, or codec operations are touched.
 
+- Expanded stable guidance for single-task handle ownership, application-lock
+  scope, integrity-failure recovery data, strict Boolean migration, and the
+  unchanged same-call tiny-write contract. Both maintained examples now have
+  clean-checkout and wheel-installed run instructions and clearly distinguish
+  application helpers from public aiogzip API.
+
 ## [2.0.0a3] - 2026-08-16
 
 ### Added
