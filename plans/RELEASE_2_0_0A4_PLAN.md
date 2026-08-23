@@ -1481,12 +1481,12 @@ This function belongs in the example, not `src/aiogzip/`.
 
 Validation requirements:
 
-- [ ] `concurrency` is a positive integer and rejects booleans.
-- [ ] limits are positive integers and reject booleans.
-- [ ] destination must not already exist.
-- [ ] input names are made deterministic in output metadata.
-- [ ] duplicate input paths are rejected or deliberately handled.
-- [ ] staging and final directories share a parent filesystem.
+- [x] `concurrency` is a positive integer and rejects booleans.
+- [x] limits are positive integers and reject booleans.
+- [x] destination must not already exist.
+- [x] input names are made deterministic in output metadata.
+- [x] duplicate input paths are rejected or deliberately handled.
+- [x] staging and final directories share a parent filesystem.
 
 ### 10.5 Concurrency model
 
@@ -1494,14 +1494,14 @@ Use `asyncio.TaskGroup` plus a semaphore or a fixed worker set.
 
 Requirements:
 
-- [ ] At most `concurrency` gzip handles are active.
-- [ ] Every active shard has exactly one owning task.
-- [ ] One aiogzip handle is never shared across tasks.
-- [ ] No unbounded decompressed-data queue exists.
-- [ ] A slow shard cannot monopolize a shared handle or lock.
-- [ ] A failure in one shard cancels sibling work through structured concurrency.
-- [ ] Cancellation cleanup waits for owned async operations and closes handles.
-- [ ] No background task survives function return.
+- [x] At most `concurrency` gzip handles are active.
+- [x] Every active shard has exactly one owning task.
+- [x] One aiogzip handle is never shared across tasks.
+- [x] No unbounded decompressed-data queue exists.
+- [x] A slow shard cannot monopolize a shared handle or lock.
+- [x] A failure in one shard cancels sibling work through structured concurrency.
+- [x] Cancellation cleanup waits for owned async operations and closes handles.
+- [x] No background task survives function return.
 
 A semaphore around the whole per-shard operation is acceptable. Creating one lightweight task per known input is acceptable for the small maintained example; document that very large input sets may use a fixed worker pool.
 
@@ -1524,14 +1524,14 @@ async with aiogzip.open(
 
 Requirements:
 
-- [ ] Use `iter_batches()` or the established bounded `readlines(hint)` pattern.
-- [ ] Do not use one `await` per line in the hot path.
-- [ ] Parse each line as JSON to prove record boundaries are intact.
-- [ ] Write decoded bytes to a per-shard staged output.
-- [ ] Update digest and row count incrementally.
-- [ ] Do not retain all rows in memory.
-- [ ] Treat normal exhaustion as the gzip validation boundary.
-- [ ] Do not publish a shard merely because decoded bytes were produced.
+- [x] Use `iter_batches()` or the established bounded `readlines(hint)` pattern.
+- [x] Do not use one `await` per line in the hot path.
+- [x] Parse each line as JSON to prove record boundaries are intact.
+- [x] Write decoded bytes to a per-shard staged output.
+- [x] Update digest and row count incrementally.
+- [x] Do not retain all rows in memory.
+- [x] Treat normal exhaustion as the gzip validation boundary.
+- [x] Do not publish a shard merely because decoded bytes were produced.
 
 ### 10.7 Dataset-wide budget
 
@@ -1555,12 +1555,12 @@ class DatasetBudget:
 
 Requirements:
 
-- [ ] Count exact encoded bytes written to staged outputs.
-- [ ] The first over-limit batch fails before publication.
-- [ ] A dataset-limit failure cancels siblings.
-- [ ] Per-shard aiogzip limits remain independently active.
-- [ ] The budget lock is held only for arithmetic, never file I/O or JSON parsing.
-- [ ] Tests cover two tasks racing near the limit.
+- [x] Count exact encoded bytes written to staged outputs.
+- [x] The first over-limit batch fails before publication.
+- [x] A dataset-limit failure cancels siblings.
+- [x] Per-shard aiogzip limits remain independently active.
+- [x] The budget lock is held only for arithmetic, never file I/O or JSON parsing.
+- [x] Tests cover two tasks racing near the limit.
 
 Do not expose this as an aiogzip API.
 
@@ -1584,17 +1584,17 @@ manifest.json
 
 Publication requirements:
 
-- [ ] The final destination does not exist during ingest.
-- [ ] Every shard writes only inside the staging directory.
-- [ ] Each staged output is closed before its result is accepted.
-- [ ] The manifest is generated only after all shard tasks succeed.
-- [ ] The manifest contains exact row counts, byte counts, digests, and source names.
-- [ ] The staging directory is renamed to the final destination once.
-- [ ] The rename is on the same filesystem.
-- [ ] A failure before rename leaves no final destination.
-- [ ] Cancellation removes the staging directory.
-- [ ] Cleanup is idempotent.
-- [ ] Cleanup errors do not replace the primary ingest error unless no primary error exists.
+- [x] The final destination does not exist during ingest.
+- [x] Every shard writes only inside the staging directory.
+- [x] Each staged output is closed before its result is accepted.
+- [x] The manifest is generated only after all shard tasks succeed.
+- [x] The manifest contains exact row counts, byte counts, digests, and source names.
+- [x] The staging directory is renamed to the final destination once.
+- [x] The rename is on the same filesystem.
+- [x] A failure before rename leaves no final destination.
+- [x] Cancellation removes the staging directory.
+- [x] Cleanup is idempotent.
+- [x] Cleanup errors do not replace the primary ingest error unless no primary error exists.
 
 If cross-platform directory replacement behavior requires the destination to be absent, enforce that precondition rather than adding complicated replacement semantics.
 
@@ -1602,93 +1602,93 @@ If cross-platform directory replacement behavior requires the destination to be 
 
 #### All valid
 
-- [ ] At least three gzip files are ingested concurrently.
-- [ ] Final destination appears only after all finish.
-- [ ] Row counts, byte counts, and digests match fixture metadata.
-- [ ] Output JSON Lines parse successfully.
-- [ ] Standard-library gzip can independently read each source fixture.
+- [x] At least three gzip files are ingested concurrently.
+- [x] Final destination appears only after all finish.
+- [x] Row counts, byte counts, and digests match fixture metadata.
+- [x] Output JSON Lines parse successfully.
+- [x] Standard-library gzip can independently read each source fixture.
 
 #### Corrupt CRC
 
-- [ ] Corrupt one shard's trailer CRC.
-- [ ] Other shards may make progress and write staged bytes.
-- [ ] The dataset is not published.
-- [ ] The staging directory is removed.
-- [ ] The primary exception identifies the failing shard.
+- [x] Corrupt one shard's trailer CRC.
+- [x] Other shards may make progress and write staged bytes.
+- [x] The dataset is not published.
+- [x] The staging directory is removed.
+- [x] The primary exception identifies the failing shard.
 
 #### Truncated stream
 
-- [ ] Truncate one shard in the header, body, or trailer in focused tests.
-- [ ] The dataset is not published.
-- [ ] No staged artifact leaks.
+- [x] Truncate one shard in the header, body, or trailer in focused tests.
+- [x] The dataset is not published.
+- [x] No staged artifact leaks.
 
 #### Per-shard limit
 
-- [ ] One valid high-ratio shard exceeds `max_decompressed_size`.
-- [ ] The limit failure aborts the dataset.
-- [ ] Output beyond the permitted limit is not published.
+- [x] One valid high-ratio shard exceeds `max_decompressed_size`.
+- [x] The limit failure aborts the dataset.
+- [x] Output beyond the permitted limit is not published.
 
 #### Dataset-wide limit
 
-- [ ] Individually valid shards fit their per-shard limits.
-- [ ] Their combined decoded size exceeds the global budget.
-- [ ] Exactly one budget failure becomes primary.
-- [ ] Siblings are cancelled and cleaned up.
+- [x] Individually valid shards fit their per-shard limits.
+- [x] Their combined decoded size exceeds the global budget.
+- [x] Exactly one budget failure becomes primary.
+- [x] Siblings are cancelled and cleaned up.
 
 #### Slow shard
 
-- [ ] One shard deliberately pauses between batches.
-- [ ] At least one healthy shard records completion progress before the slow shard resumes.
-- [ ] Final publication still waits for the slow shard.
-- [ ] The assertion uses events/progress logs rather than timing alone.
+- [x] One shard deliberately pauses between batches.
+- [x] At least one healthy shard records completion progress before the slow shard resumes.
+- [x] Final publication still waits for the slow shard.
+- [x] The assertion uses events/progress logs rather than timing alone.
 
 #### Cancellation
 
-- [ ] Cancel the top-level ingest after at least one staged write.
-- [ ] All shard tasks terminate.
-- [ ] Every aiogzip handle closes.
-- [ ] The staging directory is removed.
-- [ ] The final destination does not exist.
-- [ ] No “task was destroyed but pending” or resource warning appears.
+- [x] Cancel the top-level ingest after at least one staged write.
+- [x] All shard tasks terminate.
+- [x] Every aiogzip handle closes.
+- [x] The staging directory is removed.
+- [x] The final destination does not exist.
+- [x] No “task was destroyed but pending” or resource warning appears.
 
 #### Staged output failure
 
-- [ ] An example-local test hook fails a staged write after a deterministic byte count.
-- [ ] The triggering shard reports the write failure without publishing.
-- [ ] Sibling tasks settle or cancel through the documented `TaskGroup` policy.
-- [ ] Staging cleanup is attempted without masking the primary write error.
-- [ ] The production happy path does not carry an unnecessary failure-injection abstraction.
+- [x] An example-local test hook fails a staged write after a deterministic byte count.
+- [x] The triggering shard reports the write failure without publishing.
+- [x] Sibling tasks settle or cancel through the documented `TaskGroup` policy.
+- [x] Staging cleanup is attempted without masking the primary write error.
+- [x] The production happy path does not carry an unnecessary failure-injection abstraction.
 
 #### Invalid JSON
 
-- [ ] A gzip stream can be structurally valid but contain an invalid JSON line.
-- [ ] Application-level parsing failure aborts publication.
-- [ ] The example distinguishes gzip validity from application-data validity.
+- [x] A gzip stream can be structurally valid but contain an invalid JSON line.
+- [x] Application-level parsing failure aborts publication.
+- [x] The example distinguishes gzip validity from application-data validity.
 
 ### 10.10 Bounded-resource assertions
 
 Functional tests must assert bounded structure without brittle absolute memory thresholds:
 
-- [ ] Active handles never exceed configured concurrency.
-- [ ] Batch size remains bounded by the established approximate hint semantics.
-- [ ] No list of all decoded records is retained.
-- [ ] Staged output grows on disk rather than in memory.
-- [ ] Pending application data is at most one bounded batch per active shard plus small metadata.
-- [ ] No unbounded producer-consumer queue exists.
+- [x] Active handles never exceed configured concurrency.
+- [x] Batch size remains bounded by the established approximate hint semantics.
+- [x] No list of all decoded records is retained.
+- [x] Staged output grows on disk rather than in memory.
+- [x] Pending application data is at most one bounded batch per active shard plus small metadata.
+- [x] No unbounded producer-consumer queue exists.
 
 A separate diagnostic peak-allocation run may be recorded, but release success must not depend on a noisy microbenchmark for the example.
 
 ### 10.11 Type, package, and platform requirements
 
-- [ ] The example imports public aiogzip names only.
-- [ ] Mypy passes.
-- [ ] `ty` passes.
-- [ ] The example runs from a built wheel outside the source checkout.
-- [ ] The source distribution contains the example.
-- [ ] Paths and cleanup work on Linux, Windows, and macOS.
-- [ ] Tests do not assume POSIX-only path separators or open-file rename behavior.
-- [ ] Generated fixture sizes remain small enough for ordinary CI.
-- [ ] Larger demonstration sizes are optional CLI parameters, not CI defaults.
+- [x] The example imports public aiogzip names only.
+- [x] Mypy passes.
+- [x] `ty` passes.
+- [x] The example runs from a built wheel outside the source checkout.
+- [x] The source distribution contains the example.
+- [x] Paths and cleanup work on Linux, Windows, and macOS.
+- [x] Tests do not assume POSIX-only path separators or open-file rename behavior.
+- [x] Generated fixture sizes remain small enough for ordinary CI.
+- [x] Larger demonstration sizes are optional CLI parameters, not CI defaults.
 
 ### 10.12 Documentation requirements
 
@@ -1707,15 +1707,15 @@ Explain:
 
 WP4 is complete when:
 
-- [ ] valid concurrent ingest publishes exactly once;
-- [ ] corruption, truncation, limits, invalid JSON, and cancellation publish nothing;
-- [ ] staging cleanup is leak-free;
-- [ ] active concurrency is bounded;
-- [ ] slow-source progress is proven deterministically;
-- [ ] output digests and row counts match;
-- [ ] no private aiogzip API is used;
-- [ ] wheel/sdist execution and both type checkers pass;
-- [ ] integration feedback records any public API confusion or missing hook.
+- [x] valid concurrent ingest publishes exactly once;
+- [x] corruption, truncation, limits, invalid JSON, and cancellation publish nothing;
+- [x] staging cleanup is leak-free;
+- [x] active concurrency is bounded;
+- [x] slow-source progress is proven deterministically;
+- [x] output digests and row counts match;
+- [x] no private aiogzip API is used;
+- [x] wheel/sdist execution and both type checkers pass;
+- [x] integration feedback records any public API confusion or missing hook.
 
 Suggested commit or PR title:
 

@@ -11,6 +11,11 @@ All notable changes to this project will be documented in this file.
   length-prefixed frames. It demonstrates provisional JSONL visibility,
   verified completion, flush/backpressure behavior, arbitrary fragmentation,
   concatenated members, trailer failures, and explicit abandonment cleanup.
+- A maintained concurrent JSONL ingest example demonstrates one-handle-per-task
+  structured concurrency, bounded `iter_batches()` processing, independent
+  per-shard and dataset-wide limits, incremental application validation, and
+  sibling staging followed by one atomic dataset publication. Corruption,
+  truncation, invalid JSON, write failure, and cancellation publish nothing.
 
 ### Fixed
 

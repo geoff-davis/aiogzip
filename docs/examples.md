@@ -30,6 +30,37 @@ example illustrates these lifecycle and framing choices; it is not an official
 transport abstraction. The repository's `examples/README.md` has the focused
 scenario list.
 
+## Maintained concurrent JSONL ingest
+
+The staged-ingest example generates ordinary independent gzip files with the
+standard library, processes them through bounded `asyncio.TaskGroup`
+concurrency, and publishes one dataset only after every shard validates:
+
+```bash
+python examples/concurrent_jsonl_ingest.py \
+  --generate-fixtures ./demo-input \
+  --output ./demo-published
+```
+
+One task owns each handle; separate files can overlap without sharing mutable
+gzip state. The hot path uses `iter_batches()` rather than one await per JSON
+line, parses every line, updates counts and digests incrementally, and writes
+decoded bytes to per-shard files on disk. It retains only one approximate-hint
+batch per active shard, not the complete dataset or an unbounded queue.
+
+Decoded batches remain provisional until their gzip iterator reaches normal
+EOF. All output therefore stays in a unique sibling staging directory. After
+every shard succeeds, the example closes staged outputs, writes the complete
+manifest, and renames the directory to its final destination once. Corruption,
+truncation, per-shard or dataset-wide limits, invalid JSON, write failure, and
+cancellation remove staging and publish nothing.
+
+Per-shard limits bound each gzip expansion independently. The dataset budget
+atomically counts exact bytes written across all staged outputs while holding
+its lock only for arithmetic. Structurally valid gzip can still fail the
+application contract when a decoded line is invalid JSON. These are ordinary
+independent files, not a custom row-striped format.
+
 ## CSV Processing with `aiocsv`
 
 `aiogzip` pairs perfectly with `aiocsv` for efficient, asynchronous CSV processing.

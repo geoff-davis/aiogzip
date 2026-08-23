@@ -48,3 +48,41 @@ After those helpers were in place, no recurring ownership mistake, private
 aiogzip hook, lifecycle workaround, or unbounded queue was needed. Explicit
 provisional/verified state was the main application-level obligation exposed
 by the integration.
+
+## Concurrent staged JSONL ingest
+
+Generate three deterministic standard-library gzip shards, ingest them with
+bounded concurrency, and atomically publish a validated dataset:
+
+```bash
+python examples/concurrent_jsonl_ingest.py \
+  --generate-fixtures ./demo-input \
+  --output ./demo-published
+```
+
+Each input is an ordinary independent `.jsonl.gz` file owned by exactly one
+task and one aiogzip handle. `iter_batches()` amortizes async line overhead
+without retaining all records. Decoded bytes are parsed and written to a unique
+sibling staging directory, but remain provisional until normal gzip exhaustion.
+Only after every shard validates does the example write `manifest.json` and
+rename the complete staging directory once.
+
+The per-shard limit bounds one gzip expansion. The locked dataset budget counts
+exact bytes written across all staged outputs, holding its lock only for
+arithmetic. Invalid JSON is a separate application failure even when the gzip
+framing is valid. Any corruption, limit, write failure, cancellation, or JSON
+error cancels sibling work and removes staging without creating the final
+destination.
+
+Multiple independent files demonstrate useful async overlap; this is not a
+custom striped format. Creating one lightweight task per known shard keeps the
+example compact. Applications with very large input lists can use a fixed
+worker pool while retaining the same one-handle-per-task rule.
+
+### Ingest implementation feedback
+
+The high-level API needed no private hook: `iter_batches()`, normal context
+exit, decompression limits, `TaskGroup`, and application-owned staging were
+sufficient. The main integration obligation was recognizing that batch output
+is provisional until the iterator reaches normal EOF; atomic dataset
+publication belongs to application code, not aiogzip.
