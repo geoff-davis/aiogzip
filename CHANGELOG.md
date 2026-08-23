@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0a4] - 2026-08-23
+
 ### Added
 
 - A maintained, deterministic fragmented-transport example exercises the
@@ -848,6 +850,7 @@ All notable changes to this project will be documented in this file.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
 
 [Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a3...HEAD
+[2.0.0a4]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a3...v2.0.0a4
 [2.0.0a3]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a2...v2.0.0a3
 [2.0.0a2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a1...v2.0.0a2
 [2.0.0a1]: https://github.com/geoff-davis/aiogzip/compare/v1.11.0...v2.0.0a1

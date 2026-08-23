@@ -43,7 +43,7 @@ their import path; `aiogzip` resolves from the installed wheel.
 uv build
 python -m venv .venv-example
 .venv-example/bin/python -m pip install \
-  dist/aiogzip-2.0.0a4.dev0-py3-none-any.whl
+  dist/aiogzip-2.0.0a4-py3-none-any.whl
 .venv-example/bin/python examples/fragmented_transport.py --self-test
 .venv-example/bin/python examples/concurrent_jsonl_ingest.py \
   --generate-fixtures ./wheel-demo-input \
