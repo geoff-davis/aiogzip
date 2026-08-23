@@ -41,6 +41,14 @@ All notable changes to this project will be documented in this file.
   clean-checkout and wheel-installed run instructions and clearly distinguish
   application helpers from public aiogzip API.
 
+### Performance
+
+- Preserved the `2.0.0a3` direct-codec, scheduler, optional-header,
+  high-level, concurrent-stream, memory, and small-write regression gates.
+  The strict same-call write contract is unchanged; use `writelines()` or
+  explicit bounded batching for tiny records. No performance improvement is
+  claimed for this release.
+
 ## [2.0.0a3] - 2026-08-16
 
 ### Added

@@ -1,6 +1,7 @@
 # aiogzip 2.0.0a4 Integration and Beta-Readiness Release Plan
 
-> **Status:** Codex-ready implementation plan
+> **Status:** Local implementation candidate complete at `ed0fe74`; independent
+> human review, candidate platform CI, and release preparation remain pending
 > **Target release:** `2.0.0a4`
 > **Repository destination:** `plans/RELEASE_2_0_0A4_PLAN.md`
 > **Plan date:** 2026-08-17
@@ -1737,27 +1738,27 @@ WP4 complete.
 
 ### Example discoverability
 
-- [ ] Add a top-level `examples/README.md` explaining the maintained-example standard.
-- [ ] Link both examples from the repository README.
-- [ ] Link both examples from `docs/examples.md` or the equivalent recipes page.
-- [ ] Add examples to MkDocs navigation where appropriate.
-- [ ] Clearly label example-only helpers as application code, not aiogzip API.
-- [ ] State Python and optional dependency requirements.
-- [ ] Keep both required examples free of non-runtime dependencies beyond the project's existing development/test stack.
-- [ ] Provide exact run commands from a clean checkout and from a wheel-installed environment.
+- [x] Add a top-level `examples/README.md` explaining the maintained-example standard.
+- [x] Link both examples from the repository README.
+- [x] Link both examples from `docs/examples.md` or the equivalent recipes page.
+- [x] Add examples to MkDocs navigation where appropriate.
+- [x] Clearly label example-only helpers as application code, not aiogzip API.
+- [x] State Python and optional dependency requirements.
+- [x] Keep both required examples free of non-runtime dependencies beyond the project's existing development/test stack.
+- [x] Provide exact run commands from a clean checkout and from a wheel-installed environment.
 
 ### Concurrency guidance
 
 Add or update stable documentation to state:
 
-- [ ] one logical task owns one open handle at a time;
-- [ ] separate handles may progress concurrently;
-- [ ] `ConcurrentOperationError` reports misuse before state corruption;
-- [ ] it is not a lock and should not be used as retry-based synchronization;
-- [ ] serialize intentional shared access with an application lock covering the complete logical operation;
-- [ ] composite methods already reserve state across their complete internal work;
-- [ ] context exit and close have defined interaction with active operations;
-- [ ] examples intentionally avoid same-handle overlap.
+- [x] one logical task owns one open handle at a time;
+- [x] separate handles may progress concurrently;
+- [x] `ConcurrentOperationError` reports misuse before state corruption;
+- [x] it is not a lock and should not be used as retry-based synchronization;
+- [x] serialize intentional shared access with an application lock covering the complete logical operation;
+- [x] composite methods already reserve state across their complete internal work;
+- [x] context exit and close have defined interaction with active operations;
+- [x] examples intentionally avoid same-handle overlap.
 
 Include a compact example:
 
@@ -1790,31 +1791,31 @@ non-rewindable source:
 
 Document:
 
-- [ ] recovery data is not proof of member integrity;
-- [ ] a later CRC/ISIZE failure may invalidate confidence in bytes already emitted from that member;
-- [ ] validated prior members remain represented in `GzipDecoder.members` when collection is enabled;
-- [ ] the failing member is not represented as validated;
-- [ ] clean EOF and terminal poisoned state are distinct;
-- [ ] limits, cancellation, and unexpected internal failures do not automatically enable salvage.
+- [x] recovery data is not proof of member integrity;
+- [x] a later CRC/ISIZE failure may invalidate confidence in bytes already emitted from that member;
+- [x] validated prior members remain represented in `GzipDecoder.members` when collection is enabled;
+- [x] the failing member is not represented as validated;
+- [x] clean EOF and terminal poisoned state are distinct;
+- [x] limits, cancellation, and unexpected internal failures do not automatically enable salvage.
 
 ### Boolean migration guidance
 
-- [ ] List affected options.
-- [ ] Show valid exact Boolean values.
-- [ ] Show that integers and strings now raise `TypeError`.
-- [ ] Explain `closefd=None`.
-- [ ] State that the tightening occurs before beta to avoid freezing accidental coercion.
+- [x] List affected options.
+- [x] Show valid exact Boolean values.
+- [x] Show that integers and strings now raise `TypeError`.
+- [x] Explain `closefd=None`.
+- [x] State that the tightening occurs before beta to avoid freezing accidental coercion.
 
 ### Tiny-write disposition
 
 Prepare a local issue-disposition note containing:
 
-- [ ] exact `a3` and `a4` diagnostic results;
-- [ ] the retained same-call write contract;
-- [ ] why implicit cross-call buffering is not a transparent optimization;
-- [ ] `writelines()` and bounded batching guidance;
-- [ ] recommendation to close #86 as accepted for 2.0 or reframe it as an explicit future buffered-writer feature;
-- [ ] statement that Codex did not modify the remote issue.
+- [x] exact `a3` and `a4` diagnostic results;
+- [x] the retained same-call write contract;
+- [x] why implicit cross-call buffering is not a transparent optimization;
+- [x] `writelines()` and bounded batching guidance;
+- [x] recommendation to close #86 as accepted for 2.0 or reframe it as an explicit future buffered-writer feature;
+- [x] statement that Codex did not modify the remote issue.
 
 Suggested location:
 
@@ -1826,12 +1827,12 @@ plans/reviews/issue-86-a4-disposition.md
 
 After both required integrations pass, evaluate whether a concise HTTPX recipe materially improves documentation.
 
-- [ ] If added, keep it documentation-only or an optional example dependency.
-- [ ] Use `aiter_raw()` and `Accept-Encoding: identity` to avoid HTTP content-decoding ambiguity.
-- [ ] Stage output and promote only after normal iterator completion.
-- [ ] Do not add HTTPX to core runtime dependencies.
-- [ ] Do not let this optional work delay release.
-- [ ] If not added, record it as a post-2.0 recipe idea.
+- [x] If added, keep it documentation-only or an optional example dependency.
+- [x] Use `aiter_raw()` and `Accept-Encoding: identity` to avoid HTTP content-decoding ambiguity.
+- [x] Stage output and promote only after normal iterator completion.
+- [x] Do not add HTTPX to core runtime dependencies.
+- [x] Do not let this optional work delay release.
+- [x] If not added, record it as a post-2.0 recipe idea.
 
 ### Changelog tasks
 
@@ -1860,12 +1861,12 @@ Adjust commands to existing mypy/ty include conventions without weakening covera
 
 ### Exit criteria
 
-- [ ] Users can discover and run both examples.
-- [ ] concurrency and recovery behavior are explained outside release notes;
-- [ ] Boolean and metadata contracts are documented;
-- [ ] #86 has a complete local disposition;
-- [ ] docs build strictly;
-- [ ] no optional recipe has expanded required scope.
+- [x] Users can discover and run both examples.
+- [x] concurrency and recovery behavior are explained outside release notes;
+- [x] Boolean and metadata contracts are documented;
+- [x] #86 has a complete local disposition;
+- [x] docs build strictly;
+- [x] no optional recipe has expanded required scope.
 
 ### Suggested commits
 
@@ -1887,29 +1888,29 @@ WP5 complete.
 
 ### Boolean property tests
 
-- [ ] Generate arbitrary non-Boolean objects that must be rejected.
-- [ ] Test exact `True` and `False` across all applicable surfaces.
-- [ ] Test `closefd=None` separately.
-- [ ] Assert invalid values cause no file-system side effects.
-- [ ] Assert invalid values cause no warning side effects.
-- [ ] Assert exception type/message parity.
-- [ ] Assert direct constructors and factory helpers agree.
+- [x] Generate arbitrary non-Boolean objects that must be rejected.
+- [x] Test exact `True` and `False` across all applicable surfaces.
+- [x] Test `closefd=None` separately.
+- [x] Assert invalid values cause no file-system side effects.
+- [x] Assert invalid values cause no warning side effects.
+- [x] Assert exception type/message parity.
+- [x] Assert direct constructors and factory helpers agree.
 
 ### Member-retention property tests
 
 Generate concatenated streams with:
 
-- [ ] zero through many valid members;
-- [ ] random failure position;
-- [ ] CRC corruption;
-- [ ] ISIZE corruption;
-- [ ] body corruption;
-- [ ] truncated header/body/trailer;
-- [ ] optional fields;
-- [ ] NUL padding;
-- [ ] arbitrary compressed-input fragmentation;
-- [ ] arbitrary output chunk sizes;
-- [ ] stdlib zlib and zlib-ng.
+- [x] zero through many valid members;
+- [x] random failure position;
+- [x] CRC corruption;
+- [x] ISIZE corruption;
+- [x] body corruption;
+- [x] truncated header/body/trailer;
+- [x] optional fields;
+- [x] NUL padding;
+- [x] arbitrary compressed-input fragmentation;
+- [x] arbitrary output chunk sizes;
+- [x] stdlib zlib and zlib-ng.
 
 Invariants:
 
@@ -1926,73 +1927,73 @@ record order and offsets are monotonic
 
 Re-run and preserve tests for:
 
-- [ ] dropped unadvanced operation under `gc.disable()`;
-- [ ] dropped partially advanced operation under `gc.disable()`;
-- [ ] retained invalidated operation after discard;
-- [ ] operation close idempotence;
-- [ ] feed/start/flush/finish ordering;
-- [ ] feed after decoder finish;
-- [ ] bytes-subclass snapshot semantics;
-- [ ] hostile bytes subclass behavior;
-- [ ] thread-safety documentation assumptions;
-- [ ] engine retained-input fake matrix;
-- [ ] decompression limits at exact boundary;
-- [ ] CRC/ISIZE/FHCRC and reserved flags;
-- [ ] concatenated members and padding;
-- [ ] trailing junk and truncation;
-- [ ] source fragmentation independent of correctness.
+- [x] dropped unadvanced operation under `gc.disable()`;
+- [x] dropped partially advanced operation under `gc.disable()`;
+- [x] retained invalidated operation after discard;
+- [x] operation close idempotence;
+- [x] feed/start/flush/finish ordering;
+- [x] feed after decoder finish;
+- [x] bytes-subclass snapshot semantics;
+- [x] hostile bytes subclass behavior;
+- [x] thread-safety documentation assumptions;
+- [x] engine retained-input fake matrix;
+- [x] decompression limits at exact boundary;
+- [x] CRC/ISIZE/FHCRC and reserved flags;
+- [x] concatenated members and padding;
+- [x] trailing junk and truncation;
+- [x] source fragmentation independent of correctness.
 
 ### Existing high-level regression suites
 
 Re-run and preserve tests for:
 
-- [ ] live `mtime` across members;
-- [ ] rewind and reread `mtime`;
-- [ ] binary read/readline/readinto/peek/seek/tell;
-- [ ] text read/readline/readlines/iter_batches/tell/seek cookies;
-- [ ] text rollback after transient failure;
-- [ ] recovery data after validation failure;
-- [ ] stable terminal error after recovery drain;
-- [ ] cancellation poisoning;
-- [ ] absolute seek recovery on rewindable input;
-- [ ] non-rewindable guidance;
-- [ ] overlapping reads/writes/seeks/flushes/closes;
-- [ ] composite-operation ownership;
-- [ ] context-exit interaction;
-- [ ] partial sink writes;
-- [ ] same-call sink-error timing;
-- [ ] append and concatenated-member output;
-- [ ] external async file objects;
-- [ ] text encoding and newline modes.
+- [x] live `mtime` across members;
+- [x] rewind and reread `mtime`;
+- [x] binary read/readline/readinto/peek/seek/tell;
+- [x] text read/readline/readlines/iter_batches/tell/seek cookies;
+- [x] text rollback after transient failure;
+- [x] recovery data after validation failure;
+- [x] stable terminal error after recovery drain;
+- [x] cancellation poisoning;
+- [x] absolute seek recovery on rewindable input;
+- [x] non-rewindable guidance;
+- [x] overlapping reads/writes/seeks/flushes/closes;
+- [x] composite-operation ownership;
+- [x] context-exit interaction;
+- [x] partial sink writes;
+- [x] same-call sink-error timing;
+- [x] append and concatenated-member output;
+- [x] external async file objects;
+- [x] text encoding and newline modes.
 
 ### Integration stress variants
 
 Fragmented transport:
 
-- [ ] one-byte frames;
-- [ ] alternating 1/97-byte frames;
-- [ ] random deterministic frames;
-- [ ] empty record set;
-- [ ] Unicode records;
-- [ ] record larger than public output chunk;
-- [ ] cancellation during `drain()`;
-- [ ] cancellation during receive;
-- [ ] error during finalization.
+- [x] one-byte frames;
+- [x] alternating 1/97-byte frames;
+- [x] random deterministic frames;
+- [x] empty record set;
+- [x] Unicode records;
+- [x] record larger than public output chunk;
+- [x] cancellation during `drain()`;
+- [x] cancellation during receive;
+- [x] error during finalization.
 
 Concurrent ingest:
 
-- [ ] one shard;
-- [ ] three shards;
-- [ ] more shards than semaphore permits;
-- [ ] empty valid shard;
-- [ ] Unicode JSON;
-- [ ] very long line crossing batch hint;
-- [ ] final line with and without newline according to the chosen format policy;
-- [ ] deterministic delayed shard;
-- [ ] simultaneous failures, preserving a sensible primary/exception-group result;
-- [ ] cancellation during input read;
-- [ ] cancellation during output write;
-- [ ] cleanup on Windows-compatible path behavior.
+- [x] one shard;
+- [x] three shards;
+- [x] more shards than semaphore permits;
+- [x] empty valid shard;
+- [x] Unicode JSON;
+- [x] very long line crossing batch hint;
+- [x] final line with and without newline according to the chosen format policy;
+- [x] deterministic delayed shard;
+- [x] simultaneous failures, preserving a sensible primary/exception-group result;
+- [x] cancellation during input read;
+- [x] cancellation during output write;
+- [x] cleanup on Windows-compatible path behavior.
 
 ### Engine matrix
 
@@ -2007,8 +2008,8 @@ stdlib zlib forced while zlib-ng is installed
 - [ ] direct codec tests pass in all modes;
 - [ ] high-level tests pass in all modes;
 - [ ] integrations pass in all modes where compression output differences are not asserted byte-for-byte;
-- [ ] reproducible-byte assertions pin engine choice explicitly;
-- [ ] no test accidentally depends on the installed optional engine.
+- [x] reproducible-byte assertions pin engine choice explicitly;
+- [x] no test accidentally depends on the installed optional engine.
 
 ### Interpreter/platform matrix
 
@@ -2027,21 +2028,21 @@ Codex may prepare workflow changes only if current CI cannot exercise the exampl
 
 ### Coverage
 
-- [ ] Preserve at least the existing 85% floor.
-- [ ] Cover every new validator branch.
-- [ ] Cover metadata retention after each failure category.
-- [ ] Cover both example success paths.
-- [ ] Cover example cleanup and cancellation paths.
-- [ ] Do not exclude examples merely to make coverage pass if they are claimed as maintained integration code.
+- [x] Preserve at least the existing 85% floor.
+- [x] Cover every new validator branch.
+- [x] Cover metadata retention after each failure category.
+- [x] Cover both example success paths.
+- [x] Cover example cleanup and cancellation paths.
+- [x] Do not exclude examples merely to make coverage pass if they are claimed as maintained integration code.
 
 ### Exit criteria
 
-- [ ] Randomized tests support the new invariants.
-- [ ] All `a3` lifecycle and recovery contracts remain passing.
-- [ ] Both engines agree.
+- [x] Randomized tests support the new invariants.
+- [x] All `a3` lifecycle and recovery contracts remain passing.
+- [x] Both engines agree.
 - [ ] Required interpreter/platform jobs pass.
-- [ ] No unresolved flaky timing assertion remains.
-- [ ] Coverage passes honestly.
+- [x] No unresolved flaky timing assertion remains.
+- [x] Coverage passes honestly.
 
 ### Suggested commits
 
@@ -2065,24 +2066,24 @@ WP6 complete.
 
 ### Final benchmark tasks
 
-- [ ] Freeze the candidate commit.
-- [ ] Run exact `a3` and candidate in an alternating or randomized order.
-- [ ] Run stdlib benchmark rows.
-- [ ] Run zlib-ng benchmark rows.
-- [ ] Run forced-stdlib rows where relevant.
-- [ ] Capture all individual samples.
-- [ ] Verify output hashes.
-- [ ] Record noise and interrupted runs.
-- [ ] Investigate every >5% slowdown.
-- [ ] Block every reproducible >10% slowdown.
-- [ ] Retain the 10-byte write diagnostic.
-- [ ] Retain direct decoder scaling.
-- [ ] Retain scheduler-gap measurements.
-- [ ] Retain optional-header measurements.
-- [ ] Retain concurrent independent-stream measurements.
-- [ ] Add informational integration memory/high-water records.
-- [ ] Write `plans/benchmarks/v2.0.0a4-candidate.md`.
-- [ ] Commit raw JSON.
+- [x] Freeze the candidate commit.
+- [x] Run exact `a3` and candidate in an alternating or randomized order.
+- [x] Run stdlib benchmark rows.
+- [x] Run zlib-ng benchmark rows.
+- [x] Run forced-stdlib rows where relevant.
+- [x] Capture all individual samples.
+- [x] Verify output hashes.
+- [x] Record noise and interrupted runs.
+- [x] Investigate every >5% slowdown.
+- [x] Block every reproducible >10% slowdown.
+- [x] Retain the 10-byte write diagnostic.
+- [x] Retain direct decoder scaling.
+- [x] Retain scheduler-gap measurements.
+- [x] Retain optional-header measurements.
+- [x] Retain concurrent independent-stream measurements.
+- [x] Add informational integration memory/high-water records.
+- [x] Write `plans/benchmarks/v2.0.0a4-candidate.md`.
+- [x] Commit raw JSON.
 
 ### Quality commands
 
@@ -2103,21 +2104,21 @@ Also run the repository's existing explicit engine-selection commands and platfo
 
 ### Packaging tasks
 
-- [ ] Remove old `dist/` contents.
-- [ ] Build wheel and source distribution using the established release command.
-- [ ] Run `twine check` or the repository's equivalent metadata check.
-- [ ] Record artifact filenames, sizes, and SHA-256 hashes.
-- [ ] Inspect wheel contents.
-- [ ] Confirm `py.typed` is present.
-- [ ] Confirm examples are not accidentally installed as aiogzip package modules unless intentionally configured.
-- [ ] Create a clean wheel environment.
-- [ ] Install only the wheel and required example test dependencies.
-- [ ] Run both examples with repository source removed from import paths.
-- [ ] Create a clean sdist environment.
-- [ ] Install the sdist.
-- [ ] Run representative library and example smoke tests.
-- [ ] Confirm Python 3.11 metadata and Alpha classifier.
-- [ ] Confirm version is still `2.0.0a4.dev0` until release-prep package.
+- [x] Remove old `dist/` contents.
+- [x] Build wheel and source distribution using the established release command.
+- [x] Run `twine check` or the repository's equivalent metadata check.
+- [x] Record artifact filenames, sizes, and SHA-256 hashes.
+- [x] Inspect wheel contents.
+- [x] Confirm `py.typed` is present.
+- [x] Confirm examples are not accidentally installed as aiogzip package modules unless intentionally configured.
+- [x] Create a clean wheel environment.
+- [x] Install only the wheel and required example test dependencies.
+- [x] Run both examples with repository source removed from import paths.
+- [x] Create a clean sdist environment.
+- [x] Install the sdist.
+- [x] Run representative library and example smoke tests.
+- [x] Confirm Python 3.11 metadata and Alpha classifier.
+- [x] Confirm version is still `2.0.0a4.dev0` until release-prep package.
 
 ### Review packet
 
@@ -2164,11 +2165,11 @@ Reviewer checklist:
 
 ### Exit criteria
 
-- [ ] Candidate benchmarks pass.
-- [ ] All quality commands pass.
-- [ ] Wheel and sdist install cleanly.
-- [ ] Both examples run from the wheel.
-- [ ] Artifact hashes are recorded.
+- [x] Candidate benchmarks pass.
+- [x] All quality commands pass.
+- [x] Wheel and sdist install cleanly.
+- [x] Both examples run from the wheel.
+- [x] Artifact hashes are recorded.
 - [ ] Independent review is completed and blocking findings resolved.
 - [ ] No material lifecycle redesign is requested.
 
@@ -2370,15 +2371,15 @@ Preserve combinations for:
 
 ### 15.6 Packaging and typing
 
-- [ ] source checkout tests;
-- [ ] wheel-installed library tests;
-- [ ] sdist-installed smoke tests;
-- [ ] mypy for public examples;
-- [ ] `ty` for public examples;
-- [ ] docs code snippets or example imports execute;
-- [ ] `py.typed` shipped;
-- [ ] no private import in examples;
-- [ ] no accidental runtime dependency added.
+- [x] source checkout tests;
+- [x] wheel-installed library tests;
+- [x] sdist-installed smoke tests;
+- [x] mypy for public examples;
+- [x] `ty` for public examples;
+- [x] docs code snippets or example imports execute;
+- [x] `py.typed` shipped;
+- [x] no private import in examples;
+- [x] no accidental runtime dependency added.
 
 ---
 
@@ -2386,79 +2387,79 @@ Preserve combinations for:
 
 ### 16.1 Correctness — hard blockers
 
-- [ ] Every existing `a3` test remains passing.
-- [ ] Invalid Boolean values fail before side effects.
-- [ ] Completed member records survive later failure and discard.
-- [ ] Invalid/incomplete members are never retained as validated.
-- [ ] CRC, ISIZE, FHCRC, flags, limits, padding, and trailing-data behavior remain intact.
-- [ ] Same-handle overlap remains deterministic and non-mutating.
-- [ ] Recovery-data and terminal-error sequencing remain intact.
-- [ ] Both examples pass success and failure tests.
-- [ ] Failed ingest never publishes a manifest or dataset.
+- [x] Every existing `a3` test remains passing.
+- [x] Invalid Boolean values fail before side effects.
+- [x] Completed member records survive later failure and discard.
+- [x] Invalid/incomplete members are never retained as validated.
+- [x] CRC, ISIZE, FHCRC, flags, limits, padding, and trailing-data behavior remain intact.
+- [x] Same-handle overlap remains deterministic and non-mutating.
+- [x] Recovery-data and terminal-error sequencing remain intact.
+- [x] Both examples pass success and failure tests.
+- [x] Failed ingest never publishes a manifest or dataset.
 
 ### 16.2 Architecture — hard blockers
 
-- [ ] No second gzip parser or codec state machine is introduced.
-- [ ] No public example imports private modules.
-- [ ] No background queue or whole-stream materialization is introduced.
-- [ ] No default cross-call writer buffering is introduced.
-- [ ] No example-specific helper moves into public package API.
-- [ ] The direct codec ownership model remains unchanged.
-- [ ] The immutable-span and cooperative-scheduling architecture remains unchanged.
+- [x] No second gzip parser or codec state machine is introduced.
+- [x] No public example imports private modules.
+- [x] No background queue or whole-stream materialization is introduced.
+- [x] No default cross-call writer buffering is introduced.
+- [x] No example-specific helper moves into public package API.
+- [x] The direct codec ownership model remains unchanged.
+- [x] The immutable-span and cooperative-scheduling architecture remains unchanged.
 
 ### 16.3 Performance and memory — hard blockers
 
-- [ ] Every comparable representative row is within 10% of exact `a3` after controlled rerun.
-- [ ] Every slowdown over 5% has a written investigation.
-- [ ] The 10-byte write row is no more than 10% slower than exact `a3`.
-- [ ] Direct decoder scaling remains linear under existing gates.
-- [ ] Scheduler gap remains within existing gates.
-- [ ] Optional-header memory and scaling remain within existing gates.
-- [ ] Collection-disabled many-member decoding does not allocate retained member records.
-- [ ] Examples satisfy their boundedness/high-water assertions.
+- [x] Every comparable representative row is within 10% of exact `a3` after controlled rerun.
+- [x] Every slowdown over 5% has a written investigation.
+- [x] The 10-byte write row is no more than 10% slower than exact `a3`.
+- [x] Direct decoder scaling remains linear under existing gates.
+- [x] Scheduler gap remains within existing gates.
+- [x] Optional-header memory and scaling remain within existing gates.
+- [x] Collection-disabled many-member decoding does not allocate retained member records.
+- [x] Examples satisfy their boundedness/high-water assertions.
 
 ### 16.4 Integration — hard blockers
 
-- [ ] Two maintained integrations exist.
-- [ ] One uses the public direct codec.
-- [ ] One uses high-level async file APIs with independent concurrent handles.
-- [ ] Both run from a built wheel.
-- [ ] Both pass mypy and `ty`.
-- [ ] Both include corruption or truncation.
-- [ ] Both include cancellation/cleanup coverage.
-- [ ] Neither needs private hooks.
-- [ ] Integration ergonomics reveal no unresolved recurring lifecycle problem.
+- [x] Two maintained integrations exist.
+- [x] One uses the public direct codec.
+- [x] One uses high-level async file APIs with independent concurrent handles.
+- [x] Both run from a built wheel.
+- [x] Both pass mypy and `ty`.
+- [x] Both include corruption or truncation.
+- [x] Both include cancellation/cleanup coverage.
+- [x] Neither needs private hooks.
+- [x] Integration ergonomics reveal no unresolved recurring lifecycle problem.
 
 ### 16.5 API and documentation — hard blockers
 
-- [ ] Boolean behavior is consistent and documented.
-- [ ] Metadata-after-failure/discard behavior is documented.
-- [ ] `ConcurrentOperationError` guidance is stable.
-- [ ] Recovery-data guidance is stable.
-- [ ] Tiny-write disposition is recorded.
-- [ ] Changelog links are correct.
-- [ ] The `a3` plan is honestly closed out.
-- [ ] Codec remains labeled provisional during `a4`.
+- [x] Boolean behavior is consistent and documented.
+- [x] Metadata-after-failure/discard behavior is documented.
+- [x] `ConcurrentOperationError` guidance is stable.
+- [x] Recovery-data guidance is stable.
+- [x] Tiny-write disposition is recorded.
+- [x] Changelog links are correct.
+- [x] The `a3` plan is honestly closed out.
+- [x] Codec remains labeled provisional during `a4`.
 
 ### 16.6 Quality and packaging — hard blockers
 
-- [ ] Ruff lint passes.
-- [ ] Ruff formatting check passes.
-- [ ] mypy passes.
-- [ ] `ty` passes.
-- [ ] hooks pass.
-- [ ] coverage floor passes.
-- [ ] strict documentation build passes.
+- [x] Ruff lint passes.
+- [x] Ruff formatting check passes.
+- [x] mypy passes.
+- [x] `ty` passes.
+- [x] hooks pass.
+- [x] coverage floor passes.
+- [x] strict documentation build passes.
 - [ ] Python 3.11–3.14 Linux jobs pass.
 - [ ] representative Windows job passes.
 - [ ] representative macOS job passes.
-- [ ] stdlib zlib passes.
-- [ ] zlib-ng passes.
-- [ ] forced stdlib with zlib-ng installed passes.
-- [ ] wheel builds and installs.
-- [ ] sdist builds and installs.
-- [ ] package metadata check passes.
-- [ ] artifact hashes are recorded.
+- [x] stdlib zlib passes.
+- [x] zlib-ng passes.
+- [x] forced stdlib with zlib-ng installed passes.
+- [x] wheel builds and installs.
+- [x] sdist builds and installs.
+- [x] package metadata check passes.
+- [x] artifact hashes are recorded.
 
 ### 16.7 Review — hard blockers
 
@@ -2957,27 +2958,27 @@ Advance `main` to `2.0.0b1.dev0` only if all conditions below are true:
 
 ### Integration criteria
 
-- [ ] Both maintained examples work from the built wheel.
-- [ ] Neither requires private hooks.
-- [ ] Neither reveals recurring operation-ownership confusion.
-- [ ] Cancellation and cleanup behavior is practical.
-- [ ] Integrity-at-completion is expressible without workaround.
+- [x] Both maintained examples work from the built wheel.
+- [x] Neither requires private hooks.
+- [x] Neither reveals recurring operation-ownership confusion.
+- [x] Cancellation and cleanup behavior is practical.
+- [x] Integrity-at-completion is expressible without workaround.
 - [ ] At least one reviewer or user other than the implementation author ran the examples.
 
 ### Contract criteria
 
-- [ ] Exact Boolean behavior is settled.
-- [ ] Metadata terminal behavior is settled.
-- [ ] `CodecOperation` ownership remains acceptable.
-- [ ] No pull-style redesign is expected.
-- [ ] No material exception-timing change is expected.
-- [ ] Same-handle overlap behavior is stable.
-- [ ] Recovery-data semantics are stable.
+- [x] Exact Boolean behavior is settled.
+- [x] Metadata terminal behavior is settled.
+- [x] `CodecOperation` ownership remains acceptable.
+- [x] No pull-style redesign is expected.
+- [x] No material exception-timing change is expected.
+- [x] Same-handle overlap behavior is stable.
+- [x] Recovery-data semantics are stable.
 
 ### Quality criteria
 
-- [ ] No critical correctness issue is open.
-- [ ] No reproducible performance gate fails.
+- [x] No critical correctness issue is open.
+- [x] No reproducible performance gate fails.
 - [ ] Full engine and platform matrix passes.
 - [ ] Independent human review approves the candidate.
 - [ ] Packaging and provenance are sound.
@@ -3080,29 +3081,29 @@ artifact hashes, or review evidence.
 
 `2.0.0a4` is ready for maintainer publication only when:
 
-- [ ] exact starting SHAs were verified;
-- [ ] exact `a3` baselines were captured before production changes;
-- [ ] changelog comparison links are correct;
-- [ ] the `a3` plan has an honest closeout;
-- [ ] exact Boolean validation is implemented across every applicable public surface;
-- [ ] invalid Boolean values cause no side effects;
-- [ ] completed member metadata survives later failure and discard;
-- [ ] failing members never appear as validated;
-- [ ] transient decoder state is still released;
-- [ ] the fragmented transport example is public-only, bounded, typed, tested, and wheel-run;
-- [ ] the concurrent staged ingest example is public-only, bounded, atomic, typed, tested, and wheel-run;
-- [ ] corruption, truncation, limits, staged-write failure, cancellation, and cleanup are demonstrated;
-- [ ] no required example introduces a runtime dependency;
-- [ ] tiny-write semantics remain unchanged and #86 has a local disposition;
-- [ ] concurrency and recovery-data guidance is stable;
-- [ ] every `a3` correctness and lifecycle suite passes;
-- [ ] every comparable performance row is within the release policy;
-- [ ] stdlib, zlib-ng, and forced-stdlib engine modes pass;
+- [x] exact starting SHAs were verified;
+- [x] exact `a3` baselines were captured before production changes;
+- [x] changelog comparison links are correct;
+- [x] the `a3` plan has an honest closeout;
+- [x] exact Boolean validation is implemented across every applicable public surface;
+- [x] invalid Boolean values cause no side effects;
+- [x] completed member metadata survives later failure and discard;
+- [x] failing members never appear as validated;
+- [x] transient decoder state is still released;
+- [x] the fragmented transport example is public-only, bounded, typed, tested, and wheel-run;
+- [x] the concurrent staged ingest example is public-only, bounded, atomic, typed, tested, and wheel-run;
+- [x] corruption, truncation, limits, staged-write failure, cancellation, and cleanup are demonstrated;
+- [x] no required example introduces a runtime dependency;
+- [x] tiny-write semantics remain unchanged and #86 has a local disposition;
+- [x] concurrency and recovery-data guidance is stable;
+- [x] every `a3` correctness and lifecycle suite passes;
+- [x] every comparable performance row is within the release policy;
+- [x] stdlib, zlib-ng, and forced-stdlib engine modes pass;
 - [ ] Python 3.11–3.14 and representative Windows/macOS/Linux jobs pass;
-- [ ] lint, format, mypy, `ty`, coverage, docs, and hooks pass;
-- [ ] wheel and sdist build, install, and run examples cleanly;
-- [ ] artifact hashes are recorded;
+- [x] lint, format, mypy, `ty`, coverage, docs, and hooks pass;
+- [x] wheel and sdist build, install, and run examples cleanly;
+- [x] artifact hashes are recorded;
 - [ ] an independent human reviewer approves the candidate;
-- [ ] release notes remain accurate and Alpha-labelled;
-- [ ] maintainer-only publication steps are documented but not performed by Codex;
+- [x] release notes remain accurate and Alpha-labelled;
+- [x] maintainer-only publication steps are documented but not performed by Codex;
 - [ ] the post-release beta-versus-alpha decision is based on section 22 evidence.
