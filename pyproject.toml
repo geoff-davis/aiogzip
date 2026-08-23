@@ -81,6 +81,7 @@ include = [
     "mkdocs.yml",
     "benchmarks/",
     "docs/",
+    "examples/",
     "scripts/",
     "tests/",
 ]

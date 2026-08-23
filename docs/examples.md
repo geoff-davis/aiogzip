@@ -2,6 +2,34 @@
 
 This guide provides practical examples for using `aiogzip` in various scenarios.
 
+## Maintained fragmented-transport example
+
+The repository includes a deterministic, credential-free demonstration of the
+public `GzipEncoder`, `GzipDecoder`, and `CodecOperation` APIs over a bounded
+local bidirectional asyncio byte transport. Its application-level two-byte
+length prefix makes gzip fragmentation explicit instead of incorrectly relying
+on TCP packet boundaries:
+
+```bash
+python examples/fragmented_transport.py
+python examples/fragmented_transport.py --self-test
+```
+
+The sender exhausts `start()`, every `feed()`, every low-latency `flush()`, and
+`finish()` in order. If an operation is abandoned, it calls
+`operation.close()`; codec-wide `discard()` provides idempotent terminal
+cleanup. The receiver parses JSON Lines incrementally but labels records
+`receiving-provisional` until `GzipDecoder.finish()` proves the final trailer
+and changes the status to `verified`.
+
+Calling `flush()` after each record improves visibility latency at the cost of
+compression efficiency. One long-lived member preserves compression context
+but has one final validation boundary; member-per-batch designs validate more
+often while paying for extra headers, trailers, and compression resets. The
+example illustrates these lifecycle and framing choices; it is not an official
+transport abstraction. The repository's `examples/README.md` has the focused
+scenario list.
+
 ## CSV Processing with `aiocsv`
 
 `aiogzip` pairs perfectly with `aiocsv` for efficient, asynchronous CSV processing.

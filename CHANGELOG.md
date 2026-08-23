@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- A maintained, deterministic fragmented-transport example exercises the
+  public sans-I/O encoder, decoder, and operation lifecycle over explicit
+  length-prefixed frames. It demonstrates provisional JSONL visibility,
+  verified completion, flush/backpressure behavior, arbitrary fragmentation,
+  concatenated members, trailer failures, and explicit abandonment cleanup.
+
 ### Fixed
 
 - `GzipDecoder.members` now retains immutable records for earlier

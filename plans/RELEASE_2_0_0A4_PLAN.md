@@ -1246,18 +1246,18 @@ Do not rely on TCP packet boundaries, which applications cannot observe reliably
 
 The sender must:
 
-- [ ] construct `aiogzip.GzipEncoder` through the public API;
-- [ ] set `mtime=0` for deterministic output;
-- [ ] optionally set a small original filename;
-- [ ] exhaust `start()` before calling another codec method;
-- [ ] encode a deterministic sequence of JSON Lines records;
-- [ ] exhaust each `feed()` operation;
-- [ ] call and exhaust `flush()` after each record or small batch to demonstrate low-latency visibility;
-- [ ] exhaust `finish()` on the successful path;
-- [ ] fragment every emitted codec chunk into transport frames;
-- [ ] apply backpressure with `await writer.drain()` or an equivalent transport await;
-- [ ] close or discard codec work explicitly on failure;
-- [ ] never begin a second codec operation while one remains active.
+- [x] construct `aiogzip.GzipEncoder` through the public API;
+- [x] set `mtime=0` for deterministic output;
+- [x] optionally set a small original filename;
+- [x] exhaust `start()` before calling another codec method;
+- [x] encode a deterministic sequence of JSON Lines records;
+- [x] exhaust each `feed()` operation;
+- [x] call and exhaust `flush()` after each record or small batch to demonstrate low-latency visibility;
+- [x] exhaust `finish()` on the successful path;
+- [x] fragment every emitted codec chunk into transport frames;
+- [x] apply backpressure with `await writer.drain()` or an equivalent transport await;
+- [x] close or discard codec work explicitly on failure;
+- [x] never begin a second codec operation while one remains active.
 
 Provide one small public-only helper with lifecycle-safe behavior, for example:
 
@@ -1281,16 +1281,16 @@ The exact helper may differ, but early abandonment must be explicit and type-che
 
 The receiver must:
 
-- [ ] construct `aiogzip.GzipDecoder` through the public API;
-- [ ] read exact application frames;
-- [ ] call `feed(frame)` for arbitrary frame boundaries;
-- [ ] exhaust each returned `CodecOperation` before accepting the next frame;
-- [ ] assemble and parse complete JSON Lines records incrementally;
-- [ ] expose records as **provisional** while the final gzip trailer is unavailable;
-- [ ] call and exhaust `finish()` after clean transport completion;
-- [ ] change status to **verified** only after `finish()` succeeds;
-- [ ] discard the decoder on error or early exit;
-- [ ] distinguish transport EOF from verified gzip completion.
+- [x] construct `aiogzip.GzipDecoder` through the public API;
+- [x] read exact application frames;
+- [x] call `feed(frame)` for arbitrary frame boundaries;
+- [x] exhaust each returned `CodecOperation` before accepting the next frame;
+- [x] assemble and parse complete JSON Lines records incrementally;
+- [x] expose records as **provisional** while the final gzip trailer is unavailable;
+- [x] call and exhaust `finish()` after clean transport completion;
+- [x] change status to **verified** only after `finish()` succeeds;
+- [x] discard the decoder on error or early exit;
+- [x] distinguish transport EOF from verified gzip completion.
 
 The displayed or returned status model must use explicit states such as:
 
@@ -1309,70 +1309,70 @@ The executable example must support at least:
 
 #### Successful stream
 
-- [ ] Ten or more deterministic JSON records arrive incrementally.
-- [ ] At least one record becomes visible before the sender finishes.
-- [ ] The final status is verified.
-- [ ] The record count and digest match the source.
-- [ ] Standard-library `gzip.decompress()` accepts the captured wire stream.
+- [x] Ten or more deterministic JSON records arrive incrementally.
+- [x] At least one record becomes visible before the sender finishes.
+- [x] The final status is verified.
+- [x] The record count and digest match the source.
+- [x] Standard-library `gzip.decompress()` accepts the captured wire stream.
 
 #### Truncated trailer
 
-- [ ] The sender or fixture omits part of the final trailer.
-- [ ] Some provisional records may have arrived.
-- [ ] `finish()` raises the established gzip error.
-- [ ] Final status is invalid, never verified.
-- [ ] The example explains that previously displayed payload was provisional.
+- [x] The sender or fixture omits part of the final trailer.
+- [x] Some provisional records may have arrived.
+- [x] `finish()` raises the established gzip error.
+- [x] Final status is invalid, never verified.
+- [x] The example explains that previously displayed payload was provisional.
 
 #### Corrupt trailer
 
-- [ ] Corrupt CRC in one run.
-- [ ] Corrupt ISIZE in another focused test.
-- [ ] Decoder rejects the stream.
-- [ ] No full-stream-valid claim is emitted.
+- [x] Corrupt CRC in one run.
+- [x] Corrupt ISIZE in another focused test.
+- [x] Decoder rejects the stream.
+- [x] No full-stream-valid claim is emitted.
 
 #### Early consumer abandonment
 
-- [ ] Stop while a codec operation remains unexhausted.
-- [ ] Call `operation.close()`.
-- [ ] Prove the codec becomes unusable as documented.
-- [ ] Prove codec-wide `discard()` is idempotent cleanup.
+- [x] Stop while a codec operation remains unexhausted.
+- [x] Call `operation.close()`.
+- [x] Prove the codec becomes unusable as documented.
+- [x] Prove codec-wide `discard()` is idempotent cleanup.
 
 #### Retained invalidated operation
 
-- [ ] Retain an operation object.
-- [ ] Call `decoder.discard()` or `encoder.discard()`.
-- [ ] Advancing the retained operation raises `RuntimeError`.
-- [ ] No bytes are emitted after invalidation.
+- [x] Retain an operation object.
+- [x] Call `decoder.discard()` or `encoder.discard()`.
+- [x] Advancing the retained operation raises `RuntimeError`.
+- [x] No bytes are emitted after invalidation.
 
 ### 9.7 Frame-invariance tests
 
 Use the same logical payload with:
 
-- [ ] one frame containing the complete wire stream;
-- [ ] one-byte frames;
-- [ ] repeating 1–97-byte frames;
-- [ ] pseudo-random deterministic frames;
-- [ ] boundaries exactly before and after the eight-byte trailer;
-- [ ] boundaries inside optional filename data;
-- [ ] empty frames handled according to the example protocol without calling `feed(b"")` unnecessarily.
+- [x] one frame containing the complete wire stream;
+- [x] one-byte frames;
+- [x] repeating 1–97-byte frames;
+- [x] pseudo-random deterministic frames;
+- [x] boundaries exactly before and after the eight-byte trailer;
+- [x] boundaries inside optional filename data;
+- [x] empty frames handled according to the example protocol without calling `feed(b"")` unnecessarily.
 
 For every valid fragmentation:
 
-- [ ] decoded bytes are identical;
-- [ ] member counts are identical;
-- [ ] final verification result is identical;
-- [ ] no operation-ownership error occurs.
+- [x] decoded bytes are identical;
+- [x] member counts are identical;
+- [x] final verification result is identical;
+- [x] no operation-ownership error occurs.
 
 ### 9.8 Type and packaging requirements
 
-- [ ] The example imports only public aiogzip names.
-- [ ] No `src.aiogzip` or package-private import appears.
-- [ ] Mypy passes on the example.
-- [ ] `ty` passes on the example.
-- [ ] The example runs against a built wheel from outside the checkout source path.
-- [ ] The source distribution contains the example.
-- [ ] `--help` exits successfully without network access.
-- [ ] `--self-test` is deterministic.
+- [x] The example imports only public aiogzip names.
+- [x] No `src.aiogzip` or package-private import appears.
+- [x] Mypy passes on the example.
+- [x] `ty` passes on the example.
+- [x] The example runs against a built wheel from outside the checkout source path.
+- [x] The source distribution contains the example.
+- [x] `--help` exits successfully without network access.
+- [x] `--self-test` is deterministic.
 
 ### 9.9 Documentation requirements
 
@@ -1391,15 +1391,15 @@ Keep the quick-start path short. Put deeper lifecycle notes after the runnable c
 
 WP3 is complete when:
 
-- [ ] the example succeeds from a built wheel;
-- [ ] all failure paths are deterministic and tested;
-- [ ] no private API is used;
-- [ ] arbitrary fragmentation is proven;
-- [ ] operation cleanup is explicit;
-- [ ] provisional versus verified output is visible;
-- [ ] stdlib interoperability is checked;
-- [ ] type checkers, integration tests, docs, lint, formatting, and hooks pass;
-- [ ] implementation feedback records whether the public ownership model caused any recurring mistake or private-hook need.
+- [x] the example succeeds from a built wheel;
+- [x] all failure paths are deterministic and tested;
+- [x] no private API is used;
+- [x] arbitrary fragmentation is proven;
+- [x] operation cleanup is explicit;
+- [x] provisional versus verified output is visible;
+- [x] stdlib interoperability is checked;
+- [x] type checkers, integration tests, docs, lint, formatting, and hooks pass;
+- [x] implementation feedback records whether the public ownership model caused any recurring mistake or private-hook need.
 
 Suggested commit or PR title:
 
