@@ -176,7 +176,8 @@ Abandonment is deliberately deterministic:
 - explicitly closing a partially consumed operation makes the codec unusable;
 - no iterator finalizer releases ownership or mutates codec state; and
 - `discard()` permanently invalidates the codec and any retained operation,
-  immediately releasing the operation's captured input and codec state.
+  immediately releasing the operation's captured input and the codec's mutable
+  and incomplete state while preserving validated member records.
 
 When an operation is still reachable, exhaust it if the stream should remain
 usable. Otherwise call its idempotent `close()` method. A `try`/`finally`
@@ -197,9 +198,10 @@ def decode_chunk(decoder: aiogzip.GzipDecoder, chunk: bytes) -> bytes:
 Calling `close()` after exhaustion has no effect. Calling it earlier releases
 the operation and makes the codec unusable. If the caller no longer retains
 the operation, use the codec's idempotent `discard()` method; it invalidates
-active work and promptly releases both the captured operation input and codec
-state. Neither method resets the codec, so construct a new instance to
-continue.
+active work and promptly releases both the captured operation input and the
+codec's mutable and incomplete state. Already trailer-validated member records
+remain available. Neither method resets the codec, so construct a new instance
+to continue.
 
 Codec instances and their operation iterators are **not thread-safe**. Use an
 instance from one thread at a time, or hold an external lock around the entire

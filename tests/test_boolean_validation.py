@@ -9,6 +9,7 @@ import tempfile
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import IntEnum
 from pathlib import Path
 from typing import Any
 
@@ -95,9 +96,16 @@ class _NumpyLikeBool:
         return True
 
 
+class _BooleanIntEnum(IntEnum):
+    FALSE = 0
+    TRUE = 1
+
+
 INVALID_VALUE_FACTORIES: list[tuple[str, Callable[[], object]]] = [
     ("zero", lambda: 0),
     ("one", lambda: 1),
+    ("int-enum-zero", lambda: _BooleanIntEnum.FALSE),
+    ("int-enum-one", lambda: _BooleanIntEnum.TRUE),
     ("empty-string", lambda: ""),
     ("false-string", lambda: "false"),
     ("empty-list", list),

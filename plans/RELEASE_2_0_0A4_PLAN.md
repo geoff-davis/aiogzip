@@ -2005,9 +2005,9 @@ zlib-ng selected
 stdlib zlib forced while zlib-ng is installed
 ```
 
-- [ ] direct codec tests pass in all modes;
-- [ ] high-level tests pass in all modes;
-- [ ] integrations pass in all modes where compression output differences are not asserted byte-for-byte;
+- [x] direct codec tests pass in all modes;
+- [x] high-level tests pass in all modes;
+- [x] integrations pass in all modes where compression output differences are not asserted byte-for-byte;
 - [x] reproducible-byte assertions pin engine choice explicitly;
 - [x] no test accidentally depends on the installed optional engine.
 
