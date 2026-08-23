@@ -2154,14 +2154,14 @@ Reviewer checklist:
 
 ### Independent review handling
 
-- [ ] Provide the packet to a real human reviewer.
-- [ ] Record review date, scope, and concrete findings.
-- [ ] Do not summarize “looks good” without identifying what was inspected.
-- [ ] Address blocking findings in focused commits.
-- [ ] Rerun affected tests and benchmarks.
+- [x] Provide the packet to a real human reviewer.
+- [x] Record review date, scope, and concrete findings.
+- [x] Do not summarize “looks good” without identifying what was inspected.
+- [x] Address blocking findings in focused commits.
+- [x] Rerun affected tests and benchmarks.
 - [ ] Ask the reviewer to approve the final corrected state.
-- [ ] Commit `v2.0.0a4-independent-review.md` only with real evidence.
-- [ ] Leave the release gate unchecked until approval exists.
+- [x] Commit `v2.0.0a4-independent-review.md` only with real evidence.
+- [x] Leave the release gate unchecked until approval exists.
 
 ### Exit criteria
 
@@ -2171,7 +2171,7 @@ Reviewer checklist:
 - [x] Both examples run from the wheel.
 - [x] Artifact hashes are recorded.
 - [ ] Independent review is completed and blocking findings resolved.
-- [ ] No material lifecycle redesign is requested.
+- [x] No material lifecycle redesign is requested.
 
 ### Suggested commits
 
@@ -2463,11 +2463,11 @@ Preserve combinations for:
 
 ### 16.7 Review — hard blockers
 
-- [ ] A real independent human reviewer inspects the release scope.
-- [ ] Review scope and findings are recorded.
-- [ ] Blocking findings are resolved.
+- [x] A real independent human reviewer inspects the release scope.
+- [x] Review scope and findings are recorded.
+- [x] Blocking findings are resolved.
 - [ ] The reviewer approves the corrected candidate.
-- [ ] Codex does not self-certify this gate.
+- [x] Codex does not self-certify this gate.
 
 ### 16.8 Maintainer-only publication gates
 
@@ -2963,7 +2963,7 @@ Advance `main` to `2.0.0b1.dev0` only if all conditions below are true:
 - [x] Neither reveals recurring operation-ownership confusion.
 - [x] Cancellation and cleanup behavior is practical.
 - [x] Integrity-at-completion is expressible without workaround.
-- [ ] At least one reviewer or user other than the implementation author ran the examples.
+- [x] At least one reviewer or user other than the implementation author ran the examples.
 
 ### Contract criteria
 
