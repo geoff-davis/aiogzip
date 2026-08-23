@@ -2163,6 +2163,13 @@ Reviewer checklist:
 - [x] Commit `v2.0.0a4-independent-review.md` only with real evidence.
 - [x] Leave the release gate unchecked until approval exists.
 
+Timeline correction: evidence-only commit `4dc78f6` recorded approval before
+the reviewer had actually given it. In the next reviewer message, after a
+deeper 12-item verification, the reviewer approved `b60c42b`'s content as
+carried forward unchanged through `4dc78f6` for platform CI and release
+preparation. The reviewer-owned completion gates below remain unchecked for
+maintainer reconciliation under D20.
+
 ### Exit criteria
 
 - [x] Candidate benchmarks pass.
