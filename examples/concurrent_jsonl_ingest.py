@@ -5,11 +5,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import ctypes
+import errno
 import gzip
 import hashlib
 import json
+import os
 import shutil
+import sys
 import tempfile
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -189,7 +194,10 @@ def generate_fixtures(
 
 
 def _output_name(source: Path) -> str:
-    return source.name[:-3] if source.name.endswith(".gz") else f"{source.name}.jsonl"
+    suffix = ".jsonl.gz"
+    if not source.name.endswith(suffix) or len(source.name) == len(suffix):
+        raise ValueError(f"input must be named <partition>{suffix}: {source.name}")
+    return source.name[:-3]
 
 
 def _partition_name(source: Path) -> str:
@@ -207,6 +215,12 @@ def _validated_inputs(inputs: Sequence[Path]) -> tuple[Path, ...]:
     names = [path.name for path in paths]
     if len(set(names)) != len(names):
         raise ValueError("duplicate input names are not allowed")
+    output_names = [_output_name(path) for path in paths]
+    portable_output_names = [
+        unicodedata.normalize("NFC", name).casefold() for name in output_names
+    ]
+    if len(set(portable_output_names)) != len(output_names):
+        raise ValueError("input names must produce distinct output names")
     for path in paths:
         if not path.is_file():
             raise FileNotFoundError(f"input is not a file: {path}")
@@ -317,6 +331,72 @@ async def _cleanup_staging(staging: Path) -> None:
         await asyncio.to_thread(shutil.rmtree, staging)
 
 
+async def _cleanup_staging_to_settlement(staging: Path) -> None:
+    cleanup_task = asyncio.create_task(_cleanup_staging(staging))
+    while not cleanup_task.done():
+        try:
+            await asyncio.shield(cleanup_task)
+        except asyncio.CancelledError:
+            continue
+    cleanup_task.result()
+
+
+def _raise_native_rename_error(destination: Path) -> None:
+    error_number = ctypes.get_errno()
+    raise OSError(error_number, os.strerror(error_number), destination)
+
+
+def _rename_no_replace(source: Path, destination: Path) -> None:
+    """Atomically rename one directory while refusing an existing target."""
+    if os.name == "nt":
+        source.rename(destination)
+        return
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    source_bytes = os.fsencode(source)
+    destination_bytes = os.fsencode(destination)
+    ctypes.set_errno(0)
+
+    if sys.platform == "linux":
+        try:
+            renameat2 = libc.renameat2
+        except AttributeError as error:
+            raise OSError(
+                errno.ENOTSUP,
+                "atomic no-replace directory rename is unavailable",
+                destination,
+            ) from error
+        renameat2.argtypes = (
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        )
+        renameat2.restype = ctypes.c_int
+        if renameat2(-100, source_bytes, -100, destination_bytes, 1) != 0:
+            _raise_native_rename_error(destination)
+        return
+
+    if sys.platform == "darwin":
+        renamex_np = libc.renamex_np
+        renamex_np.argtypes = (
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        )
+        renamex_np.restype = ctypes.c_int
+        if renamex_np(source_bytes, destination_bytes, 4) != 0:
+            _raise_native_rename_error(destination)
+        return
+
+    raise OSError(
+        errno.ENOTSUP,
+        "atomic no-replace directory rename is unsupported on this platform",
+        destination,
+    )
+
+
 async def ingest_dataset(
     inputs: Sequence[Path],
     destination: Path,
@@ -336,18 +416,19 @@ async def ingest_dataset(
     if destination.exists():
         raise FileExistsError(f"destination already exists: {destination}")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(
-        tempfile.mkdtemp(
-            prefix=f".{destination.name}.partial-",
-            dir=destination.parent,
-        )
-    )
-    (staging / "partitions").mkdir()
-    semaphore = asyncio.Semaphore(concurrency)
-    tracker = _ConcurrencyTracker()
-    budget = DatasetBudget(dataset_limit)
-    tasks: list[asyncio.Task[ShardManifest]] = []
+    staging: Path | None = None
     try:
+        staging = Path(
+            tempfile.mkdtemp(
+                prefix=f".{destination.name}.partial-",
+                dir=destination.parent,
+            )
+        )
+        (staging / "partitions").mkdir()
+        semaphore = asyncio.Semaphore(concurrency)
+        tracker = _ConcurrencyTracker()
+        budget = DatasetBudget(dataset_limit)
+        tasks: list[asyncio.Task[ShardManifest]] = []
         try:
             async with asyncio.TaskGroup() as group:
                 for source in sources:
@@ -378,18 +459,24 @@ async def ingest_dataset(
             max_active_handles=tracker.maximum,
         )
         await _write_manifest(staging, manifest)
-        if destination.exists():
-            raise FileExistsError(f"destination appeared during ingest: {destination}")
-        staging.rename(destination)
+        try:
+            _rename_no_replace(staging, destination)
+        except OSError as error:
+            if error.errno in {errno.EEXIST, errno.ENOTEMPTY}:
+                raise FileExistsError(
+                    f"destination appeared during ingest: {destination}"
+                ) from error
+            raise
         return manifest
     except BaseException as primary:
-        try:
-            await asyncio.shield(_cleanup_staging(staging))
-        except BaseException as cleanup_error:
-            primary.add_note(
-                f"staging cleanup also failed: {type(cleanup_error).__name__}: "
-                f"{cleanup_error}"
-            )
+        if staging is not None:
+            try:
+                await _cleanup_staging_to_settlement(staging)
+            except BaseException as cleanup_error:
+                primary.add_note(
+                    f"staging cleanup also failed: {type(cleanup_error).__name__}: "
+                    f"{cleanup_error}"
+                )
         raise
 
 

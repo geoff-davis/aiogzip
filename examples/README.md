@@ -117,12 +117,18 @@ sibling staging directory, but remain provisional until normal gzip exhaustion.
 Only after every shard validates does the example write `manifest.json` and
 rename the complete staging directory once.
 
+Inputs must use nonempty `<partition>.jsonl.gz` names, and their derived
+`.jsonl` output names must remain distinct under cross-platform case folding.
+Publication uses the operating system's atomic no-replace rename operation, so
+a destination created by another publisher is preserved and the ingest fails.
+
 The per-shard limit bounds one gzip expansion. The locked dataset budget counts
 exact bytes written across all staged outputs, holding its lock only for
 arithmetic. Invalid JSON is a separate application failure even when the gzip
 framing is valid. Any corruption, limit, write failure, cancellation, or JSON
 error cancels sibling work and removes staging without creating the final
-destination.
+destination. Cleanup is awaited to completion even when cancellation is
+requested repeatedly; no cleanup task is left running after the ingest returns.
 
 Multiple independent files demonstrate useful async overlap; this is not a
 custom striped format. Creating one lightweight task per known shard keeps the

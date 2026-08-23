@@ -100,6 +100,36 @@ async def test_input_and_destination_preconditions(tmp_path):
         await _ingest([], tmp_path / "empty")
 
 
+@pytest.mark.parametrize(
+    "source_name",
+    ["events.gz", "events.JSONL.GZ", ".jsonl.gz"],
+)
+async def test_input_names_require_nonempty_jsonl_gz_partition(tmp_path, source_name):
+    source = tmp_path / "fixtures" / source_name
+    _write_payload_shard(source, b'{"valid":true}\n')
+    destination = tmp_path / "published"
+
+    with pytest.raises(ValueError, match=r"<partition>\.jsonl\.gz"):
+        await _ingest([source], destination)
+
+    assert not destination.exists()
+    assert _partial_directories(destination) == []
+
+
+async def test_portably_colliding_output_names_are_rejected_before_staging(tmp_path):
+    first = tmp_path / "first" / "Events.jsonl.gz"
+    second = tmp_path / "second" / "events.jsonl.gz"
+    _write_payload_shard(first, b'{"source":1}\n')
+    _write_payload_shard(second, b'{"source":2}\n')
+    destination = tmp_path / "published"
+
+    with pytest.raises(ValueError, match="distinct output names"):
+        await _ingest([first, second], destination)
+
+    assert not destination.exists()
+    assert _partial_directories(destination) == []
+
+
 async def test_valid_ingest_publishes_once_with_exact_manifest(tmp_path):
     fixtures = tmp_path / "fixtures"
     expected = example.generate_fixtures(fixtures, rows_per_shard=17)
@@ -396,6 +426,51 @@ async def test_top_level_cancellation_closes_handles_and_removes_staging(
     assert _partial_directories(destination) == []
 
 
+async def test_repeated_cancellation_waits_for_cleanup_to_settle(tmp_path, monkeypatch):
+    fixtures = tmp_path / "fixtures"
+    example.generate_fixtures(fixtures, rows_per_shard=100)
+    destination = tmp_path / "published"
+    staged_write = asyncio.Event()
+    never_resume_write = asyncio.Event()
+    cleanup_started = asyncio.Event()
+    resume_cleanup = asyncio.Event()
+    cleanup_tasks = []
+    original_write = example._write_staged_bytes
+    original_cleanup = example._cleanup_staging
+
+    async def blocking_write(writer, data):
+        written = await original_write(writer, data)
+        staged_write.set()
+        await never_resume_write.wait()
+        return written
+
+    async def controlled_cleanup(staging):
+        cleanup_tasks.append(asyncio.current_task())
+        cleanup_started.set()
+        await resume_cleanup.wait()
+        await original_cleanup(staging)
+
+    monkeypatch.setattr(example, "_write_staged_bytes", blocking_write)
+    monkeypatch.setattr(example, "_cleanup_staging", controlled_cleanup)
+    task = asyncio.create_task(_ingest(_inputs(fixtures), destination))
+    await staged_write.wait()
+    task.cancel()
+    await cleanup_started.wait()
+    task.cancel()
+    await asyncio.sleep(0)
+
+    assert not task.done()
+    assert _partial_directories(destination)
+
+    resume_cleanup.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert cleanup_tasks and all(cleanup.done() for cleanup in cleanup_tasks)
+    assert not destination.exists()
+    assert _partial_directories(destination) == []
+
+
 async def test_cancellation_during_input_read_closes_handles_and_removes_staging(
     tmp_path, monkeypatch
 ):
@@ -518,6 +593,66 @@ async def test_cleanup_error_does_not_replace_primary_failure(tmp_path, monkeypa
     assert any("secondary cleanup failure" in note for note in exc_info.value.__notes__)
     for partial in _partial_directories(destination):
         shutil.rmtree(partial)
+
+
+async def test_destination_appearing_at_publish_is_not_replaced(tmp_path, monkeypatch):
+    fixtures = tmp_path / "fixtures"
+    example.generate_fixtures(fixtures)
+    destination = tmp_path / "published"
+    marker = destination / "owned-by-another-publisher"
+    original_rename = example._rename_no_replace
+
+    def competing_rename(staging, target):
+        destination.mkdir()
+        marker.write_text("preserve me", encoding="utf-8")
+        original_rename(staging, target)
+
+    monkeypatch.setattr(example, "_rename_no_replace", competing_rename)
+
+    with pytest.raises(FileExistsError, match="appeared during ingest"):
+        await _ingest(_inputs(fixtures), destination)
+
+    assert marker.read_text(encoding="utf-8") == "preserve me"
+    assert _partial_directories(destination) == []
+
+
+def test_atomic_no_replace_rename_preserves_empty_destination(tmp_path):
+    source = tmp_path / "staged"
+    destination = tmp_path / "published"
+    source.mkdir()
+    destination.mkdir()
+
+    with pytest.raises(OSError) as exc_info:
+        example._rename_no_replace(source, destination)
+
+    assert exc_info.value.errno in {example.errno.EEXIST, example.errno.ENOTEMPTY}
+    assert source.is_dir()
+    assert destination.is_dir()
+    assert list(destination.iterdir()) == []
+
+
+async def test_partition_directory_creation_failure_cleans_staging(
+    tmp_path, monkeypatch
+):
+    fixtures = tmp_path / "fixtures"
+    example.generate_fixtures(fixtures)
+    destination = tmp_path / "published"
+    original_mkdir = example.Path.mkdir
+
+    def fail_partition_mkdir(path, *args, **kwargs):
+        if path.name == "partitions" and path.parent.name.startswith(
+            ".published.partial-"
+        ):
+            raise OSError("injected partition directory failure")
+        return original_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(example.Path, "mkdir", fail_partition_mkdir)
+
+    with pytest.raises(OSError, match="partition directory failure"):
+        await _ingest(_inputs(fixtures), destination)
+
+    assert not destination.exists()
+    assert _partial_directories(destination) == []
 
 
 async def test_valid_gzip_with_invalid_json_is_application_failure(tmp_path):
