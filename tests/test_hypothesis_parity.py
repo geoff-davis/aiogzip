@@ -72,6 +72,28 @@ _member = st.tuples(
 
 _members = st.lists(_member, min_size=1, max_size=4)
 
+# ``test_read_patterns_match_stdlib`` performs one async file operation for
+# every compressed chunk.  Keep its generated payloads bounded so the
+# single-byte chunk case remains practical on Windows.  The decoder-surface
+# and corruption properties below continue to exercise the full 10,000-byte
+# payload and four-member ranges.
+_access_payload = st.one_of(
+    st.builds(
+        lambda token, n: (token * (n // len(token) + 1))[:n],
+        st.binary(min_size=1, max_size=8),
+        st.integers(min_value=0, max_value=512),
+    ),
+    st.integers(min_value=0, max_value=512).map(os.urandom),
+)
+
+_access_member = st.tuples(
+    _access_payload,
+    st.integers(min_value=0, max_value=9),
+    st.integers(min_value=0, max_value=64),
+)
+
+_access_members = st.lists(_access_member, min_size=1, max_size=4)
+
 _chunk_size = st.sampled_from(CHUNK_SIZES)
 
 _latin1_field = st.lists(
@@ -449,7 +471,7 @@ async def _check_pattern(path, chunk_size, pattern, params):
 
 
 @settings(max_examples=MAX_EXAMPLES, deadline=None, suppress_health_check=_SUPPRESSED)
-@given(members=_members, chunk_size=_chunk_size, data=st.data())
+@given(members=_access_members, chunk_size=_chunk_size, data=st.data())
 def test_read_patterns_match_stdlib(members, chunk_size, data):
     """aiogzip output and tell() match stdlib gzip across access patterns."""
     raw, _ = _build_raw(members)
