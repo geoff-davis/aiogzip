@@ -2,7 +2,8 @@
 
 > **Status:** Follow-up review findings are corrected in `c3f681e`; exact
 > corrected code/test head `d0d0866` passed the full platform and engine
-> matrix, with renewed human approval and release preparation pending
+> matrix, and renewed human approval covers evidence head `a9e44f7`; release
+> preparation and corrected artifacts remain pending
 > **Target release:** `2.0.0a4`
 > **Repository destination:** `plans/RELEASE_2_0_0A4_PLAN.md`
 > **Plan date:** 2026-08-17
@@ -2170,16 +2171,16 @@ Prepare `plans/reviews/v2.0.0a4-review-packet.md` containing:
 
 Reviewer checklist:
 
-- [ ] strict validation is deliberate and side-effect-free;
-- [ ] metadata records are retained only after trailer validation;
-- [ ] transient decoder state is still released;
-- [ ] direct transport operations never overlap;
-- [ ] provisional records are not called verified;
-- [ ] staged ingest cannot publish a partial manifest;
-- [ ] cleanup is bounded and cancellation-safe;
-- [ ] examples require no private hooks;
-- [ ] no `a3` lifecycle behavior changed unintentionally;
-- [ ] release evidence is reproducible.
+- [x] strict validation is deliberate and side-effect-free;
+- [x] metadata records are retained only after trailer validation;
+- [x] transient decoder state is still released;
+- [x] direct transport operations never overlap;
+- [x] provisional records are not called verified;
+- [x] staged ingest cannot publish a partial manifest;
+- [x] cleanup is bounded and cancellation-safe;
+- [x] examples require no private hooks;
+- [x] no `a3` lifecycle behavior changed unintentionally;
+- [x] release evidence is reproducible.
 
 ### Independent review handling
 
@@ -2188,7 +2189,7 @@ Reviewer checklist:
 - [x] Do not summarize “looks good” without identifying what was inspected.
 - [x] Address blocking findings in focused commits.
 - [x] Rerun affected tests and benchmarks.
-- [ ] Ask the reviewer to approve the final corrected state after `c3f681e`.
+- [x] Ask the reviewer to approve the final corrected state after `c3f681e`.
 - [x] Commit `v2.0.0a4-independent-review.md` only with real evidence.
 - [x] Leave the release gate unchecked until approval exists.
 
@@ -2202,8 +2203,11 @@ maintainer reconciliation under D20.
 That approval predates the additional staged-ingest review in
 `v2.0.0a4-follow-up-code-review.md`. The new review found four blocking defects
 and `c3f681e` changes example behavior to correct them. Its clean agent
-re-review is supporting evidence, not renewed human approval; the human gate
-therefore remains open for the corrected candidate.
+re-review was supporting evidence, not renewed human approval. The reviewer
+subsequently reproduced the publication race and detached-cleanup behavior
+against the pre-fix code, adversarially verified all four corrections, reran
+the local gates, checked exact-head CI run `32673408549`, and explicitly
+renewed approval of `a9e44f7`.
 
 ### Exit criteria
 
@@ -2212,7 +2216,7 @@ therefore remains open for the corrected candidate.
 - [x] Wheel and sdist install cleanly.
 - [x] Both examples run from the wheel.
 - [x] Artifact hashes are recorded.
-- [ ] Independent review is completed and blocking findings resolved.
+- [x] Independent review is completed and blocking findings resolved.
 - [x] No material lifecycle redesign is requested.
 
 ### Suggested commits
@@ -2508,7 +2512,7 @@ Preserve combinations for:
 - [x] A real independent human reviewer inspects the release scope.
 - [x] Review scope and findings are recorded.
 - [x] Blocking findings are resolved.
-- [ ] The reviewer approves the corrected candidate.
+- [x] The reviewer approves the corrected candidate.
 - [x] Codex does not self-certify this gate.
 
 ### 16.8 Maintainer-only publication gates
@@ -3022,7 +3026,7 @@ Advance `main` to `2.0.0b1.dev0` only if all conditions below are true:
 - [x] No critical correctness issue is open.
 - [x] No reproducible performance gate fails.
 - [x] Full engine and platform matrix passes.
-- [ ] Independent human review approves the candidate.
+- [x] Independent human review approves the candidate.
 - [ ] Packaging and provenance are sound.
 
 ### Decision
@@ -3145,7 +3149,7 @@ artifact hashes, or review evidence.
 - [x] lint, format, mypy, `ty`, coverage, docs, and hooks pass;
 - [x] wheel and sdist build, install, and run examples cleanly;
 - [x] artifact hashes are recorded;
-- [ ] an independent human reviewer approves the candidate;
+- [x] an independent human reviewer approves the candidate;
 - [x] release notes remain accurate and Alpha-labelled;
 - [x] maintainer-only publication steps are documented but not performed by Codex;
 - [ ] the post-release beta-versus-alpha decision is based on section 22 evidence.
