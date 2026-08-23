@@ -1,8 +1,8 @@
 # aiogzip 2.0.0a4 Integration and Beta-Readiness Release Plan
 
-> **Status:** Follow-up review found four staged-ingest blockers at `f4a2fc8`;
-> corrected in `c3f681e`, with corrected-head platform CI, renewed human
-> approval, and release preparation pending
+> **Status:** Follow-up review findings are corrected in `c3f681e`; exact
+> corrected code/test head `d0d0866` passed the full platform and engine
+> matrix, with renewed human approval and release preparation pending
 > **Target release:** `2.0.0a4`
 > **Repository destination:** `plans/RELEASE_2_0_0A4_PLAN.md`
 > **Plan date:** 2026-08-17
@@ -2033,20 +2033,25 @@ stdlib zlib forced while zlib-ng is installed
 
 Required release evidence:
 
-Run `32653855777` passed this complete matrix on exact head `f4a2fc8`, after a
-failed Windows job rerun on that same SHA. Commit `c3f681e` then changed the
-staged-ingest example and its platform-native publication path, so the run is
-historical evidence rather than the final release gate. Leave every box below
-unchecked until the corrected evidence head passes.
+Run
+[`32672990768`](https://github.com/geoff-davis/aiogzip/actions/runs/32672990768)
+passed this complete matrix on exact corrected code/test head `d0d0866`. That
+head includes the staged-ingest correction in `c3f681e` and a focused bound on
+the generated payload size of the Windows-heavy async read-pattern property.
+The other decoder-surface and corruption properties retain the original
+10,000-byte, four-member range. The earlier corrected-head attempt
+`32672487551` passed every job except Windows, where that unchanged property
+again crossed the 120-second watchdog; all 39 staged-ingest tests had already
+passed in that Windows job.
 
-- [ ] Python 3.11 on Linux;
-- [ ] Python 3.12 on Linux;
-- [ ] Python 3.13 on Linux;
-- [ ] Python 3.14 on Linux;
-- [ ] representative Windows job;
-- [ ] representative macOS job;
-- [ ] zlib-ng job;
-- [ ] forced-stdlib-with-zlib-ng-installed job.
+- [x] Python 3.11 on Linux;
+- [x] Python 3.12 on Linux;
+- [x] Python 3.13 on Linux;
+- [x] Python 3.14 on Linux;
+- [x] representative Windows job;
+- [x] representative macOS job;
+- [x] zlib-ng job;
+- [x] forced-stdlib-with-zlib-ng-installed job.
 
 Codex may prepare workflow changes only if current CI cannot exercise the examples. Do not redesign CI otherwise.
 
@@ -2064,7 +2069,7 @@ Codex may prepare workflow changes only if current CI cannot exercise the exampl
 - [x] Randomized tests support the new invariants.
 - [x] All `a3` lifecycle and recovery contracts remain passing.
 - [x] Both engines agree.
-- [ ] Required interpreter/platform jobs pass.
+- [x] Required interpreter/platform jobs pass.
 - [x] No unresolved flaky timing assertion remains.
 - [x] Coverage passes honestly.
 
@@ -2487,9 +2492,9 @@ Preserve combinations for:
 - [x] hooks pass.
 - [x] coverage floor passes.
 - [x] strict documentation build passes.
-- [ ] Python 3.11–3.14 Linux jobs pass.
-- [ ] representative Windows job passes.
-- [ ] representative macOS job passes.
+- [x] Python 3.11–3.14 Linux jobs pass.
+- [x] representative Windows job passes.
+- [x] representative macOS job passes.
 - [x] stdlib zlib passes.
 - [x] zlib-ng passes.
 - [x] forced stdlib with zlib-ng installed passes.
@@ -3016,7 +3021,7 @@ Advance `main` to `2.0.0b1.dev0` only if all conditions below are true:
 
 - [x] No critical correctness issue is open.
 - [x] No reproducible performance gate fails.
-- [ ] Full engine and platform matrix passes.
+- [x] Full engine and platform matrix passes.
 - [ ] Independent human review approves the candidate.
 - [ ] Packaging and provenance are sound.
 
@@ -3136,7 +3141,7 @@ artifact hashes, or review evidence.
 - [x] every `a3` correctness and lifecycle suite passes;
 - [x] every comparable performance row is within the release policy;
 - [x] stdlib, zlib-ng, and forced-stdlib engine modes pass;
-- [ ] Python 3.11–3.14 and representative Windows/macOS/Linux jobs pass;
+- [x] Python 3.11–3.14 and representative Windows/macOS/Linux jobs pass;
 - [x] lint, format, mypy, `ty`, coverage, docs, and hooks pass;
 - [x] wheel and sdist build, install, and run examples cleanly;
 - [x] artifact hashes are recorded;
