@@ -2159,7 +2159,7 @@ Reviewer checklist:
 - [x] Do not summarize “looks good” without identifying what was inspected.
 - [x] Address blocking findings in focused commits.
 - [x] Rerun affected tests and benchmarks.
-- [ ] Ask the reviewer to approve the final corrected state.
+- [x] Ask the reviewer to approve the final corrected state.
 - [x] Commit `v2.0.0a4-independent-review.md` only with real evidence.
 - [x] Leave the release gate unchecked until approval exists.
 
