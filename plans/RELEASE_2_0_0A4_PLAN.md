@@ -1,7 +1,8 @@
 # aiogzip 2.0.0a4 Integration and Beta-Readiness Release Plan
 
-> **Status:** Local implementation candidate complete at `ed0fe74`; independent
-> human review, candidate platform CI, and release preparation remain pending
+> **Status:** Follow-up review found four staged-ingest blockers at `f4a2fc8`;
+> corrected in `c3f681e`, with corrected-head platform CI, renewed human
+> approval, and release preparation pending
 > **Target release:** `2.0.0a4`
 > **Repository destination:** `plans/RELEASE_2_0_0A4_PLAN.md`
 > **Plan date:** 2026-08-17
@@ -1718,6 +1719,23 @@ WP4 is complete when:
 - [x] wheel/sdist execution and both type checkers pass;
 - [x] integration feedback records any public API confusion or missing hook.
 
+### 10.14 Follow-up review hardening
+
+A later code review found four application-owned staging defects after the
+initial human approval. Commit `c3f681e` corrects them without changing aiogzip
+production code:
+
+- [x] noncanonical input names and portable derived-output collisions are
+  rejected before staging;
+- [x] repeated cancellation cannot detach cleanup from `ingest_dataset()`;
+- [x] final directory publication atomically refuses an existing destination;
+- [x] staging-initialization failures enter the same cleanup path; and
+- [x] focused regressions reproduce the old failure modes and pass after the
+  correction.
+
+The full finding and correction record is
+`plans/reviews/v2.0.0a4-follow-up-code-review.md`.
+
 Suggested commit or PR title:
 
 ```text
@@ -2015,6 +2033,12 @@ stdlib zlib forced while zlib-ng is installed
 
 Required release evidence:
 
+Run `32653855777` passed this complete matrix on exact head `f4a2fc8`, after a
+failed Windows job rerun on that same SHA. Commit `c3f681e` then changed the
+staged-ingest example and its platform-native publication path, so the run is
+historical evidence rather than the final release gate. Leave every box below
+unchecked until the corrected evidence head passes.
+
 - [ ] Python 3.11 on Linux;
 - [ ] Python 3.12 on Linux;
 - [ ] Python 3.13 on Linux;
@@ -2159,7 +2183,7 @@ Reviewer checklist:
 - [x] Do not summarize “looks good” without identifying what was inspected.
 - [x] Address blocking findings in focused commits.
 - [x] Rerun affected tests and benchmarks.
-- [x] Ask the reviewer to approve the final corrected state.
+- [ ] Ask the reviewer to approve the final corrected state after `c3f681e`.
 - [x] Commit `v2.0.0a4-independent-review.md` only with real evidence.
 - [x] Leave the release gate unchecked until approval exists.
 
@@ -2169,6 +2193,12 @@ deeper 12-item verification, the reviewer approved `b60c42b`'s content as
 carried forward unchanged through `4dc78f6` for platform CI and release
 preparation. The reviewer-owned completion gates below remain unchecked for
 maintainer reconciliation under D20.
+
+That approval predates the additional staged-ingest review in
+`v2.0.0a4-follow-up-code-review.md`. The new review found four blocking defects
+and `c3f681e` changes example behavior to correct them. Its clean agent
+re-review is supporting evidence, not renewed human approval; the human gate
+therefore remains open for the corrected candidate.
 
 ### Exit criteria
 
