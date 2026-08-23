@@ -27,6 +27,7 @@ from hypothesis import strategies as st
 from aiogzip import (
     AsyncGzipBinaryFile,
     GzipDecoder,
+    _engine,
     decompress_chunks,
     inspect,
     verify,
@@ -41,6 +42,7 @@ _SUPPRESSED = [
     HealthCheck.too_slow,
     HealthCheck.data_too_large,
     HealthCheck.large_base_example,
+    HealthCheck.function_scoped_fixture,
 ]
 
 
@@ -90,6 +92,29 @@ _rich_member = st.tuples(
 )
 
 _rich_members = st.lists(_rich_member, min_size=0, max_size=5)
+
+_retention_member = st.tuples(
+    st.binary(min_size=0, max_size=4096),
+    st.integers(min_value=0, max_value=9),
+    st.integers(min_value=0, max_value=16),
+    st.integers(min_value=0, max_value=2**32 - 1),
+    st.one_of(st.none(), st.binary(min_size=0, max_size=16)),
+    st.one_of(st.none(), _latin1_field),
+    st.one_of(st.none(), _latin1_field),
+    st.booleans(),
+)
+
+_retention_prefix = st.lists(_retention_member, min_size=0, max_size=6)
+_failing_member = st.tuples(
+    st.binary(min_size=1, max_size=4096),
+    st.integers(min_value=0, max_value=9),
+    st.just(0),
+    st.integers(min_value=0, max_value=2**32 - 1),
+    st.one_of(st.none(), st.binary(min_size=0, max_size=16)),
+    st.one_of(st.none(), _latin1_field),
+    st.one_of(st.none(), _latin1_field),
+    st.booleans(),
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -525,6 +550,125 @@ def test_rich_archives_agree_across_every_decoder_surface(
         )
     finally:
         os.unlink(path)
+
+
+def _damage_last_member(raw, layout, failure):
+    if failure == "truncated-header":
+        return raw[: layout["start"] + 3]
+    if failure == "truncated-body":
+        body_size = layout["trailer"] - layout["body"]
+        return raw[: layout["body"] + max(1, body_size // 2)]
+    if failure == "truncated-trailer":
+        return raw[: layout["start"] + layout["size"] - 1]
+
+    damaged = bytearray(raw)
+    if failure == "crc":
+        damaged[layout["trailer"]] ^= 1
+    elif failure == "isize":
+        damaged[layout["trailer"] + 4] ^= 1
+    elif failure == "body":
+        # BFINAL=1/BTYPE=3 is an invalid DEFLATE block header, independent of
+        # the compressor's randomized payload and level.
+        damaged[layout["body"]] = (damaged[layout["body"]] & ~0x07) | 0x07
+    else:  # pragma: no cover - guards the strategy itself
+        raise AssertionError(f"unknown failure: {failure}")
+    return bytes(damaged)
+
+
+@pytest.mark.parametrize(
+    "use_zlib_ng",
+    [
+        False,
+        pytest.param(
+            True,
+            marks=pytest.mark.skipif(
+                _engine._zng is None,
+                reason="zlib-ng not installed",
+            ),
+        ),
+    ],
+    ids=["stdlib", "zlib-ng"],
+)
+@settings(max_examples=50, deadline=None, suppress_health_check=_SUPPRESSED)
+@given(
+    prefix=_retention_prefix,
+    failing_member=_failing_member,
+    failure=st.sampled_from(
+        [
+            "crc",
+            "isize",
+            "body",
+            "truncated-header",
+            "truncated-body",
+            "truncated-trailer",
+        ]
+    ),
+    source_sizes=st.lists(
+        st.integers(min_value=1, max_value=257),
+        min_size=1,
+        max_size=8,
+    ),
+    output_chunk_size=st.integers(min_value=1, max_value=257),
+    collect_member_info=st.booleans(),
+)
+def test_completed_member_prefix_survives_random_later_failure(
+    monkeypatch,
+    use_zlib_ng,
+    prefix,
+    failing_member,
+    failure,
+    source_sizes,
+    output_chunk_size,
+    collect_member_info,
+):
+    """Only trailer-validated prefix records survive randomized failures."""
+    monkeypatch.setattr(_engine, "_HAVE_ZNG", use_zlib_ng)
+    raw, layouts = _build_rich_raw([*prefix, failing_member])
+    damaged = _damage_last_member(raw, layouts[-1], failure)
+    decoder = GzipDecoder(
+        output_chunk_size=output_chunk_size,
+        collect_member_info=collect_member_info,
+    )
+
+    terminal_error = None
+    for part in _split_by_sizes(damaged, source_sizes):
+        try:
+            list(decoder.feed(part))
+        except OSError as error:
+            terminal_error = error
+            break
+    if terminal_error is None:
+        with pytest.raises(OSError):
+            list(decoder.finish())
+
+    assert not decoder.finished
+    assert decoder.member_count == len(prefix)
+    if not collect_member_info:
+        assert decoder.members == ()
+        return
+
+    assert len(decoder.members) == decoder.member_count
+    offsets = [member.compressed_offset for member in decoder.members]
+    assert offsets == sorted(offsets)
+    for index, (actual, layout, spec) in enumerate(
+        zip(decoder.members, layouts[: len(prefix)], prefix, strict=True)
+    ):
+        payload, _, _, mtime, extra, filename, comment, _ = spec
+        assert actual.index == index
+        assert actual.compressed_offset == layout["start"]
+        assert actual.compressed_size == layout["size"]
+        assert actual.uncompressed_size == len(payload)
+        assert actual.mtime == mtime
+        assert actual.original_filename == (
+            filename.decode("latin-1") if filename is not None else None
+        )
+        assert actual.comment == (
+            comment.decode("latin-1") if comment is not None else None
+        )
+        assert actual.extra == extra
+        assert actual.flags == layout["flags"]
+        assert actual.crc32 == zlib.crc32(payload) & 0xFFFFFFFF
+        assert actual.trailer_isize == len(payload) & 0xFFFFFFFF
 
 
 @settings(max_examples=40, deadline=None, suppress_health_check=_SUPPRESSED)

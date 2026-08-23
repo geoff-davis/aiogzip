@@ -42,6 +42,11 @@ def _partial_directories(destination):
     return list(destination.parent.glob(f".{destination.name}.partial-*"))
 
 
+def _write_payload_shard(path, payload):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(gzip.compress(payload, mtime=0))
+
+
 async def _ingest(inputs, destination, **overrides):
     options = {
         "concurrency": 2,
@@ -131,6 +136,75 @@ async def test_valid_ingest_publishes_once_with_exact_manifest(tmp_path):
     assert disk_manifest["row_count"] == manifest.row_count
 
 
+@pytest.mark.parametrize(
+    ("shard_count", "concurrency"),
+    [(1, 1), (3, 3), (5, 2)],
+    ids=["one-shard", "three-shards", "more-than-semaphore"],
+)
+async def test_shard_topologies_respect_the_concurrency_bound(
+    tmp_path, shard_count, concurrency
+):
+    fixtures = tmp_path / "fixtures"
+    example.generate_fixtures(
+        fixtures,
+        shard_count=shard_count,
+        rows_per_shard=3,
+    )
+    destination = tmp_path / "published"
+
+    manifest = await _ingest(
+        _inputs(fixtures),
+        destination,
+        concurrency=concurrency,
+    )
+
+    assert len(manifest.shards) == shard_count
+    assert 1 <= manifest.max_active_handles <= min(shard_count, concurrency)
+    assert destination.is_dir()
+
+
+async def test_empty_unicode_long_and_unterminated_jsonl_are_preserved(tmp_path):
+    fixtures = tmp_path / "input files"
+    payloads = {
+        "empty.jsonl.gz": b"",
+        "long.jsonl.gz": (
+            json.dumps({"message": "x" * 200_000}, separators=(",", ":")) + "\n"
+        ).encode(),
+        "unicode.jsonl.gz": (
+            json.dumps(
+                {"message": "Καλημέρα 🌍"},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            + "\n"
+        ).encode(),
+        "unterminated.jsonl.gz": b'{"final":"line without newline"}',
+    }
+    for name, payload in payloads.items():
+        _write_payload_shard(fixtures / name, payload)
+    destination = tmp_path / "published data"
+
+    manifest = await _ingest(
+        _inputs(fixtures),
+        destination,
+        concurrency=2,
+        batch_hint=31,
+    )
+
+    assert manifest.row_count == 3
+    assert manifest.byte_count == sum(map(len, payloads.values()))
+    for shard in manifest.shards:
+        assert (destination / "partitions" / shard.output_name).read_bytes() == (
+            payloads[shard.source_name]
+        )
+    assert (
+        next(
+            shard for shard in manifest.shards if shard.source_name == "long.jsonl.gz"
+        ).max_batch_chars
+        > 31
+    )
+
+
 async def test_corrupt_crc_identifies_shard_and_cleans_staging(tmp_path, monkeypatch):
     fixtures = tmp_path / "fixtures"
     example.generate_fixtures(fixtures, rows_per_shard=50)
@@ -141,14 +215,25 @@ async def test_corrupt_crc_identifies_shard_and_cleans_staging(tmp_path, monkeyp
     damaged.write_bytes(wire)
     destination = tmp_path / "published"
     writers_with_progress = set()
+    healthy_progress = asyncio.Event()
     original_write = example._write_staged_bytes
+    original_ingest_shard = example._ingest_shard
 
     async def recording_write(writer, data):
+        name = Path(writer.name).name
         written = await original_write(writer, data)
-        writers_with_progress.add(Path(writer.name).name)
+        writers_with_progress.add(name)
+        if name != "events-001.jsonl":
+            healthy_progress.set()
         return written
 
+    async def delay_damaged_shard(source, output, **kwargs):
+        if source == damaged:
+            await healthy_progress.wait()
+        return await original_ingest_shard(source, output, **kwargs)
+
     monkeypatch.setattr(example, "_write_staged_bytes", recording_write)
+    monkeypatch.setattr(example, "_ingest_shard", delay_damaged_shard)
 
     with pytest.raises(example.ShardIngestError, match=damaged.name) as exc_info:
         await _ingest(inputs, destination)
@@ -307,6 +392,79 @@ async def test_top_level_cancellation_closes_handles_and_removes_staging(
         await task
 
     assert trackers and trackers[0].active == 0
+    assert not destination.exists()
+    assert _partial_directories(destination) == []
+
+
+async def test_cancellation_during_input_read_closes_handles_and_removes_staging(
+    tmp_path, monkeypatch
+):
+    fixtures = tmp_path / "fixtures"
+    example.generate_fixtures(fixtures, rows_per_shard=100)
+    destination = tmp_path / "published"
+    read_started = asyncio.Event()
+    never_resume = asyncio.Event()
+    trackers = []
+    original_tracker = example._ConcurrencyTracker
+    original_readlines = example.aiogzip.AsyncGzipTextFile.readlines
+
+    class CapturedTracker(original_tracker):
+        def __init__(self):
+            super().__init__()
+            trackers.append(self)
+
+    async def blocking_readlines(stream, hint=-1):
+        read_started.set()
+        await never_resume.wait()
+        return await original_readlines(stream, hint)
+
+    monkeypatch.setattr(example, "_ConcurrencyTracker", CapturedTracker)
+    monkeypatch.setattr(
+        example.aiogzip.AsyncGzipTextFile,
+        "readlines",
+        blocking_readlines,
+    )
+    task = asyncio.create_task(_ingest(_inputs(fixtures), destination))
+    await read_started.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert trackers and trackers[0].active == 0
+    assert not destination.exists()
+    assert _partial_directories(destination) == []
+
+
+async def test_simultaneous_shard_failures_keep_a_named_primary_and_group(
+    tmp_path, monkeypatch
+):
+    fixtures = tmp_path / "fixtures"
+    example.generate_fixtures(fixtures, shard_count=2)
+    inputs = _inputs(fixtures)
+    destination = tmp_path / "published"
+    both_started = asyncio.Event()
+    count_lock = asyncio.Lock()
+    started = 0
+
+    async def fail_together(source, output, **kwargs):
+        nonlocal started
+        del output, kwargs
+        async with count_lock:
+            started += 1
+            if started == 2:
+                both_started.set()
+        await both_started.wait()
+        raise example.ShardIngestError(source.name, OSError("simultaneous failure"))
+
+    monkeypatch.setattr(example, "_ingest_shard", fail_together)
+
+    with pytest.raises(example.ShardIngestError) as exc_info:
+        await _ingest(inputs, destination, concurrency=2)
+
+    assert exc_info.value.source_name in {path.name for path in inputs}
+    assert isinstance(exc_info.value.__cause__, ExceptionGroup)
+    assert "simultaneous failure" in str(exc_info.value)
     assert not destination.exists()
     assert _partial_directories(destination) == []
 

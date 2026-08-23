@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import gzip
 import io
+import tempfile
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -11,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 import aiogzip
 from aiogzip import codec as codec_module
@@ -102,6 +106,15 @@ INVALID_VALUE_FACTORIES: list[tuple[str, Callable[[], object]]] = [
     ("exploding-bool", _ExplodingBool),
     ("numpy-like-bool", _NumpyLikeBool),
 ]
+
+ARBITRARY_NON_BOOLEAN = st.one_of(
+    st.integers(),
+    st.floats(allow_nan=False),
+    st.text(),
+    st.binary(),
+    st.lists(st.integers(), max_size=8),
+    st.dictionaries(st.text(max_size=8), st.integers(), max_size=8),
+)
 
 
 @dataclass(frozen=True)
@@ -259,6 +272,39 @@ async def test_invalid_boolean_is_rejected_before_side_effects(
     assert source.iterations == 0
     assert source.pulls == 0
     assert getattr(value, "calls", 0) == 0
+
+
+@settings(max_examples=150, deadline=None)
+@given(surface=st.sampled_from(SURFACES), value=ARBITRARY_NON_BOOLEAN)
+def test_arbitrary_non_boolean_values_have_uniform_side_effect_free_errors(
+    surface, value
+):
+    async def invoke() -> None:
+        result = surface.invoke(path, fileobj, source, value)
+        if surface.timing == "coroutine":
+            await result
+        elif surface.timing == "stream":
+            async for _ in result:
+                pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "must-not-exist.gz"
+        fileobj = _ObservedFile()
+        source = _ObservedSource()
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with pytest.raises(
+                TypeError,
+                match=rf"{surface.parameter} must be a bool",
+            ):
+                asyncio.run(invoke())
+
+        assert caught == []
+        assert not path.exists()
+        assert fileobj.calls == []
+        assert source.iterations == 0
+        assert source.pulls == 0
 
 
 @pytest.mark.parametrize("surface", SURFACES, ids=lambda surface: surface.name)
