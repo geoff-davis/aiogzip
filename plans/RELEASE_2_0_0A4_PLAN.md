@@ -2,8 +2,9 @@
 
 > **Status:** Follow-up review findings are corrected in `c3f681e`; exact
 > corrected code/test head `d0d0866` passed the full platform and engine
-> matrix, and renewed human approval covers evidence head `a9e44f7`; release
-> preparation and corrected artifacts remain pending
+> matrix, renewed human approval covers evidence head `a9e44f7`, and package
+> head `81e8cca` has reproducible final artifacts and passed exact package-head
+> CI; maintainer-only publication remains pending
 > **Target release:** `2.0.0a4`
 > **Repository destination:** `plans/RELEASE_2_0_0A4_PLAN.md`
 > **Plan date:** 2026-08-17
@@ -2241,45 +2242,45 @@ WP7 complete.
 
 ### Release-note tasks
 
-- [ ] Move Unreleased entries into `## [2.0.0a4] - YYYY-MM-DD` only on the actual release-prep date.
-- [ ] Add a `[2.0.0a4]` comparison link.
-- [ ] Make `[Unreleased]` compare `v2.0.0a4...HEAD` only in the post-release development bump, not before the tag exists unless repository convention requires otherwise.
-- [ ] Summarize strict Boolean validation as a compatibility tightening.
-- [ ] Summarize member-metadata retention.
-- [ ] List the two examples.
-- [ ] State that tiny-write behavior is unchanged in contract and batching remains recommended.
-- [ ] State that codec API remains provisional through this alpha.
-- [ ] Do not claim beta stability.
-- [ ] Do not claim performance improvement unless final measurements support it.
+- [x] Move Unreleased entries into `## [2.0.0a4] - YYYY-MM-DD` only on the actual release-prep date.
+- [x] Add a `[2.0.0a4]` comparison link.
+- [x] Make `[Unreleased]` compare `v2.0.0a4...HEAD` only in the post-release development bump, not before the tag exists unless repository convention requires otherwise.
+- [x] Summarize strict Boolean validation as a compatibility tightening.
+- [x] Summarize member-metadata retention.
+- [x] List the two examples.
+- [x] State that tiny-write behavior is unchanged in contract and batching remains recommended.
+- [x] State that codec API remains provisional through this alpha.
+- [x] Do not claim beta stability.
+- [x] Do not claim performance improvement unless final measurements support it.
 
 ### Version and metadata tasks
 
-- [ ] Change `__version__` from `2.0.0a4.dev0` to `2.0.0a4` in the release-prep commit.
-- [ ] Keep Alpha classifier.
-- [ ] Preserve Python `>=3.11`.
-- [ ] Run version/changelog synchronization tests.
-- [ ] Update maintainer guidance files only where release-current wording requires it.
-- [ ] Do not advance to beta in the release-prep commit.
+- [x] Change `__version__` from `2.0.0a4.dev0` to `2.0.0a4` in the release-prep commit.
+- [x] Keep Alpha classifier.
+- [x] Preserve Python `>=3.11`.
+- [x] Run version/changelog synchronization tests.
+- [x] Update maintainer guidance files only where release-current wording requires it.
+- [x] Do not advance to beta in the release-prep commit.
 
 ### Final validation
 
 From the exact release-prep commit:
 
-- [ ] run the full default test suite;
-- [ ] run stdlib-forced tests;
-- [ ] run zlib-ng tests;
-- [ ] run lint and format checks;
-- [ ] run mypy and `ty` including examples;
-- [ ] run strict docs;
-- [ ] run hooks;
-- [ ] build wheel and sdist;
-- [ ] run metadata checks;
-- [ ] install wheel in a clean environment;
-- [ ] install sdist in a clean environment;
-- [ ] run both examples from the clean wheel environment;
-- [ ] record final artifact hashes;
-- [ ] verify no unexpected generated or benchmark temporary files are tracked;
-- [ ] verify the working tree is clean.
+- [x] run the full default test suite;
+- [x] run stdlib-forced tests;
+- [x] run zlib-ng tests;
+- [x] run lint and format checks;
+- [x] run mypy and `ty` including examples;
+- [x] run strict docs;
+- [x] run hooks;
+- [x] build wheel and sdist;
+- [x] run metadata checks;
+- [x] install wheel in a clean environment;
+- [x] install sdist in a clean environment;
+- [x] run both examples from the clean wheel environment;
+- [x] record final artifact hashes;
+- [x] verify no unexpected generated or benchmark temporary files are tracked;
+- [x] verify the working tree is clean.
 
 ### Maintainer handoff
 
@@ -2303,11 +2304,11 @@ Codex must not perform these remote actions.
 
 ### Exit criteria
 
-- [ ] Release-prep commit is internally consistent.
-- [ ] All local and CI gates pass.
-- [ ] Artifacts are ready but unpublished.
-- [ ] Maintainer handoff is complete.
-- [ ] No release claim exceeds the evidence.
+- [x] Release-prep commit is internally consistent.
+- [x] All local and CI gates pass.
+- [x] Artifacts are ready but unpublished.
+- [x] Maintainer handoff is complete.
+- [x] No release claim exceeds the evidence.
 
 ### Suggested commit
 
@@ -3028,6 +3029,20 @@ Advance `main` to `2.0.0b1.dev0` only if all conditions below are true:
 - [x] Full engine and platform matrix passes.
 - [x] Independent human review approves the candidate.
 - [ ] Packaging and provenance are sound.
+
+### Release-prep assessment
+
+Package head `81e8cca` passes local packaging, metadata, clean-install, and
+example-smoke gates. The publish workflow derives a
+merge-strategy-independent `SOURCE_DATE_EPOCH` from the dated release heading,
+and two builds with that value produced identical final wheel and sdist hashes.
+Packaging is ready; the combined packaging/provenance box remains open until
+the tag-triggered Trusted Publishing run exposes the remote attestations.
+
+The evidence supports `2.0.0b1.dev0` after successful publication and
+provenance verification. No concrete unresolved public-contract or correctness
+issue requires `2.0.0a5.dev0`. This is the required post-release
+recommendation, not a beta version bump in the a4 release-prep commit.
 
 ### Decision
 
