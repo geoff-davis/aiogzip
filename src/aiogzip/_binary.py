@@ -35,9 +35,11 @@ from ._common import (
     _format_file_repr,
     _normalize_mtime,
     _parse_mode_tokens,
+    _validate_bool,
     _validate_chunk_size,
     _validate_compresslevel,
     _validate_filename,
+    _validate_optional_bool,
     _validate_optional_positive_int,
     _validate_original_filename,
 )
@@ -236,6 +238,10 @@ class AsyncGzipBinaryFile:
         strict_size: bool = False,
         fast_compress: bool = False,
     ) -> None:
+        validated_closefd = _validate_optional_bool(closefd, "closefd")
+        validated_strict_size = _validate_bool(strict_size, "strict_size")
+        validated_fast_compress = _validate_bool(fast_compress, "fast_compress")
+
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
         _validate_chunk_size(chunk_size)
@@ -255,7 +261,7 @@ class AsyncGzipBinaryFile:
         self._writing_mode = mode_op in {"w", "a", "x"}
         if self._writing_mode:
             _validate_compresslevel(compresslevel)
-        self._fast_compress = bool(fast_compress)
+        self._fast_compress = validated_fast_compress
         if (
             self._writing_mode
             and self._fast_compress
@@ -272,7 +278,9 @@ class AsyncGzipBinaryFile:
         self._header_mtime = _normalize_mtime(mtime)
         self._header_filename_override = _validate_original_filename(original_filename)
         self._external_file = fileobj
-        self._closefd = closefd if closefd is not None else fileobj is None
+        self._closefd = (
+            validated_closefd if validated_closefd is not None else fileobj is None
+        )
 
         # Determine the underlying file mode based on gzip mode
         file_mode_suffix = "b"
@@ -315,7 +323,7 @@ class AsyncGzipBinaryFile:
         self._read_broken: bool = False
         self._read_validation_failed: bool = False
         self._max_decompressed_size: Optional[int] = max_decompressed_size
-        self._strict_size: bool = bool(strict_size)
+        self._strict_size = validated_strict_size
 
     async def open(self) -> "AsyncGzipBinaryFile":
         """Open the file for I/O and return ``self``.

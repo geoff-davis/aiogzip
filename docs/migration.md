@@ -51,6 +51,22 @@ Ordinary asyncio callers do not need to change their code. The high-level
 lifecycle and interoperability behavior. The main compatibility change is the
 Python 3.11 floor.
 
+Before the 2.0 API reaches beta, Boolean configuration has also been tightened
+to avoid freezing accidental truth-value coercion. Pass the exact built-in
+values `True` or `False` for `fast_compress`, `strict_size`, and the direct
+decoder's `collect_member_info`. Integer stand-ins (`0`, `1`), strings such as
+`"false"`, and custom truthy or falsy objects now raise `TypeError`:
+
+```python
+aiogzip.GzipEncoder(fast_compress=False)  # valid
+aiogzip.GzipEncoder(fast_compress=0)      # TypeError
+```
+
+`closefd` accepts exact `True`, exact `False`, or `None`. `None` preserves the
+ownership default: a resource opened from a path is closed by aiogzip, while a
+caller-supplied `fileobj` remains open. Use an explicit Boolean only when
+overriding that default.
+
 The 2.0 alpha also adds synchronous `GzipEncoder` and `GzipDecoder` classes for
 applications that own a custom transport and want to drive aiogzip's gzip
 state machine directly:

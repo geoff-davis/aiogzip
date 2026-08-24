@@ -26,6 +26,7 @@ from ._common import (
     _build_gzip_trailer,
     _derive_header_filename,
     _normalize_mtime,
+    _validate_bool,
     _validate_chunk_size,
     _validate_compresslevel,
     _validate_optional_positive_int,
@@ -262,6 +263,8 @@ class GzipEncoder(_CodecBase):
         strict_size: bool = False,
         output_chunk_size: int = 256 * 1024,
     ) -> None:
+        validated_fast_compress = _validate_bool(fast_compress, "fast_compress")
+        validated_strict_size = _validate_bool(strict_size, "strict_size")
         super().__init__()
         _validate_compresslevel(compresslevel)
         _validate_chunk_size(output_chunk_size)
@@ -269,8 +272,8 @@ class GzipEncoder(_CodecBase):
         self._mtime = _normalize_mtime(mtime)
         validated_filename = _validate_original_filename(original_filename)
         self._filename = _derive_header_filename(validated_filename, None)
-        self._fast_compress = bool(fast_compress)
-        self._strict_size = bool(strict_size)
+        self._fast_compress = validated_fast_compress
+        self._strict_size = validated_strict_size
         self._output_chunk_size = output_chunk_size
         if self._fast_compress and not _engine.have_fast_engine():
             warnings.warn(
@@ -429,7 +432,9 @@ class GzipDecoder(_CodecBase):
 
     Payload bytes may be emitted before their member trailer is available, so
     integrity is established only after :meth:`finish` is exhausted. Completed
-    metadata is retained only when ``collect_member_info=True``.
+    metadata is retained only when ``collect_member_info=True``. Records for
+    trailer-validated members survive a later failure or explicit discard;
+    :attr:`finished` remains the whole-stream validation indicator.
 
     Methods return bounded lazy iterators that must be exhausted. This class
     performs no I/O or executor offload and is not thread-safe.
@@ -442,12 +447,15 @@ class GzipDecoder(_CodecBase):
         max_decompressed_size: int | None = None,
         collect_member_info: bool = False,
     ) -> None:
+        validated_collect_member_info = _validate_bool(
+            collect_member_info, "collect_member_info"
+        )
         super().__init__()
         _validate_chunk_size(output_chunk_size)
         _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")
         self._output_chunk_size = output_chunk_size
         self._max_decompressed_size = max_decompressed_size
-        self._collect_member_info = bool(collect_member_info)
+        self._collect_member_info = validated_collect_member_info
         self._pending = _InputQueue()
         self._inflate_input: bytes | None = None
         self._output = _OutputCursor()
@@ -474,7 +482,7 @@ class GzipDecoder(_CodecBase):
 
     @property
     def members(self) -> tuple[GzipMemberInfo, ...]:
-        """Completed, trailer-validated members when collection is enabled."""
+        """Collected completed members, retained after failure or discard."""
         return tuple(self._members)
 
     @property
@@ -515,7 +523,11 @@ class GzipDecoder(_CodecBase):
         self._engine = None
         self._header = None
         self._header_parser = None
-        self._members.clear()
+        self._state = "header"
+        self._member_offset = 0
+        self._member_crc = 0
+        self._member_size = 0
+        self._allow_padding = False
 
     def _new_header_parser(self) -> _GzipHeaderParser:
         return _GzipHeaderParser(

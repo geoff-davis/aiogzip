@@ -64,6 +64,32 @@ If the records already exist as a synchronous iterable of strings,
 `await f.writelines(records)` batches small writes while keeping memory use
 bounded.
 
+Each `await f.write(data)` deliberately completes that call's codec work and
+delivers every compressed byte it produced to the sink before returning. This
+keeps sink failures attached to the call that triggered them, but makes a loop
+of tiny awaited writes expensive. Prefer `writelines()` or build explicit
+bounded batches when per-record sink-failure boundaries are unnecessary:
+
+```python
+pending: list[str] = []
+pending_chars = 0
+
+async for record in records:
+    line = json.dumps(record) + "\n"
+    pending.append(line)
+    pending_chars += len(line)
+    if pending_chars >= 64 * 1024:
+        await f.writelines(pending)
+        pending.clear()
+        pending_chars = 0
+
+await f.writelines(pending)
+```
+
+aiogzip does not buffer across separate `write()` calls by default. Do not
+catch a write error and continue the same writer: the incomplete gzip member
+is poisoned and must be discarded.
+
 ## Processing untrusted gzip input
 
 Set an application-appropriate decompressed-size ceiling:

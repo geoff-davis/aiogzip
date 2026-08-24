@@ -2,6 +2,73 @@
 
 This guide provides practical examples for using `aiogzip` in various scenarios.
 
+The repository's [maintained-example runbook](https://github.com/geoff-davis/aiogzip/tree/main/examples)
+states the Python/dependency requirements and gives exact clean-checkout and
+wheel-installed commands. Helpers, framing, staging, manifests, and status
+labels defined by those scripts are application code, not aiogzip API.
+
+## Maintained fragmented-transport example
+
+The repository includes
+[`examples/fragmented_transport.py`](https://github.com/geoff-davis/aiogzip/blob/main/examples/fragmented_transport.py),
+a deterministic, credential-free demonstration of the
+public `GzipEncoder`, `GzipDecoder`, and `CodecOperation` APIs over a bounded
+local bidirectional asyncio byte transport. Its application-level two-byte
+length prefix makes gzip fragmentation explicit instead of incorrectly relying
+on TCP packet boundaries:
+
+```bash
+python examples/fragmented_transport.py
+python examples/fragmented_transport.py --self-test
+```
+
+The sender exhausts `start()`, every `feed()`, every low-latency `flush()`, and
+`finish()` in order. If an operation is abandoned, it calls
+`operation.close()`; codec-wide `discard()` provides idempotent terminal
+cleanup. The receiver parses JSON Lines incrementally but labels records
+`receiving-provisional` until `GzipDecoder.finish()` proves the final trailer
+and changes the status to `verified`.
+
+Calling `flush()` after each record improves visibility latency at the cost of
+compression efficiency. One long-lived member preserves compression context
+but has one final validation boundary; member-per-batch designs validate more
+often while paying for extra headers, trailers, and compression resets. The
+example illustrates these lifecycle and framing choices; it is not an official
+transport abstraction. The repository's `examples/README.md` has the focused
+scenario list.
+
+## Maintained concurrent JSONL ingest
+
+[`examples/concurrent_jsonl_ingest.py`](https://github.com/geoff-davis/aiogzip/blob/main/examples/concurrent_jsonl_ingest.py)
+generates ordinary independent gzip files with the
+standard library, processes them through bounded `asyncio.TaskGroup`
+concurrency, and publishes one dataset only after every shard validates:
+
+```bash
+python examples/concurrent_jsonl_ingest.py \
+  --generate-fixtures ./demo-input \
+  --output ./demo-published
+```
+
+One task owns each handle; separate files can overlap without sharing mutable
+gzip state. The hot path uses `iter_batches()` rather than one await per JSON
+line, parses every line, updates counts and digests incrementally, and writes
+decoded bytes to per-shard files on disk. It retains only one approximate-hint
+batch per active shard, not the complete dataset or an unbounded queue.
+
+Decoded batches remain provisional until their gzip iterator reaches normal
+EOF. All output therefore stays in a unique sibling staging directory. After
+every shard succeeds, the example closes staged outputs, writes the complete
+manifest, and renames the directory to its final destination once. Corruption,
+truncation, per-shard or dataset-wide limits, invalid JSON, write failure, and
+cancellation remove staging and publish nothing.
+
+Per-shard limits bound each gzip expansion independently. The dataset budget
+atomically counts exact bytes written across all staged outputs while holding
+its lock only for arithmetic. Structurally valid gzip can still fail the
+application contract when a decoded line is invalid JSON. These are ordinary
+independent files, not a custom row-striped format.
+
 ## CSV Processing with `aiocsv`
 
 `aiogzip` pairs perfectly with `aiocsv` for efficient, asynchronous CSV processing.

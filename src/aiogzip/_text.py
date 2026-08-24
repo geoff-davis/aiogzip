@@ -29,9 +29,11 @@ from ._common import (
     _format_file_repr,
     _normalize_mtime,
     _parse_mode_tokens,
+    _validate_bool,
     _validate_chunk_size,
     _validate_compresslevel,
     _validate_filename,
+    _validate_optional_bool,
     _validate_optional_positive_int,
     _validate_original_filename,
 )
@@ -235,6 +237,10 @@ class AsyncGzipTextFile:
         strict_size: bool = False,
         fast_compress: bool = False,
     ) -> None:
+        validated_closefd = _validate_optional_bool(closefd, "closefd")
+        validated_strict_size = _validate_bool(strict_size, "strict_size")
+        validated_fast_compress = _validate_bool(fast_compress, "fast_compress")
+
         # Validate inputs using shared validation functions
         _validate_filename(filename, fileobj)
         _validate_chunk_size(chunk_size)
@@ -271,7 +277,9 @@ class AsyncGzipTextFile:
         self._header_mtime = _normalize_mtime(mtime)
         self._header_filename_override = _validate_original_filename(original_filename)
         self._external_file = fileobj
-        self._closefd = closefd if closefd is not None else fileobj is None
+        self._closefd = (
+            validated_closefd if validated_closefd is not None else fileobj is None
+        )
 
         # Determine the underlying binary file mode
         self._binary_mode = f"{mode_op}b"
@@ -319,8 +327,8 @@ class AsyncGzipTextFile:
         self._universal_newlines: bool = newline in {None, ""}
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
-        self._strict_size: bool = bool(strict_size)
-        self._fast_compress: bool = bool(fast_compress)
+        self._strict_size = validated_strict_size
+        self._fast_compress = validated_fast_compress
 
         # Batched line iteration: for the single-character terminator modes we
         # bulk-split a decoded chunk into whole lines once (C-speed) and serve

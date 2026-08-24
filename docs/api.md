@@ -47,6 +47,29 @@ await aiogzip.write("copy.bin.gz", data, mtime=0)
 Both helpers operate in binary mode and load the entire uncompressed payload
 into memory. Use `open()` for streaming large files.
 
+## Exact boolean options
+
+Public boolean configuration uses exact built-in booleans. `fast_compress`,
+`strict_size`, and the codec's `collect_member_info` accept only `True` or
+`False`. `closefd` accepts `True`, `False`, or `None`; `None` keeps the ownership
+default, closing path-opened resources while preserving caller-supplied file
+objects. Integer substitutes such as `0` and `1`, strings, and custom truthy or
+falsy objects raise `TypeError` with the parameter name.
+
+The contract is identical across `AsyncGzipBinaryFile`,
+`AsyncGzipTextFile`, `open()`, `AsyncGzipFile`, the whole-file helpers, the
+async-iterable compressor, and the synchronous codec. Validation happens
+before file acquisition, external file methods, source iteration, zlib-ng
+warning logic, or codec operation reservation. This is an intentional alpha
+compatibility tightening, not a security fix.
+
+For writers, `strict_size=False` preserves gzip's normal modulo-2³² `ISIZE`;
+`strict_size=True` rejects a member crossing that field's range.
+`fast_compress=False` keeps stdlib-compatible output, while
+`fast_compress=True` opts that writer into zlib-ng when available and otherwise
+emits the documented fallback warning. Explicit `closefd=False` preserves a
+caller-supplied file object; `closefd=True` closes it with the wrapper.
+
 ## Live member timestamps
 
 In read mode, `AsyncGzipBinaryFile.mtime` is `None` until the shared gzip
@@ -96,6 +119,14 @@ payload = b"".join(decoder.feed(wire)) + b"".join(decoder.finish())
 The codec API is provisional during the 2.0 alpha series. See the
 [synchronous codec guide](codec.md) for constructor validation, immutable
 input snapshots, lifecycle hazards, thread safety, and error behavior.
+
+With `collect_member_info=True`, `GzipDecoder.members` contains immutable
+records only for members whose trailers validated. Those completed records
+remain available if a later member fails or the codec is explicitly discarded;
+the incomplete member is absent and the codec remains unusable. Retained
+records prove only those members, not the entire concatenated stream. Use
+`decoder.finished` as the whole-stream completion indicator. Collection is
+opt-in because its memory use grows with the member count.
 
 ::: aiogzip.codec.CodecOperation
 

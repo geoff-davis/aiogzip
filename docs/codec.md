@@ -45,6 +45,12 @@ the file writer:
 - `strict_size=True` rejects input beyond gzip's 4 GiB `ISIZE` range; and
 - `output_chunk_size` is an integer from 1 through 128 MiB.
 
+`fast_compress` and `strict_size` require the exact built-in values `True` or
+`False`. Integer stand-ins such as `0` and `1`, strings, and custom truthy or
+falsy objects raise `TypeError`; aiogzip does not call their `__bool__` or
+`__len__` methods. Validation happens before the compression engine is
+constructed or an unavailable-zlib-ng warning can be emitted.
+
 ## Decoding complete streams
 
 A decoder accepts zero or more concatenated gzip members plus permitted NUL
@@ -96,6 +102,34 @@ member's trailer is validated, `members` gains a `GzipMemberInfo` entry and
 `member_count` advances. Metadata for an incomplete or corrupt member is never
 committed.
 
+`collect_member_info` likewise requires exact `True` or `False`; `0`, `1`, and
+other truthy or falsy substitutes are rejected before decoder state is built.
+
+Completed records survive a later member failure, an abandoned operation, or
+an explicit `discard()`. They describe only members whose CRC and ISIZE
+trailers validated; they do not mean the complete concatenated stream is
+valid, and no record is created for the failed member. Check `finished` to
+distinguish successful whole-stream completion. Collection remains opt-in
+because retained records consume memory proportional to the member count.
+
+```python
+import gzip
+
+import aiogzip
+
+decoder = aiogzip.GzipDecoder(collect_member_info=True)
+try:
+    # Feed transport chunks and exhaust decoder.finish().
+    ...
+except gzip.BadGzipFile:
+    for member in decoder.members:
+        report_already_validated_member(member)
+```
+
+Payload emitted from the failed member is recovery data, not validated output.
+The decoder remains unusable after the failure or discard even though earlier
+metadata remains available.
+
 After successful completion, another decoder `feed()` or `finish()` raises
 `ValueError`. Repeated encoder finalization and invalid method ordering also
 raise `ValueError`; create a new codec for another stream.
@@ -142,7 +176,8 @@ Abandonment is deliberately deterministic:
 - explicitly closing a partially consumed operation makes the codec unusable;
 - no iterator finalizer releases ownership or mutates codec state; and
 - `discard()` permanently invalidates the codec and any retained operation,
-  immediately releasing the operation's captured input and codec state.
+  immediately releasing the operation's captured input and the codec's mutable
+  and incomplete state while preserving validated member records.
 
 When an operation is still reachable, exhaust it if the stream should remain
 usable. Otherwise call its idempotent `close()` method. A `try`/`finally`
@@ -163,9 +198,10 @@ def decode_chunk(decoder: aiogzip.GzipDecoder, chunk: bytes) -> bytes:
 Calling `close()` after exhaustion has no effect. Calling it earlier releases
 the operation and makes the codec unusable. If the caller no longer retains
 the operation, use the codec's idempotent `discard()` method; it invalidates
-active work and promptly releases both the captured operation input and codec
-state. Neither method resets the codec, so construct a new instance to
-continue.
+active work and promptly releases both the captured operation input and the
+codec's mutable and incomplete state. Already trailer-validated member records
+remain available. Neither method resets the codec, so construct a new instance
+to continue.
 
 Codec instances and their operation iterators are **not thread-safe**. Use an
 instance from one thread at a time, or hold an external lock around the entire

@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0a4] - 2026-08-23
+
+### Added
+
+- A maintained, deterministic fragmented-transport example exercises the
+  public sans-I/O encoder, decoder, and operation lifecycle over explicit
+  length-prefixed frames. It demonstrates provisional JSONL visibility,
+  verified completion, flush/backpressure behavior, arbitrary fragmentation,
+  concatenated members, trailer failures, and explicit abandonment cleanup.
+- A maintained concurrent JSONL ingest example demonstrates one-handle-per-task
+  structured concurrency, bounded `iter_batches()` processing, independent
+  per-shard and dataset-wide limits, incremental application validation, and
+  sibling staging followed by one atomic dataset publication. Corruption,
+  truncation, invalid JSON, write failure, and cancellation publish nothing.
+
+### Fixed
+
+- `GzipDecoder.members` now retains immutable records for earlier
+  trailer-validated members when a later member fails or the decoder is
+  explicitly discarded. The failing or incomplete member never receives a
+  record, `member_count` remains coherent with collected metadata, and the
+  decoder still releases transient state and remains unusable. `finished`
+  continues to distinguish whole-stream validation from partial progress.
+
+### Changed
+
+- Public boolean configuration is now exact during the 2.0 alpha series.
+  `fast_compress`, `strict_size`, and `collect_member_info` accept only the
+  built-in `True` and `False` values; `closefd` accepts those values or `None`
+  for its ownership default. Integer stand-ins such as `0` and `1` and other
+  truthy or falsy objects now raise a parameter-specific `TypeError` before
+  files, engines, warnings, source iterators, or codec operations are touched.
+
+### Documentation
+
+- Expanded stable guidance for single-task handle ownership, application-lock
+  scope, integrity-failure recovery data, strict Boolean migration, and the
+  unchanged same-call tiny-write contract. Both maintained examples now have
+  clean-checkout and wheel-installed run instructions and clearly distinguish
+  application helpers from public aiogzip API.
+
+### Performance
+
+- Preserved the `2.0.0a3` direct-codec, scheduler, optional-header,
+  high-level, concurrent-stream, memory, and small-write regression gates.
+  The strict same-call write contract is unchanged; use `writelines()` or
+  explicit bounded batching for tiny records. No performance improvement is
+  claimed for this release.
+
 ## [2.0.0a3] - 2026-08-16
 
 ### Added
@@ -800,6 +849,8 @@ All notable changes to this project will be documented in this file.
 - Normalize iteration errors from `AsyncGzipBinaryFile` to `TypeError`, matching the standard file API.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
 
-[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a2...HEAD
+[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a3...HEAD
+[2.0.0a4]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a3...v2.0.0a4
+[2.0.0a3]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a2...v2.0.0a3
 [2.0.0a2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a1...v2.0.0a2
 [2.0.0a1]: https://github.com/geoff-davis/aiogzip/compare/v1.11.0...v2.0.0a1

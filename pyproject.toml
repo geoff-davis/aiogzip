@@ -81,6 +81,7 @@ include = [
     "mkdocs.yml",
     "benchmarks/",
     "docs/",
+    "examples/",
     "scripts/",
     "tests/",
 ]
@@ -129,7 +130,9 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/aiogzip"]
+# Maintained examples are release-gate application code, so measure them with
+# the library rather than treating behavioral subprocess tests as sufficient.
+source = ["src/aiogzip", "examples"]
 branch = true
 relative_files = true
 omit = [
