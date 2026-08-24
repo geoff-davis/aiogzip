@@ -823,10 +823,10 @@ returns a lazy <code>CodecOperation</code> that must be exhausted before the nex
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">encoder</span> <span class="o">=</span> <span class="n">GzipEncoder</span><span class="p">(</span><span class="n">mtime</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">output_chunk_size</span><span class="o">=</span><span class="mi">64</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">wire</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">wire</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">encoder</span><span class="o">.</span><span class="n">start</span><span class="p">()))</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">wire</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">encoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;hello &quot;</span><span class="p">)))</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">wire</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">encoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;world&quot;</span><span class="p">)))</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">wire</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">encoder</span><span class="o">.</span><span class="n">finish</span><span class="p">()))</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">wire</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">encoder</span><span class="o">.</span><span class="n">start</span><span class="p">()))</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">wire</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">encoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="sa">b</span><span class="s2">"hello "</span><span class="p">)))</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">wire</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">encoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="sa">b</span><span class="s2">"world"</span><span class="p">)))</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">wire</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">encoder</span><span class="o">.</span><span class="n">finish</span><span class="p">()))</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="k">assert</span> <span class="n">encoder</span><span class="o">.</span><span class="n">finished</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="k">assert</span> <span class="n">encoder</span><span class="o">.</span><span class="n">input_size</span> <span class="o">==</span> <span class="mi">11</span>
@@ -847,6 +847,11 @@ the file writer:</p>
 <li><code>strict_size=True</code> rejects input beyond gzip's 4 GiB <code>ISIZE</code> range; and</li>
 <li><code>output_chunk_size</code> is an integer from 1 through 128 MiB.</li>
 </ul>
+<p><code>fast_compress</code> and <code>strict_size</code> require the exact built-in values <code>True</code> or
+<code>False</code>. Integer stand-ins such as <code>0</code> and <code>1</code>, strings, and custom truthy or
+falsy objects raise <code>TypeError</code>; aiogzip does not call their <code>__bool__</code> or
+<code>__len__</code> methods. Validation happens before the compression engine is
+constructed or an unavailable-zlib-ng warning can be emitted.</p>
 <h2 id="decoding-complete-streams">Decoding complete streams</h2>
 <p>A decoder accepts zero or more concatenated gzip members plus permitted NUL
 padding. Feed it arbitrary compressed boundaries and then exhaust <code>finish()</code>
@@ -859,9 +864,9 @@ valid:</p>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">max_decompressed_size</span><span class="o">=</span><span class="mi">100</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">,</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">)</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">plain</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">plain</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">decoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">first_network_chunk</span><span class="p">)))</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">plain</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">decoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">second_network_chunk</span><span class="p">)))</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">plain</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">decoder</span><span class="o">.</span><span class="n">finish</span><span class="p">()))</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">plain</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">decoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">first_network_chunk</span><span class="p">)))</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">plain</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">decoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">second_network_chunk</span><span class="p">)))</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">plain</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">decoder</span><span class="o">.</span><span class="n">finish</span><span class="p">()))</span>
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="k">assert</span> <span class="n">decoder</span><span class="o">.</span><span class="n">finished</span>
 </code></pre></div>
@@ -892,6 +897,29 @@ malformed gzip data raises <code>gzip.BadGzipFile</code>.</p>
 member's trailer is validated, <code>members</code> gains a <code>GzipMemberInfo</code> entry and
 <code>member_count</code> advances. Metadata for an incomplete or corrupt member is never
 committed.</p>
+<p><code>collect_member_info</code> likewise requires exact <code>True</code> or <code>False</code>; <code>0</code>, <code>1</code>, and
+other truthy or falsy substitutes are rejected before decoder state is built.</p>
+<p>Completed records survive a later member failure, an abandoned operation, or
+an explicit <code>discard()</code>. They describe only members whose CRC and ISIZE
+trailers validated; they do not mean the complete concatenated stream is
+valid, and no record is created for the failed member. Check <code>finished</code> to
+distinguish successful whole-stream completion. Collection remains opt-in
+because retained records consume memory proportional to the member count.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">gzip</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">aiogzip</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">decoder</span> <span class="o">=</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">GzipDecoder</span><span class="p">(</span><span class="n">collect_member_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="c1"># Feed transport chunks and exhaust decoder.finish().</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="o">...</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="k">except</span> <span class="n">gzip</span><span class="o">.</span><span class="n">BadGzipFile</span><span class="p">:</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="n">decoder</span><span class="o">.</span><span class="n">members</span><span class="p">:</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="n">report_already_validated_member</span><span class="p">(</span><span class="n">member</span><span class="p">)</span>
+</code></pre></div>
+<p>Payload emitted from the failed member is recovery data, not validated output.
+The decoder remains unusable after the failure or discard even though earlier
+metadata remains available.</p>
 <p>After successful completion, another decoder <code>feed()</code> or <code>finish()</code> raises
 <code>ValueError</code>. Repeated encoder finalization and invalid method ordering also
 raise <code>ValueError</code>; create a new codec for another stream.</p>
@@ -933,27 +961,29 @@ or output has been copied into a second contiguous buffer.</p>
 <li>explicitly closing a partially consumed operation makes the codec unusable;</li>
 <li>no iterator finalizer releases ownership or mutates codec state; and</li>
 <li><code>discard()</code> permanently invalidates the codec and any retained operation,
-  immediately releasing the operation's captured input and codec state.</li>
+  immediately releasing the operation's captured input and the codec's mutable
+  and incomplete state while preserving validated member records.</li>
 </ul>
 <p>When an operation is still reachable, exhaust it if the stream should remain
 usable. Otherwise call its idempotent <code>close()</code> method. A <code>try</code>/<code>finally</code>
 ensures an exception or early return cannot leave the codec reserved:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">aiogzip</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">decode_chunk</span><span class="p">(</span><span class="n">decoder</span><span class="p">:</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">GzipDecoder</span><span class="p">,</span> <span class="n">chunk</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">operation</span><span class="p">:</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">CodecOperation</span> <span class="o">=</span> <span class="n">decoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="k">return</span> <span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">operation</span><span class="p">)</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">finally</span><span class="p">:</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="n">operation</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">aiogzip</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">decode_chunk</span><span class="p">(</span><span class="n">decoder</span><span class="p">:</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">GzipDecoder</span><span class="p">,</span> <span class="n">chunk</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">operation</span><span class="p">:</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">CodecOperation</span> <span class="o">=</span> <span class="n">decoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="k">return</span> <span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">operation</span><span class="p">)</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">finally</span><span class="p">:</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="n">operation</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </code></pre></div>
 <p>Calling <code>close()</code> after exhaustion has no effect. Calling it earlier releases
 the operation and makes the codec unusable. If the caller no longer retains
 the operation, use the codec's idempotent <code>discard()</code> method; it invalidates
-active work and promptly releases both the captured operation input and codec
-state. Neither method resets the codec, so construct a new instance to
-continue.</p>
+active work and promptly releases both the captured operation input and the
+codec's mutable and incomplete state. Already trailer-validated member records
+remain available. Neither method resets the codec, so construct a new instance
+to continue.</p>
 <p>Codec instances and their operation iterators are <strong>not thread-safe</strong>. Use an
 instance from one thread at a time, or hold an external lock around the entire
 call-and-exhaust operation lifecycle. The same rule excludes overlapping

@@ -969,8 +969,8 @@ and yields the complete bytes for exactly one gzip member:</p>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">raw_source</span><span class="p">():</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">yield</span> <span class="sa">b</span><span class="s2">&quot;hello &quot;</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">yield</span> <span class="sa">b</span><span class="s2">&quot;world&quot;</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">yield</span> <span class="sa">b</span><span class="s2">"hello "</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">yield</span> <span class="sa">b</span><span class="s2">"world"</span>
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
 <a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
 <a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="k">async</span> <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">compress_chunks</span><span class="p">(</span><span class="n">raw_source</span><span class="p">(),</span> <span class="n">mtime</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
@@ -991,7 +991,7 @@ metadata explicitly when output bytes must be reproducible:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">stream</span> <span class="o">=</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">compress_chunks</span><span class="p">(</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">raw_source</span><span class="p">(),</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">mtime</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">original_filename</span><span class="o">=</span><span class="s2">&quot;payload.bin&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">original_filename</span><span class="o">=</span><span class="s2">"payload.bin"</span><span class="p">,</span>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">)</span>
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="k">async</span> <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">stream</span><span class="p">:</span>
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="k">await</span> <span class="n">send</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
@@ -1005,6 +1005,11 @@ removed, matching the existing writer.</p>
 requires. Set <code>strict_size=True</code> to reject a member that would exceed the
 32-bit <code>ISIZE</code> field. <code>fast_compress=True</code> opts into zlib-ng when installed and
 otherwise emits the same fallback warning as the file writer.</p>
+<p>Both options require the exact built-in values <code>True</code> or <code>False</code>. Values such
+as <code>0</code>, <code>1</code>, strings, and custom truthy or falsy objects raise a
+parameter-specific <code>TypeError</code> when <code>compress_chunks()</code> is called, before its
+lazy iterator is returned, zlib-ng warning logic runs, or the async source is
+iterated.</p>
 <h3 id="failure-cancellation-and-early-exit">Failure, cancellation, and early exit</h3>
 <p>The final deflate bytes and eight-byte trailer are emitted only after the
 source ends normally. If the source raises, compression fails, cancellation

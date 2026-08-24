@@ -559,6 +559,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#recovery-data-after-an-integrity-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery data after an integrity failure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#codec-finalization-and-operation-abandonment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -756,6 +767,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#recovery-data-after-an-integrity-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery data after an integrity failure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#codec-finalization-and-operation-abandonment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -825,7 +847,7 @@ working when the fast engine is installed.</p>
 <tr>
 <td>Overlapping operations on one async file</td>
 <td><code>aiogzip.ConcurrentOperationError</code></td>
-<td>An <code>OSError</code> subtype. Await the active call, then retry; one handle is single-task-owned.</td>
+<td>An <code>OSError</code> subtype reporting a shared-handle ownership bug before state corruption.</td>
 </tr>
 <tr>
 <td>Codec operation still active</td>
@@ -861,7 +883,7 @@ to general:</p>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">aiogzip</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">&quot;untrusted.gz&quot;</span><span class="p">,</span> <span class="n">max_decompressed_size</span><span class="o">=</span><span class="mi">100</span> <span class="o">*</span> <span class="mi">2</span><span class="o">**</span><span class="mi">20</span><span class="p">)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">"untrusted.gz"</span><span class="p">,</span> <span class="n">max_decompressed_size</span><span class="o">=</span><span class="mi">100</span> <span class="o">*</span> <span class="mi">2</span><span class="o">**</span><span class="mi">20</span><span class="p">)</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="k">except</span> <span class="n">gzip</span><span class="o">.</span><span class="n">BadGzipFile</span><span class="p">:</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="o">...</span>  <span class="c1"># corrupt or hostile input: reject the file</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
@@ -871,10 +893,19 @@ to general:</p>
 <p>One <code>AsyncGzipBinaryFile</code> or <code>AsyncGzipTextFile</code> handle is intentionally owned
 by one task at a time. If a read, seek, write, flush, or close overlaps an
 operation already in flight on that handle, the rejected call raises the
-public <code>ConcurrentOperationError</code>. The active call is left intact; await it,
-then retry the rejected operation. Because the exception subclasses
-<code>OSError</code>, existing general I/O handlers remain effective while callers that
-want to retry this case can catch it explicitly.</p>
+public <code>ConcurrentOperationError</code>. The active call is left intact. Treat the
+exception as a programming error: it is not a lock, and catching it in a retry
+loop is not supported synchronization. Separate handles may progress
+concurrently because they do not share gzip or buffer state.</p>
+<p>When several tasks intentionally share a handle, use an application lock that
+covers the complete logical operation, not only the first low-level call:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">lock</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">async</span> <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">batch</span> <span class="o">=</span> <span class="k">await</span> <span class="n">stream</span><span class="o">.</span><span class="n">readlines</span><span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
+</code></pre></div>
 <p>The reservation covers text already decoded into the wrapper's buffer as well
 as binary codec work. Composite <code>readlines()</code>, <code>writelines()</code>, and write-mode
 <code>seek()</code> calls retain ownership across all of their internal reads or writes;
@@ -892,6 +923,9 @@ propagates, and a failed abortive underlying close leaves the handle reportably
 open so <code>close()</code> can be retried.</p>
 <p>Cancellation while a clean context exit is waiting for an active call also
 attempts abortive owned-resource cleanup before the cancellation propagates.</p>
+<p>The maintained examples avoid same-handle overlap entirely: each shard task
+owns a separate file handle, and each transport codec operation is exhausted
+before the next begins.</p>
 <h2 id="telling-the-decompression-cap-apart-from-corruption">Telling the decompression cap apart from corruption</h2>
 <p>A stream that exceeds <code>max_decompressed_size</code> (a decompression bomb, or just a
 bigger file than expected) raises a plain <code>OSError</code>, <strong>not</strong> <code>BadGzipFile</code> —
@@ -900,15 +934,15 @@ exceeded. Because the cap error is not a <code>BadGzipFile</code>, the handler s
 above distinguishes the two cases by exception type alone. If you need to
 single the cap out from real I/O errors within the <code>OSError</code> branch, match on
 its stable message prefix:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">&quot;untrusted.gz&quot;</span><span class="p">,</span> <span class="n">max_decompressed_size</span><span class="o">=</span><span class="mi">100</span> <span class="o">*</span> <span class="mi">2</span><span class="o">**</span><span class="mi">20</span><span class="p">)</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">except</span> <span class="n">gzip</span><span class="o">.</span><span class="n">BadGzipFile</span><span class="p">:</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">raise</span>  <span class="c1"># corrupt input: not the cap</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;decompressed output exceeded max_decompressed_size&quot;</span><span class="p">):</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="o">...</span>  <span class="c1"># over budget: maybe retry with a larger cap</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="k">raise</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">"untrusted.gz"</span><span class="p">,</span> <span class="n">max_decompressed_size</span><span class="o">=</span><span class="mi">100</span> <span class="o">*</span> <span class="mi">2</span><span class="o">**</span><span class="mi">20</span><span class="p">)</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">except</span> <span class="n">gzip</span><span class="o">.</span><span class="n">BadGzipFile</span><span class="p">:</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">raise</span>  <span class="c1"># corrupt input: not the cap</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"decompressed output exceeded max_decompressed_size"</span><span class="p">):</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="o">...</span>  <span class="c1"># over budget: maybe retry with a larger cap</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="k">raise</span>
 </code></pre></div>
 <h2 id="where-errors-surface">Where errors surface</h2>
 <blockquote>
@@ -925,6 +959,33 @@ is exhausted. <code>verify()</code> and <code>inspect()</code> scan the whole st
 raise before returning a result. See
 <a href="../recipes/#processing-untrusted-gzip-input">Processing untrusted gzip input</a>
 for a full defensive-reading recipe.</p>
+<h2 id="recovery-data-after-an-integrity-failure">Recovery data after an integrity failure</h2>
+<p>High-level binary and text readers distinguish clean EOF from a poisoned
+terminal state. Their integrity-failure lifecycle is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>healthy
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  -&gt; integrity failure raised
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  -&gt; previously decoded recovery data may remain readable
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  -&gt; recovery data is drained
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  -&gt; stable terminal OSError
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>rewindable source:
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  absolute seek(0) may construct a fresh decoder and recover
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>non-rewindable source:
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>  close and reopen/recreate the source
+</code></pre></div>
+<p>Recovery data is not proof that its gzip member is valid. Deflate output can
+be emitted before a later CRC-32 or <code>ISIZE</code> trailer check fails, so applications
+must not publish or trust that member's bytes merely because they were
+readable. When codec metadata collection is enabled, trailer-validated prior
+members remain in <code>GzipDecoder.members</code>; the failing member is absent. Those
+records validate only the completed prefix, not the full concatenated stream.</p>
+<p>After the recovery buffer is empty, later reads raise the same terminal
+<code>OSError</code> instead of returning clean EOF. An absolute <code>seek(0)</code> can rebuild the
+decoder only when the source can rewind (directly or through its replay cache).
+Close and recreate a non-rewindable source. Decompression-limit failures,
+cancellation, and unexpected internal failures poison the reader without
+automatically enabling the integrity-failure salvage path.</p>
 <h2 id="codec-finalization-and-operation-abandonment">Codec finalization and operation abandonment</h2>
 <p>Every state-changing <code>GzipEncoder</code> or <code>GzipDecoder</code> call reserves the codec and
 returns a lazy <code>CodecOperation</code>. Engine errors, integrity failures, or closing
