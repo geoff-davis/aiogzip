@@ -1,10 +1,9 @@
 # aiogzip 2.0.0a4 Integration and Beta-Readiness Release Plan
 
-> **Status:** Follow-up review findings are corrected in `c3f681e`; exact
-> corrected code/test head `d0d0866` passed the full platform and engine
-> matrix, renewed human approval covers evidence head `a9e44f7`, and package
-> head `81e8cca` has reproducible final artifacts and passed exact package-head
-> CI; maintainer-only publication remains pending
+> **Status:** Released as `v2.0.0a4` from merge commit `262d9a5`; exact main,
+> documentation, and tag-triggered publication workflows passed; PyPI artifacts,
+> hashes, and attestations were verified; post-release development advances to
+> `2.0.0b1.dev0`. Issue #86 remains a separate maintainer follow-up.
 > **Target release:** `2.0.0a4`
 > **Repository destination:** `plans/RELEASE_2_0_0A4_PLAN.md`
 > **Plan date:** 2026-08-17
@@ -2518,17 +2517,19 @@ Preserve combinations for:
 
 ### 16.8 Maintainer-only publication gates
 
-- [ ] Release pull request approved and merged.
-- [ ] Signed or verified `v2.0.0a4` tag created.
-- [ ] Tag-triggered release workflow succeeds.
-- [ ] Trusted Publishing succeeds.
-- [ ] PyPI wheel and sdist hashes match local records.
-- [ ] Attestations/provenance are visible.
-- [ ] Documentation deployment succeeds.
+- [x] Release pull request approved and merged.
+- [x] Signed or verified `v2.0.0a4` tag created.
+- [x] Tag-triggered release workflow succeeds.
+- [x] Trusted Publishing succeeds.
+- [x] PyPI wheel and sdist hashes match local records.
+- [x] Attestations/provenance are visible.
+- [x] Documentation deployment succeeds.
 - [ ] Issue #86 receives the maintainer-approved disposition.
-- [ ] Post-release version decision is recorded.
+- [x] Post-release version decision is recorded.
 
-Codex records these as handoff items and does not execute them.
+These gates required maintainer authority. The completed actions were performed
+only after the maintainer explicitly authorized them. Issue #86 was not changed
+as part of publication and remains visibly open in this checklist.
 
 ## 17. Documentation and release-note requirements
 
@@ -2973,18 +2974,18 @@ Use a table:
 
 ### 21.3 Remote action checklist
 
-- [ ] Open focused pull requests or confirm equivalent reviewed commit groups.
-- [ ] Obtain required approval.
-- [ ] Confirm all required checks.
-- [ ] Merge release-prep state.
-- [ ] Create verified tag `v2.0.0a4`.
-- [ ] Confirm release workflow.
-- [ ] Confirm PyPI artifacts and attestations.
-- [ ] Confirm docs deployment.
+- [x] Open focused pull requests or confirm equivalent reviewed commit groups.
+- [x] Obtain required approval.
+- [x] Confirm all required checks.
+- [x] Merge release-prep state.
+- [x] Create verified tag `v2.0.0a4`.
+- [x] Confirm release workflow.
+- [x] Confirm PyPI artifacts and attestations.
+- [x] Confirm docs deployment.
 - [ ] Apply approved issue #86 disposition.
-- [ ] Leave #71 and #72 deferred.
-- [ ] Choose `2.0.0b1.dev0` or `2.0.0a5.dev0`.
-- [ ] Reconcile the living `a4` checklist after publication.
+- [x] Leave #71 and #72 deferred.
+- [x] Choose `2.0.0b1.dev0` or `2.0.0a5.dev0`.
+- [x] Reconcile the living `a4` checklist after publication.
 
 ### 21.4 Honest limitations
 
@@ -3028,25 +3029,24 @@ Advance `main` to `2.0.0b1.dev0` only if all conditions below are true:
 - [x] No reproducible performance gate fails.
 - [x] Full engine and platform matrix passes.
 - [x] Independent human review approves the candidate.
-- [ ] Packaging and provenance are sound.
+- [x] Packaging and provenance are sound.
 
-### Release-prep assessment
+### Post-publication assessment
 
 Package head `81e8cca` passes local packaging, metadata, clean-install, and
 example-smoke gates. The publish workflow derives a
 merge-strategy-independent `SOURCE_DATE_EPOCH` from the dated release heading,
 and two builds with that value produced identical final wheel and sdist hashes.
-Packaging is ready; the combined packaging/provenance box remains open until
-the tag-triggered Trusted Publishing run exposes the remote attestations.
+The signed and GitHub-verified `v2.0.0a4` tag targets merge commit `262d9a5`.
+Tag workflow run `32682508495` published through Trusted Publishing, and the
+PyPI wheel and sdist exactly match the recorded local hashes. PyPI exposes
+publish attestations for both artifacts. Main CI run `32679651099` and
+documentation run `32679651142` passed on the exact merge commit. A fresh,
+no-cache install from the canonical PyPI index passed a public API round-trip.
 
-The evidence supports `2.0.0b1.dev0` after successful publication and
-provenance verification. No concrete unresolved public-contract or correctness
-issue requires `2.0.0a5.dev0`. This is the required post-release
-recommendation, not a beta version bump in the a4 release-prep commit.
-
-### Decision
-
-If every criterion passes:
+Every criterion now passes. No concrete unresolved public-contract or
+correctness issue requires `2.0.0a5.dev0`, so the selected development version
+is:
 
 ```text
 post-release version: 2.0.0b1.dev0
@@ -3166,5 +3166,5 @@ artifact hashes, or review evidence.
 - [x] artifact hashes are recorded;
 - [x] an independent human reviewer approves the candidate;
 - [x] release notes remain accurate and Alpha-labelled;
-- [x] maintainer-only publication steps are documented but not performed by Codex;
-- [ ] the post-release beta-versus-alpha decision is based on section 22 evidence.
+- [x] maintainer-only publication steps were performed only with explicit maintainer authorization and are documented;
+- [x] the post-release beta-versus-alpha decision is based on section 22 evidence.
