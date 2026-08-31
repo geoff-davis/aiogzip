@@ -92,7 +92,7 @@ jobs:
         uses: astral-sh/setup-uv@v9.0.0
 
       # Step 3: Install dependencies. The [test] extra skips lint-only
-      # tooling (ruff, ty, prek); deliberately unpinned (uv.lock is
+      # tooling (ruff and prek); deliberately unpinned (uv.lock is
       # not consulted) so CI exercises fresh dependency releases.
       - name: Install dependencies
         run: uv pip install --system -e ".[test,csv]"
@@ -152,6 +152,137 @@ jobs:
       - name: Run tests with stdlib forced (zlib-ng installed but disabled)
         run: |
           AIOGZIP_ENGINE=stdlib pytest -q
+
+  # Resolve nothing implicitly in this matrix: build one wheel, install it
+  # without dependencies, then add each exact runtime floor. Current test
+  # tooling is intentionally separate from the runtime compatibility promise.
+  minimum-dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [base, csv, fast, fast-forced-stdlib]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+
+      - name: Build candidate wheel
+        run: uv build --wheel --out-dir dist
+
+      - name: Create isolated test environment
+        run: |
+          uv venv --python 3.11 .minimum-venv
+          uv pip install --python .minimum-venv/bin/python \
+            "pytest>=8,<10" "pytest-asyncio>=0.24" "hypothesis>=6" \
+            psutil "mypy>=1" types-aiofiles "ty>=0.0.1a16"
+          uv pip install --python .minimum-venv/bin/python \
+            --no-deps dist/*.whl
+
+      - name: Install exact runtime floors
+        shell: bash
+        run: |
+          case "${{ matrix.mode }}" in
+            base)
+              uv pip install --python .minimum-venv/bin/python \
+                "aiofiles==23.2.1"
+              ;;
+            csv)
+              uv pip install --python .minimum-venv/bin/python \
+                "aiofiles==23.2.1" "aiocsv==1.2.3"
+              ;;
+            fast|fast-forced-stdlib)
+              uv pip install --python .minimum-venv/bin/python \
+                "aiofiles==23.2.1" "zlib-ng==0.4.0"
+              ;;
+          esac
+
+      - name: Assert exact versions and engine selection
+        shell: bash
+        run: |
+          if [[ "${{ matrix.mode }}" == "fast-forced-stdlib" ]]; then
+            AIOGZIP_ENGINE=stdlib .minimum-venv/bin/python \
+              scripts/report_runtime_versions.py \
+              --mode "${{ matrix.mode }}" --require-installed-artifact
+          else
+            .minimum-venv/bin/python scripts/report_runtime_versions.py \
+              --mode "${{ matrix.mode }}" --require-installed-artifact
+          fi
+
+      - name: Check installed public API and typing contract
+        if: matrix.mode == 'base'
+        shell: bash
+        run: |
+          temporary_workdir="$(mktemp -d)"
+          cd "$temporary_workdir"
+          "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
+            "$GITHUB_WORKSPACE/scripts/capture_public_api.py" \
+            --check "$GITHUB_WORKSPACE/tests/data/public_api_2_0.json"
+          "$GITHUB_WORKSPACE/.minimum-venv/bin/python" -m mypy --strict \
+            "$GITHUB_WORKSPACE/tests/typing/public_api_positive.py"
+          "$GITHUB_WORKSPACE/.minimum-venv/bin/python" -m ty check \
+            --python-version 3.11 --no-progress \
+            "$GITHUB_WORKSPACE/tests/typing/public_api_positive.py"
+
+      - name: Smoke installed wheel outside checkout
+        shell: bash
+        run: |
+          temporary_workdir="$(mktemp -d)"
+          package_version="$(.minimum-venv/bin/python -c \
+            'import importlib.metadata; print(importlib.metadata.version("aiogzip"))')"
+          extra_arguments=()
+          if [[ "${{ matrix.mode }}" == "fast" ]]; then
+            extra_arguments+=(--expect-fast)
+          fi
+          cd "$temporary_workdir"
+          if [[ "${{ matrix.mode }}" == "fast-forced-stdlib" ]]; then
+            AIOGZIP_ENGINE=stdlib \
+              "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
+              "$GITHUB_WORKSPACE/scripts/smoke_wheel.py" \
+              --expected-version "$package_version"
+          else
+            "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
+              "$GITHUB_WORKSPACE/scripts/smoke_wheel.py" \
+              --expected-version "$package_version" "${extra_arguments[@]}"
+          fi
+
+      - name: Run maintained examples at the base floor
+        if: matrix.mode == 'base'
+        shell: bash
+        run: |
+          temporary_workdir="$(mktemp -d)"
+          cd "$temporary_workdir"
+          "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
+            "$GITHUB_WORKSPACE/examples/fragmented_transport.py" --self-test
+          "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
+            "$GITHUB_WORKSPACE/examples/concurrent_jsonl_ingest.py" \
+            --generate-fixtures "$temporary_workdir/input" \
+            --output "$temporary_workdir/output"
+
+      - name: Run full applicable minimum-version suite
+        shell: bash
+        run: |
+          arguments=(
+            -q
+            --deselect=tests/test_benchmark_runner.py::test_source_root_attestation_identifies_current_checkout
+          )
+          if [[ "${{ matrix.mode }}" != "csv" ]]; then
+            arguments+=(--ignore=tests/test_aiocsv.py)
+          fi
+          if [[ "${{ matrix.mode }}" == "fast-forced-stdlib" ]]; then
+            AIOGZIP_ENGINE=stdlib .minimum-venv/bin/python -m pytest \
+              "${arguments[@]}"
+          else
+            .minimum-venv/bin/python -m pytest "${arguments[@]}"
+          fi
 
   # Posts the coverage comment from the ubuntu/3.12 build leg's uploaded
   # .coverage data — no dependency install or duplicate test run needed.

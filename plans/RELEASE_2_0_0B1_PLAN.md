@@ -434,13 +434,24 @@ Mode-sensitive `open()` and `AsyncGzipFile()` return types, `CodecOperation.clos
 
 ### D14. Minimum dependency floor
 
-The declared runtime floor must correspond to a real release and pass tests. `aiofiles>=23.0.0` currently names a lower bound that has no matching release; the oldest actual 23.x release is `23.1.0`.
-
-After the minimum-version job passes, change the requirement to `aiofiles>=23.1.0`. Do not raise it further without a demonstrated requirement.
+The declared runtime floor must correspond to a real release and pass tests.
+`aiofiles>=23.0.0` initially named a lower bound with no matching release. Exact
+wheel tests then demonstrated that `23.1.0` leaves aiogzip-owned files open and
+unflushed on Python 3.11 and 3.12 because its delegated `close()` is a
+generator-based awaitable. `23.2.0` fixes that behavior but is yanked. Use the
+first non-yanked passing release, `aiofiles>=23.2.1`, on every supported Python
+version; a Python 3.11-only marker would leave the same defect installable on
+newer interpreters.
 
 ### D15. Optional dependency floors
 
-Test `aiocsv==1.2.0` and `zlib-ng==0.4.0` as the declared optional floors. Keep those floors if they pass. Raise a floor only when a reproducible incompatibility demonstrates the need, and document the exact failing capability.
+The initially declared `aiocsv>=1.2.0` floor names no published `1.2.0`
+release. Releases `1.2.1` and `1.2.2` fail to build on Python 3.11 because
+their generated extension includes the removed private header
+`longintrepr.h`; `1.2.3` is the first release that builds and passes the
+integration. Use `aiocsv>=1.2.3`. Retain `zlib-ng>=0.4.0`, which passes active
+and forced-stdlib tests. Any later floor raise still requires a reproducible
+incompatibility.
 
 ### D16. Latest and minimum CI are complementary
 
@@ -756,13 +767,14 @@ The actual schema may differ, but it must satisfy these properties:
 
 ### 7.1 Declared and tested floors
 
-The beta candidate should use the following floors, subject to actual successful testing:
+Exact Python 3.11 wheel testing revised the plan's initial candidates as
+follows:
 
-| Dependency | Current metadata | Minimum-version candidate | Action |
+| Dependency | Metadata before WP3 | Initial candidate | Tested floor |
 | --- | --- | --- | --- |
-| `aiofiles` | `>=23.0.0` | `23.1.0` | Test, then correct metadata to `>=23.1.0` |
-| `aiocsv` | `>=1.2.0` | `1.2.0` | Test optional integration; retain if passing |
-| `zlib-ng` | `>=0.4.0` | `0.4.0` | Test active and forced-stdlib paths; retain if passing |
+| `aiofiles` | `>=23.0.0` | `23.1.0` | `23.2.1` |
+| `aiocsv` | `>=1.2.0` | `1.2.0` | `1.2.3` |
+| `zlib-ng` | `>=0.4.0` | `0.4.0` | `0.4.0` |
 
 Test and tooling dependencies are not runtime compatibility promises. Use reasonably current pytest, type-checker, and build tools to run the minimum-runtime matrix.
 
@@ -800,26 +812,26 @@ minimum-dependencies:
 
 The final implementation should follow repository conventions rather than copy this sketch verbatim.
 
-- [ ] The minimum job uses Python 3.11, the oldest supported interpreter.
-- [ ] The package is installed from the built wheel with `--no-deps` before exact floors are installed.
-- [ ] The job prints `importlib.metadata.version()` for every dependency.
-- [ ] The job fails if the resolver selected a version other than the requested floor.
-- [ ] The base mode has zlib-ng absent.
-- [ ] The CSV mode installs exactly `aiocsv==1.2.0` and exercises the existing aiocsv integration.
-- [ ] The fast mode installs exactly `zlib-ng==0.4.0` and proves that the fast engine is active where expected.
-- [ ] The forced-stdlib mode installs zlib-ng but sets `AIOGZIP_ENGINE=stdlib` and proves stdlib selection.
-- [ ] The suite includes file read/write, text/binary, codec, streaming, inspection, verification, and maintained-example smoke tests.
-- [ ] The job runs outside the repository import path for at least one artifact smoke phase.
-- [ ] Latest/unpinned dependency CI remains unchanged in purpose.
-- [ ] A failure at a declared floor is investigated before metadata is raised.
+- [x] The minimum job uses Python 3.11, the oldest supported interpreter.
+- [x] The package is installed from the built wheel with `--no-deps` before exact floors are installed.
+- [x] The job prints `importlib.metadata.version()` for every dependency.
+- [x] The job fails if the resolver selected a version other than the requested floor.
+- [x] The base mode has zlib-ng absent.
+- [x] The CSV mode installs exactly `aiocsv==1.2.3` and exercises the existing aiocsv integration.
+- [x] The fast mode installs exactly `zlib-ng==0.4.0` and proves that the fast engine is active where expected.
+- [x] The forced-stdlib mode installs zlib-ng but sets `AIOGZIP_ENGINE=stdlib` and proves stdlib selection.
+- [x] The suite includes file read/write, text/binary, codec, streaming, inspection, verification, and maintained-example smoke tests.
+- [x] The job runs outside the repository import path for at least one artifact smoke phase.
+- [x] Latest/unpinned dependency CI remains unchanged in purpose.
+- [x] A failure at a declared floor is investigated before metadata is raised.
 
 ### 7.3 Dependency metadata update
 
-- [ ] After successful testing, `pyproject.toml` changes `aiofiles>=23.0.0` to `aiofiles>=23.1.0`.
-- [ ] The changelog explains that this makes the lower bound correspond to an actual tested release and does not exclude a real `23.0.0` release.
-- [ ] `uv.lock` is refreshed according to repository policy without treating the lock as the runtime floor test.
-- [ ] Package metadata in both wheel and sdist contains the corrected requirement.
-- [ ] No optional floor is raised without a committed failing-case record.
+- [x] After successful testing, `pyproject.toml` changes `aiofiles>=23.0.0` to `aiofiles>=23.2.1`.
+- [x] The changelog explains why the corrected lower bounds are the first actual compatible releases.
+- [x] `uv.lock` is refreshed according to repository policy without treating the lock as the runtime floor test.
+- [x] Package metadata in both wheel and sdist contains the corrected requirement.
+- [x] No optional floor is raised without a committed failing-case record.
 
 ## 8. Beta documentation and metadata
 
@@ -1076,37 +1088,37 @@ CHANGELOG.md
 
 #### WP3 tasks
 
-- [ ] Add a Python 3.11 minimum-dependency CI job.
-- [ ] Build the candidate wheel before installing runtime floors.
-- [ ] Install the wheel with `--no-deps`.
-- [ ] Install exactly `aiofiles==23.1.0` in all minimum-runtime modes.
-- [ ] Install exactly `aiocsv==1.2.0` in the CSV mode.
-- [ ] Install exactly `zlib-ng==0.4.0` in fast modes.
-- [ ] Print and assert exact installed versions.
-- [ ] Verify base mode has no zlib-ng installation.
-- [ ] Verify fast mode selects zlib-ng where expected.
-- [ ] Verify forced-stdlib mode honors `AIOGZIP_ENGINE=stdlib` with zlib-ng installed.
-- [ ] Run the full suite where practical; otherwise document and justify the selected minimum-version subset.
-- [ ] Run maintained examples in at least one minimum-version mode.
-- [ ] Run aiocsv integration at its floor.
-- [ ] Run public API manifest and typing smoke checks at the minimum runtime floor.
-- [ ] Record every exact command and result.
-- [ ] Change metadata to `aiofiles>=23.1.0` only after the floor passes.
-- [ ] Retain `aiocsv>=1.2.0` if passing.
-- [ ] Retain `zlib-ng>=0.4.0` if passing.
-- [ ] If an optional floor fails, capture a minimal reproduction before proposing a metadata raise.
-- [ ] Preserve latest/unpinned dependency CI jobs.
-- [ ] Update dependency-floor documentation and changelog.
-- [ ] Refresh `uv.lock` under repository policy.
+- [x] Add a Python 3.11 minimum-dependency CI job.
+- [x] Build the candidate wheel before installing runtime floors.
+- [x] Install the wheel with `--no-deps`.
+- [x] Install exactly `aiofiles==23.2.1` in all minimum-runtime modes.
+- [x] Install exactly `aiocsv==1.2.3` in the CSV mode.
+- [x] Install exactly `zlib-ng==0.4.0` in fast modes.
+- [x] Print and assert exact installed versions.
+- [x] Verify base mode has no zlib-ng installation.
+- [x] Verify fast mode selects zlib-ng where expected.
+- [x] Verify forced-stdlib mode honors `AIOGZIP_ENGINE=stdlib` with zlib-ng installed.
+- [x] Run the full suite where practical; otherwise document and justify the selected minimum-version subset.
+- [x] Run maintained examples in at least one minimum-version mode.
+- [x] Run aiocsv integration at its floor.
+- [x] Run public API manifest and typing smoke checks at the minimum runtime floor.
+- [x] Record every exact command and result.
+- [x] Change metadata to `aiofiles>=23.2.1` only after the floor passes.
+- [x] Raise the CSV floor to `aiocsv>=1.2.3` only after the earlier releases fail and `1.2.3` passes.
+- [x] Retain `zlib-ng>=0.4.0` after it passes.
+- [x] Capture minimal reproductions before raising either failed floor.
+- [x] Preserve latest/unpinned dependency CI jobs.
+- [x] Update dependency-floor documentation and changelog.
+- [x] Refresh `uv.lock` under repository policy.
 
 #### WP3 exit criteria
 
-- [ ] Every declared runtime/optional floor is an actual release.
-- [ ] Every declared floor is exercised in CI.
-- [ ] The resolver cannot silently substitute a newer release.
-- [ ] Latest-dependency testing remains in place.
-- [ ] Wheel metadata contains the tested floors.
-- [ ] No unnecessary floor increase occurred.
+- [x] Every declared runtime/optional floor is an actual release.
+- [x] Every declared floor is exercised in CI.
+- [x] The resolver cannot silently substitute a newer release.
+- [x] Latest-dependency testing remains in place.
+- [x] Wheel metadata contains the tested floors.
+- [x] No unnecessary floor increase occurred.
 
 **Suggested commit:** `CI: test and declare the 2.0 minimum dependencies`
 
@@ -1408,7 +1420,7 @@ The review must cover the actual candidate commit, not an earlier code head.
 
 - [ ] Explain that this is the first beta and the 2.0 public API is frozen.
 - [ ] Summarize the machine-readable API and typing contract.
-- [ ] Summarize minimum-dependency CI and the corrected `aiofiles>=23.1.0` floor.
+- [ ] Summarize minimum-dependency CI and the corrected `aiofiles>=23.2.1` and `aiocsv>=1.2.3` floors.
 - [ ] Summarize beta documentation and support-policy updates.
 - [ ] State that runtime behavior is intentionally preserved from `a4`.
 - [ ] State that AnyIO/Trio and indexed access remain deferred.
@@ -1493,11 +1505,11 @@ Codex prepares this checklist but must not execute remote publication actions un
 
 ### 10.3 Dependencies and installation
 
-- [ ] `aiofiles==23.1.0` passes the minimum-runtime suite.
-- [ ] `aiocsv==1.2.0` passes the optional CSV suite.
-- [ ] `zlib-ng==0.4.0` passes the optional fast-engine suite.
-- [ ] Forced stdlib works with zlib-ng installed at its floor.
-- [ ] Metadata declares only tested floors.
+- [x] `aiofiles==23.2.1` passes the minimum-runtime suite.
+- [x] `aiocsv==1.2.3` passes the optional CSV suite.
+- [x] `zlib-ng==0.4.0` passes the optional fast-engine suite.
+- [x] Forced stdlib works with zlib-ng installed at its floor.
+- [x] Metadata declares only tested floors.
 - [ ] Latest/unpinned dependency CI also passes.
 - [ ] Wheel and sdist install cleanly.
 - [ ] The sdist contains maintained examples; the wheel contains only the intended library/package data.
@@ -1621,7 +1633,7 @@ A practical sequence:
 
 3. **PR C — Dependency floors**
    - minimum-version jobs;
-   - `aiofiles>=23.1.0`;
+   - `aiofiles>=23.2.1` and `aiocsv>=1.2.3`;
    - floor evidence.
 
 4. **PR D — Beta documentation**
@@ -1671,7 +1683,7 @@ runtime contract manifest and mypy/ty typing-contract fixtures. Do not freeze
 private details, complete dynamic error messages, literal version values, or
 engine diagnostic strings.
 
-Add an exact minimum-dependency CI matrix. Prove aiofiles 23.1.0, aiocsv 1.2.0,
+Add an exact minimum-dependency CI matrix. Prove aiofiles 23.2.1, aiocsv 1.2.3,
 and zlib-ng 0.4.0 before changing metadata. Keep latest/unpinned dependency CI.
 
 Update active documentation from alpha/provisional status to a precise beta

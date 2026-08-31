@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Corrected the tested minimum dependencies to `aiofiles>=23.2.1` and
+  `aiocsv>=1.2.3`. The earlier declared bounds named versions that either do
+  not exist or cannot support aiogzip's Python 3.11+ runtime contract;
+  zlib-ng remains supported from `0.4.0`.
+
 ## [2.0.0a4] - 2026-08-23
 
 ### Added

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import re
 import tomllib
 from pathlib import Path
@@ -88,3 +89,35 @@ def test_release_metadata_is_synchronized():
     assert any(
         dependency.startswith("aiofiles") for dependency in project["dependencies"]
     )
+
+
+def test_minimum_runtime_dependencies_are_synchronized():
+    """Metadata, the assertion script, and CI must use the proven floors."""
+    root = Path(__file__).resolve().parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]
+    assert project["dependencies"] == ["aiofiles>=23.2.1"]
+    assert project["optional-dependencies"]["csv"] == ["aiocsv>=1.2.3"]
+    assert project["optional-dependencies"]["fast"] == ["zlib-ng>=0.4.0"]
+
+    script = root / "scripts" / "report_runtime_versions.py"
+    spec = importlib.util.spec_from_file_location("report_runtime_versions", script)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module._EXPECTED_VERSIONS == {
+        "base": {"aiofiles": "23.2.1"},
+        "csv": {"aiofiles": "23.2.1", "aiocsv": "1.2.3"},
+        "fast": {"aiofiles": "23.2.1", "zlib-ng": "0.4.0"},
+        "fast-forced-stdlib": {"aiofiles": "23.2.1", "zlib-ng": "0.4.0"},
+    }
+
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    for exact_pin in (
+        "aiofiles==23.2.1",
+        "aiocsv==1.2.3",
+        "zlib-ng==0.4.0",
+    ):
+        assert exact_pin in workflow

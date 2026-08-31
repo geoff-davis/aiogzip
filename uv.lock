@@ -120,8 +120,8 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiocsv", marker = "extra == 'csv'", specifier = ">=1.2.0" },
-    { name = "aiofiles", specifier = ">=23.0.0" },
+    { name = "aiocsv", marker = "extra == 'csv'", specifier = ">=1.2.3" },
+    { name = "aiofiles", specifier = ">=23.2.1" },
     { name = "aiogzip", extras = ["test"], marker = "extra == 'dev'" },
     { name = "hypothesis", marker = "extra == 'test'", specifier = ">=6.0.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.5.0" },

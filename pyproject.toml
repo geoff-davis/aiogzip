@@ -28,11 +28,11 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "aiofiles>=23.0.0",
+    "aiofiles>=23.2.1",
 ]
 [project.optional-dependencies]
 csv = [
-    "aiocsv>=1.2.0",
+    "aiocsv>=1.2.3",
 ]
 fast = [
     "zlib-ng>=0.4.0",
@@ -68,11 +68,6 @@ Documentation = "https://geoff-davis.github.io/aiogzip/"
 Changelog = "https://github.com/geoff-davis/aiogzip/blob/main/CHANGELOG.md"
 "Source Code" = "https://github.com/geoff-davis/aiogzip"
 "Bug Tracker" = "https://github.com/geoff-davis/aiogzip/issues"
-
-[tool.uv]
-# The lockfile pins the development environment only; CI deliberately installs
-# unpinned dependencies. Keep local resolution aligned with the 2.0 floor.
-environments = ["python_full_version >= '3.11'"]
 
 [tool.flit.sdist]
 include = [
