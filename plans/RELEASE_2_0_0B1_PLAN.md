@@ -1220,42 +1220,42 @@ The existing platform matrix may absorb some rows; avoid gratuitous duplication.
 
 #### WP5 tasks
 
-- [ ] Build wheel and sdist from a clean checkout.
-- [ ] Inspect the exact sdist file list and record whether `examples/README.md`, `examples/fragmented_transport.py`, and `examples/concurrent_jsonl_ingest.py` are present.
-- [ ] If maintained examples are absent from the sdist, add `examples/` to the flit sdist include policy and test it.
-- [ ] Confirm maintained examples are not installed into the `aiogzip` package namespace in the wheel.
-- [ ] Create clean virtual environments outside the repository.
-- [ ] Install artifacts without editable mode.
-- [ ] Run from a working directory outside the repository.
-- [ ] Assert `aiogzip.__file__` is inside the clean environment.
-- [ ] Assert package metadata version and dependency requirements.
-- [ ] Run top-level import and public API manifest smoke checks.
-- [ ] Run binary and text file read/write smoke tests.
-- [ ] Run codec encode/decode and standard-library interoperability smoke tests.
-- [ ] Run `compress_chunks()` and `decompress_chunks()` smoke tests.
-- [ ] Run `inspect()` and `verify()` against valid and corrupt fixtures.
-- [ ] Run the fragmented-transport maintained example.
-- [ ] Run fragmented-transport corruption and truncation scenarios.
-- [ ] Run the concurrent-ingest maintained example.
-- [ ] Run concurrent-ingest corruption, truncation, cancellation, and limit scenarios.
-- [ ] Verify maintained examples use only public aiogzip imports.
-- [ ] Run CLI inspect/verify commands from the installed artifact when applicable.
-- [ ] Run the aiocsv integration from an installed artifact.
-- [ ] Run the tarfile-style integration from an installed artifact.
-- [ ] Verify zlib-ng active and forced-stdlib behavior in clean environments.
-- [ ] Record exact artifact path, size, SHA-256, Python, OS, and dependency versions.
-- [ ] Do not treat example output wording as frozen API.
+- [x] Build wheel and sdist from a clean checkout.
+- [x] Inspect the exact sdist file list and record whether `examples/README.md`, `examples/fragmented_transport.py`, and `examples/concurrent_jsonl_ingest.py` are present.
+- [x] If maintained examples are absent from the sdist, add `examples/` to the flit sdist include policy and test it.
+- [x] Confirm maintained examples are not installed into the `aiogzip` package namespace in the wheel.
+- [x] Create clean virtual environments outside the repository.
+- [x] Install artifacts without editable mode.
+- [x] Run from a working directory outside the repository.
+- [x] Assert `aiogzip.__file__` is inside the clean environment.
+- [x] Assert package metadata version and dependency requirements.
+- [x] Run top-level import and public API manifest smoke checks.
+- [x] Run binary and text file read/write smoke tests.
+- [x] Run codec encode/decode and standard-library interoperability smoke tests.
+- [x] Run `compress_chunks()` and `decompress_chunks()` smoke tests.
+- [x] Run `inspect()` and `verify()` against valid and corrupt fixtures.
+- [x] Run the fragmented-transport maintained example.
+- [x] Run fragmented-transport corruption and truncation scenarios.
+- [x] Run the concurrent-ingest maintained example.
+- [x] Run concurrent-ingest corruption, truncation, cancellation, and limit scenarios.
+- [x] Verify maintained examples use only public aiogzip imports.
+- [x] Run CLI inspect/verify commands from the installed artifact when applicable.
+- [x] Run the aiocsv integration from an installed artifact.
+- [x] Run the tarfile-style integration from an installed artifact.
+- [x] Verify zlib-ng active and forced-stdlib behavior in clean environments.
+- [x] Record exact artifact path, size, SHA-256, Python, OS, and dependency versions.
+- [x] Do not treat example output wording as frozen API.
 
 #### WP5 exit criteria
 
-- [ ] Both artifact types import and behave correctly outside the checkout.
-- [ ] The sdist contains the maintained example sources and runbook.
-- [ ] The wheel remains a library artifact without an accidental examples package.
-- [ ] Both maintained examples run from installed artifacts.
-- [ ] Public API manifest matches the candidate artifact.
-- [ ] Minimum and latest dependency modes pass their intended paths.
-- [ ] No undeclared runtime dependency is imported.
-- [ ] No example requires private aiogzip hooks.
+- [x] Both artifact types import and behave correctly outside the checkout.
+- [x] The sdist contains the maintained example sources and runbook.
+- [x] The wheel remains a library artifact without an accidental examples package.
+- [x] Both maintained examples run from installed artifacts.
+- [x] Public API manifest matches the candidate artifact.
+- [x] Minimum and latest dependency modes pass their intended paths.
+- [x] No undeclared runtime dependency is imported.
+- [x] No example requires private aiogzip hooks.
 
 **Suggested commit:** `Tests: validate beta artifacts and maintained integrations`
 
