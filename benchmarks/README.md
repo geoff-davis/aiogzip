@@ -233,7 +233,11 @@ concurrent digests are calculated after each bounded library read completes.
 that remain noisy across separate benchmark processes. It loads two source
 trees under distinct package aliases in one interpreter, warms both, disables
 GC during measurement, and runs repeated A/B/B/A cycles. It reports raw
-samples plus per-side minima and does not replace the locked release matrices:
+samples plus per-side minima and does not replace the locked release matrices.
+Before allocating fixtures, it requires clean tracked source trees, captures
+commit and `git describe` provenance, and verifies both packages actually use
+the requested engine. The output is checkpointed atomically after every case,
+so a late failure preserves completed measurements with `status: failed`:
 
 ```bash
 taskset -c 0 uv run python benchmarks/investigate_b1_timing.py \

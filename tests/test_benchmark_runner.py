@@ -10,6 +10,7 @@ import sys
 import tracemalloc
 import zlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from conftest import FramedAsyncReader
@@ -22,6 +23,7 @@ bench_streaming = importlib.import_module("bench_streaming")
 bench_codec_regressions = importlib.import_module("bench_codec_regressions")
 bench_a3_regressions = importlib.import_module("bench_a3_regressions")
 bench_a4_supplement = importlib.import_module("bench_a4_supplement")
+investigate_b1_timing = importlib.import_module("investigate_b1_timing")
 verify_a3_writes = importlib.import_module("verify_a3_writes")
 verify_a3_headers = importlib.import_module("verify_a3_headers")
 BenchmarkResults = bench_common.BenchmarkResults
@@ -53,6 +55,10 @@ a4_bounded_jsonl_once = bench_a4_supplement._bounded_jsonl_once
 a4_concurrent_reads_once = bench_a4_supplement._concurrent_reads_once
 a4_full_binary_read_once = bench_a4_supplement._full_binary_read_once
 a4_jsonl_fixture = bench_a4_supplement._jsonl_fixture
+b1_assert_requested_engine = investigate_b1_timing._assert_requested_engine
+b1_run = investigate_b1_timing.run
+b1_source_identity = investigate_b1_timing._source_identity
+b1_time_output_bound = investigate_b1_timing._time_output_bound
 
 
 def _result(name, duration, marker):
@@ -119,6 +125,235 @@ def test_positive_int(value, expected):
 def test_positive_int_rejects_nonpositive_values(value):
     with pytest.raises(argparse.ArgumentTypeError, match="positive integer"):
         positive_int(value)
+
+
+def test_b1_investigation_rejects_requested_engine_mismatch():
+    from aiogzip import EngineInfo
+
+    stdlib = SimpleNamespace(
+        engine_info=lambda: EngineInfo(
+            compression="stdlib-zlib",
+            decompression="stdlib-zlib",
+            crc32="stdlib-zlib",
+        )
+    )
+    zlib_ng = SimpleNamespace(
+        engine_info=lambda: EngineInfo(
+            compression="stdlib-zlib",
+            decompression="zlib-ng",
+            crc32="zlib-ng",
+        )
+    )
+
+    assert b1_assert_requested_engine(stdlib, "stdlib", source_label="test") == {
+        "compression": "stdlib-zlib",
+        "decompression": "stdlib-zlib",
+        "crc32": "stdlib-zlib",
+    }
+    assert b1_assert_requested_engine(zlib_ng, "zlib-ng", source_label="test") == {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng",
+        "crc32": "zlib-ng",
+    }
+    with pytest.raises(RuntimeError, match="zlib-ng was requested"):
+        b1_assert_requested_engine(stdlib, "zlib-ng", source_label="test")
+    with pytest.raises(RuntimeError, match="stdlib was requested"):
+        b1_assert_requested_engine(zlib_ng, "stdlib", source_label="test")
+
+
+def test_b1_investigation_attests_clean_source_before_timing(tmp_path, monkeypatch):
+    package_init = tmp_path / "src" / "aiogzip" / "__init__.py"
+    package_init.parent.mkdir(parents=True)
+    package_init.write_text("__version__ = 'test'\n", encoding="utf-8")
+
+    def fake_git(root, *args):
+        assert root == tmp_path
+        if args == ("rev-parse", "HEAD"):
+            return "abc123"
+        if args == ("describe", "--always", "--dirty", "--tags"):
+            return "v2.0.0a4"
+        if args == ("status", "--porcelain", "--untracked-files=no"):
+            return ""
+        raise AssertionError(args)
+
+    monkeypatch.setattr(investigate_b1_timing, "_git", fake_git)
+
+    assert b1_source_identity(tmp_path) == {
+        "source_root": str(tmp_path),
+        "commit": "abc123",
+        "describe": "v2.0.0a4",
+        "dirty_tracked": False,
+    }
+
+
+def test_b1_investigation_rejects_dirty_source(tmp_path, monkeypatch):
+    package_init = tmp_path / "src" / "aiogzip" / "__init__.py"
+    package_init.parent.mkdir(parents=True)
+    package_init.write_text("__version__ = 'test'\n", encoding="utf-8")
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_git",
+        lambda _root, *args: (
+            " M src/aiogzip/__init__.py" if args[0] == "status" else "abc123"
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="tracked changes"):
+        b1_source_identity(tmp_path)
+
+
+def test_b1_output_bound_allows_multiple_legal_chunks_and_closes_operations():
+    payload = b"x" * (128 * 1024)
+
+    class Operation:
+        def __init__(self, outputs):
+            self.outputs = outputs
+            self.closed = False
+
+        def __iter__(self):
+            return iter(self.outputs)
+
+        def close(self):
+            self.closed = True
+
+    class Decoder:
+        def __init__(self):
+            self.feed_operation = Operation([payload[: 64 * 1024]])
+            self.finish_operation = Operation([payload[64 * 1024 :]])
+            self.discarded = False
+
+        def feed(self, _wire):
+            return self.feed_operation
+
+        def finish(self):
+            return self.finish_operation
+
+        def discard(self):
+            self.discarded = True
+
+    decoder = Decoder()
+    module = SimpleNamespace(GzipDecoder=lambda **_kwargs: decoder)
+
+    assert (
+        b1_time_output_bound(module, b"wire", hashlib.sha256(payload).hexdigest()) >= 0
+    )
+    assert decoder.feed_operation.closed
+    assert decoder.finish_operation.closed
+    assert decoder.discarded
+
+
+def test_b1_output_bound_discards_decoder_when_iteration_fails():
+    class Operation:
+        closed = False
+
+        def __iter__(self):
+            yield object()
+
+        def close(self):
+            self.closed = True
+
+    class Decoder:
+        def __init__(self):
+            self.feed_operation = Operation()
+            self.discarded = False
+
+        def feed(self, _wire):
+            return self.feed_operation
+
+        def discard(self):
+            self.discarded = True
+
+    decoder = Decoder()
+    module = SimpleNamespace(GzipDecoder=lambda **_kwargs: decoder)
+
+    with pytest.raises(TypeError):
+        b1_time_output_bound(module, b"wire", "unused")
+    assert decoder.feed_operation.closed
+    assert decoder.discarded
+
+
+def test_b1_investigation_checkpoints_partial_results_on_late_failure(
+    tmp_path, monkeypatch
+):
+    from aiogzip import EngineInfo
+
+    baseline_root = tmp_path / "baseline"
+    candidate_root = tmp_path / "candidate"
+    for root in (baseline_root, candidate_root):
+        package_init = root / "src" / "aiogzip" / "__init__.py"
+        package_init.parent.mkdir(parents=True)
+        package_init.write_text("__version__ = 'test'\n", encoding="utf-8")
+
+    def identity(root):
+        return {
+            "source_root": str(root),
+            "commit": root.name,
+            "describe": root.name,
+            "dirty_tracked": False,
+        }
+
+    def package(root):
+        return SimpleNamespace(
+            __file__=str(root / "src" / "aiogzip" / "__init__.py"),
+            __version__="test",
+            engine_info=lambda: EngineInfo(
+                compression="stdlib-zlib",
+                decompression="stdlib-zlib",
+                crc32="stdlib-zlib",
+            ),
+        )
+
+    monkeypatch.setattr(investigate_b1_timing, "_source_identity", identity)
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_load_package",
+        lambda alias, root: package(root),
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_output_bound_fixture",
+        lambda: (b"wire", "digest"),
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "optional_header_fixture",
+        lambda *_args, **_kwargs: (b"wire", b""),
+    )
+    calls = 0
+
+    async def measure_case(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("late failure")
+        return {"name": "completed"}
+
+    monkeypatch.setattr(investigate_b1_timing, "_measure_case", measure_case)
+    snapshots = []
+    args = argparse.Namespace(
+        baseline_root=baseline_root,
+        candidate_root=candidate_root,
+        engine="stdlib",
+        cycles=1,
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        asyncio.run(
+            b1_run(
+                args,
+                checkpoint=lambda document: snapshots.append(
+                    json.loads(json.dumps(document))
+                ),
+            )
+        )
+
+    assert snapshots[0]["status"] == "running"
+    assert snapshots[-1]["status"] == "failed"
+    assert snapshots[-1]["results"] == [{"name": "completed"}]
+    assert snapshots[-1]["failure"] == {
+        "type": "RuntimeError",
+        "message": "late failure",
+    }
 
 
 def test_comparison_fixture_is_deterministic(tmp_path):
