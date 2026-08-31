@@ -114,6 +114,7 @@ test = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
+    { name = "ty" },
     { name = "types-aiofiles" },
 ]
 
@@ -133,7 +134,7 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.24" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.15.20" },
-    { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.1a16" },
+    { name = "ty", marker = "extra == 'test'", specifier = ">=0.0.1a16" },
     { name = "types-aiofiles", marker = "extra == 'test'" },
     { name = "zlib-ng", marker = "extra == 'fast'", specifier = ">=0.4.0" },
 ]

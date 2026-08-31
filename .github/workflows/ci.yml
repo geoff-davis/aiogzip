@@ -52,10 +52,10 @@ jobs:
         run: ruff format --check .
 
       - name: Type check with Mypy
-        run: mypy src
+        run: mypy src tests/typing/public_api_positive.py
 
       - name: Type check with Ty
-        run: ty check src
+        run: ty check src tests/typing/public_api_positive.py
 
   build:
     # The type of runner that the job will run on
@@ -96,6 +96,12 @@ jobs:
       # not consulted) so CI exercises fresh dependency releases.
       - name: Install dependencies
         run: uv pip install --system -e ".[test,csv]"
+
+      # This explicit check makes the supported-Python matrix the portability
+      # gate for the structured runtime manifest. The test suite also covers
+      # deterministic capture and intentional failure cases.
+      - name: Check frozen public API manifest
+        run: python scripts/capture_public_api.py --check tests/data/public_api_2_0.json
 
       # Step 4: Run tests with pytest and coverage
       # --cov-fail-under gates against silent coverage regressions. The

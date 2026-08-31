@@ -1001,42 +1001,42 @@ tests/test_public_api_typing.py
 
 #### WP2 implementation tasks
 
-- [ ] Implement a deterministic standard-library-only public API capture script.
-- [ ] Add explicit schema versioning.
-- [ ] Normalize signatures structurally rather than storing raw `repr()` strings where possible.
-- [ ] Normalize sentinel/default values deterministically.
-- [ ] Capture top-level and codec-module exports.
-- [ ] Capture curated function signatures and coroutine/iterator categories.
-- [ ] Capture curated class constructor and public method/property presence.
-- [ ] Capture dataclass fields, defaults, frozen state, and slots state.
-- [ ] Capture exception base classes.
-- [ ] Capture protocol member sets.
-- [ ] Capture constants and values.
-- [ ] Capture `__version__` presence/type without freezing its literal.
-- [ ] Exclude engine-name values and private internals.
-- [ ] Add `--check`, `--output`, and human-readable diff behavior.
+- [x] Implement a deterministic standard-library-only public API capture script.
+- [x] Add explicit schema versioning.
+- [x] Normalize signatures structurally rather than storing raw `repr()` strings where possible.
+- [x] Normalize sentinel/default values deterministically.
+- [x] Capture top-level and codec-module exports.
+- [x] Capture curated function signatures and coroutine/iterator categories.
+- [x] Capture curated class constructor and public method/property presence.
+- [x] Capture dataclass fields, defaults, frozen state, and slots state.
+- [x] Capture exception base classes.
+- [x] Capture protocol member sets.
+- [x] Capture constants and values.
+- [x] Capture `__version__` presence/type without freezing its literal.
+- [x] Exclude engine-name values and private internals.
+- [x] Add `--check`, `--output`, and human-readable diff behavior.
 - [ ] Generate the committed `tests/data/public_api_2_0.json` from the approved beta decision.
-- [ ] Add tests that the manifest is deterministic under repeated capture.
-- [ ] Add tests that duplicate exports or missing exports fail clearly.
-- [ ] Add positive typing fixtures.
-- [ ] Add negative typing fixtures with an explicit expected-error mechanism.
-- [ ] Cover binary/text mode overload inference.
-- [ ] Cover source/fileobj protocol acceptance.
-- [ ] Cover codec operation cleanup typing.
-- [ ] Cover async iterator item types.
-- [ ] Cover dataclass attributes.
-- [ ] Run mypy and `ty` against the fixtures.
-- [ ] Run the manifest capture under Python 3.11 through 3.14 in CI.
-- [ ] Document the regeneration procedure for future intentional changes.
+- [x] Add tests that the manifest is deterministic under repeated capture.
+- [x] Add tests that duplicate exports or missing exports fail clearly.
+- [x] Add positive typing fixtures.
+- [x] Add negative typing fixtures with an explicit expected-error mechanism.
+- [x] Cover binary/text mode overload inference.
+- [x] Cover source/fileobj protocol acceptance.
+- [x] Cover codec operation cleanup typing.
+- [x] Cover async iterator item types.
+- [x] Cover dataclass attributes.
+- [x] Run mypy and `ty` against the fixtures.
+- [x] Run the manifest capture under Python 3.11 through 3.14 in CI.
+- [x] Document the regeneration procedure for future intentional changes.
 
 #### WP2 prohibitions
 
-- [ ] Do not capture private modules or private members.
-- [ ] Do not freeze exact exception messages that contain dynamic context.
-- [ ] Do not freeze engine diagnostic strings.
-- [ ] Do not depend on third-party API-diff libraries.
-- [ ] Do not import test contract code from package runtime modules.
-- [ ] Do not make a runtime signature change merely to simplify the snapshot.
+- [x] Do not capture private modules or private members.
+- [x] Do not freeze exact exception messages that contain dynamic context.
+- [x] Do not freeze engine diagnostic strings.
+- [x] Do not depend on third-party API-diff libraries.
+- [x] Do not import test contract code from package runtime modules.
+- [x] Do not make a runtime signature change merely to simplify the snapshot.
 
 #### WP2 required checks
 
@@ -1051,11 +1051,11 @@ uv run prek run --all-files
 
 #### WP2 exit criteria
 
-- [ ] An accidental public export/signature/dataclass/exception/constant change fails CI.
-- [ ] Typing overload regressions fail both mypy and `ty` checks.
+- [x] An accidental public export/signature/dataclass/exception/constant change fails CI.
+- [x] Typing overload regressions fail both mypy and `ty` checks.
 - [ ] The manifest is stable across supported Python versions.
 - [ ] The manifest encodes only approved public facts.
-- [ ] No runtime behavior changes were needed.
+- [x] No runtime behavior changes were needed.
 
 **Suggested commit:** `Tests: freeze the aiogzip 2.0 public API contract`
 
