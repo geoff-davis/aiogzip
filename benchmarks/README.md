@@ -227,6 +227,26 @@ comparison surface. The JSONL digest is updated incrementally inside the timed
 region so the benchmark does not retain all decoded rows. Binary and
 concurrent digests are calculated after each bounded library read completes.
 
+### Targeted same-process evidence investigation
+
+`investigate_b1_timing.py` is an evidence-only diagnostic for threshold rows
+that remain noisy across separate benchmark processes. It loads two source
+trees under distinct package aliases in one interpreter, warms both, disables
+GC during measurement, and runs repeated A/B/B/A cycles. It reports raw
+samples plus per-side minima and does not replace the locked release matrices:
+
+```bash
+taskset -c 0 uv run python benchmarks/investigate_b1_timing.py \
+  --baseline-root /tmp/aiogzip-v2.0.0a4 \
+  --candidate-root . \
+  --engine stdlib --cycles 50 \
+  --output /tmp/aiogzip-b1-targeted-stdlib.json
+```
+
+Run it once per required engine only after retaining the original threshold
+crossing and the interleaved process-level follow-up. Treat its minimum
+comparison as an investigation result, not a standalone performance claim.
+
 ## Running Benchmarks
 
 ### Command Line Options

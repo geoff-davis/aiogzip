@@ -1297,6 +1297,12 @@ plans/reviews/v2.0.0b1-hardening.md
 - [ ] Minimum-dependency jobs pass.
 - [x] Coverage remains at or above the configured floor.
 
+The absent-zlib checkbox is supported by a current CPython 3.12 environment
+with no importable `zlib_ng`: the full applicable collection passed with 2,377
+tests and 18 zlib-specific skips. Eight zlib-ng fixture parameterizations are
+not generated when the optional module is absent. This supersedes the earlier
+smaller exact-minimum run as evidence for that checkbox.
+
 #### WP6 performance matrix
 
 - [x] Representative `decompress_chunks()` 512/256 KiB row is compared with exact `a4`.
@@ -1315,6 +1321,14 @@ plans/reviews/v2.0.0b1-hardening.md
 - [x] Every slowdown over 5% has a written investigation.
 - [x] Every slowdown over 10% blocks release.
 - [x] New API-contract and artifact tests are not presented as performance improvements.
+
+Review of `fa507af` found two omitted >5% rows, an undispositioned bimodal
+allocation result, and two statistically insufficient noise explanations.
+The corrected benchmark record enumerates every crossing. One reverse-order
+minimum crossed 10% and held the gate closed until an interleaved 100-sample
+same-process diagnostic put every investigated row below 5%. Fifteen-sample
+allocation follow-ups reproduce the same modes and maxima on both source
+trees. Original and corrective raw records are retained.
 
 #### WP6 issue `#86` closeout
 
@@ -1364,15 +1378,15 @@ The review must cover the actual candidate commit, not an earlier code head.
 - [ ] Reviewer inspects stale alpha/provisional wording search results.
 - [ ] Reviewer confirms no material lifecycle redesign is concealed in the beta candidate.
 - [ ] Reviewer confirms AnyIO, indexed access, and buffered-writer work remain deferred.
-- [ ] Reviewer records approval, requested changes, or blocking findings against the exact SHA.
+- [x] Reviewer records approval, requested changes, or blocking findings against the exact SHA.
 
 #### WP7 response to findings
 
-- [ ] Every finding has an owner and disposition.
-- [ ] Corrective commits invalidate prior approval until the reviewer covers the new head.
+- [x] Every finding has an owner and disposition.
+- [x] Corrective commits invalidate prior approval until the reviewer covers the new head.
 - [ ] A material contract finding triggers the beta escalation rule and likely `a5`.
 - [ ] Review evidence names the reviewer, date, exact commit, scope, commands, and conclusion.
-- [ ] Codex does not claim the review complete on the reviewer's behalf.
+- [x] Codex does not claim the review complete on the reviewer's behalf.
 
 #### WP7 exit criteria
 
