@@ -24,11 +24,19 @@ Codex performed no remote mutation.
   `plans/benchmarks/data/v2.0.0a4-candidate-pinned-stdlib.json`.
 - zlib-ng raw write matrix:
   `plans/benchmarks/data/v2.0.0a4-candidate-pinned-zlib-ng.json`.
+- Controlled exact-a4 and b1 forced-stdlib write matrices:
+  `plans/benchmarks/data/v2.0.0a4-b1-controlled-a3-stdlib.json` and
+  `plans/benchmarks/data/v2.0.0b1-controlled-a3-stdlib.json`.
+- Controlled exact-a4 and b1 zlib-ng write matrices:
+  `plans/benchmarks/data/v2.0.0a4-b1-controlled-a3-zlib-ng.json` and
+  `plans/benchmarks/data/v2.0.0b1-controlled-a3-zlib-ng.json`.
 
 The controlled a3 to a4 10-byte-per-call diagnostic was 5.38% faster with
 forced stdlib zlib and 0.36% slower with zlib-ng. Both passed the retained 10%
-anti-regression gate. The b1 candidate must again pass the exact-a4 gate before
-the maintainer uses this packet.
+anti-regression gate. The b1 candidate also passes its exact-a4 gate: the
+controlled b1 comparison measured the 10-byte row 0.75% faster with forced
+stdlib and 0.02% slower with zlib-ng than exact a4. No write-size row was more
+than 5% slower.
 
 ## Exact proposed maintainer comment
 

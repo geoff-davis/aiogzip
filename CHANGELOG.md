@@ -22,6 +22,14 @@ All notable changes to this project will be documented in this file.
   not exist or cannot support aiogzip's Python 3.11+ runtime contract;
   zlib-ng remains supported from `0.4.0`.
 
+### Performance
+
+- Preserved the `2.0.0a4` codec, scheduler, optional-header, high-level,
+  concurrent-stream, memory, and small-write regression gates under both
+  engines. The strict same-call write contract remains unchanged; use
+  `writelines()` or explicit bounded batching for tiny records. No performance
+  improvement is claimed for this beta.
+
 ## [2.0.0a4] - 2026-08-23
 
 ### Added

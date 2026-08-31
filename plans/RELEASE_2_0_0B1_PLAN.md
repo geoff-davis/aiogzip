@@ -1277,68 +1277,68 @@ plans/reviews/v2.0.0b1-hardening.md
 - [ ] Full test suite passes on Python 3.11, 3.12, 3.13, and 3.14 on Linux.
 - [ ] Representative full suite passes on Windows.
 - [ ] Representative full suite passes on macOS.
-- [ ] Full stdlib-zlib path passes with zlib-ng absent.
-- [ ] Active zlib-ng path passes.
-- [ ] Forced stdlib path passes while zlib-ng is installed.
-- [ ] Property-based valid-stream tests pass.
-- [ ] Malformed header, body, trailer, CRC, ISIZE, FHCRC, reserved-flag, padding, and trailing-data tests pass.
-- [ ] Concatenated-member tests pass.
-- [ ] Completed-member metadata retention tests pass.
-- [ ] Live `mtime` tests pass across concatenated members and rewind.
-- [ ] Codec operation abandonment and discard tests pass with GC disabled.
-- [ ] Same-handle overlap tests pass for binary and text handles.
-- [ ] Cancellation and poisoning tests pass.
-- [ ] Recovery-data sequencing tests pass.
-- [ ] Seek and rewind-cache tests pass.
-- [ ] Text cookie and newline tests pass.
-- [ ] Partial sink-write and sink-error timing tests pass.
-- [ ] Strict-size and decompression-limit tests pass.
+- [x] Full stdlib-zlib path passes with zlib-ng absent.
+- [x] Active zlib-ng path passes.
+- [x] Forced stdlib path passes while zlib-ng is installed.
+- [x] Property-based valid-stream tests pass.
+- [x] Malformed header, body, trailer, CRC, ISIZE, FHCRC, reserved-flag, padding, and trailing-data tests pass.
+- [x] Concatenated-member tests pass.
+- [x] Completed-member metadata retention tests pass.
+- [x] Live `mtime` tests pass across concatenated members and rewind.
+- [x] Codec operation abandonment and discard tests pass with GC disabled.
+- [x] Same-handle overlap tests pass for binary and text handles.
+- [x] Cancellation and poisoning tests pass.
+- [x] Recovery-data sequencing tests pass.
+- [x] Seek and rewind-cache tests pass.
+- [x] Text cookie and newline tests pass.
+- [x] Partial sink-write and sink-error timing tests pass.
+- [x] Strict-size and decompression-limit tests pass.
 - [ ] Public API contract tests pass on every supported Python version.
 - [ ] Minimum-dependency jobs pass.
-- [ ] Coverage remains at or above the configured floor.
+- [x] Coverage remains at or above the configured floor.
 
 #### WP6 performance matrix
 
-- [ ] Representative `decompress_chunks()` 512/256 KiB row is compared with exact `a4`.
-- [ ] Representative `decompress_chunks()` 64/64 KiB row is compared with exact `a4`.
-- [ ] Representative `compress_chunks()` rows are compared with exact `a4`.
-- [ ] Direct one-large-feed decoder scaling is compared with exact `a4`.
-- [ ] Transport-sized decoder input is compared with exact `a4`.
-- [ ] One-item async-source scheduler responsiveness is compared with exact `a4`.
-- [ ] Fragmented optional-header time and peak allocation are compared with exact `a4`.
-- [ ] Full binary read peak allocation is compared with exact `a4`.
-- [ ] Concurrent independent-stream throughput is compared with exact `a4`.
-- [ ] Bounded JSONL batching is compared with exact `a4`.
-- [ ] Write-size curve from 10 B through 256 KiB is compared with exact `a4`.
-- [ ] Extreme one-call-per-10-byte diagnostic is retained.
-- [ ] Every correctness-bearing benchmark verifies output length and digest.
-- [ ] Every slowdown over 5% has a written investigation.
-- [ ] Every slowdown over 10% blocks release.
-- [ ] New API-contract and artifact tests are not presented as performance improvements.
+- [x] Representative `decompress_chunks()` 512/256 KiB row is compared with exact `a4`.
+- [x] Representative `decompress_chunks()` 64/64 KiB row is compared with exact `a4`.
+- [x] Representative `compress_chunks()` rows are compared with exact `a4`.
+- [x] Direct one-large-feed decoder scaling is compared with exact `a4`.
+- [x] Transport-sized decoder input is compared with exact `a4`.
+- [x] One-item async-source scheduler responsiveness is compared with exact `a4`.
+- [x] Fragmented optional-header time and peak allocation are compared with exact `a4`.
+- [x] Full binary read peak allocation is compared with exact `a4`.
+- [x] Concurrent independent-stream throughput is compared with exact `a4`.
+- [x] Bounded JSONL batching is compared with exact `a4`.
+- [x] Write-size curve from 10 B through 256 KiB is compared with exact `a4`.
+- [x] Extreme one-call-per-10-byte diagnostic is retained.
+- [x] Every correctness-bearing benchmark verifies output length and digest.
+- [x] Every slowdown over 5% has a written investigation.
+- [x] Every slowdown over 10% blocks release.
+- [x] New API-contract and artifact tests are not presented as performance improvements.
 
 #### WP6 issue `#86` closeout
 
-- [ ] Candidate retains same-call write visibility and error timing.
-- [ ] No hidden cross-call buffer exists.
-- [ ] The 10-byte diagnostic does not regress more than 10% against exact `a4`.
-- [ ] The 10-byte diagnostic remains in the continuing benchmark matrix after issue closure.
-- [ ] Documentation recommends `writelines()` or explicit bounded application batching for tiny records.
-- [ ] `plans/reviews/issue-86-b1-closeout.md` records the current issue state and cites the authoritative `a4` disposition.
-- [ ] The closeout record contains an exact final comment that does not claim the historical regression was eliminated.
-- [ ] The final comment states the retained strict same-call semantics and the controlled `a3` → `a4` results: 5.38% faster with forced stdlib zlib and 0.36% slower with zlib-ng.
-- [ ] The closeout record instructs the maintainer to leave the original issue body unchanged.
-- [ ] The closeout record instructs the maintainer to close issue `#86` as **Not planned** or the repository’s equivalent accepted-design-tradeoff resolution, not Completed.
-- [ ] The closeout record does not retarget `#86` and does not propose a separate buffered-writer issue absent concrete demand or a developed API proposal.
-- [ ] The handoff is idempotent: when an equivalent closeout already exists remotely, it records the existing comment URL and closure instead of requesting duplication.
-- [ ] Codex does not perform any remote issue action.
+- [x] Candidate retains same-call write visibility and error timing.
+- [x] No hidden cross-call buffer exists.
+- [x] The 10-byte diagnostic does not regress more than 10% against exact `a4`.
+- [x] The 10-byte diagnostic remains in the continuing benchmark matrix after issue closure.
+- [x] Documentation recommends `writelines()` or explicit bounded application batching for tiny records.
+- [x] `plans/reviews/issue-86-b1-closeout.md` records the current issue state and cites the authoritative `a4` disposition.
+- [x] The closeout record contains an exact final comment that does not claim the historical regression was eliminated.
+- [x] The final comment states the retained strict same-call semantics and the controlled `a3` → `a4` results: 5.38% faster with forced stdlib zlib and 0.36% slower with zlib-ng.
+- [x] The closeout record instructs the maintainer to leave the original issue body unchanged.
+- [x] The closeout record instructs the maintainer to close issue `#86` as **Not planned** or the repository’s equivalent accepted-design-tradeoff resolution, not Completed.
+- [x] The closeout record does not retarget `#86` and does not propose a separate buffered-writer issue absent concrete demand or a developed API proposal.
+- [x] The handoff is idempotent: when an equivalent closeout already exists remotely, it records the existing comment URL and closure instead of requesting duplication.
+- [x] Codex does not perform any remote issue action.
 
 #### WP6 exit criteria
 
 - [ ] All correctness and API-contract gates pass.
 - [ ] All required engines and platforms pass.
-- [ ] All named performance rows satisfy policy or the release is blocked.
-- [ ] No new memory or scheduler regression is present.
-- [ ] Issue `#86` has a complete maintainer-ready closeout record, and its tiny-write benchmark remains an active anti-regression gate.
+- [x] All named performance rows satisfy policy or the release is blocked.
+- [x] No new memory or scheduler regression is present.
+- [x] Issue `#86` has a complete maintainer-ready closeout record, and its tiny-write benchmark remains an active anti-regression gate.
 
 **Suggested commit:** `Release: record 2.0.0b1 hardening and regression evidence`
 
