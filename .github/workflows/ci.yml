@@ -284,6 +284,138 @@ jobs:
             .minimum-venv/bin/python -m pytest "${arguments[@]}"
           fi
 
+  # Build and install release artifacts into clean environments outside the
+  # checkout. The Python 3.11 minimum wheel row is covered above; this matrix
+  # adds latest/base, fast, both artifact types, and platform packaging paths.
+  installed-artifacts:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.14"
+            artifact: wheel
+            mode: base
+            run_examples: false
+          - os: ubuntu-latest
+            python-version: "3.12"
+            artifact: wheel
+            mode: fast
+            run_examples: false
+          - os: windows-latest
+            python-version: "3.12"
+            artifact: wheel
+            mode: base
+            run_examples: false
+          - os: macos-latest
+            python-version: "3.12"
+            artifact: wheel
+            mode: base
+            run_examples: false
+          - os: ubuntu-latest
+            python-version: "3.12"
+            artifact: sdist
+            mode: base
+            run_examples: true
+          - os: ubuntu-latest
+            python-version: "3.12"
+            artifact: sdist
+            mode: fast
+            run_examples: false
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+
+      - name: Build candidate ${{ matrix.artifact }}
+        shell: bash
+        run: |
+          uv build --${{ matrix.artifact }} --out-dir dist
+          ARTIFACT_KIND=${{ matrix.artifact }} python -c '
+          import os
+          from pathlib import Path
+          suffix = ".whl" if os.environ["ARTIFACT_KIND"] == "wheel" else ".tar.gz"
+          paths = sorted(Path("dist").glob(f"*{suffix}"))
+          if len(paths) != 1:
+              raise SystemExit(f"expected one {suffix} artifact, got {paths!r}")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as output:
+              print(f"ARTIFACT_PATH={paths[0].resolve()}", file=output)
+          '
+
+      - name: Create clean environment outside checkout
+        shell: bash
+        run: |
+          environment_root="$RUNNER_TEMP/aiogzip-artifact-venv"
+          uv venv --python "${{ matrix.python-version }}" "$environment_root"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            artifact_python="$environment_root/Scripts/python.exe"
+          else
+            artifact_python="$environment_root/bin/python"
+          fi
+          echo "ARTIFACT_PYTHON=$artifact_python" >> "$GITHUB_ENV"
+
+      - name: Install artifact and latest runtime dependencies
+        shell: bash
+        run: |
+          uv pip install --python "$ARTIFACT_PYTHON" \
+            pytest pytest-asyncio aiofiles aiocsv
+          if [[ "${{ matrix.mode }}" == "fast" ]]; then
+            uv pip install --python "$ARTIFACT_PYTHON" zlib-ng
+          fi
+          uv pip install --python "$ARTIFACT_PYTHON" \
+            --no-deps "$ARTIFACT_PATH"
+
+      - name: Smoke installed artifact outside checkout
+        shell: bash
+        run: |
+          run_directory="$RUNNER_TEMP/aiogzip-artifact-run"
+          mkdir -p "$run_directory"
+          package_version="$("$ARTIFACT_PYTHON" -c \
+            'import importlib.metadata; print(importlib.metadata.version("aiogzip"))')"
+          cd "$run_directory"
+          "$ARTIFACT_PYTHON" \
+            "$GITHUB_WORKSPACE/scripts/smoke_installed_artifact.py" \
+            --expected-version "$package_version" \
+            --expected-engine "${{ matrix.mode == 'fast' && 'zlib-ng' || 'stdlib-zlib' }}" \
+            --require-aiocsv \
+            --artifact "$ARTIFACT_PATH" \
+            --artifact-kind "${{ matrix.artifact }}" \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --api-script "$GITHUB_WORKSPACE/scripts/capture_public_api.py" \
+            --api-manifest "$GITHUB_WORKSPACE/tests/data/public_api_2_0.json" \
+            --report-output "$GITHUB_WORKSPACE/artifact-report.json"
+
+      - name: Run maintained example success and failure scenarios
+        if: matrix.run_examples
+        shell: bash
+        run: |
+          run_directory="$RUNNER_TEMP/aiogzip-example-runner"
+          mkdir -p "$run_directory"
+          cd "$run_directory"
+          "$ARTIFACT_PYTHON" \
+            "$GITHUB_WORKSPACE/scripts/run_maintained_examples.py" \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --report-output "$GITHUB_WORKSPACE/example-report.json"
+
+      - name: Upload artifact validation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: installed-${{ matrix.artifact }}-${{ matrix.os }}-${{ matrix.python-version }}-${{ matrix.mode }}
+          path: |
+            artifact-report.json
+            example-report.json
+          if-no-files-found: warn
+
   # Posts the coverage comment from the ubuntu/3.12 build leg's uploaded
   # .coverage data — no dependency install or duplicate test run needed.
   coverage-comment:

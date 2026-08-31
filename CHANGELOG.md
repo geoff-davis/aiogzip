@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
   negative mypy/ty fixtures.
 - A stability policy defines public import paths, compatibility guarantees,
   diagnostic values, private implementation details, and example ownership.
+- Installed wheel and sdist validation now covers the frozen API manifest,
+  metadata and archive layout, core and optional integrations, CLI behavior,
+  both compression engines, and maintained-example failure scenarios.
 
 ### Changed
 

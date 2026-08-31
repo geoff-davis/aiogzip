@@ -53,6 +53,12 @@ python -m venv .venv-example
 On Windows, replace `.venv-example/bin/python` with
 `.venv-example\\Scripts\\python.exe`.
 
+Release validation drives the same scripts from a temporary directory with
+the artifact-installed interpreter. `scripts/run_maintained_examples.py` also
+runs the maintained integration suites so corruption, truncation, limits,
+cancellation, and cleanup are checked against the installed package rather
+than an editable checkout.
+
 ## Fragmented transport
 
 Run the public sans-I/O codec over a bounded local bidirectional asyncio byte
