@@ -189,8 +189,8 @@ Codex must stop and recommend `2.0.0a5` when the work requires any of:
 - removing a documented public export without an explicit maintainer decision;
 - changing the meaning of completed-member metadata, live `mtime`, or integrity completion;
 - redesigning the async driver, engine selection, input queue, or header parser.
-- [ ] Every discovered externally visible discrepancy is classified as documentation drift, compatible bug, or alpha-requiring contract change.
-- [ ] A material contract change causes an immediate stop report rather than a hidden beta implementation.
+- [x] Every discovered externally visible discrepancy is classified as documentation drift, compatible bug, or alpha-requiring contract change.
+- [x] A material contract change causes an immediate stop report rather than a hidden beta implementation.
 - [ ] The stop report names affected APIs, current behavior, proposed behavior, compatibility impact, and why `a5` is preferable.
 
 ### 1.3 Forward-dependency rule
@@ -743,25 +743,25 @@ The actual schema may differ, but it must satisfy these properties:
 
 ### 6.3 Snapshot comparison rules
 
-- [ ] The generator has a `--check` mode that fails when the committed manifest differs.
-- [ ] The generator can write to an explicit output path for exact-tag capture.
-- [ ] The test failure prints a concise unified diff or equivalent structured difference.
+- [x] The generator has a `--check` mode that fails when the committed manifest differs.
+- [x] The generator can write to an explicit output path for exact-tag capture.
+- [x] The test failure prints a concise unified diff or equivalent structured difference.
 - [ ] The committed beta manifest is generated only after the API decision record is approved.
-- [ ] An intentional future contract change requires a manifest update and changelog entry.
-- [ ] The manifest excludes private and diagnostic-only data by design.
-- [ ] The manifest can run from an installed wheel, not only an editable checkout.
-- [ ] The manifest generation itself is covered by tests for deterministic ordering and normalization.
+- [x] An intentional future contract change requires a manifest update and changelog entry.
+- [x] The manifest excludes private and diagnostic-only data by design.
+- [x] The manifest can run from an installed wheel, not only an editable checkout.
+- [x] The manifest generation itself is covered by tests for deterministic ordering and normalization.
 
 ### 6.4 Typing fixture rules
 
-- [ ] Positive fixtures use public imports only.
-- [ ] Negative fixtures are isolated so expected failures do not make normal type checking fail ambiguously.
-- [ ] The harness verifies expected diagnostic locations or counts without freezing tool-specific prose unnecessarily.
-- [ ] Both mypy and `ty` are run against the same logical cases.
-- [ ] Mode overload fixtures include binary, text, conventional permutations, and fallback string variables.
-- [ ] File-object protocol fixtures cover read-only, write-only, and read-write async objects.
-- [ ] Codec fixtures demonstrate deterministic cleanup through the public `CodecOperation` type.
-- [ ] No fixture imports `aiogzip._*` modules.
+- [x] Positive fixtures use public imports only.
+- [x] Negative fixtures are isolated so expected failures do not make normal type checking fail ambiguously.
+- [x] The harness verifies expected diagnostic locations or counts without freezing tool-specific prose unnecessarily.
+- [x] Both mypy and `ty` are run against the same logical cases.
+- [x] Mode overload fixtures include binary, text, conventional permutations, and fallback string variables.
+- [x] File-object protocol fixtures cover read-only, write-only, and read-write async objects.
+- [x] Codec fixtures demonstrate deterministic cleanup through the public `CodecOperation` type.
+- [x] No fixture imports `aiogzip._*` modules.
 
 ## 7. Dependency-floor and CI design
 
@@ -855,17 +855,17 @@ The page must explain:
 
 ### 8.2 Alpha/provisional wording audit
 
-- [ ] README installation text says `2.0` requires Python 3.11+, without calling the current line alpha.
-- [ ] README calls the codec beta, public, and frozen for 2.0 rather than provisional-alpha.
-- [ ] `docs/codec.md` removes current-alpha provisional language while retaining lifecycle caveats.
-- [ ] `docs/api.md` replaces “intentional alpha compatibility tightening” with historical or beta-neutral wording.
-- [ ] `docs/migration.md` removes “before beta” instructions that are now complete.
-- [ ] The sans-I/O ADR records that the selected API was accepted and frozen at `2.0.0b1`.
-- [ ] `SECURITY.md` changes the active support row from alpha to the latest 2.0 beta/prerelease line.
+- [x] README installation text says `2.0` requires Python 3.11+, without calling the current line alpha.
+- [x] README calls the codec beta, public, and frozen for 2.0 rather than provisional-alpha.
+- [x] `docs/codec.md` removes current-alpha provisional language while retaining lifecycle caveats.
+- [x] `docs/api.md` replaces “intentional alpha compatibility tightening” with historical or beta-neutral wording.
+- [x] `docs/migration.md` removes “before beta” instructions that are now complete.
+- [x] The sans-I/O ADR records that the selected API was accepted and frozen at `2.0.0b1`.
+- [x] `SECURITY.md` changes the active support row from alpha to the latest 2.0 beta/prerelease line.
 - [ ] The changelog contains a `2.0.0b1` section and correct comparison links.
-- [ ] Current docs do not promise production stability.
-- [ ] Historical alpha release notes, plans, and changelog entries remain unedited except for broken links.
-- [ ] A repository search lists every remaining `alpha`, `provisional`, `a4`, and `before beta` occurrence with an explicit keep/change decision.
+- [x] Current docs do not promise production stability.
+- [x] Historical alpha release notes, plans, and changelog entries remain unedited except for broken links.
+- [x] A repository search lists every remaining `alpha`, `provisional`, `a4`, and `before beta` occurrence with an explicit keep/change decision.
 
 ```bash
 rg -n --glob '!plans/**' --glob '!CHANGELOG.md'   '(alpha|provisional|before beta|2\.0\.0a4|Development Status :: 3)'   README.md SECURITY.md docs mkdocs.yml pyproject.toml src tests examples
@@ -873,14 +873,14 @@ rg -n --glob '!plans/**' --glob '!CHANGELOG.md'   '(alpha|provisional|before bet
 
 ### 8.3 Release metadata
 
-- [ ] Development version remains `2.0.0b1.dev0` until the release-preparation package.
+- [x] Development version remains `2.0.0b1.dev0` until the release-preparation package.
 - [ ] Release candidate sets `__version__` to `2.0.0b1`.
 - [ ] `pyproject.toml` uses `Development Status :: 4 - Beta` for the release candidate.
-- [ ] Python classifiers remain 3.11 through 3.14.
-- [ ] The `Framework :: AsyncIO` and `Typing :: Typed` classifiers remain.
-- [ ] Wheel and sdist metadata report the same version, Python requirement, classifier, and dependency floors.
-- [ ] The changelog date is set only during final release preparation.
-- [ ] `[Unreleased]` compares from `v2.0.0b1` only in the post-release housekeeping commit, not before the tag exists.
+- [x] Python classifiers remain 3.11 through 3.14.
+- [x] The `Framework :: AsyncIO` and `Typing :: Typed` classifiers remain.
+- [x] Wheel and sdist metadata report the same version, Python requirement, classifier, and dependency floors.
+- [x] The changelog date is set only during final release preparation.
+- [x] `[Unreleased]` compares from `v2.0.0b1` only in the post-release housekeeping commit, not before the tag exists.
 
 ### 8.4 Support policy
 
@@ -1144,28 +1144,28 @@ docs/adr-sans-io-codec.md
 
 #### WP4 tasks
 
-- [ ] Add `docs/stability.md` to the documentation navigation.
-- [ ] State the beta compatibility policy in plain language.
-- [ ] List canonical public modules and imports.
-- [ ] Explain that private `_` modules remain unstable.
-- [ ] Explain diagnostic versus stable engine information.
-- [ ] Explain exception-type and message-prefix guarantees.
-- [ ] Explain dataclass, protocol, constant, and overload stability.
-- [ ] Explain that examples are maintained but not package API.
-- [ ] Remove active provisional-alpha wording from README.
-- [ ] Remove active provisional-alpha wording from codec docs.
-- [ ] Update API exact-Boolean history without implying it is newly changing in beta.
-- [ ] Update migration language that previously deferred decisions until beta.
-- [ ] Update the ADR status to accepted/frozen for 2.0 beta without rewriting its historical rationale.
-- [ ] Update security support rows.
+- [x] Add `docs/stability.md` to the documentation navigation.
+- [x] State the beta compatibility policy in plain language.
+- [x] List canonical public modules and imports.
+- [x] Explain that private `_` modules remain unstable.
+- [x] Explain diagnostic versus stable engine information.
+- [x] Explain exception-type and message-prefix guarantees.
+- [x] Explain dataclass, protocol, constant, and overload stability.
+- [x] Explain that examples are maintained but not package API.
+- [x] Remove active provisional-alpha wording from README.
+- [x] Remove active provisional-alpha wording from codec docs.
+- [x] Update API exact-Boolean history without implying it is newly changing in beta.
+- [x] Update migration language that previously deferred decisions until beta.
+- [x] Update the ADR status to accepted/frozen for 2.0 beta without rewriting its historical rationale.
+- [x] Update security support rows.
 - [ ] Add a `2.0.0b1` changelog section.
 - [ ] Add correct release comparison links.
-- [ ] Keep historical alpha references in historical records.
-- [ ] Run a targeted repository search for stale status language.
-- [ ] Run strict docs build.
-- [ ] Run Markdown lint/hooks.
-- [ ] Verify every public API link and code sample.
-- [ ] Ensure docs do not overstate beta as stable production software.
+- [x] Keep historical alpha references in historical records.
+- [x] Run a targeted repository search for stale status language.
+- [x] Run strict docs build.
+- [x] Run Markdown lint/hooks.
+- [x] Verify every public API link and code sample.
+- [x] Ensure docs do not overstate beta as stable production software.
 
 #### WP4 required checks
 
@@ -1179,11 +1179,11 @@ rg -n --glob '!plans/**' --glob '!CHANGELOG.md'   '(provisional 2\.0 alpha|throu
 
 #### WP4 exit criteria
 
-- [ ] Active documentation consistently describes the release as beta.
-- [ ] Stability and non-guarantees are explicit.
-- [ ] No historical release record was rewritten misleadingly.
-- [ ] Strict documentation build passes.
-- [ ] Docs match the machine-readable API decision record.
+- [x] Active documentation consistently describes the release as beta.
+- [x] Stability and non-guarantees are explicit.
+- [x] No historical release record was rewritten misleadingly.
+- [x] Strict documentation build passes.
+- [x] Docs match the machine-readable API decision record.
 
 **Suggested commit:** `Docs: define the aiogzip 2.0 beta stability contract`
 

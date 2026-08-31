@@ -6,6 +6,11 @@ which exception type you see: engine-specific errors are caught internally and
 re-raised uniformly, so `except` clauses written against stdlib behavior keep
 working when the fast engine is installed.
 
+The exception types and the explicitly documented decompression-limit message
+prefix are part of the [2.0 stability contract](stability.md). Complete dynamic
+messages are not: offsets, sizes, member numbers, engine names, and operating
+system text may vary.
+
 ## Taxonomy
 
 | Situation | Raises | Notes |

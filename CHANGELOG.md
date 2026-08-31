@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- The documented public API is now beta-frozen for the 2.0 line and protected
+  by a deterministic runtime contract manifest plus shared positive and
+  negative mypy/ty fixtures.
+- A stability policy defines public import paths, compatibility guarantees,
+  diagnostic values, private implementation details, and example ownership.
+
 ### Changed
 
 - Corrected the tested minimum dependencies to `aiofiles>=23.2.1` and

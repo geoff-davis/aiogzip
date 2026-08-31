@@ -5,9 +5,10 @@ without taking ownership of files, sockets, an event loop, or any other
 transport. They are synchronous state machines: callers provide immutable
 `bytes`, consume bounded output chunks, and decide where those chunks go.
 
-The codec API is provisional throughout the 2.0 alpha series. Ordinary
-`asyncio` callers can continue using `open()`, `read()`, `write()`,
+The public codec API is beta-frozen for the 2.0 line as of `2.0.0b1`.
+Ordinary `asyncio` callers can continue using `open()`, `read()`, `write()`,
 `compress_chunks()`, and `decompress_chunks()` without changing their code.
+See the [stability policy](stability.md) for guarantees and non-guarantees.
 
 ## Encoding one member
 
@@ -231,7 +232,7 @@ It does not use an executor or start background tasks. The high-level async
 wrappers own sources, sinks, backpressure, cancellation, and executor policy;
 they may offload sufficiently large codec steps so other tasks can progress.
 
-This alpha handles complete gzip streams only. A public raw-DEFLATE mode,
+The 2.0 codec handles complete gzip streams only. A public raw-DEFLATE mode,
 AnyIO/Trio abstraction, indexed seeking, and new engine APIs are out of scope.
 See the [architecture decision](adr-sans-io-codec.md) for the ownership and
 engine-boundary rationale.
