@@ -230,6 +230,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
             != fixtures["jsonl"]["payload_sha256"]
         ):
             raise AssertionError("bounded JSONL warm-up output mismatch")
+        print("  START bounded JSONL iter_batches", flush=True)
         jsonl_samples = [
             await _bounded_jsonl_once(
                 aiogzip,
@@ -257,6 +258,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
             != fixtures["binary"]["payload_sha256"]
         ):
             raise AssertionError("full binary-read warm-up output mismatch")
+        print("  START full binary read throughput", flush=True)
         binary_samples = [
             await _full_binary_read_once(
                 aiogzip,
@@ -273,6 +275,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                 "full binary read throughput", "integration-memory", binary_samples
             )
         )
+        print("  START full binary read peak allocation", flush=True)
         memory_sample = await _full_binary_read_once(
             aiogzip,
             binary_path,
@@ -295,6 +298,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
         expected_digests = [item["payload_sha256"] for item in fixtures["concurrent"]]
         if concurrent_warm_up.metrics["output_sha256_by_stream"] != expected_digests:
             raise AssertionError("concurrent-read warm-up output mismatch")
+        print("  START concurrent independent-file reads", flush=True)
         concurrent_samples = [
             await _concurrent_reads_once(aiogzip, concurrent_paths)
             for _ in range(args.repeat)

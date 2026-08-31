@@ -661,6 +661,11 @@ async def _warm_up(aiogzip: Any, fast_compress: bool) -> None:
         raise AssertionError("header warm-up output mismatch")
 
 
+def _announce(name: str) -> None:
+    """Emit the next measured row before entering its timed region."""
+    print(f"  START {name}", flush=True)
+
+
 async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
     runner_root = Path(__file__).resolve().parents[1]
     aiogzip, identity = configure_source_root(args.source_root, args.engine)
@@ -705,6 +710,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                         sample_count = (
                             args.memory_repeat if measure_memory else args.repeat
                         )
+                        _announce(name)
                         samples = [
                             await _read_high_level(
                                 aiogzip,
@@ -723,6 +729,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
 
                     direct_name = f"direct {fixture_name} throughput"
                     if hasattr(aiogzip, "GzipDecoder"):
+                        _announce(direct_name)
                         samples = [
                             _read_direct(
                                 aiogzip,
@@ -769,6 +776,8 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                 "expected_observed_mtime": expected_observed_mtime,
                 "mtime_policy": args.members_mtime_policy,
             }
+            name = f"high-level concatenated members {member_count}"
+            _announce(name)
             samples = [
                 await _read_high_level(
                     aiogzip,
@@ -788,7 +797,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                 )
             results.append(
                 _aggregate(
-                    f"high-level concatenated members {member_count}",
+                    name,
                     "members",
                     samples,
                 )
@@ -806,6 +815,8 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                 "payload_sha256": _sha256(payload),
             }
             for method in methods:
+                name = f"{method} {write_size}B records"
+                _announce(name)
                 samples = [
                     await _write_once(
                         aiogzip,
@@ -818,7 +829,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                 ]
                 results.append(
                     _aggregate(
-                        f"{method} {write_size}B records",
+                        name,
                         "writes",
                         samples,
                     )
