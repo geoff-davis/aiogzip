@@ -1324,11 +1324,14 @@ smaller exact-minimum run as evidence for that checkbox.
 
 Review of `fa507af` found two omitted >5% rows, an undispositioned bimodal
 allocation result, and two statistically insufficient noise explanations.
-The corrected benchmark record enumerates every crossing. One reverse-order
-minimum crossed 10% and held the gate closed until an interleaved 100-sample
-same-process diagnostic put every investigated row below 5%. Fifteen-sample
-allocation follow-ups reproduce the same modes and maxima on both source
-trees. Original and corrective raw records are retained.
+The corrected benchmark record enumerates every gated throughput crossing and
+also names the +8.08% duration change in an informational `tracemalloc` row.
+One reverse-order minimum crossed 10% and held the gate closed until an
+interleaved 100-sample same-process diagnostic put every investigated slowdown
+below 5%. Fifteen-sample allocation follow-ups reproduce the same modes and
+maxima on both source trees. The hardened diagnostic verifies active engines,
+clean source identity, and partial-result checkpoints. Original and corrective
+raw records are retained.
 
 #### WP6 issue `#86` closeout
 
@@ -1378,15 +1381,20 @@ The review must cover the actual candidate commit, not an earlier code head.
 - [ ] Reviewer inspects stale alpha/provisional wording search results.
 - [ ] Reviewer confirms no material lifecycle redesign is concealed in the beta candidate.
 - [ ] Reviewer confirms AnyIO, indexed access, and buffered-writer work remain deferred.
-- [x] Reviewer records approval, requested changes, or blocking findings against the exact SHA.
+- [ ] Reviewer records approval, requested changes, or blocking findings against the exact SHA.
 
 #### WP7 response to findings
 
-- [x] Every finding has an owner and disposition.
-- [x] Corrective commits invalidate prior approval until the reviewer covers the new head.
+- [ ] Every finding has an owner and disposition.
+- [ ] Corrective commits invalidate prior approval until the reviewer covers the new head.
 - [ ] A material contract finding triggers the beta escalation rule and likely `a5`.
 - [ ] Review evidence names the reviewer, date, exact commit, scope, commands, and conclusion.
-- [x] Codex does not claim the review complete on the reviewer's behalf.
+- [ ] Codex does not claim the review complete on the reviewer's behalf.
+
+The reviews of `fa507af` and `e412cc6` produced recorded findings and local
+dispositions, but both SHAs are superseded and the supplied review text names
+no reviewer. The WP7 boxes above apply only to the eventual exact candidate
+head and remain unchecked until an independent reviewer covers that SHA.
 
 #### WP7 exit criteria
 
