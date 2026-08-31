@@ -77,37 +77,37 @@ Allowed starting states:
 
 Any source, public API, tests, examples, CI, packaging, documentation-contract, or benchmark change beyond the known housekeeping boundary requires a maintainer-reviewed plan update before implementation continues.
 
-- [ ] The working tree is clean before preflight evidence is captured.
-- [ ] `v2.0.0a4^{commit}` resolves exactly to `262d9a5a0eb5f84fc54432e968b845b182fd255c`.
-- [ ] `v2.0.0a3^{commit}` resolves exactly to `3e95073581be7cba437da45dacd9724f649e54d0`.
-- [ ] `v1.11.0^{commit}` resolves exactly to `3f23eadb524c8dba840c4fd855ad5acf84486048`.
-- [ ] The actual starting commit is recorded in `plans/reviews/v2.0.0b1-preflight.md`.
-- [ ] The diff from `v2.0.0a4` is recorded by file and commit.
-- [ ] The status of PR `#95` is recorded without claiming remote actions that Codex did not perform.
-- [ ] The checkout contains `2.0.0b1.dev0` before beta implementation begins, or Codex stops under the allowed-starting-state rule.
-- [ ] The Unreleased changelog comparison starts at `v2.0.0a4` before beta implementation begins.
-- [ ] No unreviewed behavior change is hidden in the starting branch.
-- [ ] Repository-local instructions in `AGENTS.md`, `CLAUDE.md`, `.codexrc`, and relevant nested instruction files are read in full.
-- [ ] The repository-prescribed commit checks are recorded before the first implementation commit.
+- [x] The working tree is clean before preflight evidence is captured.
+- [x] `v2.0.0a4^{commit}` resolves exactly to `262d9a5a0eb5f84fc54432e968b845b182fd255c`.
+- [x] `v2.0.0a3^{commit}` resolves exactly to `3e95073581be7cba437da45dacd9724f649e54d0`.
+- [x] `v1.11.0^{commit}` resolves exactly to `3f23eadb524c8dba840c4fd855ad5acf84486048`.
+- [x] The actual starting commit is recorded in `plans/reviews/v2.0.0b1-preflight.md`.
+- [x] The diff from `v2.0.0a4` is recorded by file and commit.
+- [x] The status of PR `#95` is recorded without claiming remote actions that Codex did not perform.
+- [x] The checkout contains `2.0.0b1.dev0` before beta implementation begins, or Codex stops under the allowed-starting-state rule.
+- [x] The Unreleased changelog comparison starts at `v2.0.0a4` before beta implementation begins.
+- [x] No unreviewed behavior change is hidden in the starting branch.
+- [x] Repository-local instructions in `AGENTS.md`, `CLAUDE.md`, `.codexrc`, and relevant nested instruction files are read in full.
+- [x] The repository-prescribed commit checks are recorded before the first implementation commit.
 
 ### 0.2 Confirm the current release posture
 
-- [ ] The latest published 2.0 prerelease is `v2.0.0a4`.
-- [ ] The package still declares `Development Status :: 3 - Alpha` before beta release preparation.
-- [ ] Active README and codec documentation still contain alpha/provisional wording that must change for beta.
-- [ ] Python 3.11 through 3.14 remain the supported 2.0 interpreter range.
-- [ ] The default runtime dependency is still declared as `aiofiles>=23.0.0`.
-- [ ] The optional CSV dependency floor is still `aiocsv>=1.2.0`.
-- [ ] The optional fast-engine floor is still `zlib-ng>=0.4.0`.
-- [ ] Current CI exercises fresh/latest dependencies but has no dedicated minimum-dependency job.
-- [ ] The standard engine matrix remains zlib-ng absent, zlib-ng active, and stdlib forced while zlib-ng is installed.
-- [ ] The maintained fragmented-transport example still uses only public codec APIs.
-- [ ] The maintained concurrent JSONL ingest example still uses only public high-level APIs.
-- [ ] The current state of issue `#86` is recorded. If it is still open, its original description remains intact and the required closeout comment has not yet been duplicated.
-- [ ] `plans/reviews/issue-86-a4-disposition.md` still records the accepted 2.0 design tradeoff and authoritative `a3` → `a4` measurements.
-- [ ] Issue `#71` remains the AnyIO/Trio substrate decision.
-- [ ] Issue `#72` remains the indexed-random-access proposal.
-- [ ] No open critical correctness or security issue is targeted at `2.0.0b1`.
+- [x] The latest published 2.0 prerelease is `v2.0.0a4`.
+- [x] The package still declares `Development Status :: 3 - Alpha` before beta release preparation.
+- [x] Active README and codec documentation still contain alpha/provisional wording that must change for beta.
+- [x] Python 3.11 through 3.14 remain the supported 2.0 interpreter range.
+- [x] The default runtime dependency is still declared as `aiofiles>=23.0.0`.
+- [x] The optional CSV dependency floor is still `aiocsv>=1.2.0`.
+- [x] The optional fast-engine floor is still `zlib-ng>=0.4.0`.
+- [x] Current CI exercises fresh/latest dependencies but has no dedicated minimum-dependency job.
+- [x] The standard engine matrix remains zlib-ng absent, zlib-ng active, and stdlib forced while zlib-ng is installed.
+- [x] The maintained fragmented-transport example still uses only public codec APIs.
+- [x] The maintained concurrent JSONL ingest example still uses only public high-level APIs.
+- [x] The current state of issue `#86` is recorded. If it is still open, its original description remains intact and the required closeout comment has not yet been duplicated.
+- [x] `plans/reviews/issue-86-a4-disposition.md` still records the accepted 2.0 design tradeoff and authoritative `a3` → `a4` measurements.
+- [x] Issue `#71` remains the AnyIO/Trio substrate decision.
+- [x] Issue `#72` remains the indexed-random-access proposal.
+- [x] No open critical correctness or security issue is targeted at `2.0.0b1`.
 
 ### 0.3 Required preflight evidence
 
@@ -126,17 +126,17 @@ plans/reviews/issue-86-b1-closeout.md
 
 Do not invent measurements or platform results. When a required environment is unavailable locally, create the schema and command, leave the result unchecked, and let CI or the maintainer supply the evidence.
 
-- [ ] The preflight report records OS, architecture, Python, zlib, zlib-ng, uv, git, and repository status.
-- [ ] The preflight report records exact commands and their actual exit status.
-- [ ] The public API snapshot is captured from exact `v2.0.0a4`, not reconstructed from prose.
-- [ ] The public API snapshot records the generator script commit or script SHA-256.
-- [ ] The benchmark record identifies the exact existing harness used for each row.
-- [ ] The benchmark record preserves every individual timing sample and not only medians.
-- [ ] The dependency-floor record distinguishes declared floors, actual available releases, and tested floors.
-- [ ] The dependency-floor record notes that no `aiofiles` release named `23.0.0` exists and that `23.1.0` is the oldest release satisfying the intended 23.x floor.
-- [ ] The issue `#86` closeout record captures the current remote state, the exact proposed maintainer comment, the intended **Not planned / accepted design tradeoff** closure, and the evidence supporting that disposition.
-- [ ] The issue `#86` closeout record states that the original issue body must not be rewritten and that a separate buffered-writer issue is not opened absent concrete user demand or a developed API proposal.
-- [ ] The preflight evidence is committed before changing beta-facing docs, classifier, signatures, or dependency metadata.
+- [x] The preflight report records OS, architecture, Python, zlib, zlib-ng, uv, git, and repository status.
+- [x] The preflight report records exact commands and their actual exit status.
+- [x] The public API snapshot is captured from exact `v2.0.0a4`, not reconstructed from prose.
+- [x] The public API snapshot records the generator script commit or script SHA-256.
+- [x] The benchmark record identifies the exact existing harness used for each row.
+- [x] The benchmark record preserves every individual timing sample and not only medians.
+- [x] The dependency-floor record distinguishes declared floors, actual available releases, and tested floors.
+- [x] The dependency-floor record notes that no `aiofiles` release named `23.0.0` exists and that `23.1.0` is the oldest release satisfying the intended 23.x floor.
+- [x] The issue `#86` closeout record captures the current remote state, the exact proposed maintainer comment, the intended **Not planned / accepted design tradeoff** closure, and the evidence supporting that disposition.
+- [x] The issue `#86` closeout record states that the original issue body must not be rewritten and that a separate buffered-writer issue is not opened absent concrete user demand or a developed API proposal.
+- [x] The preflight evidence is committed before changing beta-facing docs, classifier, signatures, or dependency metadata.
 
 ### 0.4 Baseline immutability
 
@@ -903,22 +903,22 @@ plans/reviews/issue-86-b1-closeout.md
 
 #### WP0 tasks
 
-- [ ] Run every command in section 0 against a clean checkout.
-- [ ] Verify the exact `a4`, `a3`, and `v1.11.0` tag commits.
-- [ ] Determine whether PR `#95` is merged, checked out, or absent from the working branch.
-- [ ] Verify the semantic diff of the PR `#95` housekeeping commit.
-- [ ] Record the actual implementation-base commit and allowed-state rationale.
-- [ ] Confirm the development version is `2.0.0b1.dev0` before further work.
-- [ ] Confirm the Unreleased changelog comparison starts at `v2.0.0a4`.
-- [ ] Capture exact-`a4` top-level and `aiogzip.codec` exports.
-- [ ] Capture exact-`a4` runtime signatures and dataclass facts using a temporary or initial script.
-- [ ] Run the existing release benchmark harness against exact `v2.0.0a4`.
-- [ ] Capture stdlib-zlib baseline samples.
-- [ ] Capture zlib-ng baseline samples when the engine is available.
-- [ ] Record unavailable local environments honestly.
-- [ ] Record current declared dependency floors and actual installed versions.
-- [ ] Record all active alpha/provisional documentation occurrences.
-- [ ] Commit preflight evidence before changing public docs, metadata, or contract tests.
+- [x] Run every command in section 0 against a clean checkout.
+- [x] Verify the exact `a4`, `a3`, and `v1.11.0` tag commits.
+- [x] Determine whether PR `#95` is merged, checked out, or absent from the working branch.
+- [x] Verify the semantic diff of the PR `#95` housekeeping commit.
+- [x] Record the actual implementation-base commit and allowed-state rationale.
+- [x] Confirm the development version is `2.0.0b1.dev0` before further work.
+- [x] Confirm the Unreleased changelog comparison starts at `v2.0.0a4`.
+- [x] Capture exact-`a4` top-level and `aiogzip.codec` exports.
+- [x] Capture exact-`a4` runtime signatures and dataclass facts using a temporary or initial script.
+- [x] Run the existing release benchmark harness against exact `v2.0.0a4`.
+- [x] Capture stdlib-zlib baseline samples.
+- [x] Capture zlib-ng baseline samples when the engine is available.
+- [x] Record unavailable local environments honestly.
+- [x] Record current declared dependency floors and actual installed versions.
+- [x] Record all active alpha/provisional documentation occurrences.
+- [x] Commit preflight evidence before changing public docs, metadata, or contract tests.
 
 #### WP0 required checks
 
@@ -933,11 +933,11 @@ uv run prek run --all-files
 
 #### WP0 exit criteria
 
-- [ ] Starting commit and diff are unambiguous.
-- [ ] Exact `a4` API and benchmark evidence are immutable and committed.
-- [ ] The beta development version and changelog base are correct.
-- [ ] No behavior change has occurred.
-- [ ] The repository is green.
+- [x] Starting commit and diff are unambiguous.
+- [x] Exact `a4` API and benchmark evidence are immutable and committed.
+- [x] The beta development version and changelog base are correct.
+- [x] No behavior change has occurred.
+- [x] The repository is green.
 
 **Suggested commit:** `Plan: establish the 2.0.0b1 baseline and release boundary`
 
@@ -955,32 +955,32 @@ docs/stability.md
 
 #### WP1 tasks
 
-- [ ] Compare exact `a4` `__all__` with `docs/api.md`.
-- [ ] Compare `aiogzip.codec.__all__` with codec documentation.
-- [ ] Inventory public functions, classes, protocols, dataclasses, exceptions, constants, properties, and methods.
-- [ ] Classify every top-level export as stable, diagnostic, version-varying, compatibility alias, or typing-only.
-- [ ] Retain `AsyncGzipFile` as the supported compatibility factory.
-- [ ] Retain `ZlibEngine` with a clear typing-only/non-runtime-abstraction statement.
-- [ ] Retain the runtime-checkable `WithAsync*` protocols.
-- [ ] Retain documented gzip constants and values.
-- [ ] Record `EngineInfo` string values as diagnostic rather than feature flags.
-- [ ] Record `__version__` as public but release-varying.
-- [ ] Record public dataclass field contracts.
-- [ ] Record public exception inheritance and selected stable message prefixes.
-- [ ] Inventory overloads and mode-sensitive typing behavior.
-- [ ] Identify any documented behavior that lacks a test.
-- [ ] Identify any test-protected behavior that is intentionally not public.
+- [x] Compare exact `a4` `__all__` with `docs/api.md`.
+- [x] Compare `aiogzip.codec.__all__` with codec documentation.
+- [x] Inventory public functions, classes, protocols, dataclasses, exceptions, constants, properties, and methods.
+- [x] Classify every top-level export as stable, diagnostic, version-varying, compatibility alias, or typing-only.
+- [x] Retain `AsyncGzipFile` as the supported compatibility factory.
+- [x] Retain `ZlibEngine` with a clear typing-only/non-runtime-abstraction statement.
+- [x] Retain the runtime-checkable `WithAsync*` protocols.
+- [x] Retain documented gzip constants and values.
+- [x] Record `EngineInfo` string values as diagnostic rather than feature flags.
+- [x] Record `__version__` as public but release-varying.
+- [x] Record public dataclass field contracts.
+- [x] Record public exception inheritance and selected stable message prefixes.
+- [x] Inventory overloads and mode-sensitive typing behavior.
+- [x] Identify any documented behavior that lacks a test.
+- [x] Identify any test-protected behavior that is intentionally not public.
 - [ ] Resolve documentation drift without changing behavior.
-- [ ] When a material contract question appears, stop under the beta escalation rule.
+- [x] When a material contract question appears, stop under the beta escalation rule.
 - [ ] Obtain maintainer approval of the decision record before freezing the manifest.
 
 #### WP1 exit criteria
 
-- [ ] Every expected public symbol has an explicit beta decision.
-- [ ] No public symbol is accidentally omitted or privately relied upon.
-- [ ] No material behavior change is hidden in documentation edits.
-- [ ] The decision record is reviewable without reading implementation internals.
-- [ ] The repository remains green.
+- [x] Every expected public symbol has an explicit beta decision.
+- [x] No public symbol is accidentally omitted or privately relied upon.
+- [x] No material behavior change is hidden in documentation edits.
+- [x] The decision record is reviewable without reading implementation internals.
+- [x] The repository remains green.
 
 **Suggested commit:** `API: record the aiogzip 2.0 beta contract`
 
