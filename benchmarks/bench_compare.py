@@ -18,12 +18,33 @@ from typing import Any
 from run_benchmarks import assert_requested_engine
 
 _TARGETED_BENCHMARK = "aiogzip-2.0.0b1-targeted-timing-investigation"
+_RAW_CHANGE_FORMULA = "(raw candidate / raw baseline - 1) * 100"
 
 
 def load_results(filepath: Path) -> dict[str, Any]:
     """Load benchmark results from JSON file."""
     with filepath.open() as file:
         return json.load(file)
+
+
+def _attest_source(
+    identity: dict[str, Any],
+    label: str,
+    *,
+    commit_field: str,
+    describe_field: str,
+    dirty_field: str,
+) -> dict[str, str]:
+    """Validate the source fields shared by main and targeted captures."""
+    commit = identity.get(commit_field)
+    describe = identity.get(describe_field)
+    if not isinstance(commit, str) or not commit:
+        raise ValueError(f"{label} lacks source commit provenance")
+    if not isinstance(describe, str) or not describe:
+        raise ValueError(f"{label} lacks source description provenance")
+    if identity.get(dirty_field) is not False:
+        raise ValueError(f"{label} does not attest a clean source tree")
+    return {"commit": commit, "describe": describe}
 
 
 def _legacy_requested_engine(
@@ -59,14 +80,13 @@ def _capture_identity(
     if not isinstance(source, dict) or not isinstance(environment, dict):
         raise ValueError(f"{label} capture lacks source/environment provenance")
 
-    commit = source.get("target_commit")
-    describe = source.get("target_describe")
-    if not isinstance(commit, str) or not commit:
-        raise ValueError(f"{label} capture lacks a source commit")
-    if not isinstance(describe, str) or not describe:
-        raise ValueError(f"{label} capture lacks a source description")
-    if source.get("target_dirty") is not False:
-        raise ValueError(f"{label} capture does not attest a clean source tree")
+    attestation = _attest_source(
+        source,
+        f"{label} capture",
+        commit_field="target_commit",
+        describe_field="target_describe",
+        dirty_field="target_dirty",
+    )
     for field in ("target_commit", "target_describe", "target_dirty"):
         if environment.get(field) != source[field]:
             raise ValueError(
@@ -94,8 +114,7 @@ def _capture_identity(
         system_name=system_name,
     )
     return {
-        "commit": commit,
-        "describe": describe,
+        **attestation,
         "requested_engine": requested,
         "active_engines": engines,
         "system_name": system_name,
@@ -236,11 +255,54 @@ def _format_quarters(values: list[float]) -> str:
     return " → ".join(f"{value:.3f}" for value in values)
 
 
+def _is_exact_a4(identity: dict[str, Any]) -> bool:
+    return identity.get("version") == "2.0.0a4"
+
+
+def _targeted_producer_system(
+    capture: dict[str, Any],
+    configuration: dict[str, Any],
+    label: str,
+    *,
+    allow_legacy: bool,
+    warnings: list[str],
+) -> str | None:
+    """Validate capture-time command/host metadata and post-capture markers."""
+    problems: list[str] = []
+    command = capture.get("command")
+    if not (
+        isinstance(command, list)
+        and command
+        and all(isinstance(argument, str) and argument for argument in command)
+    ):
+        problems.append("lacks a producer-recorded command")
+    host = capture.get("host")
+    system_name = host.get("os_name") if isinstance(host, dict) else None
+    if not isinstance(system_name, str) or not system_name:
+        system_name = None
+        problems.append("lacks capture-time host OS provenance")
+    if "annotation_status" in configuration:
+        problems.append("contains a post-capture orientation/formula annotation")
+    if "post_capture_command_reconstruction" in capture:
+        problems.append("contains a post-capture command reconstruction")
+    if problems and not allow_legacy:
+        raise ValueError(
+            f"{label} is not a strict targeted capture: {', '.join(problems)}; "
+            "use --allow-legacy to inspect it with warnings"
+        )
+    warnings.extend(f"{label}: {problem}" for problem in problems)
+    return system_name
+
+
 def _targeted_identity(
     capture: dict[str, Any], label: str, *, allow_legacy: bool
-) -> tuple[str, str, str, list[str]]:
-    if capture.get("schema_version") != 2:
-        raise ValueError(f"{label} has an unsupported targeted schema")
+) -> dict[str, Any]:
+    schema = capture.get("schema_version")
+    if schema != 2:
+        raise ValueError(
+            f"{label} has unsupported targeted schema {schema!r}; "
+            "schema-v1 records are archival and cannot be validated"
+        )
     if capture.get("status") != "complete":
         raise ValueError(f"{label} capture is not complete")
     configuration = capture.get("configuration")
@@ -251,74 +313,98 @@ def _targeted_identity(
     requested = configuration.get("requested_engine")
     if requested not in {"stdlib", "zlib-ng"}:
         raise ValueError(f"{label} lacks a requested engine")
+
+    warnings: list[str] = []
+    system_name = _targeted_producer_system(
+        capture,
+        configuration,
+        label,
+        allow_legacy=allow_legacy,
+        warnings=warnings,
+    )
+    formula = configuration.get("reported_change_formula")
+    if formula != _RAW_CHANGE_FORMULA:
+        if not allow_legacy:
+            raise ValueError(f"{label} lacks the canonical raw-change formula")
+        warnings.append(f"{label}: raw-change formula was not producer-recorded")
+
+    attestations: dict[str, dict[str, str]] = {}
     active_by_side: dict[str, dict[str, str]] = {}
     for side, identity in (("baseline", baseline), ("candidate", candidate)):
-        for field in ("commit", "describe"):
-            if not isinstance(identity.get(field), str) or not identity[field]:
-                raise ValueError(f"{label} {side} lacks {field} provenance")
-        if identity.get("dirty_tracked") is not False:
-            raise ValueError(f"{label} {side} does not attest a clean source tree")
+        attestations[side] = _attest_source(
+            identity,
+            f"{label} {side}",
+            commit_field="commit",
+            describe_field="describe",
+            dirty_field="dirty_tracked",
+        )
+        version = identity.get("version")
+        if not isinstance(version, str) or not version:
+            raise ValueError(f"{label} {side} lacks source version provenance")
         engines = identity.get("active_engines")
         if not isinstance(engines, dict):
             raise ValueError(f"{label} {side} lacks active engine provenance")
         active_by_side[side] = engines
     if active_by_side["baseline"] != active_by_side["candidate"]:
         raise ValueError(f"{label} has different active engines on its two sides")
-    active = active_by_side["baseline"]
-    expected_decompression = "zlib-ng" if requested == "zlib-ng" else "stdlib-zlib"
-    if (
-        active.get("compression") != "stdlib-zlib"
-        or active.get("decompression") != expected_decompression
-        or active.get("crc32")
-        not in (
-            {"zlib-ng", "stdlib-zlib"} if requested == "zlib-ng" else {"stdlib-zlib"}
+
+    if system_name is None:
+        active_crc = active_by_side["baseline"].get("crc32")
+        system_name = (
+            "Darwin"
+            if requested == "zlib-ng" and active_crc == "stdlib-zlib"
+            else "Linux"
         )
-    ):
+    assert_requested_engine(
+        active_by_side["baseline"],
+        requested,
+        source_label=f"{label} targeted capture",
+        system_name=system_name,
+    )
+
+    baseline_is_a4 = _is_exact_a4(baseline)
+    candidate_is_a4 = _is_exact_a4(candidate)
+    if baseline_is_a4 == candidate_is_a4:
         raise ValueError(
-            f"{label} active engines do not satisfy requested engine {requested!r}: "
-            f"{active}"
+            f"{label} cannot derive canonical orientation from source versions"
         )
+    expected_side = "candidate" if baseline_is_a4 else "baseline"
     candidate_side = configuration.get("canonical_candidate_side")
-    warnings: list[str] = []
-    if candidate_side not in {"baseline", "candidate"}:
-        if not allow_legacy:
-            raise ValueError(
-                f"{label} lacks canonical_candidate_side; use --allow-legacy only "
-                "when the file orientation is known"
-            )
-        candidate_side = "candidate"
+    if candidate_side is None and allow_legacy:
+        candidate_side = expected_side
         warnings.append(
-            f"{label}: assuming the raw candidate side is the canonical candidate"
+            f"{label}: canonical candidate side inferred from source versions"
         )
-    annotation_status = configuration.get("annotation_status")
-    if isinstance(annotation_status, str) and annotation_status:
-        warnings.append(f"{label}: {annotation_status}")
-    reconstructed = capture.get("post_capture_command_reconstruction")
-    if (
-        isinstance(reconstructed, dict)
-        and reconstructed.get("recorded_at_capture") is False
-    ):
-        warnings.append(
-            f"{label}: command was reconstructed after capture, not recorded "
-            "contemporaneously"
+    elif candidate_side not in {"baseline", "candidate"}:
+        raise ValueError(f"{label} has invalid canonical_candidate_side")
+    if candidate_side != expected_side:
+        raise ValueError(
+            f"{label} canonical_candidate_side={candidate_side!r} contradicts "
+            f"source versions; expected {expected_side!r}"
         )
-    return requested, baseline["describe"], candidate["describe"], warnings
+
+    return {
+        "requested_engine": requested,
+        "baseline": attestations["baseline"]["describe"],
+        "candidate": attestations["candidate"]["describe"],
+        "candidate_side": candidate_side,
+        "warnings": warnings,
+    }
 
 
 def summarize_targeted(
     capture: dict[str, Any], label: str, *, allow_legacy: bool = False
 ) -> None:
     """Print min, median, and temporal diagnostics from one targeted record."""
-    requested, baseline, candidate, warnings = _targeted_identity(
-        capture, label, allow_legacy=allow_legacy
-    )
-    candidate_side = capture["configuration"].get(
-        "canonical_candidate_side", "candidate"
-    )
+    identity = _targeted_identity(capture, label, allow_legacy=allow_legacy)
+    requested = identity["requested_engine"]
+    baseline = identity["baseline"]
+    candidate = identity["candidate"]
+    candidate_side = identity["candidate_side"]
     print(f"\n{'=' * 88}")
     print(f"TARGETED TIMING: {label}")
     print(f"{'=' * 88}")
-    for warning in warnings:
+    for warning in identity["warnings"]:
         print(f"WARNING: {warning}")
     print(f"Raw baseline: {baseline}")
     print(f"Raw candidate: {candidate}")

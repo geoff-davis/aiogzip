@@ -260,6 +260,17 @@ def _configure_requested_engine(
     return requested
 
 
+def _verify_unattested_engine(requested: str) -> dict[str, str]:
+    """Verify an engine request when no source checkout was attested."""
+    import aiogzip
+
+    return assert_requested_engine(
+        aiogzip.engine_info().__dict__,
+        requested,
+        source_label="unattested benchmark environment",
+    )
+
+
 def configure_source_root(source_root: Path) -> dict[str, Any]:
     """Import and attest aiogzip from one explicit source checkout."""
     resolved_root = source_root.resolve()
@@ -501,6 +512,11 @@ async def main():
                 source_label="benchmark source",
                 system_name=environment["os_name"],
             )
+        except (ValueError, RuntimeError) as error:
+            parser.error(str(error))
+    elif requested_engine is not None:
+        try:
+            _verify_unattested_engine(requested_engine)
         except (ValueError, RuntimeError) as error:
             parser.error(str(error))
 

@@ -95,20 +95,22 @@ method call per line/chunk) have measurably cost throughput before. When
 touching them, benchmark before and after:
 
 Check out the baseline *source* in a worktree, but run both sides with the
-**same venv and interpreter** by shadowing the editable install via
-PYTHONPATH (aiogzip is pure Python, so no build step is needed):
+**same venv, interpreter, and benchmark runner**. Comparable captures require
+explicit clean source roots so the JSON contains commit, dirty-tree,
+environment, and engine attestations:
 
 ```bash
 git worktree add /tmp/aiogzip-baseline main
 
-# Baseline source, current venv (PYTHONPATH shadows the editable install)
-PYTHONPATH=/tmp/aiogzip-baseline/src \
-    uv run python benchmarks/run_benchmarks.py \
-    --category io,micro --engine stdlib --output /tmp/bench-before.json
-
-# Current branch source
+# Baseline source, current runner and venv
 uv run python benchmarks/run_benchmarks.py \
-    --category io,micro --engine stdlib --output /tmp/bench-after.json
+    --category io,micro --source-root /tmp/aiogzip-baseline \
+    --engine stdlib --output /tmp/bench-before.json
+
+# Clean candidate commit, current runner and venv
+uv run python benchmarks/run_benchmarks.py \
+    --category io,micro --source-root . \
+    --engine stdlib --output /tmp/bench-after.json
 
 # Compare
 uv run python benchmarks/bench_compare.py /tmp/bench-before.json /tmp/bench-after.json
@@ -122,8 +124,12 @@ Notes:
   venv that can resolve a *different Python version* (interpreter speed
   differences of ±10% masquerade as code regressions) and may lack the
   `fast` extra (zlib-ng vs stdlib skews read benchmarks several-fold).
-  Verify the source swap with
-  `PYTHONPATH=... python -c "import aiogzip; print(aiogzip.__file__)"`.
+  The runner verifies the source swap and records `aiogzip.__file__` itself.
+- Comparable captures require clean committed source roots. For an uncommitted
+  exploratory run, omit `--source-root`; the runner still verifies
+  `--engine`, but records no source/environment attestation and the comparator
+  rejects the result by design. Commit the candidate before producing a
+  before/after comparison or release evidence.
 - Pin the codec with `--engine stdlib` on both sides. The runner applies and
   verifies the library's stdlib-only environment override; use
   `--engine zlib-ng` to request and verify the optional engine.

@@ -1138,6 +1138,27 @@ def test_requested_engine_rejects_noop_zlib_ng_environment(monkeypatch):
         configure_requested_engine(None, source_root_supplied=True)
 
 
+def test_main_verifies_engine_without_source_root(monkeypatch):
+    from aiogzip import EngineInfo
+
+    fake_aiogzip = SimpleNamespace(
+        engine_info=lambda: EngineInfo(
+            compression="stdlib-zlib",
+            decompression="stdlib-zlib",
+            crc32="stdlib-zlib",
+        )
+    )
+    monkeypatch.setitem(sys.modules, "aiogzip", fake_aiogzip)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_benchmarks.py", "--quick", "--engine", "zlib-ng"],
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        asyncio.run(run_benchmarks.main())
+
+
 def test_main_checkpoints_completed_categories_on_late_failure(tmp_path, monkeypatch):
     output = tmp_path / "capture.json"
     source_root = tmp_path / "source"
@@ -1327,17 +1348,32 @@ def test_compare_results_requires_explicit_legacy_opt_in(capsys):
     assert "WARNING: baseline: legacy capture has no completion status" in output
 
 
-def _targeted_capture(candidate_side: str = "candidate") -> dict:
-    identity = {
-        "commit": "abc123",
-        "describe": "source",
-        "dirty_tracked": False,
-        "active_engines": {
-            "compression": "stdlib-zlib",
-            "decompression": "zlib-ng",
-            "crc32": "zlib-ng",
-        },
+def _targeted_capture(
+    candidate_side: str = "candidate",
+    *,
+    system_name: str = "Linux",
+    crc32: str = "zlib-ng",
+) -> dict:
+    engines = {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng",
+        "crc32": crc32,
     }
+    a4 = {
+        "commit": "a4-commit",
+        "describe": "v2.0.0a4",
+        "version": "2.0.0a4",
+        "dirty_tracked": False,
+        "active_engines": engines,
+    }
+    b1 = {
+        "commit": "b1-commit",
+        "describe": "v2.0.0a4-20-gb1",
+        "version": "2.0.0b1.dev0",
+        "dirty_tracked": False,
+        "active_engines": engines,
+    }
+    baseline, candidate = (b1, a4) if candidate_side == "baseline" else (a4, b1)
     return {
         "schema_version": 2,
         "benchmark": "aiogzip-2.0.0b1-targeted-timing-investigation",
@@ -1345,9 +1381,12 @@ def _targeted_capture(candidate_side: str = "candidate") -> dict:
         "configuration": {
             "requested_engine": "zlib-ng",
             "canonical_candidate_side": candidate_side,
+            "reported_change_formula": ("(raw candidate / raw baseline - 1) * 100"),
         },
-        "baseline": identity,
-        "candidate": identity,
+        "command": ["python", "benchmarks/investigate_b1_timing.py"],
+        "host": {"os_name": system_name},
+        "baseline": baseline,
+        "candidate": candidate,
         "results": [
             {
                 "name": "row",
@@ -1369,6 +1408,88 @@ def test_targeted_summary_marks_orientation_and_temporal_statistics(capsys):
     assert bench_compare.canonical_change_percent(10.0, "baseline") == pytest.approx(
         -9.090909
     )
+
+
+def test_targeted_legacy_orientation_fallback_is_used_by_summary(capsys):
+    capture = _targeted_capture()
+    capture["configuration"].pop("canonical_candidate_side")
+
+    bench_compare.summarize_targeted(capture, "legacy", allow_legacy=True)
+
+    output = capsys.readouterr().out
+    assert "canonical candidate side inferred from source versions" in output
+    assert "Canonical candidate side: candidate" in output
+
+
+def test_targeted_invalid_orientation_fails_before_output(capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["canonical_candidate_side"] = "invalid"
+
+    with pytest.raises(ValueError, match="invalid canonical_candidate_side"):
+        bench_compare.summarize_targeted(capture, "invalid", allow_legacy=True)
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_orientation_must_match_source_versions():
+    capture = _targeted_capture()
+    capture["configuration"]["canonical_candidate_side"] = "baseline"
+
+    with pytest.raises(ValueError, match="contradicts source versions"):
+        bench_compare.summarize_targeted(capture, "wrong")
+
+
+@pytest.mark.parametrize("field", ["commit", "describe"])
+def test_targeted_requires_source_attestation_fields(field):
+    capture = _targeted_capture()
+    capture["baseline"].pop(field)
+    provenance_name = "description" if field == "describe" else field
+
+    with pytest.raises(ValueError, match=f"source {provenance_name} provenance"):
+        bench_compare.summarize_targeted(capture, "missing")
+
+
+def test_targeted_post_capture_annotations_require_legacy_mode(capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["annotation_status"] = "untrusted free text"
+    capture["post_capture_command_reconstruction"] = {"recorded_at_capture": False}
+
+    with pytest.raises(ValueError, match="not a strict targeted capture"):
+        bench_compare.summarize_targeted(capture, "annotated")
+    assert capsys.readouterr().out == ""
+
+    bench_compare.summarize_targeted(capture, "annotated", allow_legacy=True)
+    output = capsys.readouterr().out
+    assert "contains a post-capture orientation/formula annotation" in output
+    assert "contains a post-capture command reconstruction" in output
+    assert "untrusted free text" not in output
+
+
+def test_targeted_strict_mode_requires_producer_command(capsys):
+    capture = _targeted_capture()
+    capture.pop("command")
+
+    with pytest.raises(ValueError, match="producer-recorded command"):
+        bench_compare.summarize_targeted(capture, "stripped")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_engine_validation_uses_recorded_host():
+    linux_capture = _targeted_capture(system_name="Linux", crc32="stdlib-zlib")
+    with pytest.raises(RuntimeError, match="crc32"):
+        bench_compare.summarize_targeted(linux_capture, "linux")
+
+    darwin_capture = _targeted_capture(system_name="Darwin", crc32="stdlib-zlib")
+    bench_compare.summarize_targeted(darwin_capture, "darwin")
+
+
+def test_targeted_schema_one_is_explicitly_archival():
+    capture = _targeted_capture()
+    capture["schema_version"] = 1
+
+    with pytest.raises(ValueError, match="archival"):
+        bench_compare.summarize_targeted(capture, "schema-one", allow_legacy=True)
 
 
 def test_quick_regression_output_matrix_validates_outputs():
