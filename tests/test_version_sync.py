@@ -85,7 +85,8 @@ def test_release_metadata_is_synchronized():
         )
 
     assert project["requires-python"] == ">=3.11"
-    assert "Development Status :: 3 - Alpha" in project["classifiers"]
+    assert "Development Status :: 4 - Beta" in project["classifiers"]
+    assert "Development Status :: 3 - Alpha" not in project["classifiers"]
     assert any(
         dependency.startswith("aiofiles") for dependency in project["dependencies"]
     )

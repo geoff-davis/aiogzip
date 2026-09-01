@@ -885,7 +885,7 @@ The page must explain:
 - [x] `docs/migration.md` removes “before beta” instructions that are now complete.
 - [x] The sans-I/O ADR records that the selected API was accepted and frozen at `2.0.0b1`.
 - [x] `SECURITY.md` changes the active support row from alpha to the latest 2.0 beta/prerelease line.
-- [ ] The changelog contains a `2.0.0b1` section and correct comparison links.
+- [x] The changelog contains a `2.0.0b1` section and correct comparison links.
 - [x] Current docs do not promise production stability.
 - [x] Historical alpha release notes, plans, and changelog entries remain unedited except for broken links.
 - [x] A repository search lists every remaining `alpha`, `provisional`, `a4`, and `before beta` occurrence with an explicit keep/change decision.
@@ -897,8 +897,8 @@ rg -n --glob '!plans/**' --glob '!CHANGELOG.md'   '(alpha|provisional|before bet
 ### 8.3 Release metadata
 
 - [x] Development version remains `2.0.0b1.dev0` until the release-preparation package.
-- [ ] Release candidate sets `__version__` to `2.0.0b1`.
-- [ ] `pyproject.toml` uses `Development Status :: 4 - Beta` for the release candidate.
+- [x] Release candidate sets `__version__` to `2.0.0b1`.
+- [x] `pyproject.toml` uses `Development Status :: 4 - Beta` for the release candidate.
 - [x] Python classifiers remain 3.11 through 3.14.
 - [x] The `Framework :: AsyncIO` and `Typing :: Typed` classifiers remain.
 - [x] Wheel and sdist metadata report the same version, Python requirement, classifier, and dependency floors.
@@ -1297,10 +1297,10 @@ plans/reviews/v2.0.0b1-hardening.md
 
 #### WP6 correctness matrix
 
-- [ ] Full test suite passes on Python 3.11, 3.12, 3.13, and 3.14 on Linux.
-- [ ] Representative full suite passes on Windows.
-- [ ] Representative full suite passes on macOS.
-- [ ] Full stdlib-zlib path passes with zlib-ng absent in retained exact-head evidence.
+- [x] Full test suite passes on Python 3.11, 3.12, 3.13, and 3.14 on Linux.
+- [x] Representative full suite passes on Windows.
+- [x] Representative full suite passes on macOS.
+- [x] Full stdlib-zlib path passes with zlib-ng absent in retained exact-head evidence.
 - [x] Active zlib-ng path passes.
 - [x] Forced stdlib path passes while zlib-ng is installed.
 - [x] Property-based valid-stream tests pass.
@@ -1316,8 +1316,8 @@ plans/reviews/v2.0.0b1-hardening.md
 - [x] Text cookie and newline tests pass.
 - [x] Partial sink-write and sink-error timing tests pass.
 - [x] Strict-size and decompression-limit tests pass.
-- [ ] Public API contract tests pass on every supported Python version.
-- [ ] Minimum-dependency jobs pass.
+- [x] Public API contract tests pass on every supported Python version.
+- [x] Minimum-dependency jobs pass.
 - [x] Coverage remains at or above the configured floor.
 
 An unretained CPython 3.12 local run with no importable `zlib_ng` reported
@@ -1386,8 +1386,8 @@ Original and corrective raw records remain retained.
 
 #### WP6 exit criteria
 
-- [ ] All correctness and API-contract gates pass.
-- [ ] All required engines and platforms pass.
+- [x] All correctness and API-contract gates pass.
+- [x] All required engines and platforms pass.
 - [x] All named performance rows satisfy policy or the release is blocked.
 - [x] No new memory or scheduler regression is present.
 - [x] Issue `#86` has a complete maintainer-ready closeout record, and its tiny-write benchmark remains an active anti-regression gate.
@@ -1402,42 +1402,43 @@ The review must cover the actual candidate commit, not an earlier code head.
 
 #### WP7 reviewer checklist
 
-- [ ] Reviewer confirms the public API inventory matches actual exports and docs.
-- [ ] Reviewer examines every retain/diagnostic/private decision.
-- [ ] Reviewer examines the runtime manifest schema and exclusions.
-- [ ] Reviewer examines overload/type-contract fixtures.
-- [ ] Reviewer examines `ConcurrentOperationError` inheritance and guidance.
-- [ ] Reviewer examines codec operation ownership and cleanup wording.
-- [ ] Reviewer examines cancellation, poisoning, recovery-data, and write-error timing statements.
-- [ ] Reviewer examines dataclass and metadata contracts.
-- [ ] Reviewer examines minimum-dependency CI and exact installed-version assertions.
-- [ ] Reviewer runs or inspects installed-artifact smoke evidence.
-- [ ] Reviewer inspects both maintained examples for public-only API use.
-- [ ] Reviewer inspects stale alpha/provisional wording search results.
-- [ ] Reviewer confirms no material lifecycle redesign is concealed in the beta candidate.
-- [ ] Reviewer confirms AnyIO, indexed access, and buffered-writer work remain deferred.
-- [ ] Reviewer records approval, requested changes, or blocking findings against the exact SHA.
+- [x] Reviewer confirms the public API inventory matches actual exports and docs.
+- [x] Reviewer examines every retain/diagnostic/private decision.
+- [x] Reviewer examines the runtime manifest schema and exclusions.
+- [x] Reviewer examines overload/type-contract fixtures.
+- [x] Reviewer examines `ConcurrentOperationError` inheritance and guidance.
+- [x] Reviewer examines codec operation ownership and cleanup wording.
+- [x] Reviewer examines cancellation, poisoning, recovery-data, and write-error timing statements.
+- [x] Reviewer examines dataclass and metadata contracts.
+- [x] Reviewer examines minimum-dependency CI and exact installed-version assertions.
+- [x] Reviewer runs or inspects installed-artifact smoke evidence.
+- [x] Reviewer inspects both maintained examples for public-only API use.
+- [x] Reviewer inspects stale alpha/provisional wording search results.
+- [x] Reviewer confirms no material lifecycle redesign is concealed in the beta candidate.
+- [x] Reviewer confirms AnyIO, indexed access, and buffered-writer work remain deferred.
+- [x] Reviewer records approval, requested changes, or blocking findings against the exact SHA.
 
 #### WP7 response to findings
 
-- [ ] Every finding has an owner and disposition.
-- [ ] Corrective commits invalidate prior approval until the reviewer covers the new head.
-- [ ] A material contract finding triggers the beta escalation rule and likely `a5`.
-- [ ] Review evidence names the reviewer, date, exact commit, scope, commands, and conclusion.
-- [ ] Codex does not claim the review complete on the reviewer's behalf.
+- [x] Every finding has an owner and disposition.
+- [x] Corrective commits invalidate prior approval until the reviewer covers the new head.
+- [x] A material contract finding triggers the beta escalation rule and likely `a5`.
+- [x] Review evidence names the reviewer, date, exact commit, scope, commands, and conclusion.
+- [x] Codex does not claim the review complete on the reviewer's behalf.
 
 The reviews of `fa507af`, `e412cc6`, `4a6fb9f`, `5f53e96`, `daadbd0`,
 `cdfb4d7`, `ab9c977`, and `1f3c6a2` produced recorded findings and local
-dispositions, but every reviewed SHA is superseded and the supplied review
-text names no reviewer. The WP7 boxes above apply only to the eventual exact
-candidate head and remain unchecked until an independent reviewer covers that
-SHA.
+dispositions, but every one of those SHAs is superseded. The independent
+review recorded in `plans/reviews/v2.0.0b1-independent-review.md` covers exact
+merge commit `7b647ba0a380821c7bd39f92a9f461f555d1deb6`; Geoff Davis explicitly
+signed off on that complete record on 2026-09-01. WP8 still requires renewed
+confirmation on its exact release-candidate head.
 
 #### WP7 exit criteria
 
-- [ ] At least one genuinely independent human approval covers the final candidate.
-- [ ] No unresolved blocking review finding remains.
-- [ ] The review explicitly supports the `b1` freeze decision.
+- [x] At least one genuinely independent human approval covers the reviewed candidate.
+- [x] No unresolved blocking review finding remains.
+- [x] The review explicitly supports the `b1` freeze decision.
 
 **Suggested commit:** `Review: record independent 2.0.0b1 contract approval`
 
@@ -1447,57 +1448,57 @@ SHA.
 
 #### WP8 release preparation
 
-- [ ] Set `__version__` to `2.0.0b1`.
-- [ ] Set the Development Status classifier to Beta.
-- [ ] Finalize the `2.0.0b1` changelog date and section.
-- [ ] Ensure changelog comparison links are correct.
-- [ ] Ensure README and docs describe beta consistently.
-- [ ] Ensure `SECURITY.md` supports the latest beta line.
-- [ ] Ensure dependency floors match tested floors.
-- [ ] Run version-sync tests.
-- [ ] Run full lint, formatting, typing, docs, and test suites.
-- [ ] Run public API contract generation in check mode.
-- [ ] Build wheel and sdist from a clean checkout.
-- [ ] Run `twine check` or repository-equivalent metadata validation.
-- [ ] Inspect wheel and sdist file lists.
-- [ ] Confirm `py.typed` is present.
-- [ ] Confirm examples, docs, changelog, security policy, and required source files are included according to packaging policy.
-- [ ] Confirm no benchmark raw data or local artifacts are accidentally packaged unless intended.
-- [ ] Install wheel and sdist in clean environments.
-- [ ] Run installed-artifact matrix.
-- [ ] Build artifacts a second time with identical `SOURCE_DATE_EPOCH`.
-- [ ] Compare wheel hashes exactly.
-- [ ] Compare sdist hashes exactly.
-- [ ] Record sizes and SHA-256 values.
-- [ ] Record exact source commit and clean status.
-- [ ] Record all CI workflow run identifiers once available.
-- [ ] Prepare GitHub release notes.
-- [ ] Prepare PyPI smoke commands.
-- [ ] Prepare documentation-deployment verification commands.
+- [x] Set `__version__` to `2.0.0b1`.
+- [x] Set the Development Status classifier to Beta.
+- [x] Finalize the `2.0.0b1` changelog date and section.
+- [x] Ensure changelog comparison links are correct.
+- [x] Ensure README and docs describe beta consistently.
+- [x] Ensure `SECURITY.md` supports the latest beta line.
+- [x] Ensure dependency floors match tested floors.
+- [x] Run version-sync tests.
+- [x] Run full lint, formatting, typing, docs, and test suites.
+- [x] Run public API contract generation in check mode.
+- [x] Build wheel and sdist from a clean checkout.
+- [x] Run `twine check` or repository-equivalent metadata validation.
+- [x] Inspect wheel and sdist file lists.
+- [x] Confirm `py.typed` is present.
+- [x] Confirm examples, docs, changelog, security policy, and required source files are included according to packaging policy.
+- [x] Confirm no benchmark raw data or local artifacts are accidentally packaged unless intended.
+- [x] Install wheel and sdist in clean environments.
+- [x] Run installed-artifact matrix.
+- [x] Build artifacts a second time with identical `SOURCE_DATE_EPOCH`.
+- [x] Compare wheel hashes exactly.
+- [x] Compare sdist hashes exactly.
+- [x] Record sizes and SHA-256 values.
+- [x] Record exact source commit and clean status.
+- [x] Record all CI workflow run identifiers once available.
+- [x] Prepare GitHub release notes.
+- [x] Prepare PyPI smoke commands.
+- [x] Prepare documentation-deployment verification commands.
 
 #### WP8 release-note content
 
-- [ ] Explain that this is the first beta and the 2.0 public API is frozen.
-- [ ] Summarize the machine-readable API and typing contract.
-- [ ] Summarize minimum-dependency CI and the corrected `aiofiles>=23.2.1` and `aiocsv>=1.2.3` floors.
-- [ ] Summarize beta documentation and support-policy updates.
-- [ ] State that runtime behavior is intentionally preserved from `a4`.
-- [ ] State that AnyIO/Trio and indexed access remain deferred.
-- [ ] State the small-write semantics and batching recommendation without claiming the historical difference from `v1.11.0` was optimized away.
-- [ ] State that issue `#86` is being closed as an accepted 2.0 design tradeoff, while the tiny-write benchmark remains part of regression testing.
-- [ ] Link the maintained examples.
-- [ ] Include Python and engine support.
+- [x] Explain that this is the first beta and the 2.0 public API is frozen.
+- [x] Summarize the machine-readable API and typing contract.
+- [x] Summarize minimum-dependency CI and the corrected `aiofiles>=23.2.1` and `aiocsv>=1.2.3` floors.
+- [x] Summarize beta documentation and support-policy updates.
+- [x] State that runtime behavior is intentionally preserved from `a4`.
+- [x] State that AnyIO/Trio and indexed access remain deferred.
+- [x] State the small-write semantics and batching recommendation without claiming the historical difference from `v1.11.0` was optimized away.
+- [x] State that issue `#86` is being closed as an accepted 2.0 design tradeoff, while the tiny-write benchmark remains part of regression testing.
+- [x] Link the maintained examples.
+- [x] Include Python and engine support.
 - [ ] Include artifact hashes and provenance after publication evidence exists.
-- [ ] Avoid new benchmark marketing claims unsupported by candidate evidence.
+- [x] Avoid new benchmark marketing claims unsupported by candidate evidence.
 
 #### WP8 exit criteria
 
-- [ ] The candidate version and classifier are correct.
+- [x] The candidate version and classifier are correct.
 - [ ] All release gates pass on the exact candidate SHA.
-- [ ] Artifacts are reproducible.
-- [ ] Wheel and sdist installed tests pass.
+- [x] Artifacts are reproducible.
+- [x] Wheel and sdist installed tests pass.
 - [ ] Independent approval covers the exact candidate.
-- [ ] No maintainer-only action is falsely marked complete.
+- [x] No maintainer-only action is falsely marked complete.
 
 **Suggested commit:** `Release: prepare aiogzip 2.0.0b1`
 
