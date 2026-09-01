@@ -1465,13 +1465,13 @@ confirmation on its exact release-candidate head.
 - [x] Confirm examples, docs, changelog, security policy, and required source files are included according to packaging policy.
 - [x] Confirm no benchmark raw data or local artifacts are accidentally packaged unless intended.
 - [x] Install wheel and sdist in clean environments.
-- [ ] Run installed-artifact matrix.
+- [x] Run installed-artifact matrix.
 - [x] Build artifacts a second time with identical `SOURCE_DATE_EPOCH`.
 - [x] Compare wheel hashes exactly.
 - [x] Compare sdist hashes exactly.
 - [x] Record sizes and SHA-256 values.
 - [x] Record exact source commit and clean status.
-- [ ] Record all CI workflow run identifiers once available.
+- [x] Record all CI workflow run identifiers once available.
 - [x] Prepare GitHub release notes.
 - [x] Prepare PyPI smoke commands.
 - [x] Prepare documentation-deployment verification commands.
