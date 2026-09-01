@@ -32,6 +32,49 @@ def _legacy_b1_candidate_side(
     return None
 
 
+def _require_candidate_side(value: object, label: str) -> str:
+    if not isinstance(value, str) or value not in CANONICAL_SIDES:
+        raise ValueError(f"{label} has invalid canonical_candidate_side")
+    return value
+
+
+def _require_candidate_commit(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{label} has invalid canonical_candidate_commit")
+    return value
+
+
+def require_explicit_orientation(
+    configuration: dict[str, Any], *, label: str
+) -> tuple[str, str]:
+    """Validate the orientation fields required from a new producer."""
+    candidate_side = _require_candidate_side(
+        configuration.get("canonical_candidate_side"), label
+    )
+    canonical_commit = _require_candidate_commit(
+        configuration.get("canonical_candidate_commit"), label
+    )
+    return candidate_side, canonical_commit
+
+
+def validate_candidate_commit_binding(
+    candidate_side: str,
+    canonical_commit: str,
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+    *,
+    label: str,
+) -> None:
+    """Bind an explicit orientation to the selected side's exact commit."""
+    selected = baseline if candidate_side == "baseline" else candidate
+    selected_commit = selected.get("commit")
+    if canonical_commit != selected_commit:
+        raise ValueError(
+            f"{label} canonical_candidate_commit={canonical_commit!r} contradicts "
+            f"the {candidate_side} source commit {selected_commit!r}"
+        )
+
+
 def validate_canonical_orientation(
     configuration: dict[str, Any],
     baseline: dict[str, Any],
@@ -59,12 +102,10 @@ def validate_canonical_orientation(
         warnings.append(
             f"{label}: canonical candidate side inferred from source versions"
         )
-    elif not isinstance(candidate_side, str) or candidate_side not in CANONICAL_SIDES:
-        raise ValueError(f"{label} has invalid canonical_candidate_side")
+    else:
+        candidate_side = _require_candidate_side(candidate_side, label)
 
     canonical_commit = configuration.get("canonical_candidate_commit")
-    selected = baseline if candidate_side == "baseline" else candidate
-    selected_commit = selected.get("commit")
     if canonical_commit is None:
         if not allow_legacy:
             raise ValueError(
@@ -79,17 +120,24 @@ def validate_canonical_orientation(
         warnings.append(
             f"{label}: canonical candidate commit was not producer-recorded"
         )
-    elif not isinstance(canonical_commit, str) or not canonical_commit:
-        raise ValueError(f"{label} has invalid canonical_candidate_commit")
-    elif canonical_commit != selected_commit:
-        raise ValueError(
-            f"{label} canonical_candidate_commit={canonical_commit!r} contradicts "
-            f"the {candidate_side} source commit {selected_commit!r}"
+    else:
+        canonical_commit = _require_candidate_commit(canonical_commit, label)
+        validate_candidate_commit_binding(
+            candidate_side,
+            canonical_commit,
+            baseline,
+            candidate,
+            label=label,
         )
 
     if legacy_side is not None and candidate_side != legacy_side:
         raise ValueError(
             f"{label} canonical_candidate_side={candidate_side!r} contradicts "
             f"the archived a4/b1 source versions; expected {legacy_side!r}"
+        )
+    if baseline.get("commit") == candidate.get("commit"):
+        warnings.append(
+            f"{label}: both sides attest the same source commit; canonical "
+            "candidate side labels measurement orientation only"
         )
     return candidate_side, warnings

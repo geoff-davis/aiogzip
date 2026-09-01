@@ -253,10 +253,11 @@ the requested engine. The output is checkpointed atomically after every case,
 so a late failure preserves completed measurements with `status: failed`:
 
 ```bash
+candidate_commit=$(git -C . rev-parse HEAD) &&
 taskset -c 0 uv run python benchmarks/investigate_b1_timing.py \
   --baseline-root /tmp/aiogzip-v2.0.0a4 \
   --candidate-root . \
-  --canonical-candidate-commit "$(git rev-parse HEAD)" \
+  --canonical-candidate-commit "$candidate_commit" \
   --engine stdlib --warmup-cycles 25 --cycles 50 \
   --output /tmp/aiogzip-b1-targeted-stdlib.json
 ```
@@ -264,12 +265,13 @@ taskset -c 0 uv run python benchmarks/investigate_b1_timing.py \
 Run it once per required engine only after retaining the original threshold
 crossing and the interleaved process-level follow-up. If the raw baseline and
 candidate sides are reversed, pass `--canonical-candidate-side baseline` so
-the record and comparator can orient every delta consistently. The required
-`--canonical-candidate-commit` independently binds that side choice to the
-expected exact source commit. Treat its
-minimum comparison as an investigation result, not a standalone performance
-claim; inspect medians and temporal slices for drift before using it to
-adjudicate a threshold.
+the record and comparator can orient every delta consistently, and obtain
+`--canonical-candidate-commit` from that baseline root (for example,
+`git -C /tmp/aiogzip-v2.0.0a4 rev-parse HEAD`) rather than from the raw
+candidate root. The required commit independently binds the side choice to
+the expected exact source. Treat the diagnostic's minimum comparison as an
+investigation result, not a standalone performance claim; inspect medians and
+temporal slices for drift before using it to adjudicate a threshold.
 
 ## Running Benchmarks
 

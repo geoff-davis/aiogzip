@@ -217,6 +217,8 @@ def test_shared_engine_guard_checks_each_field():
         source_label="test",
         system_name="Darwin",
     )
+    with pytest.raises(ValueError, match="unsupported requested engine"):
+        assert_requested_engine(engines, [], source_label="test")
 
 
 @pytest.mark.parametrize(
@@ -225,6 +227,7 @@ def test_shared_engine_guard_checks_each_field():
         ("compression", "unknown"),
         ("decompression", "stdlib-zlib"),
         ("crc32", "unknown"),
+        ("crc32", []),
     ],
 )
 def test_shared_engine_guard_validates_platform_unknown_records(field, value):
@@ -237,22 +240,30 @@ def test_shared_engine_guard_validates_platform_unknown_records(field, value):
         engines,
         "zlib-ng",
         source_label="legacy",
-        allow_unknown_system=True,
+        system_name=run_benchmarks.UNKNOWN_SYSTEM,
     )
     assert_requested_engine(
         {**engines, "crc32": "zlib-ng"},
         "zlib-ng",
         source_label="legacy",
-        allow_unknown_system=True,
+        system_name=run_benchmarks.UNKNOWN_SYSTEM,
     )
 
-    with pytest.raises(RuntimeError, match=field):
+    with pytest.raises(RuntimeError) as caught:
         assert_requested_engine(
             {**engines, field: value},
             "zlib-ng",
             source_label="legacy",
-            allow_unknown_system=True,
+            system_name=run_benchmarks.UNKNOWN_SYSTEM,
         )
+    mismatch = (
+        str(caught.value).split("do not match: ", 1)[1].split("; active engines", 1)[0]
+    )
+    assert mismatch.startswith(f"{{'{field}':")
+    assert all(
+        f"'{other}':" not in mismatch
+        for other in {"compression", "decompression", "crc32"} - {field}
+    )
 
 
 def test_b1_investigation_attests_clean_source_before_timing(tmp_path, monkeypatch):
@@ -419,7 +430,9 @@ def test_b1_investigation_checkpoints_partial_results_on_late_failure(
     tmp_path, monkeypatch
 ):
     baseline_root, candidate_root = _mock_b1_investigation_sources(
-        tmp_path, monkeypatch
+        tmp_path,
+        monkeypatch,
+        candidate_commit="1111111111111111111111111111111111111111",
     )
     monkeypatch.setattr(
         investigate_b1_timing,
@@ -449,7 +462,7 @@ def test_b1_investigation_checkpoints_partial_results_on_late_failure(
         cycles=1,
         warmup_cycles=1,
         canonical_candidate_side="candidate",
-        canonical_candidate_commit="2222222222222222222222222222222222222222",
+        canonical_candidate_commit="1111111111111111111111111111111111111111",
     )
 
     with pytest.raises(RuntimeError, match="late failure"):
@@ -463,6 +476,10 @@ def test_b1_investigation_checkpoints_partial_results_on_late_failure(
         )
 
     assert snapshots[0]["status"] == "running"
+    assert snapshots[0]["warnings"] == [
+        "targeted capture producer: both sides attest the same source commit; "
+        "canonical candidate side labels measurement orientation only"
+    ]
     assert snapshots[-1]["status"] == "failed"
     assert snapshots[-1]["results"] == [{"name": "completed"}]
     assert snapshots[-1]["failure"] == {
@@ -529,8 +546,8 @@ def test_b1_producer_rejects_side_that_does_not_match_expected_commit(
     )
     monkeypatch.setattr(
         investigate_b1_timing,
-        "_output_bound_fixture",
-        lambda: pytest.fail("timing fixture constructed after invalid orientation"),
+        "_load_package",
+        lambda *_args: pytest.fail("package loaded after invalid commit binding"),
     )
     args = argparse.Namespace(
         baseline_root=baseline_root,
@@ -546,9 +563,52 @@ def test_b1_producer_rejects_side_that_does_not_match_expected_commit(
         asyncio.run(b1_run(args))
 
 
+def test_b1_producer_rejects_a4_b1_version_contradiction_before_timing(
+    tmp_path, monkeypatch
+):
+    baseline_root, candidate_root = _mock_b1_investigation_sources(
+        tmp_path,
+        monkeypatch,
+        baseline_version="2.0.0b1.dev0",
+        candidate_version="2.0.0a4",
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_output_bound_fixture",
+        lambda: pytest.fail("timing started after invalid source orientation"),
+    )
+    args = argparse.Namespace(
+        baseline_root=baseline_root,
+        candidate_root=candidate_root,
+        engine="stdlib",
+        cycles=1,
+        warmup_cycles=1,
+        canonical_candidate_side="candidate",
+        canonical_candidate_commit="2222222222222222222222222222222222222222",
+    )
+
+    with pytest.raises(ValueError, match="contradicts the archived a4/b1"):
+        asyncio.run(b1_run(args))
+
+
+def test_b1_producer_rejects_invalid_side_before_source_loading(monkeypatch):
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_source_identity",
+        lambda _root: pytest.fail("source loaded after invalid side"),
+    )
+    args = argparse.Namespace(
+        canonical_candidate_side=[],
+        canonical_candidate_commit="2" * 40,
+    )
+
+    with pytest.raises(ValueError, match="invalid canonical_candidate_side"):
+        asyncio.run(b1_run(args))
+
+
 @pytest.mark.parametrize("command", [None, [], "python", ["python", ""]])
 def test_b1_capture_command_rejects_malformed_present_value(command):
-    with pytest.raises(ValueError, match="args.command must be"):
+    with pytest.raises(ValueError, match="recorded command"):
         investigate_b1_timing._capture_command(SimpleNamespace(command=command))
 
 
@@ -560,11 +620,48 @@ def test_b1_run_rejects_malformed_cli_command_before_source_loading(monkeypatch)
     )
     args = argparse.Namespace(
         command=["python", ""],
+        canonical_candidate_side="candidate",
         canonical_candidate_commit="2" * 40,
     )
 
-    with pytest.raises(ValueError, match="args.command must be"):
+    with pytest.raises(ValueError, match="recorded command argument 1 is empty"):
         asyncio.run(b1_run(args))
+
+
+def test_b1_main_reports_empty_cli_value_without_traceback(
+    tmp_path, monkeypatch, capsys
+):
+    output = tmp_path / "capture.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "investigate_b1_timing.py",
+            "--baseline-root",
+            "",
+            "--candidate-root",
+            ".",
+            "--engine",
+            "stdlib",
+            "--canonical-candidate-commit",
+            "2" * 40,
+            "--output",
+            str(output),
+        ],
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_source_identity",
+        lambda _root: pytest.fail("source loaded after empty CLI value"),
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        investigate_b1_timing.main()
+
+    error = capsys.readouterr().err
+    assert "--baseline-root has an empty value" in error
+    assert "Traceback" not in error
+    assert not output.exists()
 
 
 def test_comparison_fixture_is_deterministic(tmp_path):
@@ -1493,6 +1590,14 @@ def test_compare_results_rejects_engine_mismatch():
         )
 
 
+def test_compare_results_rejects_unhashable_requested_engine():
+    baseline = _comparison_capture("before")
+    baseline["environment"]["requested_engine"] = []
+
+    with pytest.raises(ValueError, match="explicit requested engine"):
+        bench_compare.compare_results(baseline, _comparison_capture("after"))
+
+
 def test_compare_results_rejects_dirty_source():
     with pytest.raises(ValueError, match="clean source tree"):
         bench_compare.compare_results(
@@ -1625,6 +1730,16 @@ def test_targeted_unhashable_orientation_reports_value_error(capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_targeted_unhashable_requested_engine_reports_value_error(capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["requested_engine"] = []
+
+    with pytest.raises(ValueError, match="lacks a requested engine"):
+        bench_compare.summarize_targeted(capture, "invalid-engine")
+
+    assert capsys.readouterr().out == ""
+
+
 @pytest.mark.parametrize("version", ["2.0.0b10", "2.0.0b1rc1"])
 def test_non_archival_version_is_not_treated_as_archived_b1(version, capsys):
     capture = _targeted_capture()
@@ -1734,6 +1849,20 @@ def test_targeted_same_source_quick_capture_uses_nonempty_temporal_slices(capsys
     output = capsys.readouterr().out
     assert "both sides attest the same source commit" in output
     assert "temporal slice medians (2/2)" in output
+    assert "* first-half minimum uses one sample per side" in output
+
+
+def test_targeted_one_sample_capture_summarizes_without_empty_slice(capsys):
+    capture = _targeted_capture()
+    capture["results"][0]["baseline"]["samples_seconds"] = [1.0]
+    capture["results"][0]["candidate"]["samples_seconds"] = [1.01]
+
+    bench_compare.summarize_targeted(capture, "one-sample")
+
+    output = capsys.readouterr().out
+    assert "temporal slice medians (1/1)" in output
+    assert "+1.00%*" in output
+    assert "* first-half minimum uses one sample per side" in output
 
 
 @pytest.mark.parametrize("field", ["commit", "describe"])
@@ -1796,6 +1925,41 @@ def test_targeted_legacy_missing_host_does_not_infer_crc_platform(capsys):
     output = capsys.readouterr().out
     assert "lacks capture-time host OS provenance" in output
     assert "crc32 engine cannot be checked against the platform" in output
+
+
+def test_targeted_unknown_host_rejects_unhashable_crc_engine(capsys):
+    capture = _targeted_capture()
+    capture.pop("host")
+    capture["baseline"]["active_engines"] = {
+        **capture["baseline"]["active_engines"],
+        "crc32": [],
+    }
+    capture["candidate"]["active_engines"] = capture["baseline"]["active_engines"]
+
+    with pytest.raises(RuntimeError, match="engine fields do not match"):
+        bench_compare.summarize_targeted(capture, "unhashable", allow_legacy=True)
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_legacy_missing_host_validates_stdlib_without_crc_warning(capsys):
+    capture = _targeted_capture(crc32="stdlib-zlib")
+    capture["configuration"]["requested_engine"] = "stdlib"
+    stdlib_engines = {
+        "compression": "stdlib-zlib",
+        "decompression": "stdlib-zlib",
+        "crc32": "stdlib-zlib",
+    }
+    capture["baseline"]["active_engines"] = stdlib_engines
+    capture["candidate"]["active_engines"] = stdlib_engines
+    capture.pop("host")
+
+    bench_compare.summarize_targeted(capture, "stdlib-no-host", allow_legacy=True)
+
+    output = capsys.readouterr().out
+    assert "lacks capture-time host OS provenance" in output
+    assert "Engine: stdlib" in output
+    assert "crc32 engine cannot be checked" not in output
 
 
 def test_targeted_engine_validation_uses_recorded_host():

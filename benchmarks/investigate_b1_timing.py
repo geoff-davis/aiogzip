@@ -38,6 +38,8 @@ from bench_a3_regressions import (
 from bench_targeted_contract import (
     RAW_CHANGE_FORMULA,
     TARGETED_BENCHMARK,
+    require_explicit_orientation,
+    validate_candidate_commit_binding,
     validate_canonical_orientation,
 )
 from run_benchmarks import assert_requested_engine
@@ -284,12 +286,16 @@ def _capture_command(args: argparse.Namespace) -> list[str]:
     """Record either the exact CLI or an equivalent programmatic invocation."""
     if hasattr(args, "command"):
         command = args.command
-        if not (
-            isinstance(command, list)
-            and command
-            and all(isinstance(argument, str) and argument for argument in command)
-        ):
-            raise ValueError("args.command must be a non-empty list of strings")
+        if not isinstance(command, list) or not command:
+            raise ValueError("recorded command must be a non-empty list")
+        for index, argument in enumerate(command):
+            if not isinstance(argument, str):
+                raise ValueError(f"recorded command argument {index} must be a string")
+            if not argument:
+                previous = command[index - 1] if index else None
+                if isinstance(previous, str) and previous.startswith("--"):
+                    raise ValueError(f"{previous} has an empty value")
+                raise ValueError(f"recorded command argument {index} is empty")
         return list(command)
     return [
         "programmatic:investigate_b1_timing.run",
@@ -303,22 +309,35 @@ def _capture_command(args: argparse.Namespace) -> list[str]:
     ]
 
 
+def _validate_run_arguments(args: argparse.Namespace) -> tuple[str, str, list[str]]:
+    """Validate producer-controlled provenance before reading either source."""
+    orientation = {
+        "canonical_candidate_side": getattr(args, "canonical_candidate_side", None),
+        "canonical_candidate_commit": getattr(args, "canonical_candidate_commit", None),
+    }
+    candidate_side, canonical_commit = require_explicit_orientation(
+        orientation, label="targeted capture arguments"
+    )
+    return candidate_side, canonical_commit, _capture_command(args)
+
+
 async def run(
     args: argparse.Namespace,
     *,
     checkpoint: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
-    canonical_candidate_commit = getattr(args, "canonical_candidate_commit", None)
-    if (
-        not isinstance(canonical_candidate_commit, str)
-        or not canonical_candidate_commit
-    ):
-        raise ValueError("args.canonical_candidate_commit must be a non-empty string")
-    command = _capture_command(args)
+    candidate_side, canonical_candidate_commit, command = _validate_run_arguments(args)
     # Git and cleanliness checks intentionally precede package loading and all
     # fixture construction so invalid provenance fails before a timed run.
     baseline_identity = _source_identity(args.baseline_root)
     candidate_identity = _source_identity(args.candidate_root)
+    validate_candidate_commit_binding(
+        candidate_side,
+        canonical_candidate_commit,
+        baseline_identity,
+        candidate_identity,
+        label="targeted capture producer",
+    )
     if args.engine == "stdlib":
         os.environ["AIOGZIP_ENGINE"] = "stdlib"
     else:
@@ -336,10 +355,10 @@ async def run(
         candidate_identity, candidate, candidate_engines
     )
     orientation = {
-        "canonical_candidate_side": args.canonical_candidate_side,
+        "canonical_candidate_side": candidate_side,
         "canonical_candidate_commit": canonical_candidate_commit,
     }
-    validate_canonical_orientation(
+    _, orientation_warnings = validate_canonical_orientation(
         orientation,
         baseline_record,
         candidate_record,
@@ -365,6 +384,7 @@ async def run(
             "checkpoint_policy": "atomic write before timing and after every case",
         },
         "command": command,
+        "warnings": orientation_warnings,
         "host": {
             "os_name": platform.system(),
             "platform": platform.platform(),
@@ -492,15 +512,22 @@ def _write_document(path: Path, document: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    args = build_parser().parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
     args.command = [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]]
+    try:
+        _validate_run_arguments(args)
+    except ValueError as error:
+        parser.error(str(error))
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    asyncio.run(
+    document = asyncio.run(
         run(
             args,
             checkpoint=lambda document: _write_document(args.output, document),
         )
     )
+    for warning in document["warnings"]:
+        print(f"WARNING: {warning}")
     print(f"wrote {args.output}")
     return 0
 

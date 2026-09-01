@@ -49,6 +49,7 @@ CATEGORIES = {
 
 QUICK_CATEGORIES = ["io", "compression"]
 _CPU_SYSFS_ROOT = Path("/sys/devices/system/cpu")
+UNKNOWN_SYSTEM = "<unknown>"
 
 
 async def run_category(
@@ -205,42 +206,51 @@ def _cpu_tuning() -> tuple[str, str]:
     return governor, boost
 
 
+def requested_engine_platform_warning(
+    requested: str, system_name: str, *, source_label: str
+) -> str | None:
+    """Describe the one engine field an unknown host cannot fully attest."""
+    if requested == "zlib-ng" and system_name == UNKNOWN_SYSTEM:
+        return (
+            f"{source_label}: crc32 engine cannot be checked against the platform "
+            "because capture-time host OS provenance is absent"
+        )
+    return None
+
+
 def assert_requested_engine(
     engines: dict[str, str],
     requested: str,
     *,
     source_label: str,
     system_name: str | None = None,
-    allow_unknown_system: bool = False,
 ) -> dict[str, str]:
     """Require the exact default engines expected for an evidence capture."""
-    if requested not in {"stdlib", "zlib-ng"}:
+    if not isinstance(requested, str) or requested not in {"stdlib", "zlib-ng"}:
         raise ValueError(f"unsupported requested engine: {requested}")
-    if system_name is None and not allow_unknown_system:
-        system_name = platform.system()
-    crc32_expected: str | set[str]
-    if requested == "zlib-ng" and system_name is None:
-        crc32_expected = {"stdlib-zlib", "zlib-ng"}
+    system_name = system_name or platform.system()
+    crc32_expected: tuple[str, ...]
+    if requested == "zlib-ng" and system_name == UNKNOWN_SYSTEM:
+        crc32_expected = ("stdlib-zlib", "zlib-ng")
     else:
         crc32_expected = (
-            "zlib-ng"
+            ("zlib-ng",)
             if requested == "zlib-ng" and system_name != "Darwin"
-            else "stdlib-zlib"
+            else ("stdlib-zlib",)
         )
     expected = {
-        "compression": "stdlib-zlib",
-        "decompression": "zlib-ng" if requested == "zlib-ng" else "stdlib-zlib",
+        "compression": ("stdlib-zlib",),
+        "decompression": ("zlib-ng" if requested == "zlib-ng" else "stdlib-zlib",),
         "crc32": crc32_expected,
     }
-    mismatches = {
-        field: {"expected": expected_value, "actual": engines.get(field)}
-        for field, expected_value in expected.items()
-        if (
-            engines.get(field) not in expected_value
-            if isinstance(expected_value, set)
-            else engines.get(field) != expected_value
-        )
-    }
+    mismatches = {}
+    for field, allowed_values in expected.items():
+        actual = engines.get(field)
+        if all(actual != allowed for allowed in allowed_values):
+            expected_value: str | tuple[str, ...] = (
+                allowed_values[0] if len(allowed_values) == 1 else allowed_values
+            )
+            mismatches[field] = {"expected": expected_value, "actual": actual}
     if mismatches:
         raise RuntimeError(
             f"{requested} was requested for {source_label}, but engine fields "

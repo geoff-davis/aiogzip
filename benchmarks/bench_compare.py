@@ -20,7 +20,11 @@ from bench_targeted_contract import (
     TARGETED_BENCHMARK,
     validate_canonical_orientation,
 )
-from run_benchmarks import assert_requested_engine
+from run_benchmarks import (
+    UNKNOWN_SYSTEM,
+    assert_requested_engine,
+    requested_engine_platform_warning,
+)
 
 
 def load_results(filepath: Path) -> dict[str, Any]:
@@ -53,10 +57,9 @@ def _legacy_requested_engine(
     environment: dict[str, Any], engines: dict[str, Any], label: str
 ) -> tuple[str, list[str]]:
     requested = environment.get("forced_engine")
-    if requested in {"stdlib", "zlib-ng"}:
+    if isinstance(requested, str) and requested in {"stdlib", "zlib-ng"}:
         return requested, []
-    active_values = set(engines.values())
-    if active_values == {"stdlib-zlib"}:
+    if engines and all(value == "stdlib-zlib" for value in engines.values()):
         inferred = "stdlib"
     elif engines.get("decompression") == "zlib-ng":
         inferred = "zlib-ng"
@@ -99,7 +102,7 @@ def _capture_identity(
     if not isinstance(engines, dict):
         raise ValueError(f"{label} capture lacks active engine provenance")
     requested = environment.get("requested_engine")
-    if requested not in {"stdlib", "zlib-ng"}:
+    if not isinstance(requested, str) or requested not in {"stdlib", "zlib-ng"}:
         if not allow_legacy:
             raise ValueError(f"{label} capture lacks an explicit requested engine")
         requested, legacy_warnings = _legacy_requested_engine(
@@ -314,7 +317,7 @@ def _targeted_identity(
     if not all(isinstance(item, dict) for item in (configuration, baseline, candidate)):
         raise ValueError(f"{label} lacks targeted source/configuration provenance")
     requested = configuration.get("requested_engine")
-    if requested not in {"stdlib", "zlib-ng"}:
+    if not isinstance(requested, str) or requested not in {"stdlib", "zlib-ng"}:
         raise ValueError(f"{label} lacks a requested engine")
 
     warnings: list[str] = []
@@ -351,18 +354,20 @@ def _targeted_identity(
     if active_by_side["baseline"] != active_by_side["candidate"]:
         raise ValueError(f"{label} has different active engines on its two sides")
 
+    engine_system = system_name or UNKNOWN_SYSTEM
     assert_requested_engine(
         active_by_side["baseline"],
         requested,
         source_label=f"{label} targeted capture",
-        system_name=system_name,
-        allow_unknown_system=system_name is None,
+        system_name=engine_system,
     )
-    if system_name is None and requested == "zlib-ng":
-        warnings.append(
-            f"{label}: crc32 engine cannot be checked against the platform "
-            "because capture-time host OS provenance is absent"
-        )
+    platform_warning = requested_engine_platform_warning(
+        requested,
+        engine_system,
+        source_label=label,
+    )
+    if platform_warning is not None:
+        warnings.append(platform_warning)
 
     candidate_side, orientation_warnings = validate_canonical_orientation(
         configuration,
@@ -372,11 +377,6 @@ def _targeted_identity(
         allow_legacy=allow_legacy,
     )
     warnings.extend(orientation_warnings)
-    if attestations["baseline"]["commit"] == attestations["candidate"]["commit"]:
-        warnings.append(
-            f"{label}: both sides attest the same source commit; canonical "
-            "candidate side labels measurement orientation only"
-        )
 
     return {
         "requested_engine": requested,
@@ -418,7 +418,7 @@ def summarize_targeted(
             (statistics.median(candidate_samples) / statistics.median(baseline_samples))
             - 1
         ) * 100
-        halfway = min(len(baseline_samples), len(candidate_samples)) // 2
+        halfway = max(1, min(len(baseline_samples), len(candidate_samples)) // 2)
         reported_first_half = (
             (min(candidate_samples[:halfway]) / min(baseline_samples[:halfway])) - 1
         ) * 100
@@ -427,12 +427,15 @@ def summarize_targeted(
         canonical_first_half = canonical_change_percent(
             reported_first_half, candidate_side
         )
+        first_half_text = f"{canonical_first_half:+.2f}%"
+        if halfway == 1:
+            first_half_text += "*"
         name = result["name"]
         display_name = name[:37] + ".." if len(name) > 39 else name
         print(
             f"{display_name:<39} {reported_min:>+8.2f}% "
             f"{canonical_min:>+9.2f}% {canonical_median:>+9.2f}% "
-            f"{canonical_first_half:>+12.2f}%"
+            f"{first_half_text:>13}"
         )
         baseline_parts = _quarters(baseline_samples)
         candidate_parts = _quarters(candidate_samples)
@@ -450,6 +453,8 @@ def summarize_targeted(
             f"{_format_quarters(baseline_quarters)} / "
             f"{_format_quarters(candidate_quarters)}"
         )
+        if halfway == 1:
+            print("  * first-half minimum uses one sample per side")
 
 
 def main() -> int:
