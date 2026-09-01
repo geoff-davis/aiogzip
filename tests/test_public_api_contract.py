@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 import types
+import typing
 from pathlib import Path
 
 import pytest
@@ -44,6 +45,21 @@ def test_public_api_capture_is_deterministic():
     assert first == second
     assert first.endswith("\n")
     assert json.loads(first)["schema_version"] == 1
+
+
+def test_public_api_annotations_are_interpreter_neutral():
+    module = _capture_module()
+
+    assert module._annotation_name(Path) == "pathlib.Path"
+    assert module._annotation_name(typing.Optional[int]) == "Optional[int]"
+    assert (
+        module._annotation_name(typing.Union[int, float, None])
+        == "Union[int, float, NoneType]"
+    )
+    assert (
+        module._annotation_name(typing.Union[str, bytes, Path, None])
+        == "Union[str, bytes, pathlib.Path, NoneType]"
+    )
 
 
 def test_public_api_capture_rejects_duplicate_exports():

@@ -137,6 +137,7 @@ def test_positive_int_rejects_nonpositive_values(value):
 def test_b1_investigation_rejects_requested_engine_mismatch(monkeypatch):
     from aiogzip import EngineInfo
 
+    monkeypatch.setattr(run_benchmarks.platform, "system", lambda: "Linux")
     stdlib = SimpleNamespace(
         engine_info=lambda: EngineInfo(
             compression="stdlib-zlib",

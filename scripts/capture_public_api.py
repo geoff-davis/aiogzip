@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import difflib
+import importlib
 import inspect
 import json
 import types
@@ -144,7 +145,16 @@ _CONSTANTS = (
 )
 
 
-def _annotation_name(annotation: object) -> str | None:
+def _source_annotations(obj: object) -> dict[str, str]:
+    """Return source-spelled annotations when the interpreter exposes them."""
+    try:
+        annotationlib = importlib.import_module("annotationlib")
+    except ImportError:
+        return {}
+    return annotationlib.get_annotations(obj, format=annotationlib.Format.STRING)
+
+
+def _annotation_name(annotation: object, source: str | None = None) -> str | None:
     if annotation is inspect.Signature.empty:
         return None
     if annotation is None or annotation is types.NoneType:
@@ -155,7 +165,28 @@ def _annotation_name(annotation: object) -> str | None:
         return "Any"
     if isinstance(annotation, typing.ForwardRef):
         return annotation.__forward_arg__.replace("typing.", "")
+    origin = typing.get_origin(annotation)
+    if origin in (typing.Union, types.UnionType):
+        arguments = typing.get_args(annotation)
+        pep_604 = (source is not None and "|" in source) or (
+            origin is types.UnionType and origin is not typing.Union
+        )
+        if pep_604:
+            rendered_arguments = [
+                "None" if item is types.NoneType else _annotation_name(item)
+                for item in arguments
+            ]
+            return " | ".join(rendered_arguments)
+        if len(arguments) == 2 and types.NoneType in arguments:
+            member = next(item for item in arguments if item is not types.NoneType)
+            return f"Optional[{_annotation_name(member)}]"
+        rendered_arguments = [
+            "NoneType" if item is types.NoneType else _annotation_name(item)
+            for item in arguments
+        ]
+        return f"Union[{', '.join(rendered_arguments)}]"
     rendered = inspect.formatannotation(annotation).replace("typing.", "")
+    rendered = rendered.replace("pathlib._local.Path", "pathlib.Path")
     for private_module in (
         "aiogzip._binary.",
         "aiogzip._common.",
@@ -181,6 +212,7 @@ def _default(default: object) -> dict[str, object]:
 
 def _signature(obj: object) -> dict[str, object]:
     signature = inspect.signature(obj)
+    source_annotations = _source_annotations(obj)
     parameters = []
     for parameter in signature.parameters.values():
         parameters.append(
@@ -188,12 +220,16 @@ def _signature(obj: object) -> dict[str, object]:
                 "name": parameter.name,
                 "kind": parameter.kind.name,
                 "default": _default(parameter.default),
-                "annotation": _annotation_name(parameter.annotation),
+                "annotation": _annotation_name(
+                    parameter.annotation, source_annotations.get(parameter.name)
+                ),
             }
         )
     return {
         "parameters": parameters,
-        "return": _annotation_name(signature.return_annotation),
+        "return": _annotation_name(
+            signature.return_annotation, source_annotations.get("return")
+        ),
     }
 
 
@@ -226,10 +262,12 @@ def _class_contract(name: str) -> dict[str, object]:
     for member_name in _CLASS_MEMBERS[name]:
         static_member = inspect.getattr_static(cls, member_name)
         if isinstance(static_member, property):
+            source_annotations = _source_annotations(static_member.fget)
             members[member_name] = {
                 "kind": "property",
                 "return": _annotation_name(
-                    inspect.signature(static_member.fget).return_annotation
+                    inspect.signature(static_member.fget).return_annotation,
+                    source_annotations.get("return"),
                 ),
             }
             continue
@@ -246,6 +284,7 @@ def _dataclass_contract(name: str) -> dict[str, object]:
     if not dataclasses.is_dataclass(cls):
         raise TypeError(f"aiogzip.{name} is no longer a dataclass")
     fields = []
+    source_annotations = _source_annotations(cls)
     for field in dataclasses.fields(cls):
         default = field.default
         if field.default_factory is not dataclasses.MISSING:  # type: ignore[misc]
@@ -253,7 +292,9 @@ def _dataclass_contract(name: str) -> dict[str, object]:
         fields.append(
             {
                 "name": field.name,
-                "annotation": _annotation_name(field.type),
+                "annotation": _annotation_name(
+                    field.type, source_annotations.get(field.name)
+                ),
                 "default": _default(default),
             }
         )

@@ -229,6 +229,7 @@ jobs:
           "$GITHUB_WORKSPACE/.minimum-venv/bin/python" -m mypy --strict \
             "$GITHUB_WORKSPACE/tests/typing/public_api_positive.py"
           "$GITHUB_WORKSPACE/.minimum-venv/bin/python" -m ty check \
+            --python "$GITHUB_WORKSPACE/.minimum-venv" \
             --python-version 3.11 --no-progress \
             "$GITHUB_WORKSPACE/tests/typing/public_api_positive.py"
 
