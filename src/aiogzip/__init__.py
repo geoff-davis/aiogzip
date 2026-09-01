@@ -29,7 +29,7 @@ from ._streaming import _compress_chunks, _decompress_chunks
 from ._text import AsyncGzipTextFile
 from .codec import CodecOperation, GzipDecoder, GzipEncoder
 
-__version__ = "2.0.0b1"
+__version__ = "2.0.0b2.dev0"
 
 # Mode strings that select a text stream (they contain a 't'). The factory
 # parses modes character-by-character and is permutation-tolerant, so these

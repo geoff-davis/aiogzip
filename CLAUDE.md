@@ -244,14 +244,23 @@ Always include:
   `output_chunk_size`, and cooperative event-loop checkpoints. Adds the public
   typed `CodecOperation`. The codec API remains provisional through the alpha
   series; established asyncio APIs keep their compatibility contract.
-- **2.0.0a3 (current)** - Removes the file reader's duplicate gzip-header
+- **2.0.0a3** - Removes the file reader's duplicate gzip-header
   parser and drives live `mtime` from the shared decoder. The resulting
   last-completed-header behavior, terminal reader failure/recovery contract,
   and same-handle overlap/context-exit behavior are deliberate, reviewed
   compatibility corrections to the established asyncio API for this alpha;
   their rationale and evidence are recorded in the a3 review record.
+- **2.0.0a4** - Completes the alpha integration surface with maintained
+  fragmented-transport and concurrent-ingest examples, exact Boolean
+  validation, completed-member metadata, and the final alpha performance and
+  artifact gates.
+- **2.0.0b1 (current release)** - Freezes the documented 2.0 public API,
+  adds deterministic runtime and typing contracts, proves the supported
+  dependency floors and installed artifacts, and publishes the beta stability
+  policy. Development continues as `2.0.0b2.dev0` while the Beta classifier
+  and frozen compatibility contract remain in force.
 
 ---
 
-**Last Updated:** 2026-08-16
+**Last Updated:** 2026-09-01
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
