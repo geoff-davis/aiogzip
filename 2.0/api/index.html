@@ -16,7 +16,7 @@
         <link rel="prev" href="../errors/">
       
       
-        <link rel="next" href="../adr-sans-io-codec/">
+        <link rel="next" href="../stability/">
       
       
         
@@ -2042,6 +2042,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stability policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../adr-sans-io-codec/" class="md-nav__link">
         
   
@@ -3700,8 +3727,9 @@ falsy objects raise <code>TypeError</code> with the parameter name.</p>
 <code>AsyncGzipTextFile</code>, <code>open()</code>, <code>AsyncGzipFile</code>, the whole-file helpers, the
 async-iterable compressor, and the synchronous codec. Validation happens
 before file acquisition, external file methods, source iteration, zlib-ng
-warning logic, or codec operation reservation. This is an intentional alpha
-compatibility tightening, not a security fix.</p>
+warning logic, or codec operation reservation. This contract was tightened
+during the alpha series and is frozen for 2.0; it is not a new beta change or
+a security fix.</p>
 <p>For writers, <code>strict_size=False</code> preserves gzip's normal modulo-2³² <code>ISIZE</code>;
 <code>strict_size=True</code> rejects a member crossing that field's range.
 <code>fast_compress=False</code> keeps stdlib-compatible output, while
@@ -3747,9 +3775,10 @@ deterministic cleanup when a caller exits before exhaustion.</p>
 <p><strong>Warning:</strong> Decoder output can precede its trailer. Integrity is established
 only after the operation returned by <code>finish()</code> is exhausted.</p>
 </blockquote>
-<p>The codec API is provisional during the 2.0 alpha series. See the
-<a href="../codec/">synchronous codec guide</a> for constructor validation, immutable
-input snapshots, lifecycle hazards, thread safety, and error behavior.</p>
+<p>The public codec API is beta-frozen for the 2.0 line. See the
+<a href="../stability/">stability policy</a> and <a href="../codec/">synchronous codec guide</a> for
+the compatibility boundary, constructor validation, immutable input
+snapshots, lifecycle hazards, thread safety, and error behavior.</p>
 <p>With <code>collect_member_info=True</code>, <code>GzipDecoder.members</code> contains immutable
 records only for members whose trailers validated. Those completed records
 remain available if a later member fails or the codec is explicitly discarded;

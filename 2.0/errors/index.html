@@ -622,6 +622,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stability policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../adr-sans-io-codec/" class="md-nav__link">
         
   
@@ -814,6 +841,10 @@ decompression (stdlib zlib or zlib-ng from the <code>[fast]</code> extra) never 
 which exception type you see: engine-specific errors are caught internally and
 re-raised uniformly, so <code>except</code> clauses written against stdlib behavior keep
 working when the fast engine is installed.</p>
+<p>The exception types and the explicitly documented decompression-limit message
+prefix are part of the <a href="../stability/">2.0 stability contract</a>. Complete dynamic
+messages are not: offsets, sizes, member numbers, engine names, and operating
+system text may vary.</p>
 <h2 id="taxonomy">Taxonomy</h2>
 <table>
 <thead>

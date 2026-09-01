@@ -650,6 +650,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stability policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../adr-sans-io-codec/" class="md-nav__link">
         
   
@@ -873,7 +900,8 @@ iterables.</p>
 <p>These are asynchronous transport wrappers, distinct from the synchronous
 <a href="../codec/"><code>GzipEncoder</code> and <code>GzipDecoder</code></a> state machines. The wrappers own
 async-source cleanup, cancellation, backpressure, and optional executor
-offload; the codec owns gzip framing and validation and performs no I/O.</p>
+offload; the codec owns gzip framing and validation and performs no I/O.
+Both chunk helpers are part of the <a href="../stability/">beta-frozen 2.0 API</a>.</p>
 <h2 id="decompressing">Decompressing</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">aiogzip</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>

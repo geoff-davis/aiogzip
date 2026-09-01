@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://geoff-davis.github.io/aiogzip/2.0/adr-sans-io-codec/">
       
       
-        <link rel="prev" href="../api/">
+        <link rel="prev" href="../stability/">
       
       
         <link rel="next" href="../adr-isal/">
@@ -506,6 +506,33 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stability policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -657,10 +684,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#fallback-if-alpha-feedback-rejects-iterator-ownership" class="md-nav__link">
+  <a href="#rejected-bounded-alternative" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fallback if alpha feedback rejects iterator ownership
+        Rejected bounded alternative
       
     </span>
   </a>
@@ -855,10 +882,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#fallback-if-alpha-feedback-rejects-iterator-ownership" class="md-nav__link">
+  <a href="#rejected-bounded-alternative" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fallback if alpha feedback rejects iterator ownership
+        Rejected bounded alternative
       
     </span>
   </a>
@@ -897,17 +924,20 @@
 
 
 <h1 id="adr-one-synchronous-sans-io-gzip-codec">ADR: One synchronous sans-I/O gzip codec</h1>
-<p><strong>Status:</strong> Decided for the 2.0 alpha series (2026-07-22); bounded buffering
-amendment accepted for <code>2.0.0a2</code> (2026-07-26)</p>
+<p><strong>Status:</strong> Accepted and frozen for 2.0 at <code>2.0.0b1</code> (2026-08-31); original
+decision recorded 2026-07-22 and bounded-buffering amendment accepted for
+<code>2.0.0a2</code> on 2026-07-26</p>
 <h2 id="context">Context</h2>
 <p>aiogzip 1.x has separate gzip state machines in its binary-file, async
 streaming, and inspection implementations. Keeping framing, trailer validation,
 member traversal, limits, and engine bookkeeping aligned across those paths is
 difficult. It also prevents users from applying aiogzip's gzip behavior to
 transports other than files and asynchronous iterables.</p>
-<p>The 2.0 alpha needs one reusable core without taking ownership of I/O or an
-event loop. The public API is provisional during the alpha series; the existing
-high-level asyncio APIs retain their normal compatibility expectations.</p>
+<p>During the alpha series, 2.0 needed one reusable core without taking ownership
+of I/O or an event loop. Transport-integration feedback validated the selected
+surface, which became part of the beta-frozen 2.0 public API at <code>2.0.0b1</code>.
+The existing high-level asyncio APIs retain their normal compatibility
+expectations.</p>
 <h2 id="decision">Decision</h2>
 <p>Add synchronous <code>GzipEncoder</code> and <code>GzipDecoder</code> classes in <code>aiogzip.codec</code> and
 re-export them from the package root. They handle complete RFC 1952 streams:
@@ -918,7 +948,7 @@ metadata.</p>
 <code>asyncio</code> or <code>aiofiles</code>, schedule executor work, or create background tasks.
 Async wrappers retain responsibility for sources and sinks, executor policy,
 cancellation, buffering, seeking, and text handling. Raw DEFLATE, AnyIO/Trio,
-ISA-L, and indexed seeking are outside this alpha.</p>
+ISA-L, and indexed seeking are outside this 2.0 decision.</p>
 <h2 id="lazy-operations-and-ownership">Lazy operations and ownership</h2>
 <p>Every state-changing method returns a lazy, single-use <code>CodecOperation</code> of
 non-empty <code>bytes</code> chunks bounded by <code>output_chunk_size</code>. The protocol extends
@@ -1047,14 +1077,15 @@ the wrapper waits for that worker to finish before discarding the codec and
 re-raising <code>CancelledError</code>. No replacement operation may race the old worker,
 and cleanup failures must not replace the original cancellation or source
 exception.</p>
-<h2 id="fallback-if-alpha-feedback-rejects-iterator-ownership">Fallback if alpha feedback rejects iterator ownership</h2>
+<h2 id="rejected-bounded-alternative">Rejected bounded alternative</h2>
 <p>The bounded alternative is a pull-style operation object with an explicit
 <code>next_chunk()</code> method and mandatory <code>close()</code>/context-manager lifecycle. It
 would keep codec-owned reservation tokens, snapshot semantics, output bounds,
 and deterministic abandonment behavior while making ownership more visible.
 It would not be replaced with eager lists, background queues, or unbounded
-accumulation. Such an API change is eligible for a later alpha, before the
-codec surface becomes stable.</p>
+accumulation. Alpha feedback did not require this incompatible alternative,
+so it was rejected when the selected iterator surface was frozen at
+<code>2.0.0b1</code>.</p>
 <h2 id="consequences">Consequences</h2>
 <p>There is one production gzip state machine and transport wrappers become
 independently reviewable. Users can drive gzip over memory or custom transports

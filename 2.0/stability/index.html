@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://geoff-davis.github.io/aiogzip/2.0/migration/">
+        <link rel="canonical" href="https://geoff-davis.github.io/aiogzip/2.0/stability/">
       
       
-        <link rel="prev" href="..">
+        <link rel="prev" href="../api/">
       
       
-        <link rel="next" href="../examples/">
+        <link rel="next" href="../adr-sans-io-codec/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Migrating from gzip - aiogzip</title>
+        <title>Stability policy - aiogzip</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#migrating-from-gzipopen" class="md-skip">
+        <a href="#stability-policy" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Migrating from gzip
+              Stability policy
             
           </span>
         </div>
@@ -290,37 +290,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Migrating from gzip
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../migration/" class="md-nav__link">
         
   
   
@@ -336,48 +309,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#before-after" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Before / after
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#moving-an-existing-aiogzip-application-to-20" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Moving an existing aiogzip application to 2.0
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -575,10 +506,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../stability/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stability policy
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -594,6 +552,59 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#public-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-freeze-covers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the freeze covers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples-and-future-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples and future changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -706,10 +717,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#before-after" class="md-nav__link">
+  <a href="#public-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Before / after
+        Public API
       
     </span>
   </a>
@@ -717,10 +728,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#moving-an-existing-aiogzip-application-to-20" class="md-nav__link">
+  <a href="#what-the-freeze-covers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Moving an existing aiogzip application to 2.0
+        What the freeze covers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples-and-future-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples and future changes
       
     </span>
   </a>
@@ -747,100 +769,66 @@
   
 
 
-<h1 id="migrating-from-gzipopen">Migrating from <code>gzip.open</code></h1>
-<p><code>aiogzip.open()</code> accepts the same paths, modes, and keyword arguments as the
-stdlib's <code>gzip.open()</code>, and it reads and writes the same <code>.gz</code> format. Exactly
-three things change:</p>
-<p>aiogzip 2.0 requires Python 3.11 or newer. On Python 3.8 through 3.10, normal
-dependency resolution continues selecting the newest compatible 1.x release;
-pin <code>aiogzip&lt;2</code> when an explicit upper bound is preferred. Upgrade the
-interpreter before selecting a 2.0 prerelease.</p>
-<table>
-<thead>
-<tr>
-<th></th>
-<th><code>gzip</code></th>
-<th><code>aiogzip</code></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Opening</td>
-<td><code>with gzip.open(...) as f:</code></td>
-<td><code>async with aiogzip.open(...) as f:</code></td>
-</tr>
-<tr>
-<td>Line iteration</td>
-<td><code>for line in f:</code></td>
-<td><code>async for line in f:</code></td>
-</tr>
-<tr>
-<td>Reads and writes</td>
-<td><code>f.read()</code>, <code>f.write(data)</code></td>
-<td><code>await f.read()</code>, <code>await f.write(data)</code></td>
-</tr>
-</tbody>
-</table>
-<h2 id="before-after">Before / after</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># stdlib gzip</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">gzip</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">count_lines</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"rt"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">f</span><span class="p">)</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># aiogzip</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">aiogzip</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">count_lines</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"rt"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="k">return</span> <span class="nb">sum</span><span class="p">([</span><span class="mi">1</span> <span class="k">async</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">f</span><span class="p">])</span>
-</code></pre></div>
-<p>Everything else carries over unchanged: mode strings (<code>"rb"</code>, <code>"rt"</code>, <code>"wb"</code>,
-<code>"wt"</code>, append, exclusive), <code>compresslevel</code>, text-mode <code>encoding</code> / <code>errors</code> /
-<code>newline</code>, and interoperability — files written by either library are read by
-the other.</p>
-<p>If you forget and use <code>with</code> or <code>for</code>, aiogzip raises a <code>TypeError</code> that says
-exactly what to change (e.g. <code>"must be used with 'async with', not 'with'"</code>).</p>
-<h2 id="moving-an-existing-aiogzip-application-to-20">Moving an existing aiogzip application to 2.0</h2>
-<p>Ordinary asyncio callers do not need to change their code. The high-level
-<code>open()</code>, <code>AsyncGzipFile()</code>, <code>read()</code>, <code>write()</code>, <code>inspect()</code>, <code>verify()</code>,
-<code>compress_chunks()</code>, and <code>decompress_chunks()</code> APIs retain their asynchronous
-lifecycle and interoperability behavior. The main compatibility change is the
-Python 3.11 floor.</p>
-<p>During the alpha series, Boolean configuration was tightened before the 2.0
-API freeze to avoid preserving accidental truth-value coercion. Pass the exact
-built-in values <code>True</code> or <code>False</code> for <code>fast_compress</code>, <code>strict_size</code>, and the
-direct decoder's <code>collect_member_info</code>. Integer stand-ins (<code>0</code>, <code>1</code>), strings
-such as <code>"false"</code>, and custom truthy or falsy objects raise <code>TypeError</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">aiogzip</span><span class="o">.</span><span class="n">GzipEncoder</span><span class="p">(</span><span class="n">fast_compress</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># valid</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">aiogzip</span><span class="o">.</span><span class="n">GzipEncoder</span><span class="p">(</span><span class="n">fast_compress</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>      <span class="c1"># TypeError</span>
-</code></pre></div>
-<p><code>closefd</code> accepts exact <code>True</code>, exact <code>False</code>, or <code>None</code>. <code>None</code> preserves the
-ownership default: a resource opened from a path is closed by aiogzip, while a
-caller-supplied <code>fileobj</code> remains open. Use an explicit Boolean only when
-overriding that default.</p>
-<p>aiogzip 2.0 also adds synchronous <code>GzipEncoder</code> and <code>GzipDecoder</code> classes for
-applications that own a custom transport and want to drive aiogzip's gzip
-state machine directly:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aiogzip</span><span class="w"> </span><span class="kn">import</span> <span class="n">GzipDecoder</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">decoder</span> <span class="o">=</span> <span class="n">GzipDecoder</span><span class="p">(</span><span class="n">max_decompressed_size</span><span class="o">=</span><span class="mi">100</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">payload</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">for</span> <span class="n">compressed_chunk</span> <span class="ow">in</span> <span class="n">source</span><span class="p">:</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">payload</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">decoder</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">compressed_chunk</span><span class="p">)))</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">payload</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">decoder</span><span class="o">.</span><span class="n">finish</span><span class="p">()))</span>
-</code></pre></div>
-<p>The codec is synchronous and performs no I/O or executor offload. Its returned
-operation iterators are lazy and must be exhausted before the next call, and
-decompression integrity is established only after <code>finish()</code> is exhausted.
-See the <a href="../codec/">synchronous codec guide</a> before integrating it.</p>
-<p><code>GzipEncoder</code>, <code>GzipDecoder</code>, and <code>CodecOperation</code> are public and beta-frozen
-for the 2.0 line as of <code>2.0.0b1</code>. The beta remains a prerelease; see the
-<a href="../stability/">stability policy</a> for the exact compatibility boundary.</p>
-<p>Next steps: <a href="../examples/">Examples</a> for common tasks,
-<a href="../recipes/">Recipes</a> for streaming patterns, and the
-<a href="../performance/">Performance Guide</a> for tuning.</p>
+<h1 id="stability-policy">Stability policy</h1>
+<p>aiogzip <code>2.0.0b1</code> is the first 2.0 beta. Beginning with that release, the
+documented public API is frozen for the 2.0 line: no intentional incompatible
+change is planned before 2.0 stable. Later betas and release candidates may
+contain compatible correctness fixes, documentation and packaging updates,
+and semantics-preserving performance improvements.</p>
+<p>Beta is still a prerelease. Test it against your workloads and pin an exact
+version or an appropriate prerelease range until 2.0 stable is available.</p>
+<h2 id="public-api">Public API</h2>
+<p>The canonical public import paths are the top-level <code>aiogzip</code> package and the
+<code>aiogzip.codec</code> module. The names documented in the <a href="../api/">API reference</a>,
+including the top-level <code>__all__</code> and <code>aiogzip.codec.__all__</code> inventories, are
+the supported 2.0 surface. The high-level asyncio APIs and the synchronous
+codec receive the same beta compatibility commitment.</p>
+<p>Modules and names beginning with an underscore are private unless a name is
+also re-exported through a documented public path. In particular,
+<code>aiogzip._common</code>, <code>aiogzip._binary</code>, <code>aiogzip._text</code>,
+<code>aiogzip._inspection</code>, and <code>aiogzip._streaming</code> may change without notice.
+Private caches, progress events, engine adapters, and scheduling details are
+not compatibility promises.</p>
+<h2 id="what-the-freeze-covers">What the freeze covers</h2>
+<ul>
+<li>Public function and method signatures, including their defaults and
+  overload behavior, are frozen. Conventional binary and text mode literals
+  continue to narrow to their respective file classes, while dynamic mode
+  strings return the documented union.</li>
+<li>Public exception types and inheritance are frozen. Only message prefixes
+  explicitly identified as stable are covered; currently that is
+  <code>decompressed output exceeded max_decompressed_size</code>. Complete messages
+  containing offsets, sizes, member numbers, engine names, or platform text
+  may change.</li>
+<li>Public dataclass names, field order, field names, defaults, annotations, and
+  documented frozen/slots behavior are frozen. Incidental generated <code>repr()</code>
+  formatting is not.</li>
+<li>The member sets and runtime-checkable status of the public <code>WithAsync*</code>
+  protocols are part of the typing contract. <code>CodecOperation</code> retains its
+  iterable and deterministic <code>close()</code> shape. <code>ZlibEngine</code> remains a typing
+  alias, currently represented by <code>Any</code>, rather than a runtime engine object.</li>
+<li>Documented <code>GZIP_*</code> constant names and numeric values are frozen for 2.0.</li>
+<li>Lifecycle, ownership, output-bound, integrity-validation, and cancellation
+  behavior described in the user guides is part of the public contract.</li>
+</ul>
+<p>The availability and field shape of <code>EngineInfo</code> and the availability of
+<code>engine_info()</code> are public. Their human-readable engine-name strings are
+diagnostics, not stable feature flags; do not branch on an exact string. The
+literal value of <code>aiogzip.__version__</code> likewise changes with each release,
+though it remains a public string synchronized with package metadata.</p>
+<h2 id="examples-and-future-changes">Examples and future changes</h2>
+<p>Repository examples are maintained and tested as integration workflows, but
+their helper functions, command-line wording, frame formats, staging layouts,
+and status labels are application code rather than package API. Only the
+public aiogzip names they import receive the compatibility guarantee above.</p>
+<p>After 2.0 stable, an unavoidable incompatible change to public API would be
+announced in the changelog and migration documentation and would normally use
+a deprecation period before removal. Security or correctness constraints may
+occasionally require a faster response, which would be documented explicitly.</p>
+<p>Report suspected compatibility regressions through the project's
+<a href="https://github.com/geoff-davis/aiogzip/issues">issue tracker</a>. Report security
+problems privately as described in the
+<a href="https://github.com/geoff-davis/aiogzip/security/policy">security policy</a>.</p>
 
 
 

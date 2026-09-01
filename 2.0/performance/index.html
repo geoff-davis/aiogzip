@@ -722,6 +722,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stability policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../adr-sans-io-codec/" class="md-nav__link">
         
   
@@ -1128,12 +1155,13 @@ deferred because it would change when compression and sink errors surface.</p>
 and
 <a href="https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-compression-analysis.md">compression analysis</a>
 records for commands, samples, dispersion, and fixture hashes.</p>
-<p>Run the suite on the target workload before making a capacity or latency
-decision:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">AIOGZIP_ENGINE</span><span class="o">=</span>stdlib<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>benchmarks/run_benchmarks.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--category<span class="w"> </span>io,scenarios,concurrency<span class="w"> </span>--size<span class="w"> </span><span class="m">8</span><span class="w"> </span>--repeat<span class="w"> </span><span class="m">5</span>
+<p>Run the suite from a clean committed checkout on the target workload before
+making a capacity or latency decision:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>benchmarks/run_benchmarks.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--category<span class="w"> </span>io,scenarios,concurrency<span class="w"> </span>--size<span class="w"> </span><span class="m">8</span><span class="w"> </span>--repeat<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--engine<span class="w"> </span>stdlib<span class="w"> </span>--source-root<span class="w"> </span>.
 </code></pre></div>
-<p>Repeat without <code>AIOGZIP_ENGINE=stdlib</code> to measure the optional zlib-ng engine.
+<p>Repeat with <code>--engine zlib-ng</code> to measure the optional zlib-ng engine.
 See the repository's
 <a href="https://github.com/geoff-davis/aiogzip/tree/main/benchmarks">benchmark methodology</a>
 for before/after comparison commands.</p>

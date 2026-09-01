@@ -622,6 +622,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stability policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../adr-sans-io-codec/" class="md-nav__link">
         
   
@@ -813,9 +840,10 @@
 without taking ownership of files, sockets, an event loop, or any other
 transport. They are synchronous state machines: callers provide immutable
 <code>bytes</code>, consume bounded output chunks, and decide where those chunks go.</p>
-<p>The codec API is provisional throughout the 2.0 alpha series. Ordinary
-<code>asyncio</code> callers can continue using <code>open()</code>, <code>read()</code>, <code>write()</code>,
-<code>compress_chunks()</code>, and <code>decompress_chunks()</code> without changing their code.</p>
+<p>The public codec API is beta-frozen for the 2.0 line as of <code>2.0.0b1</code>.
+Ordinary <code>asyncio</code> callers can continue using <code>open()</code>, <code>read()</code>, <code>write()</code>,
+<code>compress_chunks()</code>, and <code>decompress_chunks()</code> without changing their code.
+See the <a href="../stability/">stability policy</a> for guarantees and non-guarantees.</p>
 <h2 id="encoding-one-member">Encoding one member</h2>
 <p>One encoder creates exactly one complete gzip member. Each state-changing call
 returns a lazy <code>CodecOperation</code> that must be exhausted before the next call:</p>
@@ -1006,7 +1034,7 @@ exact <code>bytes</code> pays neither.</p>
 It does not use an executor or start background tasks. The high-level async
 wrappers own sources, sinks, backpressure, cancellation, and executor policy;
 they may offload sufficiently large codec steps so other tasks can progress.</p>
-<p>This alpha handles complete gzip streams only. A public raw-DEFLATE mode,
+<p>The 2.0 codec handles complete gzip streams only. A public raw-DEFLATE mode,
 AnyIO/Trio abstraction, indexed seeking, and new engine APIs are out of scope.
 See the <a href="../adr-sans-io-codec/">architecture decision</a> for the ownership and
 engine-boundary rationale.</p>
