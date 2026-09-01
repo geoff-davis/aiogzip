@@ -1329,9 +1329,14 @@ also names the +8.08% duration change in an informational `tracemalloc` row.
 One reverse-order minimum crossed 10% and held the gate closed until an
 interleaved 100-sample same-process diagnostic put every investigated slowdown
 below 5%. Fifteen-sample allocation follow-ups reproduce the same modes and
-maxima on both source trees. The hardened diagnostic verifies active engines,
-clean source identity, and partial-result checkpoints. Original and corrective
-raw records are retained.
+maxima on both source trees. The retained v2 diagnostic also contains a -6.13%
+same-source speedup; it is explicitly treated as a noise-floor warning rather
+than hidden by the slowdown-only gate. A 200-sample recapture and normalized
+source-order swap place that row at -0.83% and +2.00%, respectively. The
+hardened diagnostic and shared release runner verify exact platform-specific
+engine fields and clean source identity; the runner atomically retains partial
+and failure evidence, while the comparator rejects provenance mismatches.
+Original and corrective raw records are retained.
 
 #### WP6 issue `#86` closeout
 
@@ -1391,10 +1396,11 @@ The review must cover the actual candidate commit, not an earlier code head.
 - [ ] Review evidence names the reviewer, date, exact commit, scope, commands, and conclusion.
 - [ ] Codex does not claim the review complete on the reviewer's behalf.
 
-The reviews of `fa507af` and `e412cc6` produced recorded findings and local
-dispositions, but both SHAs are superseded and the supplied review text names
-no reviewer. The WP7 boxes above apply only to the eventual exact candidate
-head and remain unchecked until an independent reviewer covers that SHA.
+The reviews of `fa507af`, `e412cc6`, `4a6fb9f`, and `5f53e96` produced
+recorded findings and local dispositions, but all four SHAs are superseded and
+the supplied review text names no reviewer. The WP7 boxes above apply only to
+the eventual exact candidate head and remain unchecked until an independent
+reviewer covers that SHA.
 
 #### WP7 exit criteria
 
