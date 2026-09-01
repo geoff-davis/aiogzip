@@ -35,6 +35,11 @@ from bench_a3_regressions import (
     _sha256,
     optional_header_fixture,
 )
+from bench_targeted_contract import (
+    RAW_CHANGE_FORMULA,
+    TARGETED_BENCHMARK,
+    validate_canonical_orientation,
+)
 from run_benchmarks import assert_requested_engine
 
 _KIB = 1024
@@ -275,6 +280,26 @@ def _checkpoint(
         writer(document)
 
 
+def _capture_command(args: argparse.Namespace) -> list[str]:
+    """Record either the exact CLI or an equivalent programmatic invocation."""
+    command = getattr(args, "command", None)
+    if (
+        isinstance(command, list)
+        and command
+        and all(isinstance(argument, str) and argument for argument in command)
+    ):
+        return list(command)
+    return [
+        "programmatic:investigate_b1_timing.run",
+        f"baseline_root={Path(args.baseline_root).resolve()}",
+        f"candidate_root={Path(args.candidate_root).resolve()}",
+        f"engine={args.engine}",
+        f"cycles={args.cycles}",
+        f"warmup_cycles={args.warmup_cycles}",
+        f"canonical_candidate_side={args.canonical_candidate_side}",
+    ]
+
+
 async def run(
     args: argparse.Namespace,
     *,
@@ -296,10 +321,30 @@ async def run(
     candidate_engines = _assert_requested_engine(
         candidate, args.engine, source_label="candidate"
     )
+    baseline_record = _complete_identity(baseline_identity, baseline, baseline_engines)
+    candidate_record = _complete_identity(
+        candidate_identity, candidate, candidate_engines
+    )
+    selected_record = (
+        baseline_record
+        if args.canonical_candidate_side == "baseline"
+        else candidate_record
+    )
+    orientation = {
+        "canonical_candidate_side": args.canonical_candidate_side,
+        "canonical_candidate_commit": selected_record["commit"],
+    }
+    validate_canonical_orientation(
+        orientation,
+        baseline_record,
+        candidate_record,
+        label="targeted capture producer",
+        allow_legacy=False,
+    )
 
     document: dict[str, Any] = {
         "schema_version": 2,
-        "benchmark": "aiogzip-2.0.0b1-targeted-timing-investigation",
+        "benchmark": TARGETED_BENCHMARK,
         "status": "running",
         "created_at_unix": time.time(),
         "configuration": {
@@ -308,23 +353,21 @@ async def run(
             "samples_per_side_per_case": args.cycles * 2,
             "warmup_cycles": args.warmup_cycles,
             "ordering": "A/B/B/A",
-            "canonical_candidate_side": args.canonical_candidate_side,
-            "reported_change_formula": "(raw candidate / raw baseline - 1) * 100",
+            **orientation,
+            "reported_change_formula": RAW_CHANGE_FORMULA,
             "garbage_collection": "disabled during timed measurements",
             "process_policy": "both source trees loaded under package aliases",
             "checkpoint_policy": "atomic write before timing and after every case",
         },
-        "command": getattr(args, "command", None),
+        "command": _capture_command(args),
         "host": {
             "os_name": platform.system(),
             "platform": platform.platform(),
             "python_version": sys.version,
             "python_executable": sys.executable,
         },
-        "baseline": _complete_identity(baseline_identity, baseline, baseline_engines),
-        "candidate": _complete_identity(
-            candidate_identity, candidate, candidate_engines
-        ),
+        "baseline": baseline_record,
+        "candidate": candidate_record,
         "results": [],
     }
     _checkpoint(document, checkpoint)

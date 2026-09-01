@@ -124,12 +124,15 @@ Notes:
   venv that can resolve a *different Python version* (interpreter speed
   differences of ±10% masquerade as code regressions) and may lack the
   `fast` extra (zlib-ng vs stdlib skews read benchmarks several-fold).
-  The runner verifies the source swap and records `aiogzip.__file__` itself.
+  With `--source-root`, the runner verifies the source swap and records
+  `aiogzip.__file__` itself.
 - Comparable captures require clean committed source roots. For an uncommitted
   exploratory run, omit `--source-root`; the runner still verifies
   `--engine`, but records no source/environment attestation and the comparator
   rejects the result by design. Commit the candidate before producing a
-  before/after comparison or release evidence.
+  before/after comparison or release evidence. Before an exploratory run,
+  confirm the environment's imported package and active engines explicitly:
+  `uv run python -c 'import aiogzip; print(aiogzip.__file__); print(aiogzip.engine_info())'`.
 - Pin the codec with `--engine stdlib` on both sides. The runner applies and
   verifies the library's stdlib-only environment override; use
   `--engine zlib-ng` to request and verify the optional engine.

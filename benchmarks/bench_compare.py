@@ -15,10 +15,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from bench_targeted_contract import (
+    RAW_CHANGE_FORMULA,
+    TARGETED_BENCHMARK,
+    validate_canonical_orientation,
+)
 from run_benchmarks import assert_requested_engine
-
-_TARGETED_BENCHMARK = "aiogzip-2.0.0b1-targeted-timing-investigation"
-_RAW_CHANGE_FORMULA = "(raw candidate / raw baseline - 1) * 100"
 
 
 def load_results(filepath: Path) -> dict[str, Any]:
@@ -255,10 +257,6 @@ def _format_quarters(values: list[float]) -> str:
     return " → ".join(f"{value:.3f}" for value in values)
 
 
-def _is_exact_a4(identity: dict[str, Any]) -> bool:
-    return identity.get("version") == "2.0.0a4"
-
-
 def _targeted_producer_system(
     capture: dict[str, Any],
     configuration: dict[str, Any],
@@ -323,7 +321,7 @@ def _targeted_identity(
         warnings=warnings,
     )
     formula = configuration.get("reported_change_formula")
-    if formula != _RAW_CHANGE_FORMULA:
+    if formula != RAW_CHANGE_FORMULA:
         if not allow_legacy:
             raise ValueError(f"{label} lacks the canonical raw-change formula")
         warnings.append(f"{label}: raw-change formula was not producer-recorded")
@@ -348,40 +346,43 @@ def _targeted_identity(
     if active_by_side["baseline"] != active_by_side["candidate"]:
         raise ValueError(f"{label} has different active engines on its two sides")
 
-    if system_name is None:
-        active_crc = active_by_side["baseline"].get("crc32")
-        system_name = (
-            "Darwin"
-            if requested == "zlib-ng" and active_crc == "stdlib-zlib"
-            else "Linux"
+    if system_name is not None or requested == "stdlib":
+        assert_requested_engine(
+            active_by_side["baseline"],
+            requested,
+            source_label=f"{label} targeted capture",
+            system_name=system_name or "unknown",
         )
-    assert_requested_engine(
-        active_by_side["baseline"],
-        requested,
-        source_label=f"{label} targeted capture",
-        system_name=system_name,
-    )
-
-    baseline_is_a4 = _is_exact_a4(baseline)
-    candidate_is_a4 = _is_exact_a4(candidate)
-    if baseline_is_a4 == candidate_is_a4:
-        raise ValueError(
-            f"{label} cannot derive canonical orientation from source versions"
-        )
-    expected_side = "candidate" if baseline_is_a4 else "baseline"
-    candidate_side = configuration.get("canonical_candidate_side")
-    if candidate_side is None and allow_legacy:
-        candidate_side = expected_side
+    else:
+        engines = active_by_side["baseline"]
+        if engines.get("compression") != "stdlib-zlib":
+            raise RuntimeError(
+                f"{label} targeted capture: compression engine mismatch: "
+                f"expected 'stdlib-zlib', got {engines.get('compression')!r}"
+            )
+        if engines.get("decompression") != "zlib-ng":
+            raise RuntimeError(
+                f"{label} targeted capture: decompression engine mismatch: "
+                f"expected 'zlib-ng', got {engines.get('decompression')!r}"
+            )
+        if engines.get("crc32") not in {"stdlib-zlib", "zlib-ng"}:
+            raise RuntimeError(
+                f"{label} targeted capture: unrecognized crc32 engine: "
+                f"{engines.get('crc32')!r}"
+            )
         warnings.append(
-            f"{label}: canonical candidate side inferred from source versions"
+            f"{label}: crc32 engine cannot be checked against the platform "
+            "because capture-time host OS provenance is absent"
         )
-    elif candidate_side not in {"baseline", "candidate"}:
-        raise ValueError(f"{label} has invalid canonical_candidate_side")
-    if candidate_side != expected_side:
-        raise ValueError(
-            f"{label} canonical_candidate_side={candidate_side!r} contradicts "
-            f"source versions; expected {expected_side!r}"
-        )
+
+    candidate_side, orientation_warnings = validate_canonical_orientation(
+        configuration,
+        baseline,
+        candidate,
+        label=label,
+        allow_legacy=allow_legacy,
+    )
+    warnings.extend(orientation_warnings)
 
     return {
         "requested_engine": requested,
@@ -469,7 +470,7 @@ def main() -> int:
     try:
         captures = [load_results(path) for path in args.captures]
         targeted = [
-            capture.get("benchmark") == _TARGETED_BENCHMARK for capture in captures
+            capture.get("benchmark") == TARGETED_BENCHMARK for capture in captures
         ]
         if all(targeted):
             for path, capture in zip(args.captures, captures, strict=True):

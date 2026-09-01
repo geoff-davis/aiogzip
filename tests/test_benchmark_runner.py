@@ -20,6 +20,7 @@ sys.path.insert(0, str(BENCHMARKS_DIR))
 bench_common = importlib.import_module("bench_common")
 run_benchmarks = importlib.import_module("run_benchmarks")
 bench_compare = importlib.import_module("bench_compare")
+bench_targeted_contract = importlib.import_module("bench_targeted_contract")
 bench_streaming = importlib.import_module("bench_streaming")
 bench_codec_regressions = importlib.import_module("bench_codec_regressions")
 bench_a3_regressions = importlib.import_module("bench_a3_regressions")
@@ -63,6 +64,8 @@ b1_assert_requested_engine = investigate_b1_timing._assert_requested_engine
 b1_run = investigate_b1_timing.run
 b1_source_identity = investigate_b1_timing._source_identity
 b1_time_output_bound = investigate_b1_timing._time_output_bound
+TARGETED_BENCHMARK = bench_targeted_contract.TARGETED_BENCHMARK
+RAW_CHANGE_FORMULA = bench_targeted_contract.RAW_CHANGE_FORMULA
 
 
 def _result(name, duration, marker):
@@ -327,8 +330,8 @@ def test_b1_output_bound_discards_decoder_when_iteration_fails():
     assert decoder.discarded
 
 
-def test_b1_investigation_checkpoints_partial_results_on_late_failure(
-    tmp_path, monkeypatch
+def _mock_b1_investigation_sources(
+    tmp_path, monkeypatch, *, baseline_version="test", candidate_version="test"
 ):
     from aiogzip import EngineInfo
 
@@ -350,7 +353,9 @@ def test_b1_investigation_checkpoints_partial_results_on_late_failure(
     def package(root):
         return SimpleNamespace(
             __file__=str(root / "src" / "aiogzip" / "__init__.py"),
-            __version__="test",
+            __version__=(
+                baseline_version if root == baseline_root else candidate_version
+            ),
             engine_info=lambda: EngineInfo(
                 compression="stdlib-zlib",
                 decompression="stdlib-zlib",
@@ -363,6 +368,16 @@ def test_b1_investigation_checkpoints_partial_results_on_late_failure(
         investigate_b1_timing,
         "_load_package",
         lambda alias, root: package(root),
+    )
+    monkeypatch.setenv("AIOGZIP_ENGINE", "test-restore-sentinel")
+    return baseline_root, candidate_root
+
+
+def test_b1_investigation_checkpoints_partial_results_on_late_failure(
+    tmp_path, monkeypatch
+):
+    baseline_root, candidate_root = _mock_b1_investigation_sources(
+        tmp_path, monkeypatch
     )
     monkeypatch.setattr(
         investigate_b1_timing,
@@ -411,6 +426,79 @@ def test_b1_investigation_checkpoints_partial_results_on_late_failure(
         "type": "RuntimeError",
         "message": "late failure",
     }
+
+
+def test_b1_programmatic_capture_round_trips_through_strict_reader(
+    tmp_path, monkeypatch, capsys
+):
+    baseline_root, candidate_root = _mock_b1_investigation_sources(
+        tmp_path,
+        monkeypatch,
+        baseline_version="2.0.0a4",
+        candidate_version="2.0.0b1.dev0",
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_output_bound_fixture",
+        lambda: (b"wire", "digest"),
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "optional_header_fixture",
+        lambda *_args, **_kwargs: (b"wire", b"payload"),
+    )
+
+    async def measure_case(name, *_args, **_kwargs):
+        return {
+            "name": name,
+            "baseline": {"samples_seconds": [1.0, 1.1, 1.0, 1.1]},
+            "candidate": {"samples_seconds": [1.01, 1.11, 1.01, 1.11]},
+        }
+
+    monkeypatch.setattr(investigate_b1_timing, "_measure_case", measure_case)
+    args = argparse.Namespace(
+        baseline_root=baseline_root,
+        candidate_root=candidate_root,
+        engine="stdlib",
+        cycles=2,
+        warmup_cycles=1,
+        canonical_candidate_side="candidate",
+    )
+
+    capture = asyncio.run(b1_run(args))
+    bench_compare.summarize_targeted(capture, "programmatic")
+
+    assert capture["status"] == "complete"
+    assert capture["command"][0] == "programmatic:investigate_b1_timing.run"
+    assert capture["configuration"]["canonical_candidate_commit"] == "candidate"
+    assert "Canonical candidate side: candidate" in capsys.readouterr().out
+
+
+def test_b1_producer_rejects_misflagged_a4_b1_orientation_before_timing(
+    tmp_path, monkeypatch
+):
+    baseline_root, candidate_root = _mock_b1_investigation_sources(
+        tmp_path,
+        monkeypatch,
+        baseline_version="2.0.0b1.dev0",
+        candidate_version="2.0.0a4",
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_output_bound_fixture",
+        lambda: pytest.fail("timing fixture constructed after invalid orientation"),
+    )
+    args = argparse.Namespace(
+        baseline_root=baseline_root,
+        candidate_root=candidate_root,
+        engine="stdlib",
+        cycles=1,
+        warmup_cycles=1,
+        canonical_candidate_side="candidate",
+    )
+
+    with pytest.raises(ValueError, match="contradicts the archived a4/b1"):
+        asyncio.run(b1_run(args))
 
 
 def test_comparison_fixture_is_deterministic(tmp_path):
@@ -1138,7 +1226,7 @@ def test_requested_engine_rejects_noop_zlib_ng_environment(monkeypatch):
         configure_requested_engine(None, source_root_supplied=True)
 
 
-def test_main_verifies_engine_without_source_root(monkeypatch):
+def test_main_verifies_engine_without_source_root(monkeypatch, capsys):
     from aiogzip import EngineInfo
 
     fake_aiogzip = SimpleNamespace(
@@ -1148,15 +1236,32 @@ def test_main_verifies_engine_without_source_root(monkeypatch):
             crc32="stdlib-zlib",
         )
     )
+    benchmark_started = False
+
+    async def fail_if_started(*_args, **_kwargs):
+        nonlocal benchmark_started
+        benchmark_started = True
+        raise AssertionError("benchmark ran after failed engine verification")
+
+    monkeypatch.setenv("AIOGZIP_ENGINE", "restore-after-test")
     monkeypatch.setitem(sys.modules, "aiogzip", fake_aiogzip)
+    monkeypatch.setattr(run_benchmarks, "run_category", fail_if_started)
     monkeypatch.setattr(
         sys,
         "argv",
         ["run_benchmarks.py", "--quick", "--engine", "zlib-ng"],
     )
 
-    with pytest.raises(SystemExit, match="2"):
-        asyncio.run(run_benchmarks.main())
+    with monkeypatch.context() as engine_environment:
+        engine_environment.setenv("AIOGZIP_ENGINE", "stdlib")
+        with pytest.raises(SystemExit, match="2"):
+            asyncio.run(run_benchmarks.main())
+
+    error = capsys.readouterr().err
+    assert "engine fields do not match" in error
+    assert "decompression" in error
+    assert not benchmark_started
+    assert run_benchmarks.os.environ["AIOGZIP_ENGINE"] == "restore-after-test"
 
 
 def test_main_checkpoints_completed_categories_on_late_failure(tmp_path, monkeypatch):
@@ -1374,14 +1479,16 @@ def _targeted_capture(
         "active_engines": engines,
     }
     baseline, candidate = (b1, a4) if candidate_side == "baseline" else (a4, b1)
+    canonical_candidate = baseline if candidate_side == "baseline" else candidate
     return {
         "schema_version": 2,
-        "benchmark": "aiogzip-2.0.0b1-targeted-timing-investigation",
+        "benchmark": TARGETED_BENCHMARK,
         "status": "complete",
         "configuration": {
             "requested_engine": "zlib-ng",
             "canonical_candidate_side": candidate_side,
-            "reported_change_formula": ("(raw candidate / raw baseline - 1) * 100"),
+            "canonical_candidate_commit": canonical_candidate["commit"],
+            "reported_change_formula": RAW_CHANGE_FORMULA,
         },
         "command": ["python", "benchmarks/investigate_b1_timing.py"],
         "host": {"os_name": system_name},
@@ -1413,12 +1520,26 @@ def test_targeted_summary_marks_orientation_and_temporal_statistics(capsys):
 def test_targeted_legacy_orientation_fallback_is_used_by_summary(capsys):
     capture = _targeted_capture()
     capture["configuration"].pop("canonical_candidate_side")
+    capture["configuration"].pop("canonical_candidate_commit")
 
     bench_compare.summarize_targeted(capture, "legacy", allow_legacy=True)
 
     output = capsys.readouterr().out
     assert "canonical candidate side inferred from source versions" in output
+    assert "canonical candidate commit was not producer-recorded" in output
     assert "Canonical candidate side: candidate" in output
+
+
+def test_targeted_strict_mode_describes_missing_orientation(capsys):
+    capture = _targeted_capture()
+    capture["configuration"].pop("canonical_candidate_side")
+
+    with pytest.raises(
+        ValueError, match="lacks canonical_candidate_side; use --allow-legacy"
+    ):
+        bench_compare.summarize_targeted(capture, "missing-side")
+
+    assert capsys.readouterr().out == ""
 
 
 def test_targeted_invalid_orientation_fails_before_output(capsys):
@@ -1434,9 +1555,38 @@ def test_targeted_invalid_orientation_fails_before_output(capsys):
 def test_targeted_orientation_must_match_source_versions():
     capture = _targeted_capture()
     capture["configuration"]["canonical_candidate_side"] = "baseline"
+    capture["configuration"]["canonical_candidate_commit"] = capture["baseline"][
+        "commit"
+    ]
 
-    with pytest.raises(ValueError, match="contradicts source versions"):
+    with pytest.raises(ValueError, match="contradicts the archived a4/b1"):
         bench_compare.summarize_targeted(capture, "wrong")
+
+
+@pytest.mark.parametrize("same_source", [False, True])
+def test_targeted_strict_orientation_supports_future_and_same_source_pairs(
+    same_source, capsys
+):
+    capture = _targeted_capture()
+    capture["baseline"].update(
+        commit="future-before",
+        describe="v2.1.0",
+        version="2.1.0",
+    )
+    capture["candidate"].update(
+        commit="future-before" if same_source else "future-after",
+        describe="v2.1.0" if same_source else "v2.2.0",
+        version="2.1.0" if same_source else "2.2.0",
+    )
+    capture["configuration"]["canonical_candidate_commit"] = capture["candidate"][
+        "commit"
+    ]
+
+    bench_compare.summarize_targeted(
+        capture, "same-source" if same_source else "future"
+    )
+
+    assert "Canonical candidate side: candidate" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("field", ["commit", "describe"])
@@ -1473,6 +1623,32 @@ def test_targeted_strict_mode_requires_producer_command(capsys):
         bench_compare.summarize_targeted(capture, "stripped")
 
     assert capsys.readouterr().out == ""
+
+
+def test_targeted_formula_requires_explicit_legacy_mode(capsys):
+    capture = _targeted_capture()
+    capture["configuration"].pop("reported_change_formula")
+
+    with pytest.raises(ValueError, match="canonical raw-change formula"):
+        bench_compare.summarize_targeted(capture, "missing-formula")
+    assert capsys.readouterr().out == ""
+
+    bench_compare.summarize_targeted(capture, "missing-formula", allow_legacy=True)
+    assert "raw-change formula was not producer-recorded" in capsys.readouterr().out
+
+
+def test_targeted_legacy_missing_host_does_not_infer_crc_platform(capsys):
+    capture = _targeted_capture(crc32="stdlib-zlib")
+    capture.pop("host")
+
+    with pytest.raises(ValueError, match="capture-time host OS provenance"):
+        bench_compare.summarize_targeted(capture, "missing-host")
+    assert capsys.readouterr().out == ""
+
+    bench_compare.summarize_targeted(capture, "missing-host", allow_legacy=True)
+    output = capsys.readouterr().out
+    assert "lacks capture-time host OS provenance" in output
+    assert "crc32 engine cannot be checked against the platform" in output
 
 
 def test_targeted_engine_validation_uses_recorded_host():

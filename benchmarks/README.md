@@ -372,15 +372,21 @@ uv run python benchmarks/run_benchmarks.py --category io,memory
 # Test with larger data (10 MB)
 uv run python benchmarks/run_benchmarks.py --all --size 10
 
-# Save results for comparison
-uv run python benchmarks/run_benchmarks.py --all --output baseline.json
+# Save an attested baseline from a clean source worktree
+uv run python benchmarks/run_benchmarks.py --all --engine stdlib \
+  --source-root /tmp/aiogzip-before --output baseline.json
 
-# After making changes
-uv run python benchmarks/run_benchmarks.py --all --output current.json
+# Save an attested candidate from another clean source worktree
+uv run python benchmarks/run_benchmarks.py --all --engine stdlib \
+  --source-root /tmp/aiogzip-after --output current.json
 
 # Compare results
 uv run python benchmarks/bench_compare.py baseline.json current.json
 ```
+
+The quick, all, category, and size-only commands above are exploratory. Add an
+explicit `--engine` and `--source-root` as shown for captures that will be
+compared or retained as evidence.
 
 ### Prerequisites
 
