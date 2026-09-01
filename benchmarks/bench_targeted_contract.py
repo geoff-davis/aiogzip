@@ -6,7 +6,7 @@ from typing import Any
 
 TARGETED_BENCHMARK = "aiogzip-2.0.0b1-targeted-timing-investigation"
 RAW_CHANGE_FORMULA = "(raw candidate / raw baseline - 1) * 100"
-CANONICAL_SIDES = {"baseline", "candidate"}
+CANONICAL_SIDES = ("baseline", "candidate")
 
 
 def _is_archived_b1_version(version: object) -> bool:
@@ -75,6 +75,35 @@ def validate_candidate_commit_binding(
         )
 
 
+def validate_source_orientation(
+    candidate_side: str,
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+    *,
+    label: str,
+) -> list[str]:
+    """Validate source-derived orientation and report source-identity warnings."""
+    legacy_side = _legacy_b1_candidate_side(baseline, candidate)
+    if legacy_side is not None and candidate_side != legacy_side:
+        raise ValueError(
+            f"{label} canonical_candidate_side={candidate_side!r} contradicts "
+            f"the archived a4/b1 source versions; expected {legacy_side!r}"
+        )
+    warnings: list[str] = []
+    baseline_commit = baseline.get("commit")
+    candidate_commit = candidate.get("commit")
+    if (
+        isinstance(baseline_commit, str)
+        and baseline_commit
+        and baseline_commit == candidate_commit
+    ):
+        warnings.append(
+            f"{label}: both sides attest the same source commit; canonical "
+            "candidate side labels measurement orientation only"
+        )
+    return warnings
+
+
 def validate_canonical_orientation(
     configuration: dict[str, Any],
     baseline: dict[str, Any],
@@ -130,14 +159,12 @@ def validate_canonical_orientation(
             label=label,
         )
 
-    if legacy_side is not None and candidate_side != legacy_side:
-        raise ValueError(
-            f"{label} canonical_candidate_side={candidate_side!r} contradicts "
-            f"the archived a4/b1 source versions; expected {legacy_side!r}"
+    warnings.extend(
+        validate_source_orientation(
+            candidate_side,
+            baseline,
+            candidate,
+            label=label,
         )
-    if baseline.get("commit") == candidate.get("commit"):
-        warnings.append(
-            f"{label}: both sides attest the same source commit; canonical "
-            "candidate side labels measurement orientation only"
-        )
+    )
     return candidate_side, warnings

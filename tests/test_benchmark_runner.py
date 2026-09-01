@@ -219,6 +219,13 @@ def test_shared_engine_guard_checks_each_field():
     )
     with pytest.raises(ValueError, match="unsupported requested engine"):
         assert_requested_engine(engines, [], source_label="test")
+    with pytest.raises(ValueError, match="operating system provenance"):
+        assert_requested_engine(
+            engines,
+            "zlib-ng",
+            source_label="test",
+            system_name="<unknown>",
+        )
 
 
 @pytest.mark.parametrize(
@@ -532,6 +539,7 @@ def test_b1_programmatic_capture_round_trips_through_strict_reader(
     assert capture["status"] == "complete"
     assert capture["command"][0] == "programmatic:investigate_b1_timing.run"
     assert capture["configuration"]["canonical_candidate_commit"] == "2" * 40
+    assert capture["warnings"] == []
     assert "Canonical candidate side: candidate" in capsys.readouterr().out
 
 
@@ -606,9 +614,18 @@ def test_b1_producer_rejects_invalid_side_before_source_loading(monkeypatch):
         asyncio.run(b1_run(args))
 
 
-@pytest.mark.parametrize("command", [None, [], "python", ["python", ""]])
-def test_b1_capture_command_rejects_malformed_present_value(command):
-    with pytest.raises(ValueError, match="recorded command"):
+@pytest.mark.parametrize(
+    ("command", "message"),
+    [
+        (None, "recorded command"),
+        ([], "recorded command"),
+        ("python", "recorded command"),
+        (["python", ""], "recorded command argument 1 is empty"),
+        (["python", "--baseline-root="], "--baseline-root has an empty value"),
+    ],
+)
+def test_b1_capture_command_rejects_malformed_present_value(command, message):
+    with pytest.raises(ValueError, match=message):
         investigate_b1_timing._capture_command(SimpleNamespace(command=command))
 
 
@@ -628,8 +645,11 @@ def test_b1_run_rejects_malformed_cli_command_before_source_loading(monkeypatch)
         asyncio.run(b1_run(args))
 
 
+@pytest.mark.parametrize(
+    "baseline_arguments", [["--baseline-root", ""], ["--baseline-root="]]
+)
 def test_b1_main_reports_empty_cli_value_without_traceback(
-    tmp_path, monkeypatch, capsys
+    baseline_arguments, tmp_path, monkeypatch, capsys
 ):
     output = tmp_path / "capture.json"
     monkeypatch.setattr(
@@ -637,8 +657,7 @@ def test_b1_main_reports_empty_cli_value_without_traceback(
         "argv",
         [
             "investigate_b1_timing.py",
-            "--baseline-root",
-            "",
+            *baseline_arguments,
             "--candidate-root",
             ".",
             "--engine",
@@ -659,7 +678,46 @@ def test_b1_main_reports_empty_cli_value_without_traceback(
         investigate_b1_timing.main()
 
     error = capsys.readouterr().err
-    assert "--baseline-root has an empty value" in error
+    assert "argument --baseline-root: must not be empty" in error
+    assert "Traceback" not in error
+    assert not output.exists()
+
+
+def test_b1_main_reports_wrong_commit_without_traceback(tmp_path, monkeypatch, capsys):
+    output = tmp_path / "capture.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "investigate_b1_timing.py",
+            "--baseline-root",
+            "baseline",
+            "--candidate-root",
+            "candidate",
+            "--engine",
+            "stdlib",
+            "--canonical-candidate-commit",
+            "wrong-commit",
+            "--output",
+            str(output),
+        ],
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_source_identity",
+        lambda root: {
+            "source_root": str(root),
+            "commit": f"{root}-commit",
+            "describe": str(root),
+            "dirty_tracked": False,
+        },
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        investigate_b1_timing.main()
+
+    error = capsys.readouterr().err
+    assert "contradicts the candidate source commit 'candidate-commit'" in error
     assert "Traceback" not in error
     assert not output.exists()
 
@@ -1598,6 +1656,14 @@ def test_compare_results_rejects_unhashable_requested_engine():
         bench_compare.compare_results(baseline, _comparison_capture("after"))
 
 
+def test_compare_results_rejects_in_band_unknown_host_label():
+    baseline = _comparison_capture("before")
+    baseline["environment"]["os_name"] = "<unknown>"
+
+    with pytest.raises(ValueError, match="operating-system provenance"):
+        bench_compare.compare_results(baseline, _comparison_capture("after"))
+
+
 def test_compare_results_rejects_dirty_source():
     with pytest.raises(ValueError, match="clean source tree"):
         bench_compare.compare_results(
@@ -1797,6 +1863,18 @@ def test_targeted_orientation_must_match_source_versions():
         bench_compare.summarize_targeted(capture, "wrong")
 
 
+@pytest.mark.parametrize("commit", [None, ""])
+def test_targeted_same_source_warning_requires_attested_commit(commit):
+    warnings = bench_targeted_contract.validate_source_orientation(
+        "candidate",
+        {"commit": commit},
+        {"commit": commit},
+        label="missing-commit",
+    )
+
+    assert warnings == []
+
+
 @pytest.mark.parametrize("same_source", [False, True])
 def test_targeted_strict_orientation_supports_future_and_same_source_pairs(
     same_source, capsys
@@ -1843,13 +1921,16 @@ def test_targeted_same_source_quick_capture_uses_nonempty_temporal_slices(capsys
     capture["configuration"]["samples_per_side_per_case"] = 2
     capture["results"][0]["baseline"]["samples_seconds"] = [1.0, 1.1]
     capture["results"][0]["candidate"]["samples_seconds"] = [1.01, 1.11]
+    second_result = json.loads(json.dumps(capture["results"][0]))
+    second_result["name"] = "second quick row"
+    capture["results"].append(second_result)
 
     bench_compare.summarize_targeted(capture, "quick-a-a")
 
     output = capsys.readouterr().out
     assert "both sides attest the same source commit" in output
     assert "temporal slice medians (2/2)" in output
-    assert "* first-half minimum uses one sample per side" in output
+    assert output.count("* first-half minimum uses one sample per side") == 1
 
 
 def test_targeted_one_sample_capture_summarizes_without_empty_slice(capsys):
@@ -1969,6 +2050,15 @@ def test_targeted_engine_validation_uses_recorded_host():
 
     darwin_capture = _targeted_capture(system_name="Darwin", crc32="stdlib-zlib")
     bench_compare.summarize_targeted(darwin_capture, "darwin")
+
+
+def test_targeted_rejects_in_band_unknown_host_label(capsys):
+    capture = _targeted_capture(system_name="<unknown>", crc32="stdlib-zlib")
+
+    with pytest.raises(ValueError, match="capture-time host OS provenance"):
+        bench_compare.summarize_targeted(capture, "unknown-label")
+
+    assert capsys.readouterr().out == ""
 
 
 def test_targeted_schema_one_is_explicitly_archival():

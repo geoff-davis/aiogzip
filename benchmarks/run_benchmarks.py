@@ -29,9 +29,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 try:
-    from .bench_common import BenchmarkResults, median_results
+    from .bench_common import ENGINE_CHOICES, BenchmarkResults, median_results
 except ImportError:  # Direct script execution: benchmarks/ is on sys.path.
-    from bench_common import BenchmarkResults, median_results
+    from bench_common import ENGINE_CHOICES, BenchmarkResults, median_results
 
 # Available benchmark categories
 CATEGORIES = {
@@ -49,7 +49,14 @@ CATEGORIES = {
 
 QUICK_CATEGORIES = ["io", "compression"]
 _CPU_SYSFS_ROOT = Path("/sys/devices/system/cpu")
-UNKNOWN_SYSTEM = "<unknown>"
+UNKNOWN_SYSTEM_LABEL = "<unknown>"
+
+
+class _UnknownSystem:
+    """Out-of-band marker for legacy captures with no recorded host."""
+
+
+UNKNOWN_SYSTEM = _UnknownSystem()
 
 
 async def run_category(
@@ -207,10 +214,10 @@ def _cpu_tuning() -> tuple[str, str]:
 
 
 def requested_engine_platform_warning(
-    requested: str, system_name: str, *, source_label: str
+    requested: str, system_name: str | _UnknownSystem, *, source_label: str
 ) -> str | None:
     """Describe the one engine field an unknown host cannot fully attest."""
-    if requested == "zlib-ng" and system_name == UNKNOWN_SYSTEM:
+    if requested == "zlib-ng" and system_name is UNKNOWN_SYSTEM:
         return (
             f"{source_label}: crc32 engine cannot be checked against the platform "
             "because capture-time host OS provenance is absent"
@@ -223,14 +230,21 @@ def assert_requested_engine(
     requested: str,
     *,
     source_label: str,
-    system_name: str | None = None,
+    system_name: str | _UnknownSystem | None = None,
 ) -> dict[str, str]:
     """Require the exact default engines expected for an evidence capture."""
-    if not isinstance(requested, str) or requested not in {"stdlib", "zlib-ng"}:
+    if not isinstance(requested, str) or requested not in ENGINE_CHOICES:
         raise ValueError(f"unsupported requested engine: {requested}")
-    system_name = system_name or platform.system()
+    if system_name is None:
+        system_name = platform.system()
+    elif system_name is not UNKNOWN_SYSTEM and (
+        not isinstance(system_name, str)
+        or not system_name
+        or system_name == UNKNOWN_SYSTEM_LABEL
+    ):
+        raise ValueError(f"unsupported operating system provenance: {system_name!r}")
     crc32_expected: tuple[str, ...]
-    if requested == "zlib-ng" and system_name == UNKNOWN_SYSTEM:
+    if requested == "zlib-ng" and system_name is UNKNOWN_SYSTEM:
         crc32_expected = ("stdlib-zlib", "zlib-ng")
     else:
         crc32_expected = (
@@ -246,7 +260,7 @@ def assert_requested_engine(
     mismatches = {}
     for field, allowed_values in expected.items():
         actual = engines.get(field)
-        if all(actual != allowed for allowed in allowed_values):
+        if actual not in allowed_values:
             expected_value: str | tuple[str, ...] = (
                 allowed_values[0] if len(allowed_values) == 1 else allowed_values
             )
@@ -463,7 +477,7 @@ async def main():
     )
     parser.add_argument(
         "--engine",
-        choices=("stdlib", "zlib-ng"),
+        choices=ENGINE_CHOICES,
         help="Require and record the active engine for an attested capture",
     )
     parser.add_argument(

@@ -29,6 +29,7 @@ from bench_a3_regressions import (
     collect_environment,
     configure_source_root,
 )
+from bench_common import ENGINE_CHOICES
 
 SCHEMA_VERSION = 1
 FIXTURE_GENERATOR_VERSION = "a4-supplement-fixtures-v1"
@@ -348,7 +349,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
+    parser.add_argument("--engine", choices=ENGINE_CHOICES, required=True)
     parser.add_argument("--jsonl-mib", type=_positive_int, default=8)
     parser.add_argument("--binary-mib", type=_positive_int, default=16)
     parser.add_argument("--concurrent-mib", type=_positive_int, default=4)

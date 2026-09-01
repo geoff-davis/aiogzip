@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from bench_common import ENGINE_CHOICES
 from bench_targeted_contract import (
     RAW_CHANGE_FORMULA,
     TARGETED_BENCHMARK,
@@ -22,6 +23,7 @@ from bench_targeted_contract import (
 )
 from run_benchmarks import (
     UNKNOWN_SYSTEM,
+    UNKNOWN_SYSTEM_LABEL,
     assert_requested_engine,
     requested_engine_platform_warning,
 )
@@ -57,7 +59,7 @@ def _legacy_requested_engine(
     environment: dict[str, Any], engines: dict[str, Any], label: str
 ) -> tuple[str, list[str]]:
     requested = environment.get("forced_engine")
-    if isinstance(requested, str) and requested in {"stdlib", "zlib-ng"}:
+    if isinstance(requested, str) and requested in ENGINE_CHOICES:
         return requested, []
     if engines and all(value == "stdlib-zlib" for value in engines.values()):
         inferred = "stdlib"
@@ -102,7 +104,7 @@ def _capture_identity(
     if not isinstance(engines, dict):
         raise ValueError(f"{label} capture lacks active engine provenance")
     requested = environment.get("requested_engine")
-    if not isinstance(requested, str) or requested not in {"stdlib", "zlib-ng"}:
+    if not isinstance(requested, str) or requested not in ENGINE_CHOICES:
         if not allow_legacy:
             raise ValueError(f"{label} capture lacks an explicit requested engine")
         requested, legacy_warnings = _legacy_requested_engine(
@@ -110,7 +112,11 @@ def _capture_identity(
         )
         warnings.extend(legacy_warnings)
     system_name = environment.get("os_name")
-    if not isinstance(system_name, str) or not system_name:
+    if (
+        not isinstance(system_name, str)
+        or not system_name
+        or system_name == UNKNOWN_SYSTEM_LABEL
+    ):
         raise ValueError(f"{label} capture lacks operating-system provenance")
     assert_requested_engine(
         engines,
@@ -284,7 +290,11 @@ def _targeted_producer_system(
         problems.append("lacks a producer-recorded command")
     host = capture.get("host")
     system_name = host.get("os_name") if isinstance(host, dict) else None
-    if not isinstance(system_name, str) or not system_name:
+    if (
+        not isinstance(system_name, str)
+        or not system_name
+        or system_name == UNKNOWN_SYSTEM_LABEL
+    ):
         system_name = None
         problems.append("lacks capture-time host OS provenance")
     if "annotation_status" in configuration:
@@ -317,7 +327,7 @@ def _targeted_identity(
     if not all(isinstance(item, dict) for item in (configuration, baseline, candidate)):
         raise ValueError(f"{label} lacks targeted source/configuration provenance")
     requested = configuration.get("requested_engine")
-    if not isinstance(requested, str) or requested not in {"stdlib", "zlib-ng"}:
+    if not isinstance(requested, str) or requested not in ENGINE_CHOICES:
         raise ValueError(f"{label} lacks a requested engine")
 
     warnings: list[str] = []
@@ -410,6 +420,7 @@ def summarize_targeted(
         f"{'canon med':>10} {'canon 1/2 min':>13}"
     )
     print("-" * 88)
+    degenerate_first_half = False
     for result in capture.get("results", []):
         baseline_samples = result["baseline"]["samples_seconds"]
         candidate_samples = result["candidate"]["samples_seconds"]
@@ -430,6 +441,7 @@ def summarize_targeted(
         first_half_text = f"{canonical_first_half:+.2f}%"
         if halfway == 1:
             first_half_text += "*"
+            degenerate_first_half = True
         name = result["name"]
         display_name = name[:37] + ".." if len(name) > 39 else name
         print(
@@ -453,8 +465,8 @@ def summarize_targeted(
             f"{_format_quarters(baseline_quarters)} / "
             f"{_format_quarters(candidate_quarters)}"
         )
-        if halfway == 1:
-            print("  * first-half minimum uses one sample per side")
+    if degenerate_first_half:
+        print("  * first-half minimum uses one sample per side")
 
 
 def main() -> int:

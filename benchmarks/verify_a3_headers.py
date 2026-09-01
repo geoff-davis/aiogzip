@@ -31,6 +31,7 @@ from bench_a3_regressions import (
     configure_source_root,
     optional_header_fixture,
 )
+from bench_common import ENGINE_CHOICES
 
 
 class NonSeekableMemorySource:
@@ -312,7 +313,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
+    parser.add_argument("--engine", choices=ENGINE_CHOICES, required=True)
     parser.add_argument("--retention-mib", type=_positive_int, default=64)
     parser.add_argument("--cache-control-mib", type=_positive_int, default=32)
     parser.add_argument("--path-mib", type=_positive_int, default=16)

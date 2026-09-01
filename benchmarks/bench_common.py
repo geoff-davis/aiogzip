@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 COMPARISON_COMPRESSLEVEL = 6
+ENGINE_CHOICES = ("stdlib", "zlib-ng")
 
 
 def write_comparison_fixture(

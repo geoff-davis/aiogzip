@@ -22,7 +22,7 @@ import statistics
 import subprocess
 import sys
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Awaitable, Callable
@@ -35,17 +35,40 @@ from bench_a3_regressions import (
     _sha256,
     optional_header_fixture,
 )
+from bench_common import ENGINE_CHOICES
 from bench_targeted_contract import (
+    CANONICAL_SIDES,
     RAW_CHANGE_FORMULA,
     TARGETED_BENCHMARK,
     require_explicit_orientation,
     validate_candidate_commit_binding,
-    validate_canonical_orientation,
+    validate_source_orientation,
 )
 from run_benchmarks import assert_requested_engine
 
 _KIB = 1024
 _OUTPUT_BOUND = 256 * _KIB
+
+
+@dataclass(frozen=True)
+class _RunPreflight:
+    candidate_side: str
+    canonical_candidate_commit: str
+    command: list[str]
+    baseline_identity: dict[str, Any]
+    candidate_identity: dict[str, Any]
+
+
+def _nonempty_path(value: str) -> Path:
+    if not value:
+        raise argparse.ArgumentTypeError("must not be empty")
+    return Path(value)
+
+
+def _nonempty_commit(value: str) -> str:
+    if not value:
+        raise argparse.ArgumentTypeError("must not be empty")
+    return value
 
 
 def _git(source_root: Path, *args: str) -> str:
@@ -296,6 +319,10 @@ def _capture_command(args: argparse.Namespace) -> list[str]:
                 if isinstance(previous, str) and previous.startswith("--"):
                     raise ValueError(f"{previous} has an empty value")
                 raise ValueError(f"recorded command argument {index} is empty")
+            if argument.startswith("--") and "=" in argument:
+                option, _, value = argument.partition("=")
+                if not value:
+                    raise ValueError(f"{option} has an empty value")
         return list(command)
     return [
         "programmatic:investigate_b1_timing.run",
@@ -311,6 +338,7 @@ def _capture_command(args: argparse.Namespace) -> list[str]:
 
 def _validate_run_arguments(args: argparse.Namespace) -> tuple[str, str, list[str]]:
     """Validate producer-controlled provenance before reading either source."""
+    command = _capture_command(args) if hasattr(args, "command") else None
     orientation = {
         "canonical_candidate_side": getattr(args, "canonical_candidate_side", None),
         "canonical_candidate_commit": getattr(args, "canonical_candidate_commit", None),
@@ -318,17 +346,12 @@ def _validate_run_arguments(args: argparse.Namespace) -> tuple[str, str, list[st
     candidate_side, canonical_commit = require_explicit_orientation(
         orientation, label="targeted capture arguments"
     )
-    return candidate_side, canonical_commit, _capture_command(args)
+    return candidate_side, canonical_commit, command or _capture_command(args)
 
 
-async def run(
-    args: argparse.Namespace,
-    *,
-    checkpoint: Callable[[dict[str, Any]], None] | None = None,
-) -> dict[str, Any]:
+def _prepare_run(args: argparse.Namespace) -> _RunPreflight:
+    """Attest source commits and bind them to validated producer arguments."""
     candidate_side, canonical_candidate_commit, command = _validate_run_arguments(args)
-    # Git and cleanliness checks intentionally precede package loading and all
-    # fixture construction so invalid provenance fails before a timed run.
     baseline_identity = _source_identity(args.baseline_root)
     candidate_identity = _source_identity(args.candidate_root)
     validate_candidate_commit_binding(
@@ -338,6 +361,24 @@ async def run(
         candidate_identity,
         label="targeted capture producer",
     )
+    return _RunPreflight(
+        candidate_side=candidate_side,
+        canonical_candidate_commit=canonical_candidate_commit,
+        command=command,
+        baseline_identity=baseline_identity,
+        candidate_identity=candidate_identity,
+    )
+
+
+async def run(
+    args: argparse.Namespace,
+    *,
+    checkpoint: Callable[[dict[str, Any]], None] | None = None,
+    _preflight: _RunPreflight | None = None,
+) -> dict[str, Any]:
+    preflight = _preflight or _prepare_run(args)
+    # Provenance checks intentionally precede package loading and all fixture
+    # construction so invalid inputs fail before a timed run.
     if args.engine == "stdlib":
         os.environ["AIOGZIP_ENGINE"] = "stdlib"
     else:
@@ -350,20 +391,21 @@ async def run(
     candidate_engines = _assert_requested_engine(
         candidate, args.engine, source_label="candidate"
     )
-    baseline_record = _complete_identity(baseline_identity, baseline, baseline_engines)
+    baseline_record = _complete_identity(
+        preflight.baseline_identity, baseline, baseline_engines
+    )
     candidate_record = _complete_identity(
-        candidate_identity, candidate, candidate_engines
+        preflight.candidate_identity, candidate, candidate_engines
     )
     orientation = {
-        "canonical_candidate_side": candidate_side,
-        "canonical_candidate_commit": canonical_candidate_commit,
+        "canonical_candidate_side": preflight.candidate_side,
+        "canonical_candidate_commit": preflight.canonical_candidate_commit,
     }
-    _, orientation_warnings = validate_canonical_orientation(
-        orientation,
+    orientation_warnings = validate_source_orientation(
+        preflight.candidate_side,
         baseline_record,
         candidate_record,
         label="targeted capture producer",
-        allow_legacy=False,
     )
 
     document: dict[str, Any] = {
@@ -383,7 +425,7 @@ async def run(
             "process_policy": "both source trees loaded under package aliases",
             "checkpoint_policy": "atomic write before timing and after every case",
         },
-        "command": command,
+        "command": preflight.command,
         "warnings": orientation_warnings,
         "host": {
             "os_name": platform.system(),
@@ -475,9 +517,9 @@ async def run(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--baseline-root", type=Path, required=True)
-    parser.add_argument("--candidate-root", type=Path, required=True)
-    parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
+    parser.add_argument("--baseline-root", type=_nonempty_path, required=True)
+    parser.add_argument("--candidate-root", type=_nonempty_path, required=True)
+    parser.add_argument("--engine", choices=ENGINE_CHOICES, required=True)
     parser.add_argument(
         "--cycles",
         type=_positive_int,
@@ -492,16 +534,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--canonical-candidate-side",
-        choices=("baseline", "candidate"),
+        choices=CANONICAL_SIDES,
         default="candidate",
         help="which raw side is the candidate in the canonical comparison",
     )
     parser.add_argument(
         "--canonical-candidate-commit",
+        type=_nonempty_commit,
         required=True,
         help="expected exact commit for the canonical candidate source",
     )
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=_nonempty_path, required=True)
     return parser
 
 
@@ -516,14 +559,15 @@ def main() -> int:
     args = parser.parse_args()
     args.command = [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]]
     try:
-        _validate_run_arguments(args)
-    except ValueError as error:
+        preflight = _prepare_run(args)
+    except (ValueError, RuntimeError, subprocess.CalledProcessError) as error:
         parser.error(str(error))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     document = asyncio.run(
         run(
             args,
             checkpoint=lambda document: _write_document(args.output, document),
+            _preflight=preflight,
         )
     )
     for warning in document["warnings"]:

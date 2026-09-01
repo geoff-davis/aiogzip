@@ -263,15 +263,16 @@ taskset -c 0 uv run python benchmarks/investigate_b1_timing.py \
 ```
 
 Run it once per required engine only after retaining the original threshold
-crossing and the interleaved process-level follow-up. If the raw baseline and
-candidate sides are reversed, pass `--canonical-candidate-side baseline` so
-the record and comparator can orient every delta consistently, and obtain
-`--canonical-candidate-commit` from that baseline root (for example,
-`git -C /tmp/aiogzip-v2.0.0a4 rev-parse HEAD`) rather than from the raw
-candidate root. The required commit independently binds the side choice to
-the expected exact source. Treat the diagnostic's minimum comparison as an
-investigation result, not a standalone performance claim; inspect medians and
-temporal slices for drift before using it to adjudicate a threshold.
+crossing and the interleaved process-level follow-up. The example above puts
+the a4 source on the raw baseline side and the b1 source on the raw candidate
+side, so its default `--canonical-candidate-side candidate` is correct. If the
+roots are reversed instead (b1 as `--baseline-root`, a4 as
+`--candidate-root`), pass `--canonical-candidate-side baseline` and obtain
+`--canonical-candidate-commit` from the b1 baseline root. The required commit
+independently binds the side choice to the expected exact source. Treat the
+diagnostic's minimum comparison as an investigation result, not a standalone
+performance claim; inspect medians and temporal slices for drift before using
+it to adjudicate a threshold.
 
 ## Running Benchmarks
 

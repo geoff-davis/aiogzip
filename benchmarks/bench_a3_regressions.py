@@ -31,6 +31,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from bench_common import ENGINE_CHOICES
+
 SCHEMA_VERSION = 1
 FIXTURE_GENERATOR_VERSION = "a3-fixtures-v1"
 _KIB = 1024
@@ -874,7 +876,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--engine",
-        choices=("stdlib", "zlib-ng"),
+        choices=ENGINE_CHOICES,
         required=True,
         help="engine configuration to attest and measure",
     )
