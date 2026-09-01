@@ -253,6 +253,9 @@ def _targeted_identity(
         raise ValueError(f"{label} lacks a requested engine")
     active_by_side: dict[str, dict[str, str]] = {}
     for side, identity in (("baseline", baseline), ("candidate", candidate)):
+        for field in ("commit", "describe"):
+            if not isinstance(identity.get(field), str) or not identity[field]:
+                raise ValueError(f"{label} {side} lacks {field} provenance")
         if identity.get("dirty_tracked") is not False:
             raise ValueError(f"{label} {side} does not attest a clean source tree")
         engines = identity.get("active_engines")
@@ -286,6 +289,18 @@ def _targeted_identity(
         candidate_side = "candidate"
         warnings.append(
             f"{label}: assuming the raw candidate side is the canonical candidate"
+        )
+    annotation_status = configuration.get("annotation_status")
+    if isinstance(annotation_status, str) and annotation_status:
+        warnings.append(f"{label}: {annotation_status}")
+    reconstructed = capture.get("post_capture_command_reconstruction")
+    if (
+        isinstance(reconstructed, dict)
+        and reconstructed.get("recorded_at_capture") is False
+    ):
+        warnings.append(
+            f"{label}: command was reconstructed after capture, not recorded "
+            "contemporaneously"
         )
     return requested, baseline["describe"], candidate["describe"], warnings
 

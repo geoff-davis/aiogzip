@@ -8,9 +8,36 @@
     "cycles": 100,
     "samples_per_side_per_case": 200,
     "ordering": "A/B/B/A",
+    "canonical_candidate_side": "candidate",
+    "reported_change_formula": "(raw candidate / raw baseline - 1) * 100",
+    "annotation_status": "orientation and formula added after capture from the retained baseline/candidate commit identities; timing data unchanged",
     "garbage_collection": "disabled during timed measurements",
     "process_policy": "both source trees loaded under package aliases",
     "checkpoint_policy": "atomic write before timing and after every case"
+  },
+  "post_capture_command_reconstruction": {
+    "recorded_at_capture": false,
+    "timing_data_modified": false,
+    "basis": "reconstructed from shell history after review; retained as a reproduction aid, not contemporaneous provenance",
+    "argv": [
+      "taskset",
+      "-c",
+      "0",
+      "uv",
+      "run",
+      "python",
+      "benchmarks/investigate_b1_timing.py",
+      "--baseline-root",
+      "/tmp/aiogzip-b1-a4-worktree",
+      "--candidate-root",
+      "/home/geoff/Projects/personal/aiogzip",
+      "--engine",
+      "zlib-ng",
+      "--cycles",
+      "100",
+      "--output",
+      "plans/benchmarks/data/v2.0.0b1-investigation-targeted-v3-zlib-ng.json"
+    ]
   },
   "baseline": {
     "source_root": "/tmp/aiogzip-b1-a4-worktree",

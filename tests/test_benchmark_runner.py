@@ -1329,6 +1329,7 @@ def test_compare_results_requires_explicit_legacy_opt_in(capsys):
 
 def _targeted_capture(candidate_side: str = "candidate") -> dict:
     identity = {
+        "commit": "abc123",
         "describe": "source",
         "dirty_tracked": False,
         "active_engines": {

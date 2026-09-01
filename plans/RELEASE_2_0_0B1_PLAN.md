@@ -481,6 +481,29 @@ Exact `v2.0.0a4` is the primary candidate baseline:
 
 Apply thresholds to comparable named rows, not new informational measurements. Preserve correctness and memory checks regardless of timing.
 
+A comparable timing pair must use the same harness revision, candidate runtime
+source, engine, fixture, measurement mode, sample count, ordering policy, and
+machine controls. Do not combine columns from different captures or candidate
+commits into one threshold table. Retain and report both the locked statistic
+(minimum for the existing release matrices) and descriptive medians.
+
+Any targeted follow-up must record its exact command, raw baseline/candidate
+orientation, normalization formula, source commits, active engines, warm-up
+policy, and ordered samples. Inspect temporal slices before using a minimum to
+adjudicate a gate. A same-source A/A control whose spread exceeds 5%, or a row
+whose temporal slices show material drift, makes that diagnostic inconclusive
+at the 5% threshold; collecting more samples until the full-capture minimum
+falls below the threshold is not a valid disposition. A speedup beyond 5% also
+requires written investigation when it exposes a method or noise-floor defect,
+even though only slowdowns can trigger the release blocker.
+
+An inconclusive diagnostic cannot clear a regression for a candidate with a
+runtime implementation change. When the compared runtime source is verified
+byte-identical, the record may instead disposition the movement as
+non-attributable harness/environment variability, provided it cites the exact
+source comparison and does not claim that the diagnostic proved performance
+equivalence or an improvement.
+
 ### D21. Small-write disposition and issue `#86` closeout
 
 Do not add cross-call buffering to repair the 10-byte write diagnostic. Preserve same-call compression progress, sink-write visibility, position timing, poisoning, and sink-error attribution. The diagnostic remains in the benchmark matrix after the issue is closed; issue closure settles the design decision and does not waive future anti-regression protection.
@@ -1277,7 +1300,7 @@ plans/reviews/v2.0.0b1-hardening.md
 - [ ] Full test suite passes on Python 3.11, 3.12, 3.13, and 3.14 on Linux.
 - [ ] Representative full suite passes on Windows.
 - [ ] Representative full suite passes on macOS.
-- [x] Full stdlib-zlib path passes with zlib-ng absent.
+- [ ] Full stdlib-zlib path passes with zlib-ng absent in retained exact-head evidence.
 - [x] Active zlib-ng path passes.
 - [x] Forced stdlib path passes while zlib-ng is installed.
 - [x] Property-based valid-stream tests pass.
@@ -1297,11 +1320,12 @@ plans/reviews/v2.0.0b1-hardening.md
 - [ ] Minimum-dependency jobs pass.
 - [x] Coverage remains at or above the configured floor.
 
-The absent-zlib checkbox is supported by a current CPython 3.12 environment
-with no importable `zlib_ng`: the full applicable collection passed with 2,377
-tests and 18 zlib-specific skips. Eight zlib-ng fixture parameterizations are
-not generated when the optional module is absent. This supersedes the earlier
-smaller exact-minimum run as evidence for that checkbox.
+An unretained CPython 3.12 local run with no importable `zlib_ng` reported
+2,377 passing tests and 18 zlib-specific skips; eight zlib-ng fixture
+parameterizations are intentionally not generated when the module is absent.
+Because that output has no machine-readable commit or dirty-tree attestation,
+it does not close the exact-head checkbox. The retained exact-minimum runs
+remain useful compatibility evidence but have a smaller applicable collection.
 
 #### WP6 performance matrix
 
@@ -1324,19 +1348,22 @@ smaller exact-minimum run as evidence for that checkbox.
 
 Review of `fa507af` found two omitted >5% rows, an undispositioned bimodal
 allocation result, and two statistically insufficient noise explanations.
-The corrected benchmark record enumerates every gated throughput crossing and
-also names the +8.08% duration change in an informational `tracemalloc` row.
-One reverse-order minimum crossed 10% and held the gate closed until an
-interleaved 100-sample same-process diagnostic put every investigated slowdown
-below 5%. Fifteen-sample allocation follow-ups reproduce the same modes and
-maxima on both source trees. The retained v2 diagnostic also contains a -6.13%
-same-source speedup; it is explicitly treated as a noise-floor warning rather
-than hidden by the slowdown-only gate. A 200-sample recapture and normalized
-source-order swap place that row at -0.83% and +2.00%, respectively. The
-hardened diagnostic and shared release runner verify exact platform-specific
-engine fields and clean source identity; the runner atomically retains partial
-and failure evidence, while the comparator rejects provenance mismatches.
-Original and corrective raw records are retained.
+The corrected record enumerates gated throughput slowdowns, the -6.13%
+same-source speedup, and the +8.08% duration change in an informational
+`tracemalloc` row. One reverse-order minimum crossed 10%. The subsequent
+targeted captures do not establish a 5% minimum-statistic noise floor: the
+high-level FCOMMENT row drifts during each run, its v3 first-half minima exceed
+the threshold in both orientations, and the high-level FNAME row has a 6.90
+percentage-point same-source swing between v2 and v3. Those rows are now
+classified as methodologically inconclusive rather than cleared by the final
+full-capture minimum. The release attribution instead relies on the exact-a4
+and b1 runtime implementation being byte-identical apart from `__version__`;
+no performance improvement is claimed. Fifteen-sample allocation follow-ups
+still reproduce the same modes and maxima on both source trees. The hardened
+diagnostic and shared release runner verify engine fields and clean source
+identity; the runner atomically retains partial evidence, while the comparator
+supports strict new records and explicit-warning access to legacy records.
+Original and corrective raw records remain retained.
 
 #### WP6 issue `#86` closeout
 
@@ -1396,8 +1423,9 @@ The review must cover the actual candidate commit, not an earlier code head.
 - [ ] Review evidence names the reviewer, date, exact commit, scope, commands, and conclusion.
 - [ ] Codex does not claim the review complete on the reviewer's behalf.
 
-The reviews of `fa507af`, `e412cc6`, `4a6fb9f`, and `5f53e96` produced
-recorded findings and local dispositions, but all four SHAs are superseded and
+The reviews of `fa507af`, `e412cc6`, `4a6fb9f`, `5f53e96`, `daadbd0`, and
+`cdfb4d7` produced recorded findings and local dispositions, but every reviewed
+SHA is superseded and
 the supplied review text names no reviewer. The WP7 boxes above apply only to
 the eventual exact candidate head and remain unchecked until an independent
 reviewer covers that SHA.

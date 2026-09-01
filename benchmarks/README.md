@@ -348,7 +348,8 @@ Repeat with `--engine zlib-ng` when the change can affect zlib-ng. The
 comparison tool rejects schema, source-attestation, and engine mismatches
 before displaying timing changes. Use `--allow-legacy` only for retained
 pre-hardening schema-v2 captures; it preserves comparison access while
-printing the missing status or inferred-engine provenance. One or more
+printing the missing status or inferred-engine provenance. It does not waive a
+dirty or inconsistent source attestation. One or more
 targeted investigation records can be supplied directly to print raw and
 canonical minima, medians, first-half minima, and temporal quarter medians.
 Record the command, environment, and any material wins or regressions in the
