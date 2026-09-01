@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0b1] - 2026-09-01
+
 ### Added
 
 - The documented public API is now beta-frozen for the 2.0 line and protected
@@ -876,6 +878,7 @@ All notable changes to this project will be documented in this file.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
 
 [Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a4...HEAD
+[2.0.0b1]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a4...v2.0.0b1
 [2.0.0a4]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a3...v2.0.0a4
 [2.0.0a3]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a2...v2.0.0a3
 [2.0.0a2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a1...v2.0.0a2

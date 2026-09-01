@@ -885,7 +885,7 @@ The page must explain:
 - [x] `docs/migration.md` removes “before beta” instructions that are now complete.
 - [x] The sans-I/O ADR records that the selected API was accepted and frozen at `2.0.0b1`.
 - [x] `SECURITY.md` changes the active support row from alpha to the latest 2.0 beta/prerelease line.
-- [ ] The changelog contains a `2.0.0b1` section and correct comparison links.
+- [x] The changelog contains a `2.0.0b1` section and correct comparison links.
 - [x] Current docs do not promise production stability.
 - [x] Historical alpha release notes, plans, and changelog entries remain unedited except for broken links.
 - [x] A repository search lists every remaining `alpha`, `provisional`, `a4`, and `before beta` occurrence with an explicit keep/change decision.
@@ -897,8 +897,8 @@ rg -n --glob '!plans/**' --glob '!CHANGELOG.md'   '(alpha|provisional|before bet
 ### 8.3 Release metadata
 
 - [x] Development version remains `2.0.0b1.dev0` until the release-preparation package.
-- [ ] Release candidate sets `__version__` to `2.0.0b1`.
-- [ ] `pyproject.toml` uses `Development Status :: 4 - Beta` for the release candidate.
+- [x] Release candidate sets `__version__` to `2.0.0b1`.
+- [x] `pyproject.toml` uses `Development Status :: 4 - Beta` for the release candidate.
 - [x] Python classifiers remain 3.11 through 3.14.
 - [x] The `Framework :: AsyncIO` and `Typing :: Typed` classifiers remain.
 - [x] Wheel and sdist metadata report the same version, Python requirement, classifier, and dependency floors.
@@ -1448,16 +1448,16 @@ confirmation on its exact release-candidate head.
 
 #### WP8 release preparation
 
-- [ ] Set `__version__` to `2.0.0b1`.
-- [ ] Set the Development Status classifier to Beta.
-- [ ] Finalize the `2.0.0b1` changelog date and section.
-- [ ] Ensure changelog comparison links are correct.
-- [ ] Ensure README and docs describe beta consistently.
-- [ ] Ensure `SECURITY.md` supports the latest beta line.
-- [ ] Ensure dependency floors match tested floors.
-- [ ] Run version-sync tests.
+- [x] Set `__version__` to `2.0.0b1`.
+- [x] Set the Development Status classifier to Beta.
+- [x] Finalize the `2.0.0b1` changelog date and section.
+- [x] Ensure changelog comparison links are correct.
+- [x] Ensure README and docs describe beta consistently.
+- [x] Ensure `SECURITY.md` supports the latest beta line.
+- [x] Ensure dependency floors match tested floors.
+- [x] Run version-sync tests.
 - [ ] Run full lint, formatting, typing, docs, and test suites.
-- [ ] Run public API contract generation in check mode.
+- [x] Run public API contract generation in check mode.
 - [ ] Build wheel and sdist from a clean checkout.
 - [ ] Run `twine check` or repository-equivalent metadata validation.
 - [ ] Inspect wheel and sdist file lists.
