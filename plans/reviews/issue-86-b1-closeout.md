@@ -2,6 +2,11 @@
 
 Date observed: 2026-08-31
 
+> **Post-release outcome:** The approved comment was posted at
+> `2026-09-01T19:03:20Z`, and the issue was closed as `NOT_PLANNED` at
+> `2026-09-01T19:03:33Z`. The observed state below is the preserved
+> pre-closeout snapshot.
+
 Issue: [#86](https://github.com/geoff-davis/aiogzip/issues/86), “2.0:
 small-write overhead vs v1.11.0 (deferred from 2.0.0a2)”
 
@@ -14,7 +19,7 @@ small-write overhead vs v1.11.0 (deferred from 2.0.0a2)”
 - The original body remains intact and describes the historical v1.11.0
   comparison and the 10% anti-regression gate.
 
-Codex performed no remote mutation.
+At the time this packet was prepared, Codex performed no remote mutation.
 
 ## Evidence
 
@@ -54,15 +59,21 @@ We are accepting this overhead for the 2.0 strict-semantics design and will not 
 
 ## Maintainer-only actions
 
-- [ ] Confirm the final b1 tiny-write row remains within the 10% exact-a4 gate.
-- [ ] Confirm no equivalent closeout comment has appeared since this packet was
+- [x] Confirm the final b1 tiny-write row remains within the 10% exact-a4 gate.
+- [x] Confirm no equivalent closeout comment has appeared since this packet was
   captured. If one exists, record its URL and do not duplicate it.
-- [ ] Leave the original issue title and body unchanged.
-- [ ] Post the exact approved comment above.
-- [ ] Close #86 as **Not planned**, or the repository's equivalent
+- [x] Leave the original issue title and body unchanged.
+- [x] Post the exact approved comment above.
+- [x] Close #86 as **Not planned**, or the repository's equivalent
   accepted-design-tradeoff resolution—not Completed.
-- [ ] Record the comment URL, closure state/reason, and timestamp in final
+- [x] Record the comment URL, closure state/reason, and timestamp in final
   release evidence.
+
+Final comment:
+https://github.com/geoff-davis/aiogzip/issues/86#issuecomment-5498955484.
+The issue title and body remain unchanged, and the continuing tiny-write gate
+is retained. See `plans/reviews/v2.0.0b1-post-release.md` for the complete
+publication and closeout reconciliation.
 
 Do not retarget #86. Do not open a separate buffered-writer issue without
 concrete user demand or a separately developed and reviewed API proposal.

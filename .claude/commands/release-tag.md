@@ -28,9 +28,18 @@ Tag a merged release and publish to PyPI + GitHub Releases. Run this after a `/r
 
 ### 3. Tag and push
 
-- Run `git tag v<version>` on the current HEAD.
+- Create an annotated signed tag on the intended merge commit using the
+  maintainer's GitHub-registered signing key. For SSH signing, use
+  `git -c gpg.format=ssh tag -s -u <public-key-path> -m "Release aiogzip <version>" v<version>`.
+- Verify the tag locally before pushing. For SSH signing, configure or supply
+  `gpg.ssh.allowedSignersFile`, then run
+  `git -c gpg.ssh.allowedSignersFile=<allowed-signers-path> tag -v v<version>`.
+  Confirm the dereferenced tag target is the intended merge commit.
 - Run `git push origin v<version>`.
-- Tell the user the tag has been pushed and that the PyPI publish workflow has been triggered.
+- Query the GitHub tag object and confirm GitHub reports `verified: true` and
+  the intended target before treating the tag gate as complete.
+- Tell the user the tag has been pushed and that the PyPI publish workflow has
+  been triggered.
 
 ### 4. Create GitHub Release
 
