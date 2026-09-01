@@ -43,7 +43,7 @@ their import path; `aiogzip` resolves from the installed wheel.
 uv build
 python -m venv .venv-example
 .venv-example/bin/python -m pip install \
-  dist/aiogzip-2.0.0a4-py3-none-any.whl
+  dist/aiogzip-2.0.0b1*.whl
 .venv-example/bin/python examples/fragmented_transport.py --self-test
 .venv-example/bin/python examples/concurrent_jsonl_ingest.py \
   --generate-fixtures ./wheel-demo-input \
@@ -52,6 +52,12 @@ python -m venv .venv-example
 
 On Windows, replace `.venv-example/bin/python` with
 `.venv-example\\Scripts\\python.exe`.
+
+Release validation drives the same scripts from a temporary directory with
+the artifact-installed interpreter. `scripts/run_maintained_examples.py` also
+runs the maintained integration suites so corruption, truncation, limits,
+cancellation, and cleanup are checked against the installed package rather
+than an editable checkout.
 
 ## Fragmented transport
 

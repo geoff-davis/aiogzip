@@ -10,6 +10,7 @@ import sys
 import tracemalloc
 import zlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from conftest import FramedAsyncReader
@@ -18,19 +19,25 @@ BENCHMARKS_DIR = Path(__file__).resolve().parents[1] / "benchmarks"
 sys.path.insert(0, str(BENCHMARKS_DIR))
 bench_common = importlib.import_module("bench_common")
 run_benchmarks = importlib.import_module("run_benchmarks")
+bench_compare = importlib.import_module("bench_compare")
+bench_targeted_contract = importlib.import_module("bench_targeted_contract")
 bench_streaming = importlib.import_module("bench_streaming")
 bench_codec_regressions = importlib.import_module("bench_codec_regressions")
 bench_a3_regressions = importlib.import_module("bench_a3_regressions")
 bench_a4_supplement = importlib.import_module("bench_a4_supplement")
+investigate_b1_timing = importlib.import_module("investigate_b1_timing")
 verify_a3_writes = importlib.import_module("verify_a3_writes")
 verify_a3_headers = importlib.import_module("verify_a3_headers")
 BenchmarkResults = bench_common.BenchmarkResults
+BenchmarkBase = bench_common.BenchmarkBase
 COMPARISON_COMPRESSLEVEL = bench_common.COMPARISON_COMPRESSLEVEL
 DataGenerator = bench_common.DataGenerator
 median_results = bench_common.median_results
 positive_int = run_benchmarks.positive_int
 configure_source_root = run_benchmarks.configure_source_root
 cpu_tuning = run_benchmarks._cpu_tuning
+assert_requested_engine = run_benchmarks.assert_requested_engine
+configure_requested_engine = run_benchmarks._configure_requested_engine
 write_comparison_fixture = bench_common.write_comparison_fixture
 StreamingBenchmarks = bench_streaming.StreamingBenchmarks
 RegressionsBenchmarks = bench_codec_regressions.RegressionsBenchmarks
@@ -53,6 +60,12 @@ a4_bounded_jsonl_once = bench_a4_supplement._bounded_jsonl_once
 a4_concurrent_reads_once = bench_a4_supplement._concurrent_reads_once
 a4_full_binary_read_once = bench_a4_supplement._full_binary_read_once
 a4_jsonl_fixture = bench_a4_supplement._jsonl_fixture
+b1_assert_requested_engine = investigate_b1_timing._assert_requested_engine
+b1_run = investigate_b1_timing.run
+b1_source_identity = investigate_b1_timing._source_identity
+b1_time_output_bound = investigate_b1_timing._time_output_bound
+TARGETED_BENCHMARK = bench_targeted_contract.TARGETED_BENCHMARK
+RAW_CHANGE_FORMULA = bench_targeted_contract.RAW_CHANGE_FORMULA
 
 
 def _result(name, duration, marker):
@@ -119,6 +132,595 @@ def test_positive_int(value, expected):
 def test_positive_int_rejects_nonpositive_values(value):
     with pytest.raises(argparse.ArgumentTypeError, match="positive integer"):
         positive_int(value)
+
+
+def test_b1_investigation_rejects_requested_engine_mismatch(monkeypatch):
+    from aiogzip import EngineInfo
+
+    monkeypatch.setattr(run_benchmarks.platform, "system", lambda: "Linux")
+    stdlib = SimpleNamespace(
+        engine_info=lambda: EngineInfo(
+            compression="stdlib-zlib",
+            decompression="stdlib-zlib",
+            crc32="stdlib-zlib",
+        )
+    )
+    zlib_ng = SimpleNamespace(
+        engine_info=lambda: EngineInfo(
+            compression="stdlib-zlib",
+            decompression="zlib-ng",
+            crc32="zlib-ng",
+        )
+    )
+    zlib_ng_with_stdlib_crc = SimpleNamespace(
+        engine_info=lambda: EngineInfo(
+            compression="stdlib-zlib",
+            decompression="zlib-ng",
+            crc32="stdlib-zlib",
+        )
+    )
+
+    assert b1_assert_requested_engine(stdlib, "stdlib", source_label="test") == {
+        "compression": "stdlib-zlib",
+        "decompression": "stdlib-zlib",
+        "crc32": "stdlib-zlib",
+    }
+    assert b1_assert_requested_engine(zlib_ng, "zlib-ng", source_label="test") == {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng",
+        "crc32": "zlib-ng",
+    }
+    with pytest.raises(RuntimeError, match="zlib-ng was requested"):
+        b1_assert_requested_engine(stdlib, "zlib-ng", source_label="test")
+    with pytest.raises(RuntimeError, match="stdlib was requested"):
+        b1_assert_requested_engine(zlib_ng, "stdlib", source_label="test")
+    with pytest.raises(RuntimeError, match="crc32"):
+        b1_assert_requested_engine(
+            zlib_ng_with_stdlib_crc, "zlib-ng", source_label="test"
+        )
+
+    monkeypatch.setattr(run_benchmarks.platform, "system", lambda: "Darwin")
+    assert (
+        b1_assert_requested_engine(
+            zlib_ng_with_stdlib_crc, "zlib-ng", source_label="test"
+        )["crc32"]
+        == "stdlib-zlib"
+    )
+
+
+def test_shared_engine_guard_checks_each_field():
+    engines = {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng",
+        "crc32": "zlib-ng",
+    }
+
+    assert_requested_engine(
+        engines, "zlib-ng", source_label="test", system_name="Linux"
+    )
+    with pytest.raises(RuntimeError, match="decompression"):
+        assert_requested_engine(
+            {**engines, "decompression": "stdlib-zlib"},
+            "zlib-ng",
+            source_label="test",
+            system_name="Linux",
+        )
+    with pytest.raises(RuntimeError, match="crc32"):
+        assert_requested_engine(
+            {**engines, "crc32": "stdlib-zlib"},
+            "zlib-ng",
+            source_label="test",
+            system_name="Linux",
+        )
+    assert_requested_engine(
+        {**engines, "crc32": "stdlib-zlib"},
+        "zlib-ng",
+        source_label="test",
+        system_name="Darwin",
+    )
+    with pytest.raises(ValueError, match="unsupported requested engine"):
+        assert_requested_engine(engines, [], source_label="test")
+    with pytest.raises(ValueError, match="operating system provenance"):
+        assert_requested_engine(
+            engines,
+            "zlib-ng",
+            source_label="test",
+            system_name="<unknown>",
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("compression", "unknown"),
+        ("decompression", "stdlib-zlib"),
+        ("crc32", "unknown"),
+        ("crc32", []),
+    ],
+)
+def test_shared_engine_guard_validates_platform_unknown_records(field, value):
+    engines = {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng",
+        "crc32": "stdlib-zlib",
+    }
+    assert_requested_engine(
+        engines,
+        "zlib-ng",
+        source_label="legacy",
+        system_name=run_benchmarks.UNKNOWN_SYSTEM,
+    )
+    assert_requested_engine(
+        {**engines, "crc32": "zlib-ng"},
+        "zlib-ng",
+        source_label="legacy",
+        system_name=run_benchmarks.UNKNOWN_SYSTEM,
+    )
+
+    with pytest.raises(RuntimeError) as caught:
+        assert_requested_engine(
+            {**engines, field: value},
+            "zlib-ng",
+            source_label="legacy",
+            system_name=run_benchmarks.UNKNOWN_SYSTEM,
+        )
+    mismatch = (
+        str(caught.value).split("do not match: ", 1)[1].split("; active engines", 1)[0]
+    )
+    assert mismatch.startswith(f"{{'{field}':")
+    assert all(
+        f"'{other}':" not in mismatch
+        for other in {"compression", "decompression", "crc32"} - {field}
+    )
+
+
+def test_b1_investigation_attests_clean_source_before_timing(tmp_path, monkeypatch):
+    package_init = tmp_path / "src" / "aiogzip" / "__init__.py"
+    package_init.parent.mkdir(parents=True)
+    package_init.write_text("__version__ = 'test'\n", encoding="utf-8")
+
+    def fake_git(root, *args):
+        assert root == tmp_path
+        if args == ("rev-parse", "HEAD"):
+            return "abc123"
+        if args == ("describe", "--always", "--dirty", "--tags"):
+            return "v2.0.0a4"
+        if args == ("status", "--porcelain", "--untracked-files=no"):
+            return ""
+        raise AssertionError(args)
+
+    monkeypatch.setattr(investigate_b1_timing, "_git", fake_git)
+
+    assert b1_source_identity(tmp_path) == {
+        "source_root": str(tmp_path),
+        "commit": "abc123",
+        "describe": "v2.0.0a4",
+        "dirty_tracked": False,
+    }
+
+
+def test_b1_investigation_rejects_dirty_source(tmp_path, monkeypatch):
+    package_init = tmp_path / "src" / "aiogzip" / "__init__.py"
+    package_init.parent.mkdir(parents=True)
+    package_init.write_text("__version__ = 'test'\n", encoding="utf-8")
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_git",
+        lambda _root, *args: (
+            " M src/aiogzip/__init__.py" if args[0] == "status" else "abc123"
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="tracked changes"):
+        b1_source_identity(tmp_path)
+
+
+def test_b1_output_bound_allows_multiple_legal_chunks_and_closes_operations():
+    payload = b"x" * (128 * 1024)
+
+    class Operation:
+        def __init__(self, outputs):
+            self.outputs = outputs
+            self.closed = False
+
+        def __iter__(self):
+            return iter(self.outputs)
+
+        def close(self):
+            self.closed = True
+
+    class Decoder:
+        def __init__(self):
+            self.feed_operation = Operation([payload[: 64 * 1024]])
+            self.finish_operation = Operation([payload[64 * 1024 :]])
+            self.discarded = False
+
+        def feed(self, _wire):
+            return self.feed_operation
+
+        def finish(self):
+            return self.finish_operation
+
+        def discard(self):
+            self.discarded = True
+
+    decoder = Decoder()
+    module = SimpleNamespace(GzipDecoder=lambda **_kwargs: decoder)
+
+    assert (
+        b1_time_output_bound(module, b"wire", hashlib.sha256(payload).hexdigest()) >= 0
+    )
+    assert decoder.feed_operation.closed
+    assert decoder.finish_operation.closed
+    assert decoder.discarded
+
+
+def test_b1_output_bound_discards_decoder_when_iteration_fails():
+    class Operation:
+        closed = False
+
+        def __iter__(self):
+            yield object()
+
+        def close(self):
+            self.closed = True
+
+    class Decoder:
+        def __init__(self):
+            self.feed_operation = Operation()
+            self.discarded = False
+
+        def feed(self, _wire):
+            return self.feed_operation
+
+        def discard(self):
+            self.discarded = True
+
+    decoder = Decoder()
+    module = SimpleNamespace(GzipDecoder=lambda **_kwargs: decoder)
+
+    with pytest.raises(TypeError):
+        b1_time_output_bound(module, b"wire", "unused")
+    assert decoder.feed_operation.closed
+    assert decoder.discarded
+
+
+def _mock_b1_investigation_sources(
+    tmp_path,
+    monkeypatch,
+    *,
+    baseline_version="test",
+    candidate_version="test",
+    baseline_commit="1111111111111111111111111111111111111111",
+    candidate_commit="2222222222222222222222222222222222222222",
+):
+    from aiogzip import EngineInfo
+
+    baseline_root = tmp_path / "baseline"
+    candidate_root = tmp_path / "candidate"
+    for root in (baseline_root, candidate_root):
+        package_init = root / "src" / "aiogzip" / "__init__.py"
+        package_init.parent.mkdir(parents=True)
+        package_init.write_text("__version__ = 'test'\n", encoding="utf-8")
+
+    def identity(root):
+        return {
+            "source_root": str(root),
+            "commit": baseline_commit if root == baseline_root else candidate_commit,
+            "describe": root.name,
+            "dirty_tracked": False,
+        }
+
+    def package(root):
+        return SimpleNamespace(
+            __file__=str(root / "src" / "aiogzip" / "__init__.py"),
+            __version__=(
+                baseline_version if root == baseline_root else candidate_version
+            ),
+            engine_info=lambda: EngineInfo(
+                compression="stdlib-zlib",
+                decompression="stdlib-zlib",
+                crc32="stdlib-zlib",
+            ),
+        )
+
+    monkeypatch.setattr(investigate_b1_timing, "_source_identity", identity)
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_load_package",
+        lambda alias, root: package(root),
+    )
+    monkeypatch.setenv("AIOGZIP_ENGINE", "test-restore-sentinel")
+    return baseline_root, candidate_root
+
+
+def test_b1_investigation_checkpoints_partial_results_on_late_failure(
+    tmp_path, monkeypatch
+):
+    baseline_root, candidate_root = _mock_b1_investigation_sources(
+        tmp_path,
+        monkeypatch,
+        candidate_commit="1111111111111111111111111111111111111111",
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_output_bound_fixture",
+        lambda: (b"wire", "digest"),
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "optional_header_fixture",
+        lambda *_args, **_kwargs: (b"wire", b""),
+    )
+    calls = 0
+
+    async def measure_case(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("late failure")
+        return {"name": "completed"}
+
+    monkeypatch.setattr(investigate_b1_timing, "_measure_case", measure_case)
+    snapshots = []
+    args = argparse.Namespace(
+        baseline_root=baseline_root,
+        candidate_root=candidate_root,
+        engine="stdlib",
+        cycles=1,
+        warmup_cycles=1,
+        canonical_candidate_side="candidate",
+        canonical_candidate_commit="1111111111111111111111111111111111111111",
+    )
+
+    with pytest.raises(RuntimeError, match="late failure"):
+        asyncio.run(
+            b1_run(
+                args,
+                checkpoint=lambda document: snapshots.append(
+                    json.loads(json.dumps(document))
+                ),
+            )
+        )
+
+    assert snapshots[0]["status"] == "running"
+    assert snapshots[0]["warnings"] == [
+        "targeted capture producer: both sides attest the same source commit; "
+        "canonical candidate side labels measurement orientation only"
+    ]
+    assert snapshots[-1]["status"] == "failed"
+    assert snapshots[-1]["results"] == [{"name": "completed"}]
+    assert snapshots[-1]["failure"] == {
+        "type": "RuntimeError",
+        "message": "late failure",
+    }
+
+
+def test_b1_programmatic_capture_round_trips_through_strict_reader(
+    tmp_path, monkeypatch, capsys
+):
+    baseline_root, candidate_root = _mock_b1_investigation_sources(
+        tmp_path,
+        monkeypatch,
+        baseline_version="2.0.0a4",
+        candidate_version="2.0.0b1.dev0",
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_output_bound_fixture",
+        lambda: (b"wire", "digest"),
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "optional_header_fixture",
+        lambda *_args, **_kwargs: (b"wire", b"payload"),
+    )
+
+    async def measure_case(name, *_args, **_kwargs):
+        return {
+            "name": name,
+            "baseline": {"samples_seconds": [1.0, 1.1, 1.0, 1.1]},
+            "candidate": {"samples_seconds": [1.01, 1.11, 1.01, 1.11]},
+        }
+
+    monkeypatch.setattr(investigate_b1_timing, "_measure_case", measure_case)
+    args = argparse.Namespace(
+        baseline_root=baseline_root,
+        candidate_root=candidate_root,
+        engine="stdlib",
+        cycles=2,
+        warmup_cycles=1,
+        canonical_candidate_side="candidate",
+        canonical_candidate_commit="2222222222222222222222222222222222222222",
+    )
+
+    capture = asyncio.run(b1_run(args))
+    bench_compare.summarize_targeted(capture, "programmatic")
+
+    assert capture["status"] == "complete"
+    assert capture["command"][0] == "programmatic:investigate_b1_timing.run"
+    assert capture["configuration"]["canonical_candidate_commit"] == "2" * 40
+    assert capture["warnings"] == []
+    assert "Canonical candidate side: candidate" in capsys.readouterr().out
+
+
+def test_b1_producer_rejects_side_that_does_not_match_expected_commit(
+    tmp_path, monkeypatch
+):
+    baseline_root, candidate_root = _mock_b1_investigation_sources(
+        tmp_path,
+        monkeypatch,
+        baseline_version="2.0.0b1.dev0",
+        candidate_version="2.0.0a4",
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_load_package",
+        lambda *_args: pytest.fail("package loaded after invalid commit binding"),
+    )
+    args = argparse.Namespace(
+        baseline_root=baseline_root,
+        candidate_root=candidate_root,
+        engine="stdlib",
+        cycles=1,
+        warmup_cycles=1,
+        canonical_candidate_side="candidate",
+        canonical_candidate_commit="1111111111111111111111111111111111111111",
+    )
+
+    with pytest.raises(ValueError, match="contradicts the candidate source commit"):
+        asyncio.run(b1_run(args))
+
+
+def test_b1_producer_rejects_a4_b1_version_contradiction_before_timing(
+    tmp_path, monkeypatch
+):
+    baseline_root, candidate_root = _mock_b1_investigation_sources(
+        tmp_path,
+        monkeypatch,
+        baseline_version="2.0.0b1.dev0",
+        candidate_version="2.0.0a4",
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_output_bound_fixture",
+        lambda: pytest.fail("timing started after invalid source orientation"),
+    )
+    args = argparse.Namespace(
+        baseline_root=baseline_root,
+        candidate_root=candidate_root,
+        engine="stdlib",
+        cycles=1,
+        warmup_cycles=1,
+        canonical_candidate_side="candidate",
+        canonical_candidate_commit="2222222222222222222222222222222222222222",
+    )
+
+    with pytest.raises(ValueError, match="contradicts the archived a4/b1"):
+        asyncio.run(b1_run(args))
+
+
+def test_b1_producer_rejects_invalid_side_before_source_loading(monkeypatch):
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_source_identity",
+        lambda _root: pytest.fail("source loaded after invalid side"),
+    )
+    args = argparse.Namespace(
+        canonical_candidate_side=[],
+        canonical_candidate_commit="2" * 40,
+    )
+
+    with pytest.raises(ValueError, match="invalid canonical_candidate_side"):
+        asyncio.run(b1_run(args))
+
+
+@pytest.mark.parametrize(
+    ("command", "message"),
+    [
+        (None, "recorded command"),
+        ([], "recorded command"),
+        ("python", "recorded command"),
+        (["python", ""], "recorded command argument 1 is empty"),
+        (["python", "--baseline-root="], "--baseline-root has an empty value"),
+    ],
+)
+def test_b1_capture_command_rejects_malformed_present_value(command, message):
+    with pytest.raises(ValueError, match=message):
+        investigate_b1_timing._capture_command(SimpleNamespace(command=command))
+
+
+def test_b1_run_rejects_malformed_cli_command_before_source_loading(monkeypatch):
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_source_identity",
+        lambda _root: pytest.fail("source loaded after malformed CLI provenance"),
+    )
+    args = argparse.Namespace(
+        command=["python", ""],
+        canonical_candidate_side="candidate",
+        canonical_candidate_commit="2" * 40,
+    )
+
+    with pytest.raises(ValueError, match="recorded command argument 1 is empty"):
+        asyncio.run(b1_run(args))
+
+
+@pytest.mark.parametrize(
+    "baseline_arguments", [["--baseline-root", ""], ["--baseline-root="]]
+)
+def test_b1_main_reports_empty_cli_value_without_traceback(
+    baseline_arguments, tmp_path, monkeypatch, capsys
+):
+    output = tmp_path / "capture.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "investigate_b1_timing.py",
+            *baseline_arguments,
+            "--candidate-root",
+            ".",
+            "--engine",
+            "stdlib",
+            "--canonical-candidate-commit",
+            "2" * 40,
+            "--output",
+            str(output),
+        ],
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_source_identity",
+        lambda _root: pytest.fail("source loaded after empty CLI value"),
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        investigate_b1_timing.main()
+
+    error = capsys.readouterr().err
+    assert "argument --baseline-root: must not be empty" in error
+    assert "Traceback" not in error
+    assert not output.exists()
+
+
+def test_b1_main_reports_wrong_commit_without_traceback(tmp_path, monkeypatch, capsys):
+    output = tmp_path / "capture.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "investigate_b1_timing.py",
+            "--baseline-root",
+            "baseline",
+            "--candidate-root",
+            "candidate",
+            "--engine",
+            "stdlib",
+            "--canonical-candidate-commit",
+            "wrong-commit",
+            "--output",
+            str(output),
+        ],
+    )
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_source_identity",
+        lambda root: {
+            "source_root": str(root),
+            "commit": f"{root}-commit",
+            "describe": str(root),
+            "dirty_tracked": False,
+        },
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        investigate_b1_timing.main()
+
+    error = capsys.readouterr().err
+    assert "contradicts the candidate source commit 'candidate-commit'" in error
+    assert "Traceback" not in error
+    assert not output.exists()
 
 
 def test_comparison_fixture_is_deterministic(tmp_path):
@@ -713,15 +1315,48 @@ async def test_a4_supplement_validates_concurrent_independent_reads(tmp_path):
     ]
 
 
-def test_source_root_attestation_identifies_current_checkout():
+def test_source_root_attestation_identifies_current_checkout(monkeypatch):
     repository_root = BENCHMARKS_DIR.parent
+
+    def fake_git(_root, *args):
+        if args == ("rev-parse", "HEAD"):
+            return "abc123"
+        if args == ("describe", "--always", "--dirty", "--tags"):
+            return "v2.0.0b1-test"
+        if args == ("status", "--porcelain", "--untracked-files=no"):
+            return ""
+        raise AssertionError(args)
+
+    monkeypatch.setattr(run_benchmarks, "_git_value", fake_git)
 
     identity = configure_source_root(repository_root)
 
     assert identity["source_root"] == str(repository_root.resolve())
     assert Path(identity["aiogzip_file"]).is_relative_to(repository_root / "src")
-    assert identity["target_commit"]
+    assert identity["target_commit"] == "abc123"
+    assert identity["target_describe"] == "v2.0.0b1-test"
+    assert identity["target_dirty"] is False
     assert identity["package_version"]
+
+
+def test_source_root_attestation_rejects_dirty_tree_before_import(
+    tmp_path, monkeypatch
+):
+    package_init = tmp_path / "src" / "aiogzip" / "__init__.py"
+    package_init.parent.mkdir(parents=True)
+    package_init.write_text(
+        "raise AssertionError('must not import')\n", encoding="utf-8"
+    )
+
+    def fake_git(_root, *args):
+        if args == ("status", "--porcelain", "--untracked-files=no"):
+            return " M src/aiogzip/__init__.py"
+        return "abc123"
+
+    monkeypatch.setattr(run_benchmarks, "_git_value", fake_git)
+
+    with pytest.raises(RuntimeError, match="tracked changes"):
+        configure_source_root(tmp_path)
 
 
 def test_cpu_tuning_reads_linux_sysfs(tmp_path, monkeypatch):
@@ -772,6 +1407,667 @@ def test_regression_flags_require_category_and_source_root(monkeypatch, argument
 
     with pytest.raises(SystemExit, match="2"):
         asyncio.run(run_benchmarks.main())
+
+
+def test_release_capture_requires_explicit_engine(monkeypatch, tmp_path):
+    monkeypatch.delenv("AIOGZIP_ENGINE", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_benchmarks.py",
+            "--category",
+            "regressions",
+            "--source-root",
+            str(tmp_path),
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        asyncio.run(run_benchmarks.main())
+
+
+def test_requested_engine_uses_cli_for_zlib_ng(monkeypatch):
+    monkeypatch.setenv("AIOGZIP_ENGINE", "zlib-ng")
+
+    assert configure_requested_engine("zlib-ng", source_root_supplied=True) == "zlib-ng"
+    assert "AIOGZIP_ENGINE" not in run_benchmarks.os.environ
+
+
+def test_requested_engine_sets_real_stdlib_override(monkeypatch):
+    monkeypatch.delenv("AIOGZIP_ENGINE", raising=False)
+
+    assert configure_requested_engine("stdlib", source_root_supplied=True) == "stdlib"
+    assert run_benchmarks.os.environ["AIOGZIP_ENGINE"] == "stdlib"
+
+
+def test_requested_engine_rejects_noop_zlib_ng_environment(monkeypatch):
+    monkeypatch.setenv("AIOGZIP_ENGINE", "zlib-ng")
+
+    with pytest.raises(ValueError, match="use --engine zlib-ng"):
+        configure_requested_engine(None, source_root_supplied=True)
+
+
+def test_main_verifies_engine_without_source_root(monkeypatch, capsys):
+    from aiogzip import EngineInfo
+
+    fake_aiogzip = SimpleNamespace(
+        engine_info=lambda: EngineInfo(
+            compression="stdlib-zlib",
+            decompression="stdlib-zlib",
+            crc32="stdlib-zlib",
+        )
+    )
+    benchmark_started = False
+
+    async def fail_if_started(*_args, **_kwargs):
+        nonlocal benchmark_started
+        benchmark_started = True
+        raise AssertionError("benchmark ran after failed engine verification")
+
+    monkeypatch.setenv("AIOGZIP_ENGINE", "stdlib")
+    monkeypatch.setitem(sys.modules, "aiogzip", fake_aiogzip)
+    monkeypatch.setattr(run_benchmarks, "run_category", fail_if_started)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_benchmarks.py", "--quick", "--engine", "zlib-ng"],
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        asyncio.run(run_benchmarks.main())
+
+    error = capsys.readouterr().err
+    assert "engine fields do not match" in error
+    assert "decompression" in error
+    assert not benchmark_started
+
+
+def test_main_checkpoints_completed_categories_on_late_failure(tmp_path, monkeypatch):
+    output = tmp_path / "capture.json"
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    monkeypatch.setenv("AIOGZIP_ENGINE", "stdlib")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_benchmarks.py",
+            "--category",
+            "io,memory",
+            "--source-root",
+            str(source_root),
+            "--output",
+            str(output),
+        ],
+    )
+    identity = {
+        "source_root": str(source_root),
+        "target_commit": "abc123",
+        "target_describe": "abc123",
+        "target_dirty": False,
+    }
+    environment = {
+        **identity,
+        "os_name": "Linux",
+        "forced_engine": "stdlib",
+        "active_engines": {
+            "compression": "stdlib-zlib",
+            "decompression": "stdlib-zlib",
+            "crc32": "stdlib-zlib",
+        },
+    }
+    monkeypatch.setattr(run_benchmarks, "configure_source_root", lambda _root: identity)
+    monkeypatch.setattr(
+        run_benchmarks,
+        "collect_environment",
+        lambda _identity, *, environment_label, requested_engine: environment,
+    )
+
+    async def fake_run_category(category, **_kwargs):
+        if category == "memory":
+            raise RuntimeError("controlled late failure")
+        return [_result("completed io", 1.0, "checkpoint")]
+
+    monkeypatch.setattr(run_benchmarks, "run_category", fake_run_category)
+
+    with pytest.raises(RuntimeError, match="controlled late failure"):
+        asyncio.run(run_benchmarks.main())
+
+    capture = json.loads(output.read_text(encoding="utf-8"))
+    assert capture["status"] == "failed"
+    assert capture["completed_categories"] == ["io"]
+    assert [result["name"] for result in capture["results"]] == ["completed io"]
+    assert capture["failure"] == {
+        "type": "RuntimeError",
+        "message": "controlled late failure",
+    }
+    assert not (tmp_path / ".capture.json.tmp").exists()
+
+
+def test_run_category_checkpoints_each_completed_result(monkeypatch):
+    class PartialBenchmarks(BenchmarkBase):
+        async def run_all(self):
+            self.add_result("first row", "partial", 1.0)
+            raise RuntimeError("failure after first row")
+
+    module = SimpleNamespace(PartialBenchmarks=PartialBenchmarks)
+    monkeypatch.setitem(run_benchmarks.CATEGORIES, "partial", "bench_partial")
+    monkeypatch.setattr(
+        run_benchmarks.importlib,
+        "import_module",
+        lambda name: (
+            module if name == "bench_partial" else importlib.import_module(name)
+        ),
+    )
+    snapshots = []
+
+    with pytest.raises(RuntimeError, match="failure after first row"):
+        asyncio.run(
+            run_benchmarks.run_category(
+                "partial",
+                result_checkpoint=lambda category, index, count, completed, partial, persist: (
+                    snapshots.append(
+                        (
+                            category,
+                            index,
+                            count,
+                            [
+                                [result.name for result in results]
+                                for results in completed
+                            ],
+                            [result.name for result in partial],
+                            persist,
+                        )
+                    )
+                ),
+            )
+        )
+
+    assert snapshots == [
+        ("partial", 1, 3, [], [], True),
+        ("partial", 1, 3, [], ["first row"], False),
+    ]
+
+
+def _comparison_capture(
+    commit: str,
+    *,
+    engine: str = "stdlib",
+    schema_version: int = 2,
+    dirty: bool = False,
+) -> dict:
+    active_engines = {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng" if engine == "zlib-ng" else "stdlib-zlib",
+        "crc32": "zlib-ng" if engine == "zlib-ng" else "stdlib-zlib",
+    }
+    source = {
+        "target_commit": commit,
+        "target_describe": commit,
+        "target_dirty": dirty,
+    }
+    return {
+        "schema_version": schema_version,
+        "status": "complete",
+        "source": source,
+        "environment": {
+            **source,
+            "os_name": "Linux",
+            "requested_engine": engine,
+            "forced_engine": engine,
+            "active_engines": active_engines,
+        },
+        "results": [{"name": "row", "duration": 1.0 if commit == "before" else 1.01}],
+    }
+
+
+def test_compare_results_validates_and_prints_capture_provenance(capsys):
+    bench_compare.compare_results(
+        _comparison_capture("before"), _comparison_capture("after")
+    )
+
+    output = capsys.readouterr().out
+    assert "Baseline source: before (before)" in output
+    assert "Current source:  after (after)" in output
+    assert "Engine: stdlib" in output
+
+
+def test_compare_results_rejects_schema_mismatch():
+    with pytest.raises(ValueError, match="schema mismatch"):
+        bench_compare.compare_results(
+            _comparison_capture("before"),
+            _comparison_capture("after", schema_version=1),
+        )
+
+
+def test_compare_results_rejects_engine_mismatch():
+    with pytest.raises(ValueError, match="requested_engine mismatch"):
+        bench_compare.compare_results(
+            _comparison_capture("before"),
+            _comparison_capture("after", engine="zlib-ng"),
+        )
+
+
+def test_compare_results_rejects_unhashable_requested_engine():
+    baseline = _comparison_capture("before")
+    baseline["environment"]["requested_engine"] = []
+
+    with pytest.raises(ValueError, match="explicit requested engine"):
+        bench_compare.compare_results(baseline, _comparison_capture("after"))
+
+
+def test_compare_results_rejects_in_band_unknown_host_label():
+    baseline = _comparison_capture("before")
+    baseline["environment"]["os_name"] = "<unknown>"
+
+    with pytest.raises(ValueError, match="operating-system provenance"):
+        bench_compare.compare_results(baseline, _comparison_capture("after"))
+
+
+def test_compare_results_rejects_dirty_source():
+    with pytest.raises(ValueError, match="clean source tree"):
+        bench_compare.compare_results(
+            _comparison_capture("before", dirty=True),
+            _comparison_capture("after"),
+        )
+
+
+def test_compare_results_requires_explicit_legacy_opt_in(capsys):
+    baseline = _comparison_capture("before")
+    current = _comparison_capture("after")
+    for capture in (baseline, current):
+        capture.pop("status")
+        capture["environment"].pop("requested_engine")
+
+    with pytest.raises(ValueError, match="not complete"):
+        bench_compare.compare_results(baseline, current)
+
+    bench_compare.compare_results(baseline, current, allow_legacy=True)
+    output = capsys.readouterr().out
+    assert "WARNING: baseline: legacy capture has no completion status" in output
+
+
+def _targeted_capture(
+    candidate_side: str = "candidate",
+    *,
+    system_name: str = "Linux",
+    crc32: str = "zlib-ng",
+) -> dict:
+    engines = {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng",
+        "crc32": crc32,
+    }
+    a4 = {
+        "commit": "a4-commit",
+        "describe": "v2.0.0a4",
+        "version": "2.0.0a4",
+        "dirty_tracked": False,
+        "active_engines": engines,
+    }
+    b1 = {
+        "commit": "b1-commit",
+        "describe": "v2.0.0a4-20-gb1",
+        "version": "2.0.0b1.dev0",
+        "dirty_tracked": False,
+        "active_engines": engines,
+    }
+    baseline, candidate = (b1, a4) if candidate_side == "baseline" else (a4, b1)
+    canonical_candidate = baseline if candidate_side == "baseline" else candidate
+    return {
+        "schema_version": 2,
+        "benchmark": TARGETED_BENCHMARK,
+        "status": "complete",
+        "configuration": {
+            "requested_engine": "zlib-ng",
+            "canonical_candidate_side": candidate_side,
+            "canonical_candidate_commit": canonical_candidate["commit"],
+            "reported_change_formula": RAW_CHANGE_FORMULA,
+        },
+        "command": ["python", "benchmarks/investigate_b1_timing.py"],
+        "host": {"os_name": system_name},
+        "baseline": baseline,
+        "candidate": candidate,
+        "results": [
+            {
+                "name": "row",
+                "baseline": {"samples_seconds": [1.0, 1.1, 0.9, 1.0]},
+                "candidate": {"samples_seconds": [1.1, 1.2, 0.99, 1.1]},
+            }
+        ],
+    }
+
+
+def test_targeted_summary_marks_orientation_and_temporal_statistics(capsys):
+    bench_compare.summarize_targeted(
+        _targeted_capture(candidate_side="baseline"), "swapped"
+    )
+
+    output = capsys.readouterr().out
+    assert "Canonical candidate side: baseline" in output
+    assert "quarter medians (ms)" in output
+    assert bench_compare.canonical_change_percent(10.0, "baseline") == pytest.approx(
+        -9.090909
+    )
+
+
+def test_targeted_legacy_orientation_fallback_is_used_by_summary(capsys):
+    capture = _targeted_capture()
+    capture["configuration"].pop("canonical_candidate_side")
+    capture["configuration"].pop("canonical_candidate_commit")
+
+    bench_compare.summarize_targeted(capture, "legacy", allow_legacy=True)
+
+    output = capsys.readouterr().out
+    assert "canonical candidate side inferred from source versions" in output
+    assert "canonical candidate commit was not producer-recorded" in output
+    assert "Canonical candidate side: candidate" in output
+
+
+def test_targeted_strict_mode_describes_missing_orientation(capsys):
+    capture = _targeted_capture()
+    capture["configuration"].pop("canonical_candidate_side")
+
+    with pytest.raises(
+        ValueError, match="lacks canonical_candidate_side; use --allow-legacy"
+    ):
+        bench_compare.summarize_targeted(capture, "missing-side")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_invalid_orientation_fails_before_output(capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["canonical_candidate_side"] = "invalid"
+
+    with pytest.raises(ValueError, match="invalid canonical_candidate_side"):
+        bench_compare.summarize_targeted(capture, "invalid", allow_legacy=True)
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_unhashable_orientation_reports_value_error(capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["canonical_candidate_side"] = []
+
+    with pytest.raises(ValueError, match="invalid canonical_candidate_side"):
+        bench_compare.summarize_targeted(capture, "invalid-list")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_unhashable_requested_engine_reports_value_error(capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["requested_engine"] = []
+
+    with pytest.raises(ValueError, match="lacks a requested engine"):
+        bench_compare.summarize_targeted(capture, "invalid-engine")
+
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("version", ["2.0.0b10", "2.0.0b1rc1"])
+def test_non_archival_version_is_not_treated_as_archived_b1(version, capsys):
+    capture = _targeted_capture()
+    capture["candidate"]["version"] = version
+    capture["configuration"].pop("canonical_candidate_side")
+    capture["configuration"].pop("canonical_candidate_commit")
+
+    with pytest.raises(ValueError, match="orientation cannot be inferred"):
+        bench_compare.summarize_targeted(capture, "b10", allow_legacy=True)
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_strict_mode_requires_candidate_commit_binding(capsys):
+    capture = _targeted_capture()
+    capture["configuration"].pop("canonical_candidate_commit")
+
+    with pytest.raises(
+        ValueError, match="lacks canonical_candidate_commit; use --allow-legacy"
+    ):
+        bench_compare.summarize_targeted(capture, "missing-commit")
+
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("commit", ["", 7, ["b1-commit"]])
+def test_targeted_rejects_invalid_candidate_commit_binding(commit, capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["canonical_candidate_commit"] = commit
+
+    with pytest.raises(ValueError, match="invalid canonical_candidate_commit"):
+        bench_compare.summarize_targeted(capture, "invalid-commit")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_rejects_contradictory_candidate_commit_binding(capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["canonical_candidate_commit"] = "wrong-commit"
+
+    with pytest.raises(ValueError, match="contradicts the candidate source commit"):
+        bench_compare.summarize_targeted(capture, "wrong-commit")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_orientation_must_match_source_versions():
+    capture = _targeted_capture()
+    capture["configuration"]["canonical_candidate_side"] = "baseline"
+    capture["configuration"]["canonical_candidate_commit"] = capture["baseline"][
+        "commit"
+    ]
+
+    with pytest.raises(ValueError, match="contradicts the archived a4/b1"):
+        bench_compare.summarize_targeted(capture, "wrong")
+
+
+@pytest.mark.parametrize("commit", [None, ""])
+def test_targeted_same_source_warning_requires_attested_commit(commit):
+    warnings = bench_targeted_contract.validate_source_orientation(
+        "candidate",
+        {"commit": commit},
+        {"commit": commit},
+        label="missing-commit",
+    )
+
+    assert warnings == []
+
+
+@pytest.mark.parametrize("same_source", [False, True])
+def test_targeted_strict_orientation_supports_future_and_same_source_pairs(
+    same_source, capsys
+):
+    capture = _targeted_capture()
+    capture["baseline"].update(
+        commit="future-before",
+        describe="v2.1.0",
+        version="2.1.0",
+    )
+    capture["candidate"].update(
+        commit="future-before" if same_source else "future-after",
+        describe="v2.1.0" if same_source else "v2.2.0",
+        version="2.1.0" if same_source else "2.2.0",
+    )
+    capture["configuration"]["canonical_candidate_commit"] = capture["candidate"][
+        "commit"
+    ]
+
+    bench_compare.summarize_targeted(
+        capture, "same-source" if same_source else "future"
+    )
+
+    output = capsys.readouterr().out
+    assert "Canonical candidate side: candidate" in output
+    if same_source:
+        assert "both sides attest the same source commit" in output
+
+
+def test_targeted_same_source_quick_capture_uses_nonempty_temporal_slices(capsys):
+    capture = _targeted_capture()
+    capture["baseline"].update(
+        commit="same-commit",
+        describe="same-commit",
+        version="2.1.0",
+    )
+    capture["candidate"].update(
+        commit="same-commit",
+        describe="same-commit",
+        version="2.1.0",
+    )
+    capture["configuration"]["canonical_candidate_commit"] = "same-commit"
+    capture["configuration"]["cycles"] = 1
+    capture["configuration"]["samples_per_side_per_case"] = 2
+    capture["results"][0]["baseline"]["samples_seconds"] = [1.0, 1.1]
+    capture["results"][0]["candidate"]["samples_seconds"] = [1.01, 1.11]
+    second_result = json.loads(json.dumps(capture["results"][0]))
+    second_result["name"] = "second quick row"
+    capture["results"].append(second_result)
+
+    bench_compare.summarize_targeted(capture, "quick-a-a")
+
+    output = capsys.readouterr().out
+    assert "both sides attest the same source commit" in output
+    assert "temporal slice medians (2/2)" in output
+    assert output.count("* first-half minimum uses one sample per side") == 1
+
+
+def test_targeted_one_sample_capture_summarizes_without_empty_slice(capsys):
+    capture = _targeted_capture()
+    capture["results"][0]["baseline"]["samples_seconds"] = [1.0]
+    capture["results"][0]["candidate"]["samples_seconds"] = [1.01]
+
+    bench_compare.summarize_targeted(capture, "one-sample")
+
+    output = capsys.readouterr().out
+    assert "temporal slice medians (1/1)" in output
+    assert "+1.00%*" in output
+    assert "* first-half minimum uses one sample per side" in output
+
+
+@pytest.mark.parametrize("field", ["commit", "describe"])
+def test_targeted_requires_source_attestation_fields(field):
+    capture = _targeted_capture()
+    capture["baseline"].pop(field)
+    provenance_name = "description" if field == "describe" else field
+
+    with pytest.raises(ValueError, match=f"source {provenance_name} provenance"):
+        bench_compare.summarize_targeted(capture, "missing")
+
+
+def test_targeted_post_capture_annotations_require_legacy_mode(capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["annotation_status"] = "untrusted free text"
+    capture["post_capture_command_reconstruction"] = {"recorded_at_capture": False}
+
+    with pytest.raises(ValueError, match="not a strict targeted capture"):
+        bench_compare.summarize_targeted(capture, "annotated")
+    assert capsys.readouterr().out == ""
+
+    bench_compare.summarize_targeted(capture, "annotated", allow_legacy=True)
+    output = capsys.readouterr().out
+    assert "contains a post-capture orientation/formula annotation" in output
+    assert "contains a post-capture command reconstruction" in output
+    assert "untrusted free text" not in output
+
+
+def test_targeted_strict_mode_requires_producer_command(capsys):
+    capture = _targeted_capture()
+    capture.pop("command")
+
+    with pytest.raises(ValueError, match="producer-recorded command"):
+        bench_compare.summarize_targeted(capture, "stripped")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_formula_requires_explicit_legacy_mode(capsys):
+    capture = _targeted_capture()
+    capture["configuration"].pop("reported_change_formula")
+
+    with pytest.raises(ValueError, match="canonical raw-change formula"):
+        bench_compare.summarize_targeted(capture, "missing-formula")
+    assert capsys.readouterr().out == ""
+
+    bench_compare.summarize_targeted(capture, "missing-formula", allow_legacy=True)
+    assert "raw-change formula was not producer-recorded" in capsys.readouterr().out
+
+
+def test_targeted_legacy_missing_host_does_not_infer_crc_platform(capsys):
+    capture = _targeted_capture(crc32="stdlib-zlib")
+    capture.pop("host")
+
+    with pytest.raises(ValueError, match="capture-time host OS provenance"):
+        bench_compare.summarize_targeted(capture, "missing-host")
+    assert capsys.readouterr().out == ""
+
+    bench_compare.summarize_targeted(capture, "missing-host", allow_legacy=True)
+    output = capsys.readouterr().out
+    assert "lacks capture-time host OS provenance" in output
+    assert "crc32 engine cannot be checked against the platform" in output
+
+
+def test_targeted_unknown_host_rejects_unhashable_crc_engine(capsys):
+    capture = _targeted_capture()
+    capture.pop("host")
+    capture["baseline"]["active_engines"] = {
+        **capture["baseline"]["active_engines"],
+        "crc32": [],
+    }
+    capture["candidate"]["active_engines"] = capture["baseline"]["active_engines"]
+
+    with pytest.raises(RuntimeError, match="engine fields do not match"):
+        bench_compare.summarize_targeted(capture, "unhashable", allow_legacy=True)
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_legacy_missing_host_validates_stdlib_without_crc_warning(capsys):
+    capture = _targeted_capture(crc32="stdlib-zlib")
+    capture["configuration"]["requested_engine"] = "stdlib"
+    stdlib_engines = {
+        "compression": "stdlib-zlib",
+        "decompression": "stdlib-zlib",
+        "crc32": "stdlib-zlib",
+    }
+    capture["baseline"]["active_engines"] = stdlib_engines
+    capture["candidate"]["active_engines"] = stdlib_engines
+    capture.pop("host")
+
+    bench_compare.summarize_targeted(capture, "stdlib-no-host", allow_legacy=True)
+
+    output = capsys.readouterr().out
+    assert "lacks capture-time host OS provenance" in output
+    assert "Engine: stdlib" in output
+    assert "crc32 engine cannot be checked" not in output
+
+
+def test_targeted_engine_validation_uses_recorded_host():
+    linux_capture = _targeted_capture(system_name="Linux", crc32="stdlib-zlib")
+    with pytest.raises(RuntimeError, match="crc32"):
+        bench_compare.summarize_targeted(linux_capture, "linux")
+
+    darwin_capture = _targeted_capture(system_name="Darwin", crc32="stdlib-zlib")
+    bench_compare.summarize_targeted(darwin_capture, "darwin")
+
+
+def test_targeted_rejects_in_band_unknown_host_label(capsys):
+    capture = _targeted_capture(system_name="<unknown>", crc32="stdlib-zlib")
+
+    with pytest.raises(ValueError, match="capture-time host OS provenance"):
+        bench_compare.summarize_targeted(capture, "unknown-label")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_schema_one_is_explicitly_archival():
+    capture = _targeted_capture()
+    capture["schema_version"] = 1
+
+    with pytest.raises(ValueError, match="archival"):
+        bench_compare.summarize_targeted(capture, "schema-one", allow_legacy=True)
 
 
 def test_quick_regression_output_matrix_validates_outputs():

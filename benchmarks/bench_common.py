@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 COMPARISON_COMPRESSLEVEL = 6
+ENGINE_CHOICES = ("stdlib", "zlib-ng")
 
 
 def write_comparison_fixture(
@@ -218,6 +219,7 @@ class BenchmarkBase:
         self.temp_mgr = TempFileManager()
         self.results: List[BenchmarkResults] = []
         self.data_gen = DataGenerator()
+        self._result_checkpoint: Callable[[List[BenchmarkResults]], None] | None = None
 
     def setup(self):
         """Set up benchmark environment."""
@@ -233,6 +235,8 @@ class BenchmarkBase:
             name=name, category=category, duration=duration, metrics=metrics
         )
         self.results.append(result)
+        if self._result_checkpoint is not None:
+            self._result_checkpoint(list(self.results))
         return result
 
     def get_results(self) -> List[BenchmarkResults]:

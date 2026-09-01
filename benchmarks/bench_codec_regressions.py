@@ -267,6 +267,11 @@ class RegressionsBenchmarks(BenchmarkBase):
         self.mode = regression_mode
         self.has_public_codec = hasattr(aiogzip, "GzipDecoder")
 
+    @staticmethod
+    def _announce(name: str) -> None:
+        """Emit the next measured row before entering its timed region."""
+        print(f"  START {name}", flush=True)
+
     def _skip_codec(self, name: str, mode: str) -> None:
         self.add_result(
             name,
@@ -300,6 +305,7 @@ class RegressionsBenchmarks(BenchmarkBase):
                         continue
                     fixture = _fixture(size_mib, compressible=compressible)
                     items = _split_exact(fixture.compressed, item_size)
+                    self._announce(name)
                     start = time.perf_counter()
                     output_bytes, digest, chunks, maximum = _digest_direct(
                         items, output_chunk_size=_OUTPUT_BOUND
@@ -333,7 +339,11 @@ class RegressionsBenchmarks(BenchmarkBase):
             (64 * _KIB, 64 * _KIB),
             (512 * _KIB, 256 * _KIB),
         ):
+            name = (
+                f"decompress_chunks {input_size // _KIB}K-in {output_size // _KIB}K-out"
+            )
             items = _split_exact(fixture.compressed, input_size)
+            self._announce(name)
             start = time.perf_counter()
             output_bytes, digest, chunks, maximum = await _digest_stream(
                 items, output_chunk_size=output_size
@@ -343,8 +353,7 @@ class RegressionsBenchmarks(BenchmarkBase):
             assert digest == fixture.payload_sha256
             assert maximum <= output_size
             self.add_result(
-                f"decompress_chunks {input_size // _KIB}K-in "
-                f"{output_size // _KIB}K-out",
+                name,
                 "regressions",
                 duration,
                 benchmark_mode="throughput",
@@ -364,7 +373,11 @@ class RegressionsBenchmarks(BenchmarkBase):
             (64 * _KIB, 64 * _KIB),
             (512 * _KIB, 256 * _KIB),
         ):
+            name = (
+                f"compress_chunks {input_size // _KIB}K-in {output_size // _KIB}K-out"
+            )
             payload_items = _split_exact(fixture.payload, input_size)
+            self._announce(name)
             start = time.perf_counter()
             compressed, chunks = await _compress_stream(
                 payload_items, output_chunk_size=output_size
@@ -373,7 +386,7 @@ class RegressionsBenchmarks(BenchmarkBase):
             decoded = gzip.decompress(compressed)
             assert _sha256(decoded) == fixture.payload_sha256
             self.add_result(
-                f"compress_chunks {input_size // _KIB}K-in {output_size // _KIB}K-out",
+                name,
                 "regressions",
                 duration,
                 benchmark_mode="throughput",
@@ -406,6 +419,7 @@ class RegressionsBenchmarks(BenchmarkBase):
                 self._skip_codec(name, "throughput")
                 continue
             items = (fixture.compressed,)
+            self._announce(name)
             with _counting_decompressors() as engines:
                 start = time.perf_counter()
                 output_bytes, digest, chunks, maximum = _digest_direct(
@@ -459,6 +473,7 @@ class RegressionsBenchmarks(BenchmarkBase):
                 for boundary_name, boundary in boundaries:
                     name = f"header {field_name} {field_size} bytes {boundary_name}"
                     items = _split_exact(wire, boundary)
+                    self._announce(name)
                     start = time.perf_counter()
                     output_bytes, digest, _, maximum = _digest_direct(
                         items, output_chunk_size=_OUTPUT_BOUND
@@ -491,6 +506,7 @@ class RegressionsBenchmarks(BenchmarkBase):
                 self._skip_codec(name, "memory")
                 continue
             fixture = _fixture(size_mib)
+            self._announce(name)
             tracemalloc.start()
             start = time.perf_counter()
             output_bytes, digest, chunks, maximum = _digest_direct(
@@ -541,6 +557,7 @@ class RegressionsBenchmarks(BenchmarkBase):
                     output_chunk_size=_OUTPUT_BOUND,
                     collect_member_info=collect_metadata,
                 )
+                self._announce(name)
                 tracemalloc.start()
                 start = time.perf_counter()
                 try:
@@ -628,6 +645,8 @@ class RegressionsBenchmarks(BenchmarkBase):
         }
 
     async def _ticker_baseline(self) -> None:
+        name = "async ticker baseline"
+        self._announce(name)
         gaps: list[float] = []
         previous = time.perf_counter()
         for _ in range(10_000):
@@ -636,7 +655,7 @@ class RegressionsBenchmarks(BenchmarkBase):
             gaps.append(current - previous)
             previous = current
         self.add_result(
-            "async ticker baseline",
+            name,
             "regressions",
             sum(gaps),
             benchmark_mode="ticker",
@@ -655,10 +674,12 @@ class RegressionsBenchmarks(BenchmarkBase):
                 ("one-item", len(fixture.compressed) + 1),
                 ("256K-items", _STREAM_INPUT_BOUND),
             ):
+                name = f"async decode ticker {size_mib}MiB {boundary}"
                 items = _split_exact(fixture.compressed, item_size)
+                self._announce(name)
                 duration, metrics = await self._ticker_measure(items, fixture)
                 self.add_result(
-                    f"async decode ticker {size_mib}MiB {boundary}",
+                    name,
                     "regressions",
                     duration,
                     benchmark_mode="ticker",
@@ -678,10 +699,12 @@ class RegressionsBenchmarks(BenchmarkBase):
             compressed_sha256=_sha256(wire),
         )
         items = (wire,)
+        name = f"async decode ticker empty-blocks {self.profile.empty_blocks}"
+        self._announce(name)
         with _counting_decompressors() as engines:
             duration, metrics = await self._ticker_measure(items, fixture)
         self.add_result(
-            f"async decode ticker empty-blocks {self.profile.empty_blocks}",
+            name,
             "regressions",
             duration,
             benchmark_mode="ticker",

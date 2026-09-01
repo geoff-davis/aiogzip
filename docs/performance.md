@@ -70,15 +70,16 @@ and
 [compression analysis](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a2-compression-analysis.md)
 records for commands, samples, dispersion, and fixture hashes.
 
-Run the suite on the target workload before making a capacity or latency
-decision:
+Run the suite from a clean committed checkout on the target workload before
+making a capacity or latency decision:
 
 ```bash
-AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
-  --category io,scenarios,concurrency --size 8 --repeat 5
+uv run python benchmarks/run_benchmarks.py \
+  --category io,scenarios,concurrency --size 8 --repeat 5 \
+  --engine stdlib --source-root .
 ```
 
-Repeat without `AIOGZIP_ENGINE=stdlib` to measure the optional zlib-ng engine.
+Repeat with `--engine zlib-ng` to measure the optional zlib-ng engine.
 See the repository's
 [benchmark methodology](https://github.com/geoff-davis/aiogzip/tree/main/benchmarks)
 for before/after comparison commands.

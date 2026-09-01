@@ -22,6 +22,7 @@ from bench_a3_regressions import (
     collect_environment,
     configure_source_root,
 )
+from bench_common import ENGINE_CHOICES
 
 
 def _profile_rows(profile: cProfile.Profile) -> list[dict[str, Any]]:
@@ -109,7 +110,7 @@ def _cost_centers(rows: list[dict[str, Any]]) -> dict[str, float]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
+    parser.add_argument("--engine", choices=ENGINE_CHOICES, required=True)
     parser.add_argument(
         "--write-sizes",
         type=_csv_positive_ints,

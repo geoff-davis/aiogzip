@@ -68,6 +68,7 @@ nav:
   - Performance: performance.md
   - Error handling: errors.md
   - API Reference: api.md
+  - Stability policy: stability.md
   - Design decisions (sans-I/O codec): adr-sans-io-codec.md
   - Design decisions (ISA-L): adr-isal.md
   - Contributing: contributing.md

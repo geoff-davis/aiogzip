@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from bench_common import ENGINE_CHOICES
+
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "plans" / "benchmarks" / "data"
 OUTPUT = ROOT / "plans" / "benchmarks" / "v2.0.0a1-regression-baseline.md"
@@ -100,7 +102,7 @@ def _commands() -> list[str]:
         ("/tmp/aiogzip-v2.0.0a1-regression", "v2.0.0a1-regression"),
         ("/tmp/aiogzip-main-pre-a2-regression", "main-pre-a2-regression"),
     ):
-        for engine in ("stdlib", "zlib-ng"):
+        for engine in ENGINE_CHOICES:
             commands.append(
                 f"AIOGZIP_ENGINE={engine} uv run --frozen python "
                 "benchmarks/run_benchmarks.py --category regressions "
@@ -414,7 +416,7 @@ def render(records: dict[str, dict[str, Any]]) -> str:
         "compress_chunks 512K-in 256K-out",
     )
     high_level_rows = []
-    for engine in ("stdlib", "zlib-ng"):
+    for engine in ENGINE_CHOICES:
         v1 = records[f"v1.11.0-a2-comparable-{engine}.json"]
         alpha = records[f"v2.0.0a1-regression-{engine}.json"]
         for name in high_level_names:

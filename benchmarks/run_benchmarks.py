@@ -24,13 +24,14 @@ import sys
 import tempfile
 import time
 import zlib
+from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 try:
-    from .bench_common import median_results
+    from .bench_common import ENGINE_CHOICES, BenchmarkResults, median_results
 except ImportError:  # Direct script execution: benchmarks/ is on sys.path.
-    from bench_common import median_results
+    from bench_common import ENGINE_CHOICES, BenchmarkResults, median_results
 
 # Available benchmark categories
 CATEGORIES = {
@@ -48,6 +49,14 @@ CATEGORIES = {
 
 QUICK_CATEGORIES = ["io", "compression"]
 _CPU_SYSFS_ROOT = Path("/sys/devices/system/cpu")
+UNKNOWN_SYSTEM_LABEL = "<unknown>"
+
+
+class _UnknownSystem:
+    """Out-of-band marker for legacy captures with no recorded host."""
+
+
+UNKNOWN_SYSTEM = _UnknownSystem()
 
 
 async def run_category(
@@ -56,6 +65,20 @@ async def run_category(
     repeat: int = 3,
     *,
     benchmark_options: dict[str, Any] | None = None,
+    result_checkpoint: (
+        Callable[
+            [
+                str,
+                int,
+                int,
+                list[list[BenchmarkResults]],
+                list[BenchmarkResults],
+                bool,
+            ],
+            None,
+        ]
+        | None
+    ) = None,
 ):
     """Run a category repeatedly and return median-duration results."""
     if category not in CATEGORIES:
@@ -85,14 +108,36 @@ async def run_category(
     print(f"{'=' * 60}")
 
     repeated_results = []
-    for _ in range(repeat):
+    for repeat_index in range(1, repeat + 1):
         benchmark = benchmark_class(
             data_size_mb=data_size_mb, **(benchmark_options or {})
         )
+        if result_checkpoint is not None:
+            completed_repeats = [list(results) for results in repeated_results]
+            benchmark._result_checkpoint = partial(
+                result_checkpoint,
+                category,
+                repeat_index,
+                repeat,
+                completed_repeats,
+                persist=False,
+            )
+            result_checkpoint(
+                category, repeat_index, repeat, completed_repeats, [], True
+            )
         try:
             benchmark.setup()
             await benchmark.run_all()
             repeated_results.append(benchmark.get_results())
+            if result_checkpoint is not None:
+                result_checkpoint(
+                    category,
+                    repeat_index,
+                    repeat,
+                    [list(results) for results in repeated_results],
+                    [],
+                    True,
+                )
         finally:
             benchmark.cleanup()
 
@@ -168,6 +213,99 @@ def _cpu_tuning() -> tuple[str, str]:
     return governor, boost
 
 
+def requested_engine_platform_warning(
+    requested: str, system_name: str | _UnknownSystem, *, source_label: str
+) -> str | None:
+    """Describe the one engine field an unknown host cannot fully attest."""
+    if requested == "zlib-ng" and system_name is UNKNOWN_SYSTEM:
+        return (
+            f"{source_label}: crc32 engine cannot be checked against the platform "
+            "because capture-time host OS provenance is absent"
+        )
+    return None
+
+
+def assert_requested_engine(
+    engines: dict[str, str],
+    requested: str,
+    *,
+    source_label: str,
+    system_name: str | _UnknownSystem | None = None,
+) -> dict[str, str]:
+    """Require the exact default engines expected for an evidence capture."""
+    if not isinstance(requested, str) or requested not in ENGINE_CHOICES:
+        raise ValueError(f"unsupported requested engine: {requested}")
+    if system_name is None:
+        system_name = platform.system()
+    elif system_name is not UNKNOWN_SYSTEM and (
+        not isinstance(system_name, str)
+        or not system_name
+        or system_name == UNKNOWN_SYSTEM_LABEL
+    ):
+        raise ValueError(f"unsupported operating system provenance: {system_name!r}")
+    crc32_expected: tuple[str, ...]
+    if requested == "zlib-ng" and system_name is UNKNOWN_SYSTEM:
+        crc32_expected = ("stdlib-zlib", "zlib-ng")
+    else:
+        crc32_expected = (
+            ("zlib-ng",)
+            if requested == "zlib-ng" and system_name != "Darwin"
+            else ("stdlib-zlib",)
+        )
+    expected = {
+        "compression": ("stdlib-zlib",),
+        "decompression": ("zlib-ng" if requested == "zlib-ng" else "stdlib-zlib",),
+        "crc32": crc32_expected,
+    }
+    mismatches = {}
+    for field, allowed_values in expected.items():
+        actual = engines.get(field)
+        if actual not in allowed_values:
+            expected_value: str | tuple[str, ...] = (
+                allowed_values[0] if len(allowed_values) == 1 else allowed_values
+            )
+            mismatches[field] = {"expected": expected_value, "actual": actual}
+    if mismatches:
+        raise RuntimeError(
+            f"{requested} was requested for {source_label}, but engine fields "
+            f"do not match: {mismatches}; active engines are {engines}"
+        )
+    return engines
+
+
+def _configure_requested_engine(
+    requested: str | None, *, source_root_supplied: bool
+) -> str | None:
+    """Resolve the benchmark engine and apply the library's real env contract."""
+    environment_value = os.environ.get("AIOGZIP_ENGINE", "").strip().lower()
+    if requested is None:
+        if environment_value == "stdlib":
+            requested = "stdlib"
+        elif environment_value:
+            raise ValueError(
+                "AIOGZIP_ENGINE accepts only stdlib; use --engine zlib-ng "
+                "for an explicit zlib-ng benchmark capture"
+            )
+    if source_root_supplied and requested is None:
+        raise ValueError("--source-root requires --engine stdlib or --engine zlib-ng")
+    if requested == "stdlib":
+        os.environ["AIOGZIP_ENGINE"] = "stdlib"
+    elif requested == "zlib-ng":
+        os.environ.pop("AIOGZIP_ENGINE", None)
+    return requested
+
+
+def _verify_unattested_engine(requested: str) -> dict[str, str]:
+    """Verify an engine request when no source checkout was attested."""
+    import aiogzip
+
+    return assert_requested_engine(
+        aiogzip.engine_info().__dict__,
+        requested,
+        source_label="unattested benchmark environment",
+    )
+
+
 def configure_source_root(source_root: Path) -> dict[str, Any]:
     """Import and attest aiogzip from one explicit source checkout."""
     resolved_root = source_root.resolve()
@@ -177,6 +315,16 @@ def configure_source_root(source_root: Path) -> dict[str, Any]:
         raise ValueError(
             f"source root does not contain src/aiogzip/__init__.py: {resolved_root}"
         )
+
+    target_commit = _git_value(resolved_root, "rev-parse", "HEAD")
+    target_describe = _git_value(
+        resolved_root, "describe", "--always", "--dirty", "--tags"
+    )
+    target_dirty = bool(
+        _git_value(resolved_root, "status", "--porcelain", "--untracked-files=no")
+    )
+    if target_dirty:
+        raise RuntimeError(f"source tree has tracked changes: {resolved_root}")
 
     loaded = sys.modules.get("aiogzip")
     if loaded is not None:
@@ -200,18 +348,17 @@ def configure_source_root(source_root: Path) -> dict[str, Any]:
         "source_root": str(resolved_root),
         "aiogzip_file": str(imported_file),
         "package_version": loaded.__version__,
-        "target_commit": _git_value(resolved_root, "rev-parse", "HEAD"),
-        "target_describe": _git_value(
-            resolved_root, "describe", "--always", "--dirty", "--tags"
-        ),
-        "target_dirty": bool(
-            _git_value(resolved_root, "status", "--porcelain", "--untracked-files=no")
-        ),
+        "target_commit": target_commit,
+        "target_describe": target_describe,
+        "target_dirty": False,
     }
 
 
 def collect_environment(
-    source_identity: dict[str, Any], *, environment_label: str | None = None
+    source_identity: dict[str, Any],
+    *,
+    environment_label: str | None = None,
+    requested_engine: str | None = None,
 ) -> dict[str, Any]:
     """Collect the reproducibility metadata shared by every result file."""
     try:
@@ -274,6 +421,7 @@ def collect_environment(
         "zlib_runtime_version": zlib.ZLIB_RUNTIME_VERSION,
         "zlib_ng_package_version": zlib_ng_version,
         "active_engines": aiogzip.engine_info().__dict__,
+        "requested_engine": requested_engine,
         "forced_engine": os.environ.get("AIOGZIP_ENGINE"),
         "uv_version": uv_version,
         "uv_lock_sha256": _file_sha256(
@@ -286,6 +434,14 @@ def collect_environment(
         "garbage_collection_enabled": gc.isenabled(),
         "garbage_collection_thresholds": list(gc.get_threshold()),
     }
+
+
+def _write_document(path: Path, document: dict[str, Any]) -> None:
+    """Atomically replace a benchmark checkpoint document."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
 
 
 async def main():
@@ -318,6 +474,11 @@ async def main():
         "--source-root",
         type=Path,
         help="Import aiogzip from this checkout's src directory and verify it",
+    )
+    parser.add_argument(
+        "--engine",
+        choices=ENGINE_CHOICES,
+        help="Require and record the active engine for an attested capture",
     )
     parser.add_argument(
         "--regression-profile",
@@ -363,39 +524,43 @@ async def main():
 
     source_identity = None
     environment = None
+    try:
+        requested_engine = _configure_requested_engine(
+            args.engine, source_root_supplied=args.source_root is not None
+        )
+    except ValueError as error:
+        parser.error(str(error))
     if args.source_root is not None:
         try:
             source_identity = configure_source_root(args.source_root)
         except (ValueError, RuntimeError, subprocess.CalledProcessError) as error:
             parser.error(str(error))
         environment = collect_environment(
-            source_identity, environment_label=args.environment_label
+            source_identity,
+            environment_label=args.environment_label,
+            requested_engine=requested_engine,
         )
+        try:
+            assert_requested_engine(
+                environment["active_engines"],
+                requested_engine,
+                source_label="benchmark source",
+                system_name=environment["os_name"],
+            )
+        except (ValueError, RuntimeError) as error:
+            parser.error(str(error))
+    elif requested_engine is not None:
+        try:
+            _verify_unattested_engine(requested_engine)
+        except (ValueError, RuntimeError) as error:
+            parser.error(str(error))
 
-    # Run benchmarks
-    all_results = []
-    for category in categories_to_run:
-        benchmark_options = None
-        if category == "regressions":
-            benchmark_options = {
-                "regression_profile": args.regression_profile or "quick",
-                "regression_mode": args.regression_mode or "throughput",
-            }
-        results = await run_category(
-            category,
-            data_size_mb=args.size,
-            repeat=args.repeat,
-            benchmark_options=benchmark_options,
-        )
-        if results:
-            all_results.extend(results)
-
-    # Save results if requested
-    if args.output and all_results:
-        output_path = Path(args.output)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        data = {
+    output_path = Path(args.output) if args.output else None
+    document: dict[str, Any] | None = None
+    if output_path is not None:
+        document = {
             "schema_version": 2,
+            "status": "running",
             "timestamp": time.time(),
             "categories": categories_to_run,
             "data_size_mb": args.size,
@@ -408,10 +573,75 @@ async def main():
             ),
             "source": source_identity,
             "environment": environment,
-            "results": [r.to_dict() for r in all_results],
+            "completed_categories": [],
+            "results": [],
         }
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+        _write_document(output_path, document)
+
+    # Run benchmarks
+    all_results = []
+    completed_categories: list[str] = []
+
+    def checkpoint_category_results(
+        category: str,
+        repeat_index: int,
+        repeat_count: int,
+        completed_repeats: list[list[BenchmarkResults]],
+        partial_results: list[BenchmarkResults],
+        persist: bool,
+    ) -> None:
+        if document is None or output_path is None:
+            return
+        document["in_progress_category"] = {
+            "name": category,
+            "repeat_index": repeat_index,
+            "repeat_count": repeat_count,
+            "completed_repeats": [
+                [result.to_dict() for result in results]
+                for results in completed_repeats
+            ],
+            "partial_results": [result.to_dict() for result in partial_results],
+        }
+        if persist:
+            _write_document(output_path, document)
+
+    try:
+        for category in categories_to_run:
+            benchmark_options = None
+            if category == "regressions":
+                benchmark_options = {
+                    "regression_profile": args.regression_profile or "quick",
+                    "regression_mode": args.regression_mode or "throughput",
+                }
+            results = await run_category(
+                category,
+                data_size_mb=args.size,
+                repeat=args.repeat,
+                benchmark_options=benchmark_options,
+                result_checkpoint=checkpoint_category_results,
+            )
+            if results:
+                all_results.extend(results)
+            completed_categories.append(category)
+            if document is not None and output_path is not None:
+                document.pop("in_progress_category", None)
+                document["results"] = [result.to_dict() for result in all_results]
+                document["completed_categories"] = list(completed_categories)
+                _write_document(output_path, document)
+    except BaseException as error:
+        if document is not None and output_path is not None:
+            document["status"] = "failed"
+            document["failure"] = {
+                "type": type(error).__name__,
+                "message": str(error),
+            }
+            _write_document(output_path, document)
+        raise
+
+    if document is not None and output_path is not None:
+        document["status"] = "complete"
+        document["completed_at"] = time.time()
+        _write_document(output_path, document)
         print(f"\nResults saved to {output_path}")
 
     print(f"\n{'=' * 60}")

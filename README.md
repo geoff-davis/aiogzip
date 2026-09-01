@@ -21,8 +21,10 @@ iteration remains faster with synchronous `gzip`. See
 pip install aiogzip
 ```
 
-The 2.0 alpha series requires Python 3.11 or newer. Python 3.8 through 3.10
-users should remain on the latest compatible 1.x release.
+aiogzip 2.0 requires Python 3.11 or newer. Python 3.8 through 3.10 users should
+remain on the latest compatible 1.x release. The 2.0 beta is a prerelease; see
+the [stability policy](https://geoff-davis.github.io/aiogzip/stability/) for
+its compatibility guarantees and non-guarantees.
 
 ## Text-mode quickstart
 
@@ -79,8 +81,9 @@ the consumer exits early. See the
 [async-iterable streaming guide](https://geoff-davis.github.io/aiogzip/streaming/)
 for backpressure, limits, cancellation, metadata, and lifecycle behavior.
 
-For synchronous custom transports, the provisional 2.0 alpha codec performs
-gzip framing and validation without I/O or executor offload:
+For synchronous custom transports, the public 2.0 codec performs gzip framing
+and validation without I/O or executor offload. Its API is frozen for 2.0 as
+of `2.0.0b1`:
 
 ```python
 import aiogzip

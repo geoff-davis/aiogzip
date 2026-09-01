@@ -1,7 +1,8 @@
 # ADR: One synchronous sans-I/O gzip codec
 
-**Status:** Decided for the 2.0 alpha series (2026-07-22); bounded buffering
-amendment accepted for `2.0.0a2` (2026-07-26)
+**Status:** Accepted and frozen for 2.0 at `2.0.0b1` (2026-08-31); original
+decision recorded 2026-07-22 and bounded-buffering amendment accepted for
+`2.0.0a2` on 2026-07-26
 
 ## Context
 
@@ -11,9 +12,11 @@ member traversal, limits, and engine bookkeeping aligned across those paths is
 difficult. It also prevents users from applying aiogzip's gzip behavior to
 transports other than files and asynchronous iterables.
 
-The 2.0 alpha needs one reusable core without taking ownership of I/O or an
-event loop. The public API is provisional during the alpha series; the existing
-high-level asyncio APIs retain their normal compatibility expectations.
+During the alpha series, 2.0 needed one reusable core without taking ownership
+of I/O or an event loop. Transport-integration feedback validated the selected
+surface, which became part of the beta-frozen 2.0 public API at `2.0.0b1`.
+The existing high-level asyncio APIs retain their normal compatibility
+expectations.
 
 ## Decision
 
@@ -27,7 +30,7 @@ The codec performs no file, socket, or asynchronous I/O. It does not import
 `asyncio` or `aiofiles`, schedule executor work, or create background tasks.
 Async wrappers retain responsibility for sources and sinks, executor policy,
 cancellation, buffering, seeking, and text handling. Raw DEFLATE, AnyIO/Trio,
-ISA-L, and indexed seeking are outside this alpha.
+ISA-L, and indexed seeking are outside this 2.0 decision.
 
 ## Lazy operations and ownership
 
@@ -181,15 +184,16 @@ re-raising `CancelledError`. No replacement operation may race the old worker,
 and cleanup failures must not replace the original cancellation or source
 exception.
 
-## Fallback if alpha feedback rejects iterator ownership
+## Rejected bounded alternative
 
 The bounded alternative is a pull-style operation object with an explicit
 `next_chunk()` method and mandatory `close()`/context-manager lifecycle. It
 would keep codec-owned reservation tokens, snapshot semantics, output bounds,
 and deterministic abandonment behavior while making ownership more visible.
 It would not be replaced with eager lists, background queues, or unbounded
-accumulation. Such an API change is eligible for a later alpha, before the
-codec surface becomes stable.
+accumulation. Alpha feedback did not require this incompatible alternative,
+so it was rejected when the selected iterator surface was frozen at
+`2.0.0b1`.
 
 ## Consequences
 

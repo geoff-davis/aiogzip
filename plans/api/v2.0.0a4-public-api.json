@@ -1,0 +1,2365 @@
+{
+  "classes": {
+    "AsyncGzipBinaryFile": {
+      "constructor": {
+        "parameters": [
+          {
+            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "filename"
+          },
+          {
+            "annotation": "str",
+            "default": {
+              "kind": "value",
+              "value": "rb"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "mode"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 262144
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "chunk_size"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 6
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "compresslevel"
+          },
+          {
+            "annotation": "Union[int, float, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "mtime"
+          },
+          {
+            "annotation": "Union[str, bytes, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "original_filename"
+          },
+          {
+            "annotation": "Union[aiogzip.WithAsyncRead, aiogzip.WithAsyncWrite, aiogzip.WithAsyncReadWrite, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "fileobj"
+          },
+          {
+            "annotation": "Optional[bool]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "closefd"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "max_decompressed_size"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": 134217728
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "max_rewind_cache_size"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "strict_size"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "fast_compress"
+          }
+        ],
+        "return": "None"
+      },
+      "members": {
+        "__aenter__": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "AsyncGzipBinaryFile"
+          }
+        },
+        "__aexit__": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "Optional[type]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "exc_type"
+              },
+              {
+                "annotation": "Optional[BaseException]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "exc_val"
+              },
+              {
+                "annotation": "Optional[Any]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "exc_tb"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "__aiter__": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "AsyncGzipBinaryFile"
+          }
+        },
+        "__anext__": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "bytes"
+          }
+        },
+        "close": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "closed": {
+          "kind": "property",
+          "return": "bool"
+        },
+        "detach": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "Any"
+          }
+        },
+        "fileno": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "flush": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "isatty": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "bool"
+          }
+        },
+        "mtime": {
+          "kind": "property",
+          "return": "Optional[int]"
+        },
+        "name": {
+          "kind": "property",
+          "return": "Union[str, bytes, pathlib.Path, NoneType]"
+        },
+        "open": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "AsyncGzipBinaryFile"
+          }
+        },
+        "peek": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": -1
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "size"
+              }
+            ],
+            "return": "bytes"
+          }
+        },
+        "raw": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "Any"
+          }
+        },
+        "read": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": -1
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "size"
+              }
+            ],
+            "return": "bytes"
+          }
+        },
+        "read1": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": -1
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "size"
+              }
+            ],
+            "return": "bytes"
+          }
+        },
+        "readable": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "bool"
+          }
+        },
+        "readinto": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "Union[bytearray, memoryview]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "b"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "readinto1": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "Union[bytearray, memoryview]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "b"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "readline": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": -1
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "limit"
+              }
+            ],
+            "return": "bytes"
+          }
+        },
+        "readlines": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": -1
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "hint"
+              }
+            ],
+            "return": "List[bytes]"
+          }
+        },
+        "rewind": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "seek": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "offset"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": 0
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "whence"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "seekable": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "bool"
+          }
+        },
+        "tell": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "truncate": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "Optional[int]",
+                "default": {
+                  "kind": "value",
+                  "value": null
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "size"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "writable": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "bool"
+          }
+        },
+        "write": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "Union[bytes, bytearray, memoryview]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "data"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "writelines": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "Iterable[bytes]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "lines"
+              }
+            ],
+            "return": "None"
+          }
+        }
+      }
+    },
+    "AsyncGzipTextFile": {
+      "constructor": {
+        "parameters": [
+          {
+            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "filename"
+          },
+          {
+            "annotation": "str",
+            "default": {
+              "kind": "value",
+              "value": "rt"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "mode"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 262144
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "chunk_size"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": {
+              "kind": "value",
+              "value": "utf-8"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "encoding"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": {
+              "kind": "value",
+              "value": "strict"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "errors"
+          },
+          {
+            "annotation": "Optional[str]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "newline"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 6
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "compresslevel"
+          },
+          {
+            "annotation": "Union[int, float, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "mtime"
+          },
+          {
+            "annotation": "Union[str, bytes, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "original_filename"
+          },
+          {
+            "annotation": "Union[aiogzip.WithAsyncRead, aiogzip.WithAsyncWrite, aiogzip.WithAsyncReadWrite, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "fileobj"
+          },
+          {
+            "annotation": "Optional[bool]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "closefd"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "max_decompressed_size"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": 134217728
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "max_rewind_cache_size"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "strict_size"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "fast_compress"
+          }
+        ],
+        "return": "None"
+      },
+      "members": {
+        "__aenter__": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "AsyncGzipTextFile"
+          }
+        },
+        "__aexit__": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "Optional[type]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "exc_type"
+              },
+              {
+                "annotation": "Optional[BaseException]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "exc_val"
+              },
+              {
+                "annotation": "Optional[Any]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "exc_tb"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "__aiter__": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "AsyncGzipTextFile"
+          }
+        },
+        "__anext__": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "str"
+          }
+        },
+        "buffer": {
+          "kind": "property",
+          "return": "aiogzip.AsyncGzipBinaryFile"
+        },
+        "close": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "closed": {
+          "kind": "property",
+          "return": "bool"
+        },
+        "detach": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "Any"
+          }
+        },
+        "encoding": {
+          "kind": "property",
+          "return": "str"
+        },
+        "errors": {
+          "kind": "property",
+          "return": "str"
+        },
+        "fileno": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "flush": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "isatty": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "bool"
+          }
+        },
+        "iter_batches": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": 1048576
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "hint"
+              }
+            ],
+            "return": "AsyncIterator[List[str]]"
+          }
+        },
+        "mtime": {
+          "kind": "property",
+          "return": "Optional[int]"
+        },
+        "name": {
+          "kind": "property",
+          "return": "Union[str, bytes, pathlib.Path, NoneType]"
+        },
+        "newlines": {
+          "kind": "property",
+          "return": "Union[str, Tuple[str, ...], NoneType]"
+        },
+        "open": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "AsyncGzipTextFile"
+          }
+        },
+        "raw": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "Any"
+          }
+        },
+        "read": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": -1
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "size"
+              }
+            ],
+            "return": "str"
+          }
+        },
+        "readable": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "bool"
+          }
+        },
+        "readline": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": -1
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "limit"
+              }
+            ],
+            "return": "str"
+          }
+        },
+        "readlines": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": -1
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "hint"
+              }
+            ],
+            "return": "List[str]"
+          }
+        },
+        "seek": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "offset"
+              },
+              {
+                "annotation": "int",
+                "default": {
+                  "kind": "value",
+                  "value": 0
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "whence"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "seekable": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "bool"
+          }
+        },
+        "tell": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "truncate": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "Optional[int]",
+                "default": {
+                  "kind": "value",
+                  "value": null
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "size"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "writable": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "bool"
+          }
+        },
+        "write": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "str",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "data"
+              }
+            ],
+            "return": "int"
+          }
+        },
+        "writelines": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "Iterable[str]",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "lines"
+              }
+            ],
+            "return": "None"
+          }
+        }
+      }
+    },
+    "GzipDecoder": {
+      "constructor": {
+        "parameters": [
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 262144
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "output_chunk_size"
+          },
+          {
+            "annotation": "int | None",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_decompressed_size"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "collect_member_info"
+          }
+        ],
+        "return": "None"
+      },
+      "members": {
+        "compressed_size": {
+          "kind": "property",
+          "return": "int"
+        },
+        "discard": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "feed": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "bytes",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "data"
+              }
+            ],
+            "return": "CodecOperation"
+          }
+        },
+        "finish": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "CodecOperation"
+          }
+        },
+        "finished": {
+          "kind": "property",
+          "return": "bool"
+        },
+        "member_count": {
+          "kind": "property",
+          "return": "int"
+        },
+        "members": {
+          "kind": "property",
+          "return": "tuple[GzipMemberInfo, ...]"
+        },
+        "uncompressed_size": {
+          "kind": "property",
+          "return": "int"
+        }
+      }
+    },
+    "GzipEncoder": {
+      "constructor": {
+        "parameters": [
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 6
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "compresslevel"
+          },
+          {
+            "annotation": "int | float | None",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "mtime"
+          },
+          {
+            "annotation": "str | bytes | None",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "original_filename"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "fast_compress"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "strict_size"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 262144
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "output_chunk_size"
+          }
+        ],
+        "return": "None"
+      },
+      "members": {
+        "crc32": {
+          "kind": "property",
+          "return": "int"
+        },
+        "discard": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "feed": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "bytes",
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "data"
+              }
+            ],
+            "return": "CodecOperation"
+          }
+        },
+        "finish": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "CodecOperation"
+          }
+        },
+        "finished": {
+          "kind": "property",
+          "return": "bool"
+        },
+        "flush": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "CodecOperation"
+          }
+        },
+        "input_size": {
+          "kind": "property",
+          "return": "int"
+        },
+        "start": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "CodecOperation"
+          }
+        },
+        "started": {
+          "kind": "property",
+          "return": "bool"
+        }
+      }
+    },
+    "GzipInfo": {
+      "constructor": {
+        "parameters": [
+          {
+            "annotation": "tuple[aiogzip.GzipMemberInfo, ...]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "members"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "compressed_size"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "uncompressed_size"
+          }
+        ],
+        "return": "None"
+      },
+      "members": {
+        "member_count": {
+          "kind": "property",
+          "return": "int"
+        }
+      }
+    }
+  },
+  "constants": {
+    "GZIP_FLAG_FCOMMENT": 16,
+    "GZIP_FLAG_FEXTRA": 4,
+    "GZIP_FLAG_FHCRC": 2,
+    "GZIP_FLAG_FNAME": 8,
+    "GZIP_METHOD_DEFLATE": 8,
+    "GZIP_OS_UNKNOWN": 255,
+    "GZIP_WBITS": 31
+  },
+  "dataclasses": {
+    "EngineInfo": {
+      "fields": [
+        {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          },
+          "name": "compression"
+        },
+        {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          },
+          "name": "decompression"
+        },
+        {
+          "annotation": "str",
+          "default": {
+            "kind": "value",
+            "value": "stdlib-zlib"
+          },
+          "name": "crc32"
+        }
+      ],
+      "frozen": true,
+      "slots": false
+    },
+    "GzipInfo": {
+      "fields": [
+        {
+          "annotation": "tuple[aiogzip.GzipMemberInfo, ...]",
+          "default": {
+            "kind": "required"
+          },
+          "name": "members"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "compressed_size"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "uncompressed_size"
+        }
+      ],
+      "frozen": true,
+      "slots": false
+    },
+    "GzipMemberInfo": {
+      "fields": [
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "index"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "compressed_offset"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "compressed_size"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "uncompressed_size"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "mtime"
+        },
+        {
+          "annotation": "str | None",
+          "default": {
+            "kind": "required"
+          },
+          "name": "original_filename"
+        },
+        {
+          "annotation": "str | None",
+          "default": {
+            "kind": "required"
+          },
+          "name": "comment"
+        },
+        {
+          "annotation": "bytes | None",
+          "default": {
+            "kind": "required"
+          },
+          "name": "extra"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "flags"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "crc32"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "trailer_isize"
+        }
+      ],
+      "frozen": true,
+      "slots": false
+    },
+    "VerificationResult": {
+      "fields": [
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "member_count"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "compressed_size"
+        },
+        {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          },
+          "name": "uncompressed_size"
+        }
+      ],
+      "frozen": true,
+      "slots": false
+    }
+  },
+  "exceptions": {
+    "ConcurrentOperationError": {
+      "direct_bases": [
+        "OSError"
+      ]
+    }
+  },
+  "functions": {
+    "AsyncGzipFile": {
+      "kind": "function",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "filename"
+          },
+          {
+            "annotation": "str",
+            "default": {
+              "kind": "value",
+              "value": "rb"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "mode"
+          },
+          {
+            "annotation": "Any",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "VAR_KEYWORD",
+            "name": "kwargs"
+          }
+        ],
+        "return": "Union[aiogzip.AsyncGzipBinaryFile, aiogzip.AsyncGzipTextFile]"
+      }
+    },
+    "compress_chunks": {
+      "kind": "function",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "AsyncIterable[bytes]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "source"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 6
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "compresslevel"
+          },
+          {
+            "annotation": "Union[int, float, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "mtime"
+          },
+          {
+            "annotation": "Union[str, bytes, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "original_filename"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "fast_compress"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "strict_size"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 262144
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "output_chunk_size"
+          }
+        ],
+        "return": "AsyncIterator[bytes]"
+      }
+    },
+    "decompress_chunks": {
+      "kind": "function",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "AsyncIterable[bytes]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "source"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 262144
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "output_chunk_size"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_decompressed_size"
+          }
+        ],
+        "return": "AsyncIterator[bytes]"
+      }
+    },
+    "engine_info": {
+      "kind": "function",
+      "signature": {
+        "parameters": [],
+        "return": "aiogzip.EngineInfo"
+      }
+    },
+    "inspect": {
+      "kind": "coroutine_function",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "filename"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 262144
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "chunk_size"
+          },
+          {
+            "annotation": "Union[aiogzip.WithAsyncRead, aiogzip.WithAsyncReadWrite, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "fileobj"
+          },
+          {
+            "annotation": "Optional[bool]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "closefd"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_decompressed_size"
+          }
+        ],
+        "return": "aiogzip.GzipInfo"
+      }
+    },
+    "open": {
+      "kind": "function",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "filename"
+          },
+          {
+            "annotation": "str",
+            "default": {
+              "kind": "value",
+              "value": "rb"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "mode"
+          },
+          {
+            "annotation": "Any",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "VAR_KEYWORD",
+            "name": "kwargs"
+          }
+        ],
+        "return": "Union[aiogzip.AsyncGzipBinaryFile, aiogzip.AsyncGzipTextFile]"
+      }
+    },
+    "read": {
+      "kind": "coroutine_function",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "filename"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 262144
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "chunk_size"
+          },
+          {
+            "annotation": "Union[aiogzip.WithAsyncRead, aiogzip.WithAsyncReadWrite, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "fileobj"
+          },
+          {
+            "annotation": "Optional[bool]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "closefd"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_decompressed_size"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": 134217728
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_rewind_cache_size"
+          }
+        ],
+        "return": "bytes"
+      }
+    },
+    "verify": {
+      "kind": "coroutine_function",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "filename"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 262144
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "chunk_size"
+          },
+          {
+            "annotation": "Union[aiogzip.WithAsyncRead, aiogzip.WithAsyncReadWrite, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "fileobj"
+          },
+          {
+            "annotation": "Optional[bool]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "closefd"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_decompressed_size"
+          }
+        ],
+        "return": "aiogzip.VerificationResult"
+      }
+    },
+    "write": {
+      "kind": "coroutine_function",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "filename"
+          },
+          {
+            "annotation": "Union[bytes, bytearray, memoryview]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "data"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 262144
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "chunk_size"
+          },
+          {
+            "annotation": "int",
+            "default": {
+              "kind": "value",
+              "value": 6
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "compresslevel"
+          },
+          {
+            "annotation": "Union[int, float, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "mtime"
+          },
+          {
+            "annotation": "Union[str, bytes, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "original_filename"
+          },
+          {
+            "annotation": "Union[aiogzip.WithAsyncWrite, aiogzip.WithAsyncReadWrite, NoneType]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "fileobj"
+          },
+          {
+            "annotation": "Optional[bool]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "closefd"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "strict_size"
+          },
+          {
+            "annotation": "bool",
+            "default": {
+              "kind": "value",
+              "value": false
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "fast_compress"
+          }
+        ],
+        "return": "None"
+      }
+    }
+  },
+  "modules": {
+    "aiogzip": {
+      "exports": [
+        "AsyncGzipBinaryFile",
+        "AsyncGzipFile",
+        "AsyncGzipTextFile",
+        "CodecOperation",
+        "ConcurrentOperationError",
+        "EngineInfo",
+        "GZIP_FLAG_FCOMMENT",
+        "GZIP_FLAG_FEXTRA",
+        "GZIP_FLAG_FHCRC",
+        "GZIP_FLAG_FNAME",
+        "GZIP_METHOD_DEFLATE",
+        "GZIP_OS_UNKNOWN",
+        "GZIP_WBITS",
+        "GzipDecoder",
+        "GzipEncoder",
+        "GzipInfo",
+        "GzipMemberInfo",
+        "VerificationResult",
+        "WithAsyncRead",
+        "WithAsyncReadWrite",
+        "WithAsyncWrite",
+        "ZlibEngine",
+        "__version__",
+        "compress_chunks",
+        "decompress_chunks",
+        "engine_info",
+        "inspect",
+        "open",
+        "read",
+        "verify",
+        "write"
+      ]
+    },
+    "aiogzip.codec": {
+      "exports": [
+        "CodecOperation",
+        "GzipDecoder",
+        "GzipEncoder"
+      ]
+    }
+  },
+  "non_guarantees": [
+    "engine_info string values",
+    "literal __version__ value",
+    "private modules and members",
+    "complete dynamic exception messages",
+    "example CLI and output wording"
+  ],
+  "package": "aiogzip",
+  "protocols": {
+    "CodecOperation": {
+      "members": [
+        "__iter__",
+        "__next__",
+        "close"
+      ],
+      "runtime_checkable": false
+    },
+    "WithAsyncRead": {
+      "members": [
+        "read"
+      ],
+      "runtime_checkable": true
+    },
+    "WithAsyncReadWrite": {
+      "members": [
+        "read",
+        "write",
+        "close"
+      ],
+      "runtime_checkable": true
+    },
+    "WithAsyncWrite": {
+      "members": [
+        "write"
+      ],
+      "runtime_checkable": true
+    }
+  },
+  "release_line": "2.0",
+  "schema_version": 1,
+  "stable_message_prefixes": [
+    "decompressed output exceeded max_decompressed_size"
+  ],
+  "typing_aliases": {
+    "ZlibEngine": "Any"
+  },
+  "version": {
+    "present": true,
+    "type": "str"
+  }
+}
