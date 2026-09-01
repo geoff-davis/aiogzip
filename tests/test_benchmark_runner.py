@@ -19,6 +19,7 @@ BENCHMARKS_DIR = Path(__file__).resolve().parents[1] / "benchmarks"
 sys.path.insert(0, str(BENCHMARKS_DIR))
 bench_common = importlib.import_module("bench_common")
 run_benchmarks = importlib.import_module("run_benchmarks")
+bench_compare = importlib.import_module("bench_compare")
 bench_streaming = importlib.import_module("bench_streaming")
 bench_codec_regressions = importlib.import_module("bench_codec_regressions")
 bench_a3_regressions = importlib.import_module("bench_a3_regressions")
@@ -27,12 +28,14 @@ investigate_b1_timing = importlib.import_module("investigate_b1_timing")
 verify_a3_writes = importlib.import_module("verify_a3_writes")
 verify_a3_headers = importlib.import_module("verify_a3_headers")
 BenchmarkResults = bench_common.BenchmarkResults
+BenchmarkBase = bench_common.BenchmarkBase
 COMPARISON_COMPRESSLEVEL = bench_common.COMPARISON_COMPRESSLEVEL
 DataGenerator = bench_common.DataGenerator
 median_results = bench_common.median_results
 positive_int = run_benchmarks.positive_int
 configure_source_root = run_benchmarks.configure_source_root
 cpu_tuning = run_benchmarks._cpu_tuning
+assert_requested_engine = run_benchmarks.assert_requested_engine
 write_comparison_fixture = bench_common.write_comparison_fixture
 StreamingBenchmarks = bench_streaming.StreamingBenchmarks
 RegressionsBenchmarks = bench_codec_regressions.RegressionsBenchmarks
@@ -127,7 +130,7 @@ def test_positive_int_rejects_nonpositive_values(value):
         positive_int(value)
 
 
-def test_b1_investigation_rejects_requested_engine_mismatch():
+def test_b1_investigation_rejects_requested_engine_mismatch(monkeypatch):
     from aiogzip import EngineInfo
 
     stdlib = SimpleNamespace(
@@ -142,6 +145,13 @@ def test_b1_investigation_rejects_requested_engine_mismatch():
             compression="stdlib-zlib",
             decompression="zlib-ng",
             crc32="zlib-ng",
+        )
+    )
+    zlib_ng_with_stdlib_crc = SimpleNamespace(
+        engine_info=lambda: EngineInfo(
+            compression="stdlib-zlib",
+            decompression="zlib-ng",
+            crc32="stdlib-zlib",
         )
     )
 
@@ -159,6 +169,50 @@ def test_b1_investigation_rejects_requested_engine_mismatch():
         b1_assert_requested_engine(stdlib, "zlib-ng", source_label="test")
     with pytest.raises(RuntimeError, match="stdlib was requested"):
         b1_assert_requested_engine(zlib_ng, "stdlib", source_label="test")
+    with pytest.raises(RuntimeError, match="crc32"):
+        b1_assert_requested_engine(
+            zlib_ng_with_stdlib_crc, "zlib-ng", source_label="test"
+        )
+
+    monkeypatch.setattr(run_benchmarks.platform, "system", lambda: "Darwin")
+    assert (
+        b1_assert_requested_engine(
+            zlib_ng_with_stdlib_crc, "zlib-ng", source_label="test"
+        )["crc32"]
+        == "stdlib-zlib"
+    )
+
+
+def test_shared_engine_guard_checks_each_field():
+    engines = {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng",
+        "crc32": "zlib-ng",
+    }
+
+    assert_requested_engine(
+        engines, "zlib-ng", source_label="test", system_name="Linux"
+    )
+    with pytest.raises(RuntimeError, match="decompression"):
+        assert_requested_engine(
+            {**engines, "decompression": "stdlib-zlib"},
+            "zlib-ng",
+            source_label="test",
+            system_name="Linux",
+        )
+    with pytest.raises(RuntimeError, match="crc32"):
+        assert_requested_engine(
+            {**engines, "crc32": "stdlib-zlib"},
+            "zlib-ng",
+            source_label="test",
+            system_name="Linux",
+        )
+    assert_requested_engine(
+        {**engines, "crc32": "stdlib-zlib"},
+        "zlib-ng",
+        source_label="test",
+        system_name="Darwin",
+    )
 
 
 def test_b1_investigation_attests_clean_source_before_timing(tmp_path, monkeypatch):
@@ -948,15 +1002,48 @@ async def test_a4_supplement_validates_concurrent_independent_reads(tmp_path):
     ]
 
 
-def test_source_root_attestation_identifies_current_checkout():
+def test_source_root_attestation_identifies_current_checkout(monkeypatch):
     repository_root = BENCHMARKS_DIR.parent
+
+    def fake_git(_root, *args):
+        if args == ("rev-parse", "HEAD"):
+            return "abc123"
+        if args == ("describe", "--always", "--dirty", "--tags"):
+            return "v2.0.0b1-test"
+        if args == ("status", "--porcelain", "--untracked-files=no"):
+            return ""
+        raise AssertionError(args)
+
+    monkeypatch.setattr(run_benchmarks, "_git_value", fake_git)
 
     identity = configure_source_root(repository_root)
 
     assert identity["source_root"] == str(repository_root.resolve())
     assert Path(identity["aiogzip_file"]).is_relative_to(repository_root / "src")
-    assert identity["target_commit"]
+    assert identity["target_commit"] == "abc123"
+    assert identity["target_describe"] == "v2.0.0b1-test"
+    assert identity["target_dirty"] is False
     assert identity["package_version"]
+
+
+def test_source_root_attestation_rejects_dirty_tree_before_import(
+    tmp_path, monkeypatch
+):
+    package_init = tmp_path / "src" / "aiogzip" / "__init__.py"
+    package_init.parent.mkdir(parents=True)
+    package_init.write_text(
+        "raise AssertionError('must not import')\n", encoding="utf-8"
+    )
+
+    def fake_git(_root, *args):
+        if args == ("status", "--porcelain", "--untracked-files=no"):
+            return " M src/aiogzip/__init__.py"
+        return "abc123"
+
+    monkeypatch.setattr(run_benchmarks, "_git_value", fake_git)
+
+    with pytest.raises(RuntimeError, match="tracked changes"):
+        configure_source_root(tmp_path)
 
 
 def test_cpu_tuning_reads_linux_sysfs(tmp_path, monkeypatch):
@@ -1007,6 +1094,197 @@ def test_regression_flags_require_category_and_source_root(monkeypatch, argument
 
     with pytest.raises(SystemExit, match="2"):
         asyncio.run(run_benchmarks.main())
+
+
+def test_release_capture_requires_explicit_engine(monkeypatch, tmp_path):
+    monkeypatch.delenv("AIOGZIP_ENGINE", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_benchmarks.py",
+            "--category",
+            "regressions",
+            "--source-root",
+            str(tmp_path),
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="2"):
+        asyncio.run(run_benchmarks.main())
+
+
+def test_main_checkpoints_completed_categories_on_late_failure(tmp_path, monkeypatch):
+    output = tmp_path / "capture.json"
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    monkeypatch.setenv("AIOGZIP_ENGINE", "stdlib")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_benchmarks.py",
+            "--category",
+            "io,memory",
+            "--source-root",
+            str(source_root),
+            "--output",
+            str(output),
+        ],
+    )
+    identity = {
+        "source_root": str(source_root),
+        "target_commit": "abc123",
+        "target_describe": "abc123",
+        "target_dirty": False,
+    }
+    environment = {
+        **identity,
+        "os_name": "Linux",
+        "forced_engine": "stdlib",
+        "active_engines": {
+            "compression": "stdlib-zlib",
+            "decompression": "stdlib-zlib",
+            "crc32": "stdlib-zlib",
+        },
+    }
+    monkeypatch.setattr(run_benchmarks, "configure_source_root", lambda _root: identity)
+    monkeypatch.setattr(
+        run_benchmarks,
+        "collect_environment",
+        lambda _identity, *, environment_label: environment,
+    )
+
+    async def fake_run_category(category, **_kwargs):
+        if category == "memory":
+            raise RuntimeError("controlled late failure")
+        return [_result("completed io", 1.0, "checkpoint")]
+
+    monkeypatch.setattr(run_benchmarks, "run_category", fake_run_category)
+
+    with pytest.raises(RuntimeError, match="controlled late failure"):
+        asyncio.run(run_benchmarks.main())
+
+    capture = json.loads(output.read_text(encoding="utf-8"))
+    assert capture["status"] == "failed"
+    assert capture["completed_categories"] == ["io"]
+    assert [result["name"] for result in capture["results"]] == ["completed io"]
+    assert capture["failure"] == {
+        "type": "RuntimeError",
+        "message": "controlled late failure",
+    }
+    assert not (tmp_path / ".capture.json.tmp").exists()
+
+
+def test_run_category_checkpoints_each_completed_result(monkeypatch):
+    class PartialBenchmarks(BenchmarkBase):
+        async def run_all(self):
+            self.add_result("first row", "partial", 1.0)
+            raise RuntimeError("failure after first row")
+
+    module = SimpleNamespace(PartialBenchmarks=PartialBenchmarks)
+    monkeypatch.setitem(run_benchmarks.CATEGORIES, "partial", "bench_partial")
+    monkeypatch.setattr(
+        run_benchmarks.importlib,
+        "import_module",
+        lambda name: (
+            module if name == "bench_partial" else importlib.import_module(name)
+        ),
+    )
+    snapshots = []
+
+    with pytest.raises(RuntimeError, match="failure after first row"):
+        asyncio.run(
+            run_benchmarks.run_category(
+                "partial",
+                result_checkpoint=lambda category, index, count, completed, partial, persist: (
+                    snapshots.append(
+                        (
+                            category,
+                            index,
+                            count,
+                            [
+                                [result.name for result in results]
+                                for results in completed
+                            ],
+                            [result.name for result in partial],
+                            persist,
+                        )
+                    )
+                ),
+            )
+        )
+
+    assert snapshots == [
+        ("partial", 1, 3, [], [], True),
+        ("partial", 1, 3, [], ["first row"], False),
+    ]
+
+
+def _comparison_capture(
+    commit: str,
+    *,
+    engine: str = "stdlib",
+    schema_version: int = 2,
+    dirty: bool = False,
+) -> dict:
+    active_engines = {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng" if engine == "zlib-ng" else "stdlib-zlib",
+        "crc32": "zlib-ng" if engine == "zlib-ng" else "stdlib-zlib",
+    }
+    source = {
+        "target_commit": commit,
+        "target_describe": commit,
+        "target_dirty": dirty,
+    }
+    return {
+        "schema_version": schema_version,
+        "status": "complete",
+        "source": source,
+        "environment": {
+            **source,
+            "os_name": "Linux",
+            "forced_engine": engine,
+            "active_engines": active_engines,
+        },
+        "results": [{"name": "row", "duration": 1.0 if commit == "before" else 1.01}],
+    }
+
+
+def test_compare_results_validates_and_prints_capture_provenance(capsys):
+    bench_compare.compare_results(
+        _comparison_capture("before"), _comparison_capture("after")
+    )
+
+    output = capsys.readouterr().out
+    assert "Baseline source: before (before)" in output
+    assert "Current source:  after (after)" in output
+    assert "Engine: stdlib" in output
+
+
+def test_compare_results_rejects_schema_mismatch():
+    with pytest.raises(ValueError, match="schema mismatch"):
+        bench_compare.compare_results(
+            _comparison_capture("before"),
+            _comparison_capture("after", schema_version=1),
+        )
+
+
+def test_compare_results_rejects_engine_mismatch():
+    with pytest.raises(ValueError, match="requested_engine mismatch"):
+        bench_compare.compare_results(
+            _comparison_capture("before"),
+            _comparison_capture("after", engine="zlib-ng"),
+        )
+
+
+def test_compare_results_rejects_dirty_source():
+    with pytest.raises(ValueError, match="clean source tree"):
+        bench_compare.compare_results(
+            _comparison_capture("before", dirty=True),
+            _comparison_capture("after"),
+        )
 
 
 def test_quick_regression_output_matrix_validates_outputs():

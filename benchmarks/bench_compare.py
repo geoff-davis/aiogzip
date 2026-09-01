@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
+from run_benchmarks import assert_requested_engine
+
 
 def load_results(filepath: Path) -> Dict[str, Any]:
     """Load benchmark results from JSON file."""
@@ -19,11 +21,92 @@ def load_results(filepath: Path) -> Dict[str, Any]:
         return json.load(f)
 
 
+def _capture_identity(capture: dict[str, Any], label: str) -> dict[str, Any]:
+    if capture.get("status") != "complete":
+        raise ValueError(f"{label} capture is not complete")
+    source = capture.get("source")
+    environment = capture.get("environment")
+    if not isinstance(source, dict) or not isinstance(environment, dict):
+        raise ValueError(f"{label} capture lacks source/environment provenance")
+
+    commit = source.get("target_commit")
+    describe = source.get("target_describe")
+    if not isinstance(commit, str) or not commit:
+        raise ValueError(f"{label} capture lacks a source commit")
+    if not isinstance(describe, str) or not describe:
+        raise ValueError(f"{label} capture lacks a source description")
+    if source.get("target_dirty") is not False:
+        raise ValueError(f"{label} capture does not attest a clean source tree")
+    for field in ("target_commit", "target_describe", "target_dirty"):
+        if environment.get(field) != source[field]:
+            raise ValueError(
+                f"{label} capture has inconsistent source/environment {field}"
+            )
+
+    requested = environment.get("forced_engine")
+    if requested not in {"stdlib", "zlib-ng"}:
+        raise ValueError(f"{label} capture lacks an explicit requested engine")
+    engines = environment.get("active_engines")
+    if not isinstance(engines, dict):
+        raise ValueError(f"{label} capture lacks active engine provenance")
+    system_name = environment.get("os_name")
+    if not isinstance(system_name, str) or not system_name:
+        raise ValueError(f"{label} capture lacks operating-system provenance")
+    assert_requested_engine(
+        engines,
+        requested,
+        source_label=f"{label} capture",
+        system_name=system_name,
+    )
+    return {
+        "commit": commit,
+        "describe": describe,
+        "requested_engine": requested,
+        "active_engines": engines,
+        "system_name": system_name,
+    }
+
+
+def _validate_capture_pair(
+    baseline: dict[str, Any], current: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    baseline_schema = baseline.get("schema_version")
+    current_schema = current.get("schema_version")
+    if baseline_schema != current_schema:
+        raise ValueError(
+            "capture schema mismatch: "
+            f"baseline={baseline_schema!r}, current={current_schema!r}"
+        )
+    if baseline_schema != 2:
+        raise ValueError(f"unsupported benchmark capture schema: {baseline_schema!r}")
+
+    baseline_identity = _capture_identity(baseline, "baseline")
+    current_identity = _capture_identity(current, "current")
+    for field in ("requested_engine", "active_engines", "system_name"):
+        if baseline_identity[field] != current_identity[field]:
+            raise ValueError(
+                f"capture {field} mismatch: "
+                f"baseline={baseline_identity[field]!r}, "
+                f"current={current_identity[field]!r}"
+            )
+    return baseline_identity, current_identity
+
+
 def compare_results(baseline: dict, current: dict) -> None:
     """Compare two sets of benchmark results."""
+    baseline_identity, current_identity = _validate_capture_pair(baseline, current)
     print(f"\n{'=' * 70}")
     print("BENCHMARK COMPARISON")
     print(f"{'=' * 70}")
+    print(
+        f"Baseline source: {baseline_identity['describe']} "
+        f"({baseline_identity['commit']})"
+    )
+    print(
+        f"Current source:  {current_identity['describe']} "
+        f"({current_identity['commit']})"
+    )
+    print(f"Engine: {baseline_identity['requested_engine']}")
 
     # Create lookup dictionaries by benchmark name
     baseline_results = {r["name"]: r for r in baseline.get("results", [])}

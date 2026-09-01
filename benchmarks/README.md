@@ -132,11 +132,18 @@ individual duration samples, median absolute deviation, fixture hashes, source
 item statistics, the resolved package file and commit, Python/OS/engine
 details, the lockfile hash, and the regression-harness hash.
 
+Every capture that supplies `--source-root` must also set
+`AIOGZIP_ENGINE=stdlib` or `AIOGZIP_ENGINE=zlib-ng`. Before any timed category,
+the runner rejects tracked source changes and verifies the default compression,
+decompression, and platform-specific CRC engine fields. When `--output` is
+used, it atomically writes initial provenance, every completed category, and a
+late failure or final completion state.
+
 Use the harness from the implementation checkout while targeting detached
 historical worktrees:
 
 ```bash
-uv run --frozen python benchmarks/run_benchmarks.py \
+AIOGZIP_ENGINE=zlib-ng uv run --frozen python benchmarks/run_benchmarks.py \
   --category regressions --regression-profile release \
   --regression-mode all \
   --source-root /tmp/aiogzip-v2.0.0a1-regression \
@@ -300,11 +307,13 @@ per-call async overhead as separate effects.
 ## Before/After Regression Workflow
 
 For changes to codecs, buffering, text decoding, line iteration, executor
-offloading, or parser hot paths, capture a baseline before editing:
+offloading, or parser hot paths, capture clean baseline and candidate commits
+from explicit source worktrees:
 
 ```bash
 AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
   --category io,scenarios,concurrency --size 8 --repeat 5 \
+  --source-root /tmp/aiogzip-before \
   --output /tmp/aiogzip-before.json
 ```
 
@@ -314,15 +323,17 @@ then compare the results:
 ```bash
 AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
   --category io,scenarios,concurrency --size 8 --repeat 5 \
+  --source-root /tmp/aiogzip-after \
   --output /tmp/aiogzip-after.json
 
 uv run python benchmarks/bench_compare.py \
   /tmp/aiogzip-before.json /tmp/aiogzip-after.json
 ```
 
-Repeat without `AIOGZIP_ENGINE=stdlib` when the change can affect zlib-ng.
-Record the command, environment, and any material wins or regressions in the
-review or pull request.
+Repeat with `AIOGZIP_ENGINE=zlib-ng` when the change can affect zlib-ng. The
+comparison tool rejects schema, source-attestation, and engine mismatches
+before displaying timing changes. Record the command, environment, and any
+material wins or regressions in the review or pull request.
 
 ### Usage Examples
 
@@ -462,16 +473,24 @@ Use `bench_compare.py` to track performance over time:
 
 ```bash
 # Establish baseline
-uv run python benchmarks/run_benchmarks.py --all --output baseline.json
+AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py --all \
+  --source-root /tmp/aiogzip-before --output baseline.json
 
-# Make code changes...
+# Commit the candidate in a separate clean worktree...
 
 # Run current benchmarks
-uv run python benchmarks/run_benchmarks.py --all --output current.json
+AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py --all \
+  --source-root /tmp/aiogzip-after --output current.json
 
 # Compare
 uv run python benchmarks/bench_compare.py baseline.json current.json
 ```
+
+Both files must be schema-v2 captures made with `--source-root` and an explicit
+`AIOGZIP_ENGINE`. The comparator rejects dirty or internally inconsistent
+source attestations and requires identical requested and active engines. It
+prints both exact source commits before the timing rows; the commits may differ
+for a before/after comparison or match for an intentional same-source control.
 
 The comparison tool shows:
 

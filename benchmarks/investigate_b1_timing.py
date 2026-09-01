@@ -34,6 +34,7 @@ from bench_a3_regressions import (
     _sha256,
     optional_header_fixture,
 )
+from run_benchmarks import assert_requested_engine
 
 _KIB = 1024
 _OUTPUT_BOUND = 256 * _KIB
@@ -93,16 +94,7 @@ def _assert_requested_engine(
     module: ModuleType, requested: str, *, source_label: str
 ) -> dict[str, str]:
     engines = _active_engines(module)
-    has_zlib_ng = any("zlib-ng" in value for value in engines.values())
-    if requested == "stdlib" and has_zlib_ng:
-        raise RuntimeError(
-            f"stdlib was requested for {source_label}, but active engines are {engines}"
-        )
-    if requested == "zlib-ng" and not has_zlib_ng:
-        raise RuntimeError(
-            f"zlib-ng was requested for {source_label}, but active engines are {engines}"
-        )
-    return engines
+    return assert_requested_engine(engines, requested, source_label=source_label)
 
 
 def _output_bound_fixture() -> tuple[bytes, str]:
