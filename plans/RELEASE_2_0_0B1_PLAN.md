@@ -1297,10 +1297,10 @@ plans/reviews/v2.0.0b1-hardening.md
 
 #### WP6 correctness matrix
 
-- [ ] Full test suite passes on Python 3.11, 3.12, 3.13, and 3.14 on Linux.
-- [ ] Representative full suite passes on Windows.
-- [ ] Representative full suite passes on macOS.
-- [ ] Full stdlib-zlib path passes with zlib-ng absent in retained exact-head evidence.
+- [x] Full test suite passes on Python 3.11, 3.12, 3.13, and 3.14 on Linux.
+- [x] Representative full suite passes on Windows.
+- [x] Representative full suite passes on macOS.
+- [x] Full stdlib-zlib path passes with zlib-ng absent in retained exact-head evidence.
 - [x] Active zlib-ng path passes.
 - [x] Forced stdlib path passes while zlib-ng is installed.
 - [x] Property-based valid-stream tests pass.
@@ -1316,8 +1316,8 @@ plans/reviews/v2.0.0b1-hardening.md
 - [x] Text cookie and newline tests pass.
 - [x] Partial sink-write and sink-error timing tests pass.
 - [x] Strict-size and decompression-limit tests pass.
-- [ ] Public API contract tests pass on every supported Python version.
-- [ ] Minimum-dependency jobs pass.
+- [x] Public API contract tests pass on every supported Python version.
+- [x] Minimum-dependency jobs pass.
 - [x] Coverage remains at or above the configured floor.
 
 An unretained CPython 3.12 local run with no importable `zlib_ng` reported
@@ -1386,8 +1386,8 @@ Original and corrective raw records remain retained.
 
 #### WP6 exit criteria
 
-- [ ] All correctness and API-contract gates pass.
-- [ ] All required engines and platforms pass.
+- [x] All correctness and API-contract gates pass.
+- [x] All required engines and platforms pass.
 - [x] All named performance rows satisfy policy or the release is blocked.
 - [x] No new memory or scheduler regression is present.
 - [x] Issue `#86` has a complete maintainer-ready closeout record, and its tiny-write benchmark remains an active anti-regression gate.
@@ -1402,42 +1402,43 @@ The review must cover the actual candidate commit, not an earlier code head.
 
 #### WP7 reviewer checklist
 
-- [ ] Reviewer confirms the public API inventory matches actual exports and docs.
-- [ ] Reviewer examines every retain/diagnostic/private decision.
-- [ ] Reviewer examines the runtime manifest schema and exclusions.
-- [ ] Reviewer examines overload/type-contract fixtures.
-- [ ] Reviewer examines `ConcurrentOperationError` inheritance and guidance.
-- [ ] Reviewer examines codec operation ownership and cleanup wording.
-- [ ] Reviewer examines cancellation, poisoning, recovery-data, and write-error timing statements.
-- [ ] Reviewer examines dataclass and metadata contracts.
-- [ ] Reviewer examines minimum-dependency CI and exact installed-version assertions.
-- [ ] Reviewer runs or inspects installed-artifact smoke evidence.
-- [ ] Reviewer inspects both maintained examples for public-only API use.
-- [ ] Reviewer inspects stale alpha/provisional wording search results.
-- [ ] Reviewer confirms no material lifecycle redesign is concealed in the beta candidate.
-- [ ] Reviewer confirms AnyIO, indexed access, and buffered-writer work remain deferred.
-- [ ] Reviewer records approval, requested changes, or blocking findings against the exact SHA.
+- [x] Reviewer confirms the public API inventory matches actual exports and docs.
+- [x] Reviewer examines every retain/diagnostic/private decision.
+- [x] Reviewer examines the runtime manifest schema and exclusions.
+- [x] Reviewer examines overload/type-contract fixtures.
+- [x] Reviewer examines `ConcurrentOperationError` inheritance and guidance.
+- [x] Reviewer examines codec operation ownership and cleanup wording.
+- [x] Reviewer examines cancellation, poisoning, recovery-data, and write-error timing statements.
+- [x] Reviewer examines dataclass and metadata contracts.
+- [x] Reviewer examines minimum-dependency CI and exact installed-version assertions.
+- [x] Reviewer runs or inspects installed-artifact smoke evidence.
+- [x] Reviewer inspects both maintained examples for public-only API use.
+- [x] Reviewer inspects stale alpha/provisional wording search results.
+- [x] Reviewer confirms no material lifecycle redesign is concealed in the beta candidate.
+- [x] Reviewer confirms AnyIO, indexed access, and buffered-writer work remain deferred.
+- [x] Reviewer records approval, requested changes, or blocking findings against the exact SHA.
 
 #### WP7 response to findings
 
-- [ ] Every finding has an owner and disposition.
-- [ ] Corrective commits invalidate prior approval until the reviewer covers the new head.
-- [ ] A material contract finding triggers the beta escalation rule and likely `a5`.
-- [ ] Review evidence names the reviewer, date, exact commit, scope, commands, and conclusion.
-- [ ] Codex does not claim the review complete on the reviewer's behalf.
+- [x] Every finding has an owner and disposition.
+- [x] Corrective commits invalidate prior approval until the reviewer covers the new head.
+- [x] A material contract finding triggers the beta escalation rule and likely `a5`.
+- [x] Review evidence names the reviewer, date, exact commit, scope, commands, and conclusion.
+- [x] Codex does not claim the review complete on the reviewer's behalf.
 
 The reviews of `fa507af`, `e412cc6`, `4a6fb9f`, `5f53e96`, `daadbd0`,
 `cdfb4d7`, `ab9c977`, and `1f3c6a2` produced recorded findings and local
-dispositions, but every reviewed SHA is superseded and the supplied review
-text names no reviewer. The WP7 boxes above apply only to the eventual exact
-candidate head and remain unchecked until an independent reviewer covers that
-SHA.
+dispositions, but every one of those SHAs is superseded. The independent
+review recorded in `plans/reviews/v2.0.0b1-independent-review.md` covers exact
+merge commit `7b647ba0a380821c7bd39f92a9f461f555d1deb6`; Geoff Davis explicitly
+signed off on that complete record on 2026-09-01. WP8 still requires renewed
+confirmation on its exact release-candidate head.
 
 #### WP7 exit criteria
 
-- [ ] At least one genuinely independent human approval covers the final candidate.
-- [ ] No unresolved blocking review finding remains.
-- [ ] The review explicitly supports the `b1` freeze decision.
+- [x] At least one genuinely independent human approval covers the reviewed candidate.
+- [x] No unresolved blocking review finding remains.
+- [x] The review explicitly supports the `b1` freeze decision.
 
 **Suggested commit:** `Review: record independent 2.0.0b1 contract approval`
 
