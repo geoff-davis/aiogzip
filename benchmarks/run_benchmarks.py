@@ -238,6 +238,28 @@ def assert_requested_engine(
     return engines
 
 
+def _configure_requested_engine(
+    requested: str | None, *, source_root_supplied: bool
+) -> str | None:
+    """Resolve the benchmark engine and apply the library's real env contract."""
+    environment_value = os.environ.get("AIOGZIP_ENGINE", "").strip().lower()
+    if requested is None:
+        if environment_value == "stdlib":
+            requested = "stdlib"
+        elif environment_value:
+            raise ValueError(
+                "AIOGZIP_ENGINE accepts only stdlib; use --engine zlib-ng "
+                "for an explicit zlib-ng benchmark capture"
+            )
+    if source_root_supplied and requested is None:
+        raise ValueError("--source-root requires --engine stdlib or --engine zlib-ng")
+    if requested == "stdlib":
+        os.environ["AIOGZIP_ENGINE"] = "stdlib"
+    elif requested == "zlib-ng":
+        os.environ.pop("AIOGZIP_ENGINE", None)
+    return requested
+
+
 def configure_source_root(source_root: Path) -> dict[str, Any]:
     """Import and attest aiogzip from one explicit source checkout."""
     resolved_root = source_root.resolve()
@@ -287,7 +309,10 @@ def configure_source_root(source_root: Path) -> dict[str, Any]:
 
 
 def collect_environment(
-    source_identity: dict[str, Any], *, environment_label: str | None = None
+    source_identity: dict[str, Any],
+    *,
+    environment_label: str | None = None,
+    requested_engine: str | None = None,
 ) -> dict[str, Any]:
     """Collect the reproducibility metadata shared by every result file."""
     try:
@@ -350,6 +375,7 @@ def collect_environment(
         "zlib_runtime_version": zlib.ZLIB_RUNTIME_VERSION,
         "zlib_ng_package_version": zlib_ng_version,
         "active_engines": aiogzip.engine_info().__dict__,
+        "requested_engine": requested_engine,
         "forced_engine": os.environ.get("AIOGZIP_ENGINE"),
         "uv_version": uv_version,
         "uv_lock_sha256": _file_sha256(
@@ -404,6 +430,11 @@ async def main():
         help="Import aiogzip from this checkout's src directory and verify it",
     )
     parser.add_argument(
+        "--engine",
+        choices=("stdlib", "zlib-ng"),
+        help="Require and record the active engine for an attested capture",
+    )
+    parser.add_argument(
         "--regression-profile",
         choices=("quick", "release"),
         help="Select the regression matrix size (requires regressions category)",
@@ -447,18 +478,21 @@ async def main():
 
     source_identity = None
     environment = None
+    try:
+        requested_engine = _configure_requested_engine(
+            args.engine, source_root_supplied=args.source_root is not None
+        )
+    except ValueError as error:
+        parser.error(str(error))
     if args.source_root is not None:
-        requested_engine = os.environ.get("AIOGZIP_ENGINE", "").strip().lower()
-        if requested_engine not in {"stdlib", "zlib-ng"}:
-            parser.error(
-                "--source-root requires AIOGZIP_ENGINE=stdlib or AIOGZIP_ENGINE=zlib-ng"
-            )
         try:
             source_identity = configure_source_root(args.source_root)
         except (ValueError, RuntimeError, subprocess.CalledProcessError) as error:
             parser.error(str(error))
         environment = collect_environment(
-            source_identity, environment_label=args.environment_label
+            source_identity,
+            environment_label=args.environment_label,
+            requested_engine=requested_engine,
         )
         try:
             assert_requested_engine(

@@ -102,13 +102,13 @@ PYTHONPATH (aiogzip is pure Python, so no build step is needed):
 git worktree add /tmp/aiogzip-baseline main
 
 # Baseline source, current venv (PYTHONPATH shadows the editable install)
-PYTHONPATH=/tmp/aiogzip-baseline/src AIOGZIP_ENGINE=stdlib \
+PYTHONPATH=/tmp/aiogzip-baseline/src \
     uv run python benchmarks/run_benchmarks.py \
-    --category io,micro --output /tmp/bench-before.json
+    --category io,micro --engine stdlib --output /tmp/bench-before.json
 
 # Current branch source
-AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
-    --category io,micro --output /tmp/bench-after.json
+uv run python benchmarks/run_benchmarks.py \
+    --category io,micro --engine stdlib --output /tmp/bench-after.json
 
 # Compare
 uv run python benchmarks/bench_compare.py /tmp/bench-before.json /tmp/bench-after.json
@@ -124,7 +124,9 @@ Notes:
   `fast` extra (zlib-ng vs stdlib skews read benchmarks several-fold).
   Verify the source swap with
   `PYTHONPATH=... python -c "import aiogzip; print(aiogzip.__file__)"`.
-- Pin the codec with `AIOGZIP_ENGINE=stdlib` on both sides.
+- Pin the codec with `--engine stdlib` on both sides. The runner applies and
+  verifies the library's stdlib-only environment override; use
+  `--engine zlib-ng` to request and verify the optional engine.
 - Run on a quiet machine — background load skews results badly. Interleave
   several before/after rounds and compare per-benchmark *minimum* times;
   single-run deltas are noise.

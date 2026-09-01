@@ -1,29 +1,59 @@
 #!/usr/bin/env python3
-"""
-Compare benchmark results from different runs.
+"""Compare release captures or summarize targeted timing investigations.
 
 Usage:
     python bench_compare.py baseline.json current.json
+    python bench_compare.py targeted.json [targeted-swapped.json ...]
 """
+
+from __future__ import annotations
 
 import argparse
 import json
+import statistics
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from run_benchmarks import assert_requested_engine
 
+_TARGETED_BENCHMARK = "aiogzip-2.0.0b1-targeted-timing-investigation"
 
-def load_results(filepath: Path) -> Dict[str, Any]:
+
+def load_results(filepath: Path) -> dict[str, Any]:
     """Load benchmark results from JSON file."""
-    with open(filepath) as f:
-        return json.load(f)
+    with filepath.open() as file:
+        return json.load(file)
 
 
-def _capture_identity(capture: dict[str, Any], label: str) -> dict[str, Any]:
-    if capture.get("status") != "complete":
-        raise ValueError(f"{label} capture is not complete")
+def _legacy_requested_engine(
+    environment: dict[str, Any], engines: dict[str, Any], label: str
+) -> tuple[str, list[str]]:
+    requested = environment.get("forced_engine")
+    if requested in {"stdlib", "zlib-ng"}:
+        return requested, []
+    active_values = set(engines.values())
+    if active_values == {"stdlib-zlib"}:
+        inferred = "stdlib"
+    elif engines.get("decompression") == "zlib-ng":
+        inferred = "zlib-ng"
+    else:
+        raise ValueError(f"{label} legacy capture has ambiguous active engines")
+    return inferred, [
+        f"{label}: inferred requested engine {inferred!r} from active_engines"
+    ]
+
+
+def _capture_identity(
+    capture: dict[str, Any], label: str, *, allow_legacy: bool
+) -> dict[str, Any]:
+    warnings: list[str] = []
+    status = capture.get("status")
+    if status != "complete":
+        if allow_legacy and status is None and isinstance(capture.get("results"), list):
+            warnings.append(f"{label}: legacy capture has no completion status")
+        else:
+            raise ValueError(f"{label} capture is not complete")
     source = capture.get("source")
     environment = capture.get("environment")
     if not isinstance(source, dict) or not isinstance(environment, dict):
@@ -43,12 +73,17 @@ def _capture_identity(capture: dict[str, Any], label: str) -> dict[str, Any]:
                 f"{label} capture has inconsistent source/environment {field}"
             )
 
-    requested = environment.get("forced_engine")
-    if requested not in {"stdlib", "zlib-ng"}:
-        raise ValueError(f"{label} capture lacks an explicit requested engine")
     engines = environment.get("active_engines")
     if not isinstance(engines, dict):
         raise ValueError(f"{label} capture lacks active engine provenance")
+    requested = environment.get("requested_engine")
+    if requested not in {"stdlib", "zlib-ng"}:
+        if not allow_legacy:
+            raise ValueError(f"{label} capture lacks an explicit requested engine")
+        requested, legacy_warnings = _legacy_requested_engine(
+            environment, engines, label
+        )
+        warnings.extend(legacy_warnings)
     system_name = environment.get("os_name")
     if not isinstance(system_name, str) or not system_name:
         raise ValueError(f"{label} capture lacks operating-system provenance")
@@ -64,11 +99,15 @@ def _capture_identity(capture: dict[str, Any], label: str) -> dict[str, Any]:
         "requested_engine": requested,
         "active_engines": engines,
         "system_name": system_name,
+        "warnings": warnings,
     }
 
 
 def _validate_capture_pair(
-    baseline: dict[str, Any], current: dict[str, Any]
+    baseline: dict[str, Any],
+    current: dict[str, Any],
+    *,
+    allow_legacy: bool,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     baseline_schema = baseline.get("schema_version")
     current_schema = current.get("schema_version")
@@ -80,8 +119,10 @@ def _validate_capture_pair(
     if baseline_schema != 2:
         raise ValueError(f"unsupported benchmark capture schema: {baseline_schema!r}")
 
-    baseline_identity = _capture_identity(baseline, "baseline")
-    current_identity = _capture_identity(current, "current")
+    baseline_identity = _capture_identity(
+        baseline, "baseline", allow_legacy=allow_legacy
+    )
+    current_identity = _capture_identity(current, "current", allow_legacy=allow_legacy)
     for field in ("requested_engine", "active_engines", "system_name"):
         if baseline_identity[field] != current_identity[field]:
             raise ValueError(
@@ -92,12 +133,18 @@ def _validate_capture_pair(
     return baseline_identity, current_identity
 
 
-def compare_results(baseline: dict, current: dict) -> None:
-    """Compare two sets of benchmark results."""
-    baseline_identity, current_identity = _validate_capture_pair(baseline, current)
+def compare_results(
+    baseline: dict[str, Any], current: dict[str, Any], *, allow_legacy: bool = False
+) -> None:
+    """Compare two main-harness capture documents."""
+    baseline_identity, current_identity = _validate_capture_pair(
+        baseline, current, allow_legacy=allow_legacy
+    )
     print(f"\n{'=' * 70}")
     print("BENCHMARK COMPARISON")
     print(f"{'=' * 70}")
+    for warning in baseline_identity["warnings"] + current_identity["warnings"]:
+        print(f"WARNING: {warning}")
     print(
         f"Baseline source: {baseline_identity['describe']} "
         f"({baseline_identity['commit']})"
@@ -108,12 +155,9 @@ def compare_results(baseline: dict, current: dict) -> None:
     )
     print(f"Engine: {baseline_identity['requested_engine']}")
 
-    # Create lookup dictionaries by benchmark name
     baseline_results = {r["name"]: r for r in baseline.get("results", [])}
     current_results = {r["name"]: r for r in current.get("results", [])}
-
-    # Find common benchmarks
-    common_names = set(baseline_results.keys()) & set(current_results.keys())
+    common_names = set(baseline_results) & set(current_results)
 
     if not common_names:
         print("\nNo common benchmarks found between the two result sets.")
@@ -125,90 +169,219 @@ def compare_results(baseline: dict, current: dict) -> None:
 
     improvements = []
     regressions = []
-
     for name in sorted(common_names):
-        baseline_bench = baseline_results[name]
-        current_bench = current_results[name]
-
-        baseline_time = baseline_bench["duration"]
-        current_time = current_bench["duration"]
-
-        # Calculate percentage change
-        if baseline_time > 0:
-            change_pct = ((current_time - baseline_time) / baseline_time) * 100
-        else:
-            change_pct = 0
-
-        # Format change with color indicators
-        if change_pct < -5:  # Improvement
+        baseline_time = baseline_results[name]["duration"]
+        current_time = current_results[name]["duration"]
+        change_pct = (
+            ((current_time - baseline_time) / baseline_time) * 100
+            if baseline_time > 0
+            else 0
+        )
+        if change_pct < -5:
             change_str = f"{change_pct:+.1f}% ✓"
             improvements.append((name, change_pct))
-        elif change_pct > 5:  # Regression
+        elif change_pct > 5:
             change_str = f"{change_pct:+.1f}% ✗"
             regressions.append((name, change_pct))
-        else:  # Neutral
+        else:
             change_str = f"{change_pct:+.1f}% ="
-
-        # Truncate long names
         display_name = name[:38] + ".." if len(name) > 40 else name
-
         print(
-            f"{display_name:<40} {baseline_time:>10.3f}s {current_time:>10.3f}s {change_str:<12}"
+            f"{display_name:<40} {baseline_time:>10.3f}s "
+            f"{current_time:>10.3f}s {change_str:<12}"
         )
 
-    # Summary
     print("\n" + "=" * 70)
     print("SUMMARY")
     print("=" * 70)
-
     if improvements:
         print(f"\n✓ Improvements ({len(improvements)}):")
-        for name, pct in sorted(improvements, key=lambda x: x[1]):
+        for name, pct in sorted(improvements, key=lambda item: item[1]):
             print(f"  {name}: {pct:.1f}% faster")
-
     if regressions:
         print(f"\n✗ Regressions ({len(regressions)}):")
-        for name, pct in sorted(regressions, key=lambda x: x[1], reverse=True):
+        for name, pct in sorted(regressions, key=lambda item: item[1], reverse=True):
             print(f"  {name}: {abs(pct):.1f}% slower")
-
     if not improvements and not regressions:
         print("\n= No significant changes (within ±5%)")
 
-    # Overall stats
     total_baseline = sum(r["duration"] for r in baseline.get("results", []))
     total_current = sum(r["duration"] for r in current.get("results", []))
-
     if total_baseline > 0:
         overall_change = ((total_current - total_baseline) / total_baseline) * 100
         print(
-            f"\nOverall: {total_baseline:.3f}s → {total_current:.3f}s ({overall_change:+.1f}%)"
+            f"\nOverall: {total_baseline:.3f}s → {total_current:.3f}s "
+            f"({overall_change:+.1f}%)"
         )
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Compare benchmark results")
-    parser.add_argument("baseline", type=Path, help="Baseline results JSON file")
-    parser.add_argument("current", type=Path, help="Current results JSON file")
+def canonical_change_percent(reported: float, candidate_side: str) -> float:
+    """Orient a reported candidate/baseline delta as canonical b1 versus a4."""
+    if candidate_side == "candidate":
+        return reported
+    if candidate_side == "baseline":
+        return ((1 / (1 + reported / 100)) - 1) * 100
+    raise ValueError(f"invalid canonical candidate side: {candidate_side!r}")
 
+
+def _quarters(samples: list[float]) -> list[list[float]]:
+    """Split retained samples into four ordered, non-empty temporal slices."""
+    return [
+        samples[start * len(samples) // 4 : (start + 1) * len(samples) // 4]
+        for start in range(4)
+    ]
+
+
+def _format_quarters(values: list[float]) -> str:
+    return " → ".join(f"{value:.3f}" for value in values)
+
+
+def _targeted_identity(
+    capture: dict[str, Any], label: str, *, allow_legacy: bool
+) -> tuple[str, str, str, list[str]]:
+    if capture.get("schema_version") != 2:
+        raise ValueError(f"{label} has an unsupported targeted schema")
+    if capture.get("status") != "complete":
+        raise ValueError(f"{label} capture is not complete")
+    configuration = capture.get("configuration")
+    baseline = capture.get("baseline")
+    candidate = capture.get("candidate")
+    if not all(isinstance(item, dict) for item in (configuration, baseline, candidate)):
+        raise ValueError(f"{label} lacks targeted source/configuration provenance")
+    requested = configuration.get("requested_engine")
+    if requested not in {"stdlib", "zlib-ng"}:
+        raise ValueError(f"{label} lacks a requested engine")
+    active_by_side: dict[str, dict[str, str]] = {}
+    for side, identity in (("baseline", baseline), ("candidate", candidate)):
+        if identity.get("dirty_tracked") is not False:
+            raise ValueError(f"{label} {side} does not attest a clean source tree")
+        engines = identity.get("active_engines")
+        if not isinstance(engines, dict):
+            raise ValueError(f"{label} {side} lacks active engine provenance")
+        active_by_side[side] = engines
+    if active_by_side["baseline"] != active_by_side["candidate"]:
+        raise ValueError(f"{label} has different active engines on its two sides")
+    active = active_by_side["baseline"]
+    expected_decompression = "zlib-ng" if requested == "zlib-ng" else "stdlib-zlib"
+    if (
+        active.get("compression") != "stdlib-zlib"
+        or active.get("decompression") != expected_decompression
+        or active.get("crc32")
+        not in (
+            {"zlib-ng", "stdlib-zlib"} if requested == "zlib-ng" else {"stdlib-zlib"}
+        )
+    ):
+        raise ValueError(
+            f"{label} active engines do not satisfy requested engine {requested!r}: "
+            f"{active}"
+        )
+    candidate_side = configuration.get("canonical_candidate_side")
+    warnings: list[str] = []
+    if candidate_side not in {"baseline", "candidate"}:
+        if not allow_legacy:
+            raise ValueError(
+                f"{label} lacks canonical_candidate_side; use --allow-legacy only "
+                "when the file orientation is known"
+            )
+        candidate_side = "candidate"
+        warnings.append(
+            f"{label}: assuming the raw candidate side is the canonical candidate"
+        )
+    return requested, baseline["describe"], candidate["describe"], warnings
+
+
+def summarize_targeted(
+    capture: dict[str, Any], label: str, *, allow_legacy: bool = False
+) -> None:
+    """Print min, median, and temporal diagnostics from one targeted record."""
+    requested, baseline, candidate, warnings = _targeted_identity(
+        capture, label, allow_legacy=allow_legacy
+    )
+    candidate_side = capture["configuration"].get(
+        "canonical_candidate_side", "candidate"
+    )
+    print(f"\n{'=' * 88}")
+    print(f"TARGETED TIMING: {label}")
+    print(f"{'=' * 88}")
+    for warning in warnings:
+        print(f"WARNING: {warning}")
+    print(f"Raw baseline: {baseline}")
+    print(f"Raw candidate: {candidate}")
+    print(f"Canonical candidate side: {candidate_side}")
+    print(f"Engine: {requested}")
+    print(
+        f"{'Benchmark':<39} {'raw min':>9} {'canon min':>10} "
+        f"{'canon med':>10} {'canon 1/2 min':>13}"
+    )
+    print("-" * 88)
+    for result in capture.get("results", []):
+        baseline_samples = result["baseline"]["samples_seconds"]
+        candidate_samples = result["candidate"]["samples_seconds"]
+        reported_min = ((min(candidate_samples) / min(baseline_samples)) - 1) * 100
+        reported_median = (
+            (statistics.median(candidate_samples) / statistics.median(baseline_samples))
+            - 1
+        ) * 100
+        halfway = min(len(baseline_samples), len(candidate_samples)) // 2
+        reported_first_half = (
+            (min(candidate_samples[:halfway]) / min(baseline_samples[:halfway])) - 1
+        ) * 100
+        canonical_min = canonical_change_percent(reported_min, candidate_side)
+        canonical_median = canonical_change_percent(reported_median, candidate_side)
+        canonical_first_half = canonical_change_percent(
+            reported_first_half, candidate_side
+        )
+        name = result["name"]
+        display_name = name[:37] + ".." if len(name) > 39 else name
+        print(
+            f"{display_name:<39} {reported_min:>+8.2f}% "
+            f"{canonical_min:>+9.2f}% {canonical_median:>+9.2f}% "
+            f"{canonical_first_half:>+12.2f}%"
+        )
+        baseline_quarters = [
+            statistics.median(part) * 1000 for part in _quarters(baseline_samples)
+        ]
+        candidate_quarters = [
+            statistics.median(part) * 1000 for part in _quarters(candidate_samples)
+        ]
+        print(
+            "  quarter medians (ms), raw baseline/candidate: "
+            f"{_format_quarters(baseline_quarters)} / "
+            f"{_format_quarters(candidate_quarters)}"
+        )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("captures", nargs="+", type=Path, help="capture JSON files")
+    parser.add_argument(
+        "--allow-legacy",
+        action="store_true",
+        help="accept pre-hardening captures with explicit provenance warnings",
+    )
     args = parser.parse_args()
-
-    # Validate files exist
-    if not args.baseline.exists():
-        print(f"Error: Baseline file not found: {args.baseline}")
+    missing = [path for path in args.captures if not path.exists()]
+    if missing:
+        print(f"Error: capture file not found: {missing[0]}")
         return 1
 
-    if not args.current.exists():
-        print(f"Error: Current file not found: {args.current}")
-        return 1
-
-    # Load and compare
     try:
-        baseline = load_results(args.baseline)
-        current = load_results(args.current)
-        compare_results(baseline, current)
+        captures = [load_results(path) for path in args.captures]
+        targeted = [
+            capture.get("benchmark") == _TARGETED_BENCHMARK for capture in captures
+        ]
+        if all(targeted):
+            for path, capture in zip(args.captures, captures, strict=True):
+                summarize_targeted(capture, path.name, allow_legacy=args.allow_legacy)
+        elif any(targeted):
+            raise ValueError("cannot mix main-harness and targeted capture schemas")
+        elif len(captures) != 2:
+            raise ValueError("main-harness comparison requires exactly two captures")
+        else:
+            compare_results(captures[0], captures[1], allow_legacy=args.allow_legacy)
         return 0
-    except Exception as e:
-        print(f"Error comparing results: {e}")
+    except Exception as error:
+        print(f"Error comparing results: {error}")
         return 1
 
 

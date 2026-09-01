@@ -17,6 +17,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import platform
 import statistics
 import subprocess
 import sys
@@ -226,12 +227,14 @@ async def _measure_case(
     measure: Callable[[ModuleType], Awaitable[float]],
     *,
     cycles: int,
+    warmup_cycles: int,
 ) -> dict[str, Any]:
     print(f"  START {name}", flush=True)
-    await measure(baseline)
-    await measure(candidate)
     samples: dict[str, list[float]] = {"baseline": [], "candidate": []}
     modules = {"baseline": baseline, "candidate": candidate}
+    for _ in range(warmup_cycles):
+        for label in ("baseline", "candidate", "candidate", "baseline"):
+            await measure(modules[label])
     for _ in range(cycles):
         for label in ("baseline", "candidate", "candidate", "baseline"):
             samples[label].append(await measure(modules[label]))
@@ -241,7 +244,9 @@ async def _measure_case(
     candidate_minimum = candidate_summary["minimum_seconds"]
     return {
         "name": name,
-        "ordering": "A/B/B/A per cycle after one untimed warm-up per side",
+        "ordering": (
+            f"A/B/B/A per measured cycle after {warmup_cycles} untimed A/B/B/A cycles"
+        ),
         "baseline": baseline_summary,
         "candidate": candidate_summary,
         "minimum_change_percent": ((candidate_minimum / baseline_minimum) - 1) * 100,
@@ -301,10 +306,20 @@ async def run(
             "requested_engine": args.engine,
             "cycles": args.cycles,
             "samples_per_side_per_case": args.cycles * 2,
+            "warmup_cycles": args.warmup_cycles,
             "ordering": "A/B/B/A",
+            "canonical_candidate_side": args.canonical_candidate_side,
+            "reported_change_formula": "(raw candidate / raw baseline - 1) * 100",
             "garbage_collection": "disabled during timed measurements",
             "process_policy": "both source trees loaded under package aliases",
             "checkpoint_policy": "atomic write before timing and after every case",
+        },
+        "command": getattr(args, "command", None),
+        "host": {
+            "os_name": platform.system(),
+            "platform": platform.platform(),
+            "python_version": sys.version,
+            "python_executable": sys.executable,
         },
         "baseline": _complete_identity(baseline_identity, baseline, baseline_engines),
         "candidate": _complete_identity(
@@ -326,6 +341,7 @@ async def run(
                 candidate,
                 output_bound,
                 cycles=args.cycles,
+                warmup_cycles=args.warmup_cycles,
             )
         )
         _checkpoint(document, checkpoint)
@@ -367,6 +383,7 @@ async def run(
                     candidate,
                     measure,
                     cycles=args.cycles,
+                    warmup_cycles=args.warmup_cycles,
                 )
             )
             _checkpoint(document, checkpoint)
@@ -399,6 +416,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=50,
         help="A/B/B/A cycles; each cycle produces two samples per side",
     )
+    parser.add_argument(
+        "--warmup-cycles",
+        type=_positive_int,
+        default=25,
+        help="untimed A/B/B/A cycles per case before measurement",
+    )
+    parser.add_argument(
+        "--canonical-candidate-side",
+        choices=("baseline", "candidate"),
+        default="candidate",
+        help="which raw side is the candidate in the canonical comparison",
+    )
     parser.add_argument("--output", type=Path, required=True)
     return parser
 
@@ -411,6 +440,7 @@ def _write_document(path: Path, document: dict[str, Any]) -> None:
 
 def main() -> int:
     args = build_parser().parse_args()
+    args.command = [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]]
     args.output.parent.mkdir(parents=True, exist_ok=True)
     asyncio.run(
         run(

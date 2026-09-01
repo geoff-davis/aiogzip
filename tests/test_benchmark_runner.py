@@ -36,6 +36,7 @@ positive_int = run_benchmarks.positive_int
 configure_source_root = run_benchmarks.configure_source_root
 cpu_tuning = run_benchmarks._cpu_tuning
 assert_requested_engine = run_benchmarks.assert_requested_engine
+configure_requested_engine = run_benchmarks._configure_requested_engine
 write_comparison_fixture = bench_common.write_comparison_fixture
 StreamingBenchmarks = bench_streaming.StreamingBenchmarks
 RegressionsBenchmarks = bench_codec_regressions.RegressionsBenchmarks
@@ -389,6 +390,8 @@ def test_b1_investigation_checkpoints_partial_results_on_late_failure(
         candidate_root=candidate_root,
         engine="stdlib",
         cycles=1,
+        warmup_cycles=1,
+        canonical_candidate_side="candidate",
     )
 
     with pytest.raises(RuntimeError, match="late failure"):
@@ -1114,6 +1117,27 @@ def test_release_capture_requires_explicit_engine(monkeypatch, tmp_path):
         asyncio.run(run_benchmarks.main())
 
 
+def test_requested_engine_uses_cli_for_zlib_ng(monkeypatch):
+    monkeypatch.setenv("AIOGZIP_ENGINE", "zlib-ng")
+
+    assert configure_requested_engine("zlib-ng", source_root_supplied=True) == "zlib-ng"
+    assert "AIOGZIP_ENGINE" not in run_benchmarks.os.environ
+
+
+def test_requested_engine_sets_real_stdlib_override(monkeypatch):
+    monkeypatch.delenv("AIOGZIP_ENGINE", raising=False)
+
+    assert configure_requested_engine("stdlib", source_root_supplied=True) == "stdlib"
+    assert run_benchmarks.os.environ["AIOGZIP_ENGINE"] == "stdlib"
+
+
+def test_requested_engine_rejects_noop_zlib_ng_environment(monkeypatch):
+    monkeypatch.setenv("AIOGZIP_ENGINE", "zlib-ng")
+
+    with pytest.raises(ValueError, match="use --engine zlib-ng"):
+        configure_requested_engine(None, source_root_supplied=True)
+
+
 def test_main_checkpoints_completed_categories_on_late_failure(tmp_path, monkeypatch):
     output = tmp_path / "capture.json"
     source_root = tmp_path / "source"
@@ -1152,7 +1176,7 @@ def test_main_checkpoints_completed_categories_on_late_failure(tmp_path, monkeyp
     monkeypatch.setattr(
         run_benchmarks,
         "collect_environment",
-        lambda _identity, *, environment_label: environment,
+        lambda _identity, *, environment_label, requested_engine: environment,
     )
 
     async def fake_run_category(category, **_kwargs):
@@ -1245,6 +1269,7 @@ def _comparison_capture(
         "environment": {
             **source,
             "os_name": "Linux",
+            "requested_engine": engine,
             "forced_engine": engine,
             "active_engines": active_engines,
         },
@@ -1285,6 +1310,64 @@ def test_compare_results_rejects_dirty_source():
             _comparison_capture("before", dirty=True),
             _comparison_capture("after"),
         )
+
+
+def test_compare_results_requires_explicit_legacy_opt_in(capsys):
+    baseline = _comparison_capture("before")
+    current = _comparison_capture("after")
+    for capture in (baseline, current):
+        capture.pop("status")
+        capture["environment"].pop("requested_engine")
+
+    with pytest.raises(ValueError, match="not complete"):
+        bench_compare.compare_results(baseline, current)
+
+    bench_compare.compare_results(baseline, current, allow_legacy=True)
+    output = capsys.readouterr().out
+    assert "WARNING: baseline: legacy capture has no completion status" in output
+
+
+def _targeted_capture(candidate_side: str = "candidate") -> dict:
+    identity = {
+        "describe": "source",
+        "dirty_tracked": False,
+        "active_engines": {
+            "compression": "stdlib-zlib",
+            "decompression": "zlib-ng",
+            "crc32": "zlib-ng",
+        },
+    }
+    return {
+        "schema_version": 2,
+        "benchmark": "aiogzip-2.0.0b1-targeted-timing-investigation",
+        "status": "complete",
+        "configuration": {
+            "requested_engine": "zlib-ng",
+            "canonical_candidate_side": candidate_side,
+        },
+        "baseline": identity,
+        "candidate": identity,
+        "results": [
+            {
+                "name": "row",
+                "baseline": {"samples_seconds": [1.0, 1.1, 0.9, 1.0]},
+                "candidate": {"samples_seconds": [1.1, 1.2, 0.99, 1.1]},
+            }
+        ],
+    }
+
+
+def test_targeted_summary_marks_orientation_and_temporal_statistics(capsys):
+    bench_compare.summarize_targeted(
+        _targeted_capture(candidate_side="baseline"), "swapped"
+    )
+
+    output = capsys.readouterr().out
+    assert "Canonical candidate side: baseline" in output
+    assert "quarter medians (ms)" in output
+    assert bench_compare.canonical_change_percent(10.0, "baseline") == pytest.approx(
+        -9.090909
+    )
 
 
 def test_quick_regression_output_matrix_validates_outputs():
