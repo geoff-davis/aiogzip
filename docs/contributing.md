@@ -55,22 +55,32 @@ ty check src
 ## Performance-Sensitive Changes
 
 Capture benchmark results before changing codec calls, buffering, text
-decoding, line iteration, executor offloading, or parser hot paths. Run the
-same command afterward so the comparison uses the same Python, engine,
-filesystem, data, and repeat count:
+decoding, line iteration, executor offloading, or parser hot paths. Comparable
+captures require clean committed source roots; use the current checkout's venv
+and runner for both worktrees so Python, engine, filesystem, data, and repeat
+count stay fixed:
 
 ```bash
-AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
+git worktree add /tmp/aiogzip-before <baseline-commit>
+git worktree add /tmp/aiogzip-after <candidate-commit>
+
+uv run python benchmarks/run_benchmarks.py \
   --category io,scenarios,concurrency --size 8 --repeat 5 \
+  --engine stdlib --source-root /tmp/aiogzip-before \
   --output /tmp/aiogzip-before.json
 
-# Make the change, then repeat with --output /tmp/aiogzip-after.json.
+uv run python benchmarks/run_benchmarks.py \
+  --category io,scenarios,concurrency --size 8 --repeat 5 \
+  --engine stdlib --source-root /tmp/aiogzip-after \
+  --output /tmp/aiogzip-after.json
 
 uv run python benchmarks/bench_compare.py \
   /tmp/aiogzip-before.json /tmp/aiogzip-after.json
 ```
 
-Repeat with the default engine when zlib-ng may be affected. Include the
+Repeat with `--engine zlib-ng` when zlib-ng may be affected. Captures made
+without `--source-root` are exploratory and the comparator rejects them by
+design. Include the
 commands and any material wins or regressions in the pull request. The
 [benchmark guide](https://github.com/geoff-davis/aiogzip/tree/main/benchmarks)
 documents the comparison methodology and focused categories.

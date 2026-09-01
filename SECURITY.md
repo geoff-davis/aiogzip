@@ -4,10 +4,11 @@
 
 Security fixes are released on top of the latest release line:
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 2.0 alpha series | :white_check_mark: |
-| Latest 1.x release | :white_check_mark: |
+| Version line | Supported |
+| --- | --- |
+| Latest 2.0 beta/prerelease | :white_check_mark: |
+| Latest 1.x maintenance release | :white_check_mark: |
+| Older 2.0 alphas/betas | :x: Upgrade to the latest prerelease |
 | Older 1.x releases | :x: |
 
 ## Reporting a Vulnerability

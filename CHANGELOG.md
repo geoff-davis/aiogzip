@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0b1] - 2026-09-01
+
+### Added
+
+- The documented public API is now beta-frozen for the 2.0 line and protected
+  by a deterministic runtime contract manifest plus shared positive and
+  negative mypy/ty fixtures.
+- A stability policy defines public import paths, compatibility guarantees,
+  diagnostic values, private implementation details, and example ownership.
+- Installed wheel and sdist validation now covers the frozen API manifest,
+  metadata and archive layout, core and optional integrations, CLI behavior,
+  both compression engines, and maintained-example failure scenarios.
+
+### Changed
+
+- Corrected the tested minimum dependencies to `aiofiles>=23.2.1` and
+  `aiocsv>=1.2.3`. The earlier declared bounds named versions that either do
+  not exist or cannot support aiogzip's Python 3.11+ runtime contract;
+  zlib-ng remains supported from `0.4.0`.
+
+### Performance
+
+- Preserved the `2.0.0a4` codec, scheduler, optional-header, high-level,
+  concurrent-stream, memory, and small-write regression gates under both
+  engines. The strict same-call write contract remains unchanged; use
+  `writelines()` or explicit bounded batching for tiny records. No performance
+  improvement is claimed for this beta.
+
 ## [2.0.0a4] - 2026-08-23
 
 ### Added
@@ -849,7 +877,8 @@ All notable changes to this project will be documented in this file.
 - Normalize iteration errors from `AsyncGzipBinaryFile` to `TypeError`, matching the standard file API.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
 
-[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a3...HEAD
+[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b1...HEAD
+[2.0.0b1]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a4...v2.0.0b1
 [2.0.0a4]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a3...v2.0.0a4
 [2.0.0a3]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a2...v2.0.0a3
 [2.0.0a2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a1...v2.0.0a2

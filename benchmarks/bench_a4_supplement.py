@@ -29,6 +29,7 @@ from bench_a3_regressions import (
     collect_environment,
     configure_source_root,
 )
+from bench_common import ENGINE_CHOICES
 
 SCHEMA_VERSION = 1
 FIXTURE_GENERATOR_VERSION = "a4-supplement-fixtures-v1"
@@ -230,6 +231,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
             != fixtures["jsonl"]["payload_sha256"]
         ):
             raise AssertionError("bounded JSONL warm-up output mismatch")
+        print("  START bounded JSONL iter_batches", flush=True)
         jsonl_samples = [
             await _bounded_jsonl_once(
                 aiogzip,
@@ -257,6 +259,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
             != fixtures["binary"]["payload_sha256"]
         ):
             raise AssertionError("full binary-read warm-up output mismatch")
+        print("  START full binary read throughput", flush=True)
         binary_samples = [
             await _full_binary_read_once(
                 aiogzip,
@@ -273,6 +276,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
                 "full binary read throughput", "integration-memory", binary_samples
             )
         )
+        print("  START full binary read peak allocation", flush=True)
         memory_sample = await _full_binary_read_once(
             aiogzip,
             binary_path,
@@ -295,6 +299,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
         expected_digests = [item["payload_sha256"] for item in fixtures["concurrent"]]
         if concurrent_warm_up.metrics["output_sha256_by_stream"] != expected_digests:
             raise AssertionError("concurrent-read warm-up output mismatch")
+        print("  START concurrent independent-file reads", flush=True)
         concurrent_samples = [
             await _concurrent_reads_once(aiogzip, concurrent_paths)
             for _ in range(args.repeat)
@@ -344,7 +349,7 @@ async def run_benchmarks(args: argparse.Namespace) -> dict[str, Any]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
+    parser.add_argument("--engine", choices=ENGINE_CHOICES, required=True)
     parser.add_argument("--jsonl-mib", type=_positive_int, default=8)
     parser.add_argument("--binary-mib", type=_positive_int, default=16)
     parser.add_argument("--concurrent-mib", type=_positive_int, default=4)

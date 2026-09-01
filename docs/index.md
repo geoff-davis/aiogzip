@@ -33,6 +33,7 @@ It is designed for high-performance I/O operations, especially for text-based da
 - [Async-iterable Streaming](streaming.md)
 - [Performance Benchmarks](performance.md)
 - [API Reference](api.md)
+- [Stability Policy](stability.md)
 - [Contributing](contributing.md)
 
 ---

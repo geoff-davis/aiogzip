@@ -28,6 +28,7 @@ from bench_a3_regressions import (
     collect_environment,
     configure_source_root,
 )
+from bench_common import ENGINE_CHOICES
 
 
 async def _write_stream(writer: Any, record: bytes, total_bytes: int) -> int:
@@ -241,7 +242,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
+    parser.add_argument("--engine", choices=ENGINE_CHOICES, required=True)
     parser.add_argument("--writer-counts", type=_csv_positive_ints, default=(1, 4, 10))
     parser.add_argument(
         "--concurrent-write-sizes",

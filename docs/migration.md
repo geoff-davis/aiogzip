@@ -51,11 +51,11 @@ Ordinary asyncio callers do not need to change their code. The high-level
 lifecycle and interoperability behavior. The main compatibility change is the
 Python 3.11 floor.
 
-Before the 2.0 API reaches beta, Boolean configuration has also been tightened
-to avoid freezing accidental truth-value coercion. Pass the exact built-in
-values `True` or `False` for `fast_compress`, `strict_size`, and the direct
-decoder's `collect_member_info`. Integer stand-ins (`0`, `1`), strings such as
-`"false"`, and custom truthy or falsy objects now raise `TypeError`:
+During the alpha series, Boolean configuration was tightened before the 2.0
+API freeze to avoid preserving accidental truth-value coercion. Pass the exact
+built-in values `True` or `False` for `fast_compress`, `strict_size`, and the
+direct decoder's `collect_member_info`. Integer stand-ins (`0`, `1`), strings
+such as `"false"`, and custom truthy or falsy objects raise `TypeError`:
 
 ```python
 aiogzip.GzipEncoder(fast_compress=False)  # valid
@@ -67,7 +67,7 @@ ownership default: a resource opened from a path is closed by aiogzip, while a
 caller-supplied `fileobj` remains open. Use an explicit Boolean only when
 overriding that default.
 
-The 2.0 alpha also adds synchronous `GzipEncoder` and `GzipDecoder` classes for
+aiogzip 2.0 also adds synchronous `GzipEncoder` and `GzipDecoder` classes for
 applications that own a custom transport and want to drive aiogzip's gzip
 state machine directly:
 
@@ -86,10 +86,9 @@ operation iterators are lazy and must be exhausted before the next call, and
 decompression integrity is established only after `finish()` is exhausted.
 See the [synchronous codec guide](codec.md) before integrating it.
 
-`GzipEncoder` and `GzipDecoder` are provisional during the alpha series. Their
-surface may change in a later alpha in response to transport-integration
-feedback. This provisional statement does not weaken compatibility promises
-for the established high-level asyncio API.
+`GzipEncoder`, `GzipDecoder`, and `CodecOperation` are public and beta-frozen
+for the 2.0 line as of `2.0.0b1`. The beta remains a prerelease; see the
+[stability policy](stability.md) for the exact compatibility boundary.
 
 Next steps: [Examples](examples.md) for common tasks,
 [Recipes](recipes.md) for streaming patterns, and the

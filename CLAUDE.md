@@ -95,20 +95,22 @@ method call per line/chunk) have measurably cost throughput before. When
 touching them, benchmark before and after:
 
 Check out the baseline *source* in a worktree, but run both sides with the
-**same venv and interpreter** by shadowing the editable install via
-PYTHONPATH (aiogzip is pure Python, so no build step is needed):
+**same venv, interpreter, and benchmark runner**. Comparable captures require
+explicit clean source roots so the JSON contains commit, dirty-tree,
+environment, and engine attestations:
 
 ```bash
 git worktree add /tmp/aiogzip-baseline main
 
-# Baseline source, current venv (PYTHONPATH shadows the editable install)
-PYTHONPATH=/tmp/aiogzip-baseline/src AIOGZIP_ENGINE=stdlib \
-    uv run python benchmarks/run_benchmarks.py \
-    --category io,micro --output /tmp/bench-before.json
+# Baseline source, current runner and venv
+uv run python benchmarks/run_benchmarks.py \
+    --category io,micro --source-root /tmp/aiogzip-baseline \
+    --engine stdlib --output /tmp/bench-before.json
 
-# Current branch source
-AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
-    --category io,micro --output /tmp/bench-after.json
+# Clean candidate commit, current runner and venv
+uv run python benchmarks/run_benchmarks.py \
+    --category io,micro --source-root . \
+    --engine stdlib --output /tmp/bench-after.json
 
 # Compare
 uv run python benchmarks/bench_compare.py /tmp/bench-before.json /tmp/bench-after.json
@@ -122,9 +124,18 @@ Notes:
   venv that can resolve a *different Python version* (interpreter speed
   differences of ±10% masquerade as code regressions) and may lack the
   `fast` extra (zlib-ng vs stdlib skews read benchmarks several-fold).
-  Verify the source swap with
-  `PYTHONPATH=... python -c "import aiogzip; print(aiogzip.__file__)"`.
-- Pin the codec with `AIOGZIP_ENGINE=stdlib` on both sides.
+  With `--source-root`, the runner verifies the source swap and records
+  `aiogzip.__file__` itself.
+- Comparable captures require clean committed source roots. For an uncommitted
+  exploratory run, omit `--source-root`; the runner still verifies
+  `--engine`, but records no source/environment attestation and the comparator
+  rejects the result by design. Commit the candidate before producing a
+  before/after comparison or release evidence. Before an exploratory run,
+  confirm the environment's imported package and active engines explicitly:
+  `uv run python -c 'import aiogzip; print(aiogzip.__file__); print(aiogzip.engine_info())'`.
+- Pin the codec with `--engine stdlib` on both sides. The runner applies and
+  verifies the library's stdlib-only environment override; use
+  `--engine zlib-ng` to request and verify the optional engine.
 - Run on a quiet machine — background load skews results badly. Interleave
   several before/after rounds and compare per-benchmark *minimum* times;
   single-run deltas are noise.
@@ -233,14 +244,23 @@ Always include:
   `output_chunk_size`, and cooperative event-loop checkpoints. Adds the public
   typed `CodecOperation`. The codec API remains provisional through the alpha
   series; established asyncio APIs keep their compatibility contract.
-- **2.0.0a3 (current)** - Removes the file reader's duplicate gzip-header
+- **2.0.0a3** - Removes the file reader's duplicate gzip-header
   parser and drives live `mtime` from the shared decoder. The resulting
   last-completed-header behavior, terminal reader failure/recovery contract,
   and same-handle overlap/context-exit behavior are deliberate, reviewed
   compatibility corrections to the established asyncio API for this alpha;
   their rationale and evidence are recorded in the a3 review record.
+- **2.0.0a4** - Completes the alpha integration surface with maintained
+  fragmented-transport and concurrent-ingest examples, exact Boolean
+  validation, completed-member metadata, and the final alpha performance and
+  artifact gates.
+- **2.0.0b1 (current release)** - Freezes the documented 2.0 public API,
+  adds deterministic runtime and typing contracts, proves the supported
+  dependency floors and installed artifacts, and publishes the beta stability
+  policy. Development continues as `2.0.0b2.dev0` while the Beta classifier
+  and frozen compatibility contract remain in force.
 
 ---
 
-**Last Updated:** 2026-08-16
+**Last Updated:** 2026-09-01
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!

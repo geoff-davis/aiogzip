@@ -105,11 +105,11 @@ It requires an explicit source checkout so historical runs cannot accidentally
 import the editable package from another worktree:
 
 ```bash
-AIOGZIP_ENGINE=stdlib uv run --frozen python \
-  benchmarks/run_benchmarks.py \
+uv run --frozen python benchmarks/run_benchmarks.py \
   --category regressions \
   --regression-profile quick \
   --regression-mode throughput \
+  --engine stdlib \
   --source-root . \
   --repeat 3 \
   --output /tmp/aiogzip-regressions.json
@@ -132,13 +132,25 @@ individual duration samples, median absolute deviation, fixture hashes, source
 item statistics, the resolved package file and commit, Python/OS/engine
 details, the lockfile hash, and the regression-harness hash.
 
+Every capture that supplies `--source-root` must also pass `--engine stdlib` or
+`--engine zlib-ng`. The CLI applies the library's real selection contract:
+stdlib sets `AIOGZIP_ENGINE=stdlib`, while zlib-ng removes that stdlib-only
+override and verifies that zlib-ng is active. `AIOGZIP_ENGINE=stdlib` remains a
+backward-compatible shorthand when `--engine` is omitted;
+`AIOGZIP_ENGINE=zlib-ng` is rejected because the library does not interpret it
+as a zlib-ng request. Before any timed category, the runner rejects tracked
+source changes and verifies the default compression, decompression, and
+platform-specific CRC engine fields. When `--output` is used, it atomically
+writes initial provenance, every completed category, and a late failure or
+final completion state.
+
 Use the harness from the implementation checkout while targeting detached
 historical worktrees:
 
 ```bash
 uv run --frozen python benchmarks/run_benchmarks.py \
   --category regressions --regression-profile release \
-  --regression-mode all \
+  --regression-mode all --engine zlib-ng \
   --source-root /tmp/aiogzip-v2.0.0a1-regression \
   --repeat 5 --output /tmp/v2.0.0a1-regressions.json
 ```
@@ -227,6 +239,41 @@ comparison surface. The JSONL digest is updated incrementally inside the timed
 region so the benchmark does not retain all decoded rows. Binary and
 concurrent digests are calculated after each bounded library read completes.
 
+### Targeted same-process evidence investigation
+
+`investigate_b1_timing.py` is an evidence-only diagnostic for threshold rows
+that remain noisy across separate benchmark processes. It loads two source
+trees under distinct package aliases in one interpreter, runs configurable
+untimed A/B/B/A warm-up cycles, disables GC during measurement, and then runs
+measured A/B/B/A cycles. It reports raw samples plus per-side minima and
+medians and does not replace the locked release matrices.
+Before allocating fixtures, it requires clean tracked source trees, captures
+commit and `git describe` provenance, and verifies both packages actually use
+the requested engine. The output is checkpointed atomically after every case,
+so a late failure preserves completed measurements with `status: failed`:
+
+```bash
+candidate_commit=$(git -C . rev-parse HEAD) &&
+taskset -c 0 uv run python benchmarks/investigate_b1_timing.py \
+  --baseline-root /tmp/aiogzip-v2.0.0a4 \
+  --candidate-root . \
+  --canonical-candidate-commit "$candidate_commit" \
+  --engine stdlib --warmup-cycles 25 --cycles 50 \
+  --output /tmp/aiogzip-b1-targeted-stdlib.json
+```
+
+Run it once per required engine only after retaining the original threshold
+crossing and the interleaved process-level follow-up. The example above puts
+the a4 source on the raw baseline side and the b1 source on the raw candidate
+side, so its default `--canonical-candidate-side candidate` is correct. If the
+roots are reversed instead (b1 as `--baseline-root`, a4 as
+`--candidate-root`), pass `--canonical-candidate-side baseline` and obtain
+`--canonical-candidate-commit` from the b1 baseline root. The required commit
+independently binds the side choice to the expected exact source. Treat the
+diagnostic's minimum comparison as an investigation result, not a standalone
+performance claim; inspect medians and temporal slices for drift before using
+it to adjudicate a threshold.
+
 ## Running Benchmarks
 
 ### Command Line Options
@@ -242,6 +289,8 @@ Options:
   --repeat N           Run each category N times, report median (default: 3)
   --output, -o FILE    Save results to JSON file
   --source-root PATH   Verify and import aiogzip from PATH/src
+  --engine {stdlib,zlib-ng}
+                       Require and record the active engine
   --regression-profile {quick,release}
                        Select the regression matrix size
   --regression-mode {throughput,memory,ticker,all}
@@ -276,11 +325,14 @@ per-call async overhead as separate effects.
 ## Before/After Regression Workflow
 
 For changes to codecs, buffering, text decoding, line iteration, executor
-offloading, or parser hot paths, capture a baseline before editing:
+offloading, or parser hot paths, capture clean baseline and candidate commits
+from explicit source worktrees:
 
 ```bash
-AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
+uv run python benchmarks/run_benchmarks.py \
   --category io,scenarios,concurrency --size 8 --repeat 5 \
+  --engine stdlib \
+  --source-root /tmp/aiogzip-before \
   --output /tmp/aiogzip-before.json
 ```
 
@@ -288,15 +340,26 @@ Run the identical command after the change, using a different output file,
 then compare the results:
 
 ```bash
-AIOGZIP_ENGINE=stdlib uv run python benchmarks/run_benchmarks.py \
+uv run python benchmarks/run_benchmarks.py \
   --category io,scenarios,concurrency --size 8 --repeat 5 \
+  --engine stdlib \
+  --source-root /tmp/aiogzip-after \
   --output /tmp/aiogzip-after.json
 
 uv run python benchmarks/bench_compare.py \
   /tmp/aiogzip-before.json /tmp/aiogzip-after.json
 ```
 
-Repeat without `AIOGZIP_ENGINE=stdlib` when the change can affect zlib-ng.
+Repeat with `--engine zlib-ng` when the change can affect zlib-ng. The
+comparison tool rejects schema, source-attestation, and engine mismatches
+before displaying timing changes. Use `--allow-legacy` only for retained
+pre-hardening schema-v2 captures; it preserves comparison access while
+printing the missing status or inferred-engine provenance. It does not waive a
+dirty or inconsistent source attestation. Producer-attested schema-v2 targeted
+records can be supplied directly; older schema-v2 records require
+`--allow-legacy`, and schema-v1 diagnostics are archival and unsupported. The
+targeted summary prints raw and canonical minima, medians, first-half minima,
+and temporal quarter medians.
 Record the command, environment, and any material wins or regressions in the
 review or pull request.
 
@@ -315,15 +378,21 @@ uv run python benchmarks/run_benchmarks.py --category io,memory
 # Test with larger data (10 MB)
 uv run python benchmarks/run_benchmarks.py --all --size 10
 
-# Save results for comparison
-uv run python benchmarks/run_benchmarks.py --all --output baseline.json
+# Save an attested baseline from a clean source worktree
+uv run python benchmarks/run_benchmarks.py --all --engine stdlib \
+  --source-root /tmp/aiogzip-before --output baseline.json
 
-# After making changes
-uv run python benchmarks/run_benchmarks.py --all --output current.json
+# Save an attested candidate from another clean source worktree
+uv run python benchmarks/run_benchmarks.py --all --engine stdlib \
+  --source-root /tmp/aiogzip-after --output current.json
 
 # Compare results
 uv run python benchmarks/bench_compare.py baseline.json current.json
 ```
+
+The quick, all, category, and size-only commands above are exploratory. Add an
+explicit `--engine` and `--source-root` as shown for captures that will be
+compared or retained as evidence.
 
 ### Prerequisites
 
@@ -438,16 +507,24 @@ Use `bench_compare.py` to track performance over time:
 
 ```bash
 # Establish baseline
-uv run python benchmarks/run_benchmarks.py --all --output baseline.json
+uv run python benchmarks/run_benchmarks.py --all --engine stdlib \
+  --source-root /tmp/aiogzip-before --output baseline.json
 
-# Make code changes...
+# Commit the candidate in a separate clean worktree...
 
 # Run current benchmarks
-uv run python benchmarks/run_benchmarks.py --all --output current.json
+uv run python benchmarks/run_benchmarks.py --all --engine stdlib \
+  --source-root /tmp/aiogzip-after --output current.json
 
 # Compare
 uv run python benchmarks/bench_compare.py baseline.json current.json
 ```
+
+Both files must be schema-v2 captures made with `--source-root` and an explicit
+`--engine`. The comparator rejects dirty or internally inconsistent
+source attestations and requires identical requested and active engines. It
+prints both exact source commits before the timing rows; the commits may differ
+for a before/after comparison or match for an intentional same-source control.
 
 The comparison tool shows:
 

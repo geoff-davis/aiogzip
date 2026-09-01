@@ -15,7 +15,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["gzip", "async", "asyncio", "sans-io", "codec", "compression", "decompression", "aiofiles", "zlib", "zlib-ng", "file-io"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -28,11 +28,11 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "aiofiles>=23.0.0",
+    "aiofiles>=23.2.1",
 ]
 [project.optional-dependencies]
 csv = [
-    "aiocsv>=1.2.0",
+    "aiocsv>=1.2.3",
 ]
 fast = [
     "zlib-ng>=0.4.0",
@@ -43,8 +43,8 @@ docs = [
     "mkdocstrings[python]>=0.24.0",
 ]
 # What the CI test matrix installs. mypy and types-aiofiles live here (not in
-# dev) because test_factory_typing.py shells out to `mypy --strict`; dropping
-# them would silently skip that test.
+# dev) because typing-contract tests shell out to both checkers; dropping them
+# would silently remove part of the public API gate.
 test = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24",
@@ -52,6 +52,7 @@ test = [
     "hypothesis>=6.0.0",
     "psutil",
     "mypy>=1.0.0",
+    "ty>=0.0.1a16",
     "types-aiofiles",
 ]
 dev = [
@@ -59,7 +60,6 @@ dev = [
     # Update manually with the ruff-pre-commit rev in .pre-commit-config.yaml;
     # Dependabot ignores this pin because it cannot update both locations.
     "ruff==0.15.20",
-    "ty>=0.0.1a16",
     "prek",
 ]
 [project.urls]
@@ -68,11 +68,6 @@ Documentation = "https://geoff-davis.github.io/aiogzip/"
 Changelog = "https://github.com/geoff-davis/aiogzip/blob/main/CHANGELOG.md"
 "Source Code" = "https://github.com/geoff-davis/aiogzip"
 "Bug Tracker" = "https://github.com/geoff-davis/aiogzip/issues"
-
-[tool.uv]
-# The lockfile pins the development environment only; CI deliberately installs
-# unpinned dependencies. Keep local resolution aligned with the 2.0 floor.
-environments = ["python_full_version >= '3.11'"]
 
 [tool.flit.sdist]
 include = [

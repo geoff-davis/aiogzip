@@ -10,6 +10,7 @@ These are asynchronous transport wrappers, distinct from the synchronous
 [`GzipEncoder` and `GzipDecoder`](codec.md) state machines. The wrappers own
 async-source cleanup, cancellation, backpressure, and optional executor
 offload; the codec owns gzip framing and validation and performs no I/O.
+Both chunk helpers are part of the [beta-frozen 2.0 API](stability.md).
 
 ## Decompressing
 

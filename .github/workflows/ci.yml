@@ -38,7 +38,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.0.1
 
       # Deliberately unpinned (uv.lock is not consulted): CI exercises fresh
       # dependency releases before users hit them. uv just installs faster.
@@ -52,10 +52,10 @@ jobs:
         run: ruff format --check .
 
       - name: Type check with Mypy
-        run: mypy src
+        run: mypy src tests/typing/public_api_positive.py
 
       - name: Type check with Ty
-        run: ty check src
+        run: ty check src tests/typing/public_api_positive.py
 
   build:
     # The type of runner that the job will run on
@@ -89,13 +89,19 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.0.1
 
       # Step 3: Install dependencies. The [test] extra skips lint-only
-      # tooling (ruff, ty, prek); deliberately unpinned (uv.lock is
+      # tooling (ruff and prek); deliberately unpinned (uv.lock is
       # not consulted) so CI exercises fresh dependency releases.
       - name: Install dependencies
         run: uv pip install --system -e ".[test,csv]"
+
+      # This explicit check makes the supported-Python matrix the portability
+      # gate for the structured runtime manifest. The test suite also covers
+      # deterministic capture and intentional failure cases.
+      - name: Check frozen public API manifest
+        run: python scripts/capture_public_api.py --check tests/data/public_api_2_0.json
 
       # Step 4: Run tests with pytest and coverage
       # --cov-fail-under gates against silent coverage regressions. The
@@ -134,7 +140,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install dependencies (with fast extra)
         run: uv pip install --system -e ".[test,csv,fast]"
@@ -146,6 +152,270 @@ jobs:
       - name: Run tests with stdlib forced (zlib-ng installed but disabled)
         run: |
           AIOGZIP_ENGINE=stdlib pytest -q
+
+  # Resolve nothing implicitly in this matrix: build one wheel, install it
+  # without dependencies, then add each exact runtime floor. Current test
+  # tooling is intentionally separate from the runtime compatibility promise.
+  minimum-dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [base, csv, fast, fast-forced-stdlib]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+
+      - name: Build candidate wheel
+        run: uv build --wheel --out-dir dist
+
+      - name: Create isolated test environment
+        run: |
+          uv venv --python 3.11 .minimum-venv
+          uv pip install --python .minimum-venv/bin/python \
+            "pytest>=8,<10" "pytest-asyncio>=0.24" "hypothesis>=6" \
+            psutil "mypy>=1" types-aiofiles "ty>=0.0.1a16"
+          uv pip install --python .minimum-venv/bin/python \
+            --no-deps dist/*.whl
+
+      - name: Install exact runtime floors
+        shell: bash
+        run: |
+          case "${{ matrix.mode }}" in
+            base)
+              uv pip install --python .minimum-venv/bin/python \
+                "aiofiles==23.2.1"
+              ;;
+            csv)
+              uv pip install --python .minimum-venv/bin/python \
+                "aiofiles==23.2.1" "aiocsv==1.2.3"
+              ;;
+            fast|fast-forced-stdlib)
+              uv pip install --python .minimum-venv/bin/python \
+                "aiofiles==23.2.1" "zlib-ng==0.4.0"
+              ;;
+          esac
+
+      - name: Assert exact versions and engine selection
+        shell: bash
+        run: |
+          if [[ "${{ matrix.mode }}" == "fast-forced-stdlib" ]]; then
+            AIOGZIP_ENGINE=stdlib .minimum-venv/bin/python \
+              scripts/report_runtime_versions.py \
+              --mode "${{ matrix.mode }}" --require-installed-artifact
+          else
+            .minimum-venv/bin/python scripts/report_runtime_versions.py \
+              --mode "${{ matrix.mode }}" --require-installed-artifact
+          fi
+
+      - name: Check installed public API and typing contract
+        if: matrix.mode == 'base'
+        shell: bash
+        run: |
+          temporary_workdir="$(mktemp -d)"
+          cd "$temporary_workdir"
+          "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
+            "$GITHUB_WORKSPACE/scripts/capture_public_api.py" \
+            --check "$GITHUB_WORKSPACE/tests/data/public_api_2_0.json"
+          "$GITHUB_WORKSPACE/.minimum-venv/bin/python" -m mypy --strict \
+            "$GITHUB_WORKSPACE/tests/typing/public_api_positive.py"
+          "$GITHUB_WORKSPACE/.minimum-venv/bin/python" -m ty check \
+            --python "$GITHUB_WORKSPACE/.minimum-venv" \
+            --python-version 3.11 --no-progress \
+            "$GITHUB_WORKSPACE/tests/typing/public_api_positive.py"
+
+      - name: Smoke installed wheel outside checkout
+        shell: bash
+        run: |
+          temporary_workdir="$(mktemp -d)"
+          package_version="$(.minimum-venv/bin/python -c \
+            'import importlib.metadata; print(importlib.metadata.version("aiogzip"))')"
+          extra_arguments=()
+          if [[ "${{ matrix.mode }}" == "fast" ]]; then
+            extra_arguments+=(--expect-fast)
+          fi
+          cd "$temporary_workdir"
+          if [[ "${{ matrix.mode }}" == "fast-forced-stdlib" ]]; then
+            AIOGZIP_ENGINE=stdlib \
+              "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
+              "$GITHUB_WORKSPACE/scripts/smoke_wheel.py" \
+              --expected-version "$package_version"
+          else
+            "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
+              "$GITHUB_WORKSPACE/scripts/smoke_wheel.py" \
+              --expected-version "$package_version" "${extra_arguments[@]}"
+          fi
+
+      - name: Run maintained examples at the base floor
+        if: matrix.mode == 'base'
+        shell: bash
+        run: |
+          temporary_workdir="$(mktemp -d)"
+          cd "$temporary_workdir"
+          "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
+            "$GITHUB_WORKSPACE/examples/fragmented_transport.py" --self-test
+          "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
+            "$GITHUB_WORKSPACE/examples/concurrent_jsonl_ingest.py" \
+            --generate-fixtures "$temporary_workdir/input" \
+            --output "$temporary_workdir/output"
+
+      - name: Run full applicable minimum-version suite
+        shell: bash
+        run: |
+          arguments=(
+            -q
+            --deselect=tests/test_benchmark_runner.py::test_source_root_attestation_identifies_current_checkout
+          )
+          if [[ "${{ matrix.mode }}" != "csv" ]]; then
+            arguments+=(--ignore=tests/test_aiocsv.py)
+          fi
+          if [[ "${{ matrix.mode }}" == "fast-forced-stdlib" ]]; then
+            AIOGZIP_ENGINE=stdlib .minimum-venv/bin/python -m pytest \
+              "${arguments[@]}"
+          else
+            .minimum-venv/bin/python -m pytest "${arguments[@]}"
+          fi
+
+  # Build and install release artifacts into clean environments outside the
+  # checkout. The Python 3.11 minimum wheel row is covered above; this matrix
+  # adds latest/base, fast, both artifact types, and platform packaging paths.
+  installed-artifacts:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.14"
+            artifact: wheel
+            mode: base
+            run_examples: false
+          - os: ubuntu-latest
+            python-version: "3.12"
+            artifact: wheel
+            mode: fast
+            run_examples: false
+          - os: windows-latest
+            python-version: "3.12"
+            artifact: wheel
+            mode: base
+            run_examples: false
+          - os: macos-latest
+            python-version: "3.12"
+            artifact: wheel
+            mode: base
+            run_examples: false
+          - os: ubuntu-latest
+            python-version: "3.12"
+            artifact: sdist
+            mode: base
+            run_examples: true
+          - os: ubuntu-latest
+            python-version: "3.12"
+            artifact: sdist
+            mode: fast
+            run_examples: false
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+
+      - name: Build candidate ${{ matrix.artifact }}
+        shell: bash
+        run: |
+          uv build --${{ matrix.artifact }} --out-dir dist
+          ARTIFACT_KIND=${{ matrix.artifact }} python -c '
+          import os
+          from pathlib import Path
+          suffix = ".whl" if os.environ["ARTIFACT_KIND"] == "wheel" else ".tar.gz"
+          paths = sorted(Path("dist").glob(f"*{suffix}"))
+          if len(paths) != 1:
+              raise SystemExit(f"expected one {suffix} artifact, got {paths!r}")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as output:
+              print(f"ARTIFACT_PATH={paths[0].resolve()}", file=output)
+          '
+
+      - name: Create clean environment outside checkout
+        shell: bash
+        run: |
+          environment_root="$RUNNER_TEMP/aiogzip-artifact-venv"
+          uv venv --python "${{ matrix.python-version }}" "$environment_root"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            artifact_python="$environment_root/Scripts/python.exe"
+          else
+            artifact_python="$environment_root/bin/python"
+          fi
+          echo "ARTIFACT_PYTHON=$artifact_python" >> "$GITHUB_ENV"
+
+      - name: Install artifact and latest runtime dependencies
+        shell: bash
+        run: |
+          uv pip install --python "$ARTIFACT_PYTHON" \
+            pytest pytest-asyncio aiofiles aiocsv
+          if [[ "${{ matrix.mode }}" == "fast" ]]; then
+            uv pip install --python "$ARTIFACT_PYTHON" zlib-ng
+          fi
+          uv pip install --python "$ARTIFACT_PYTHON" \
+            --no-deps "$ARTIFACT_PATH"
+
+      - name: Smoke installed artifact outside checkout
+        shell: bash
+        run: |
+          run_directory="$RUNNER_TEMP/aiogzip-artifact-run"
+          mkdir -p "$run_directory"
+          package_version="$("$ARTIFACT_PYTHON" -c \
+            'import importlib.metadata; print(importlib.metadata.version("aiogzip"))')"
+          cd "$run_directory"
+          "$ARTIFACT_PYTHON" \
+            "$GITHUB_WORKSPACE/scripts/smoke_installed_artifact.py" \
+            --expected-version "$package_version" \
+            --expected-engine "${{ matrix.mode == 'fast' && 'zlib-ng' || 'stdlib-zlib' }}" \
+            --require-aiocsv \
+            --artifact "$ARTIFACT_PATH" \
+            --artifact-kind "${{ matrix.artifact }}" \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --api-script "$GITHUB_WORKSPACE/scripts/capture_public_api.py" \
+            --api-manifest "$GITHUB_WORKSPACE/tests/data/public_api_2_0.json" \
+            --report-output "$GITHUB_WORKSPACE/artifact-report.json"
+
+      - name: Run maintained example success and failure scenarios
+        if: matrix.run_examples
+        shell: bash
+        run: |
+          run_directory="$RUNNER_TEMP/aiogzip-example-runner"
+          mkdir -p "$run_directory"
+          cd "$run_directory"
+          "$ARTIFACT_PYTHON" \
+            "$GITHUB_WORKSPACE/scripts/run_maintained_examples.py" \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --report-output "$GITHUB_WORKSPACE/example-report.json"
+
+      - name: Upload artifact validation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: installed-${{ matrix.artifact }}-${{ matrix.os }}-${{ matrix.python-version }}-${{ matrix.mode }}
+          path: |
+            artifact-report.json
+            example-report.json
+          if-no-files-found: warn
 
   # Posts the coverage comment from the ubuntu/3.12 build leg's uploaded
   # .coverage data — no dependency install or duplicate test run needed.

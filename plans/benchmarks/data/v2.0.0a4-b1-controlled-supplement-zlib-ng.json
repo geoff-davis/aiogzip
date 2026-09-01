@@ -1,0 +1,524 @@
+{
+  "schema_version": 1,
+  "benchmark": "aiogzip-2.0.0a4-integration-supplement",
+  "created_at_unix": 1788206170.202198,
+  "command": [
+    "/home/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "/home/geoff/Projects/personal/aiogzip/benchmarks/bench_a4_supplement.py",
+    "--source-root",
+    "/tmp/aiogzip-b1-a4-worktree",
+    "--engine",
+    "zlib-ng",
+    "--repeat",
+    "9",
+    "--output",
+    "plans/benchmarks/data/v2.0.0a4-b1-controlled-supplement-zlib-ng.json"
+  ],
+  "configuration": {
+    "jsonl_mib": 8,
+    "binary_mib": 16,
+    "concurrent_mib": 4,
+    "concurrent_streams": 4,
+    "batch_hint": 1048576,
+    "repeat": 9,
+    "warm_up_policy": "one untimed verified run per throughput row",
+    "ordering_policy": "fixed category order; no randomization",
+    "garbage_collection_policy": "normal interpreter policy",
+    "digest_policy": "incremental JSONL digest inside timed region; other digests after read"
+  },
+  "source": {
+    "source_root": "/tmp/aiogzip-b1-a4-worktree",
+    "aiogzip_file": "/tmp/aiogzip-b1-a4-worktree/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a4",
+    "commit": "262d9a5a0eb5f84fc54432e968b845b182fd255c",
+    "describe": "v2.0.0a4",
+    "dirty_tracked": false,
+    "requested_engine": "zlib-ng",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "zlib-ng",
+      "crc32": "zlib-ng"
+    }
+  },
+  "environment": {
+    "source_root": "/tmp/aiogzip-b1-a4-worktree",
+    "aiogzip_file": "/tmp/aiogzip-b1-a4-worktree/src/aiogzip/__init__.py",
+    "package_version": "2.0.0a4",
+    "commit": "262d9a5a0eb5f84fc54432e968b845b182fd255c",
+    "describe": "v2.0.0a4",
+    "dirty_tracked": false,
+    "requested_engine": "zlib-ng",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "zlib-ng",
+      "crc32": "zlib-ng"
+    },
+    "runner_root": "/home/geoff/Projects/personal/aiogzip",
+    "runner_commit": "08f2517798d671cd8f3586cd1b6636a4a02f49fd",
+    "harness_sha256": "2160a73e63d4f5986aec1205aed7fba422d7b860327d0256c32da7064954dd13",
+    "fixture_generator_version": "a3-fixtures-v1",
+    "python_implementation": "CPython",
+    "python_version": "3.12.12 (main, Dec 17 2025, 21:10:06) [Clang 21.1.4 ]",
+    "python_executable": "/home/geoff/Projects/personal/aiogzip/.venv/bin/python3",
+    "python_build": [
+      "main",
+      "Dec 17 2025 21:10:06"
+    ],
+    "python_config_args": "'--build=x86_64-unknown-linux-gnu' '--host=x86_64-unknown-linux-gnu' '--prefix=/install' '--with-openssl=/tools/deps' '--with-system-expat' '--with-system-libmpdec' '--without-ensurepip' '--with-readline=editline' '--enable-static-libpython-for-interpreter' '--enable-shared' '--enable-optimizations' '--enable-bolt' '--with-lto' '--with-build-python=/tools/host/bin/python3.12' '--with-dbmliborder=bdb' 'build_alias=x86_64-unknown-linux-gnu' 'host_alias=x86_64-unknown-linux-gnu' 'PKG_CONFIG=pkg-config --static' 'PKG_CONFIG_PATH=/tools/deps/share/pkgconfig:/tools/deps/lib/pkgconfig' 'CC=clang' 'CFLAGS=-O3 -fPIC ' 'LDFLAGS= -Wl,--exclude-libs,ALL -LModules/_hacl' 'CPPFLAGS=-O3 -fPIC ' 'PROFILE_TASK=-m test --pgo'",
+    "python_compiler": "Clang 21.1.4 ",
+    "os": "Linux",
+    "os_release": "6.17.0-41-generic",
+    "kernel": "#41-Ubuntu SMP PREEMPT_DYNAMIC Sat Jun 20 18:01:40 UTC 2026",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.42"
+    ],
+    "processor": "",
+    "logical_cores": 32,
+    "physical_cores": 16,
+    "ram_bytes": 131894407168,
+    "cpu_affinity": [
+      0
+    ],
+    "cpu_policy": {
+      "governors": [
+        "powersave"
+      ],
+      "boost": "enabled"
+    },
+    "system_load": [
+      0.4326171875,
+      0.82666015625,
+      0.82421875
+    ],
+    "power_source": "ACAD:1,ucsi-source-psy-USBC000:001:0,ucsi-source-psy-USBC000:002:0",
+    "benchmark_filesystem": {
+      "path": "/tmp/aiogzip-b1-a4-worktree",
+      "device": "tmpfs",
+      "type": "tmpfs",
+      "mount": "/tmp"
+    },
+    "temporary_filesystem": {
+      "path": "/tmp",
+      "device": "tmpfs",
+      "type": "tmpfs",
+      "mount": "/tmp"
+    },
+    "temporary_directory": "/tmp",
+    "zlib_compile_version": "1.3.1",
+    "zlib_runtime_version": "1.3.1",
+    "zlib_ng_package_version": "1.0.0",
+    "uv_version": "uv 0.9.22",
+    "uv_lock_sha256": "5956b3a0e8d4ea2d84706ee16275830f4431e629bce0cf0526e5410feab6bcf4",
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      700,
+      10,
+      10
+    ]
+  },
+  "fixtures": {
+    "jsonl": {
+      "generator_version": "a4-supplement-fixtures-v1",
+      "payload_bytes": 8388617,
+      "payload_sha256": "5e4170ff15dc9f85bf01013a1e8f3123cbd8794abfb083223d49d0bd7b7ef9e8",
+      "line_count": 185227
+    },
+    "binary": {
+      "generator_version": "a4-supplement-fixtures-v1",
+      "payload_bytes": 16777216,
+      "payload_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4"
+    },
+    "concurrent": [
+      {
+        "generator_version": "a4-supplement-fixtures-v1",
+        "stream": 0,
+        "payload_bytes": 4194304,
+        "payload_sha256": "033a883764f6853ba5f992b7bc5677cde7fb7a7a2884eb78bdb15a70c9ef9867"
+      },
+      {
+        "generator_version": "a4-supplement-fixtures-v1",
+        "stream": 1,
+        "payload_bytes": 4194304,
+        "payload_sha256": "a85e2e6ef10f2c8af58653262a1b2b173ee32f602e87a7e3e9ea722d1cf23454"
+      },
+      {
+        "generator_version": "a4-supplement-fixtures-v1",
+        "stream": 2,
+        "payload_bytes": 4194304,
+        "payload_sha256": "336ea12134b601dab66ad1de6e3c8d6519adbfe685baf6e68f3feab037814724"
+      },
+      {
+        "generator_version": "a4-supplement-fixtures-v1",
+        "stream": 3,
+        "payload_bytes": 4194304,
+        "payload_sha256": "82f0d75a11521b52d6146e42a228331aa989b4da513fbffbb83bac47e10e5de9"
+      }
+    ]
+  },
+  "results": [
+    {
+      "name": "bounded JSONL iter_batches",
+      "category": "integration-jsonl",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.029499107971787453,
+        0.02970651024952531,
+        0.029402284882962704,
+        0.029242643155157566,
+        0.02920035319402814,
+        0.029340608045458794,
+        0.029211463872343302,
+        0.03016798384487629,
+        0.029758849646896124
+      ],
+      "median_seconds": 0.029402284882962704,
+      "median_absolute_deviation_seconds": 0.00019082101061940193,
+      "minimum_seconds": 0.02920035319402814,
+      "maximum_seconds": 0.03016798384487629,
+      "sample_count": 9,
+      "sample_metrics": [
+        {
+          "duration_seconds": 0.029499107971787453,
+          "output_bytes": 8388617,
+          "output_sha256": "5e4170ff15dc9f85bf01013a1e8f3123cbd8794abfb083223d49d0bd7b7ef9e8",
+          "line_count": 185227,
+          "batch_count": 8,
+          "batch_hint_chars": 1048576,
+          "maximum_batch_chars": 1048615,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.02970651024952531,
+          "output_bytes": 8388617,
+          "output_sha256": "5e4170ff15dc9f85bf01013a1e8f3123cbd8794abfb083223d49d0bd7b7ef9e8",
+          "line_count": 185227,
+          "batch_count": 8,
+          "batch_hint_chars": 1048576,
+          "maximum_batch_chars": 1048615,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.029402284882962704,
+          "output_bytes": 8388617,
+          "output_sha256": "5e4170ff15dc9f85bf01013a1e8f3123cbd8794abfb083223d49d0bd7b7ef9e8",
+          "line_count": 185227,
+          "batch_count": 8,
+          "batch_hint_chars": 1048576,
+          "maximum_batch_chars": 1048615,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.029242643155157566,
+          "output_bytes": 8388617,
+          "output_sha256": "5e4170ff15dc9f85bf01013a1e8f3123cbd8794abfb083223d49d0bd7b7ef9e8",
+          "line_count": 185227,
+          "batch_count": 8,
+          "batch_hint_chars": 1048576,
+          "maximum_batch_chars": 1048615,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.02920035319402814,
+          "output_bytes": 8388617,
+          "output_sha256": "5e4170ff15dc9f85bf01013a1e8f3123cbd8794abfb083223d49d0bd7b7ef9e8",
+          "line_count": 185227,
+          "batch_count": 8,
+          "batch_hint_chars": 1048576,
+          "maximum_batch_chars": 1048615,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.029340608045458794,
+          "output_bytes": 8388617,
+          "output_sha256": "5e4170ff15dc9f85bf01013a1e8f3123cbd8794abfb083223d49d0bd7b7ef9e8",
+          "line_count": 185227,
+          "batch_count": 8,
+          "batch_hint_chars": 1048576,
+          "maximum_batch_chars": 1048615,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.029211463872343302,
+          "output_bytes": 8388617,
+          "output_sha256": "5e4170ff15dc9f85bf01013a1e8f3123cbd8794abfb083223d49d0bd7b7ef9e8",
+          "line_count": 185227,
+          "batch_count": 8,
+          "batch_hint_chars": 1048576,
+          "maximum_batch_chars": 1048615,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.03016798384487629,
+          "output_bytes": 8388617,
+          "output_sha256": "5e4170ff15dc9f85bf01013a1e8f3123cbd8794abfb083223d49d0bd7b7ef9e8",
+          "line_count": 185227,
+          "batch_count": 8,
+          "batch_hint_chars": 1048576,
+          "maximum_batch_chars": 1048615,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.029758849646896124,
+          "output_bytes": 8388617,
+          "output_sha256": "5e4170ff15dc9f85bf01013a1e8f3123cbd8794abfb083223d49d0bd7b7ef9e8",
+          "line_count": 185227,
+          "batch_count": 8,
+          "batch_hint_chars": 1048576,
+          "maximum_batch_chars": 1048615,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        }
+      ]
+    },
+    {
+      "name": "full binary read throughput",
+      "category": "integration-memory",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.005617890041321516,
+        0.005356324836611748,
+        0.005433251149952412,
+        0.005582123063504696,
+        0.005556182935833931,
+        0.005802839994430542,
+        0.005837665870785713,
+        0.005285360850393772,
+        0.005350564140826464
+      ],
+      "median_seconds": 0.005556182935833931,
+      "median_absolute_deviation_seconds": 0.00019985809922218323,
+      "minimum_seconds": 0.005285360850393772,
+      "maximum_seconds": 0.005837665870785713,
+      "sample_count": 9,
+      "sample_metrics": [
+        {
+          "duration_seconds": 0.005617890041321516,
+          "output_bytes": 16777216,
+          "output_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4",
+          "peak_python_bytes": null,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.005356324836611748,
+          "output_bytes": 16777216,
+          "output_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4",
+          "peak_python_bytes": null,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.005433251149952412,
+          "output_bytes": 16777216,
+          "output_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4",
+          "peak_python_bytes": null,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.005582123063504696,
+          "output_bytes": 16777216,
+          "output_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4",
+          "peak_python_bytes": null,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.005556182935833931,
+          "output_bytes": 16777216,
+          "output_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4",
+          "peak_python_bytes": null,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.005802839994430542,
+          "output_bytes": 16777216,
+          "output_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4",
+          "peak_python_bytes": null,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.005837665870785713,
+          "output_bytes": 16777216,
+          "output_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4",
+          "peak_python_bytes": null,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.005285360850393772,
+          "output_bytes": 16777216,
+          "output_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4",
+          "peak_python_bytes": null,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        },
+        {
+          "duration_seconds": 0.005350564140826464,
+          "output_bytes": 16777216,
+          "output_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4",
+          "peak_python_bytes": null,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        }
+      ]
+    },
+    {
+      "name": "full binary read peak allocation",
+      "category": "integration-memory",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.009400818962603807
+      ],
+      "median_seconds": 0.009400818962603807,
+      "median_absolute_deviation_seconds": 0.0,
+      "minimum_seconds": 0.009400818962603807,
+      "maximum_seconds": 0.009400818962603807,
+      "sample_count": 1,
+      "sample_metrics": [
+        {
+          "duration_seconds": 0.009400818962603807,
+          "output_bytes": 16777216,
+          "output_sha256": "26e05bcfa44beeb3c290eda81aa8c952bfcaad7905dc656558e696557650c9f4",
+          "peak_python_bytes": 33576308,
+          "source_read_count": "not instrumented: path-backed aiofiles source"
+        }
+      ]
+    },
+    {
+      "name": "concurrent independent-file reads",
+      "category": "integration-concurrency",
+      "status": "ok",
+      "duration_samples_seconds": [
+        0.014405277092009783,
+        0.013506616931408644,
+        0.012796554248780012,
+        0.013042639009654522,
+        0.013124534860253334,
+        0.013123491778969765,
+        0.012694980949163437,
+        0.01238627778366208,
+        0.012958509847521782
+      ],
+      "median_seconds": 0.013042639009654522,
+      "median_absolute_deviation_seconds": 0.0002460847608745098,
+      "minimum_seconds": 0.01238627778366208,
+      "maximum_seconds": 0.014405277092009783,
+      "sample_count": 9,
+      "sample_metrics": [
+        {
+          "duration_seconds": 0.014405277092009783,
+          "stream_count": 4,
+          "maximum_active_handles": 4,
+          "output_bytes": 16777216,
+          "output_sha256_by_stream": [
+            "033a883764f6853ba5f992b7bc5677cde7fb7a7a2884eb78bdb15a70c9ef9867",
+            "a85e2e6ef10f2c8af58653262a1b2b173ee32f602e87a7e3e9ea722d1cf23454",
+            "336ea12134b601dab66ad1de6e3c8d6519adbfe685baf6e68f3feab037814724",
+            "82f0d75a11521b52d6146e42a228331aa989b4da513fbffbb83bac47e10e5de9"
+          ],
+          "source_read_count": "not instrumented: path-backed aiofiles sources"
+        },
+        {
+          "duration_seconds": 0.013506616931408644,
+          "stream_count": 4,
+          "maximum_active_handles": 4,
+          "output_bytes": 16777216,
+          "output_sha256_by_stream": [
+            "033a883764f6853ba5f992b7bc5677cde7fb7a7a2884eb78bdb15a70c9ef9867",
+            "a85e2e6ef10f2c8af58653262a1b2b173ee32f602e87a7e3e9ea722d1cf23454",
+            "336ea12134b601dab66ad1de6e3c8d6519adbfe685baf6e68f3feab037814724",
+            "82f0d75a11521b52d6146e42a228331aa989b4da513fbffbb83bac47e10e5de9"
+          ],
+          "source_read_count": "not instrumented: path-backed aiofiles sources"
+        },
+        {
+          "duration_seconds": 0.012796554248780012,
+          "stream_count": 4,
+          "maximum_active_handles": 4,
+          "output_bytes": 16777216,
+          "output_sha256_by_stream": [
+            "033a883764f6853ba5f992b7bc5677cde7fb7a7a2884eb78bdb15a70c9ef9867",
+            "a85e2e6ef10f2c8af58653262a1b2b173ee32f602e87a7e3e9ea722d1cf23454",
+            "336ea12134b601dab66ad1de6e3c8d6519adbfe685baf6e68f3feab037814724",
+            "82f0d75a11521b52d6146e42a228331aa989b4da513fbffbb83bac47e10e5de9"
+          ],
+          "source_read_count": "not instrumented: path-backed aiofiles sources"
+        },
+        {
+          "duration_seconds": 0.013042639009654522,
+          "stream_count": 4,
+          "maximum_active_handles": 4,
+          "output_bytes": 16777216,
+          "output_sha256_by_stream": [
+            "033a883764f6853ba5f992b7bc5677cde7fb7a7a2884eb78bdb15a70c9ef9867",
+            "a85e2e6ef10f2c8af58653262a1b2b173ee32f602e87a7e3e9ea722d1cf23454",
+            "336ea12134b601dab66ad1de6e3c8d6519adbfe685baf6e68f3feab037814724",
+            "82f0d75a11521b52d6146e42a228331aa989b4da513fbffbb83bac47e10e5de9"
+          ],
+          "source_read_count": "not instrumented: path-backed aiofiles sources"
+        },
+        {
+          "duration_seconds": 0.013124534860253334,
+          "stream_count": 4,
+          "maximum_active_handles": 4,
+          "output_bytes": 16777216,
+          "output_sha256_by_stream": [
+            "033a883764f6853ba5f992b7bc5677cde7fb7a7a2884eb78bdb15a70c9ef9867",
+            "a85e2e6ef10f2c8af58653262a1b2b173ee32f602e87a7e3e9ea722d1cf23454",
+            "336ea12134b601dab66ad1de6e3c8d6519adbfe685baf6e68f3feab037814724",
+            "82f0d75a11521b52d6146e42a228331aa989b4da513fbffbb83bac47e10e5de9"
+          ],
+          "source_read_count": "not instrumented: path-backed aiofiles sources"
+        },
+        {
+          "duration_seconds": 0.013123491778969765,
+          "stream_count": 4,
+          "maximum_active_handles": 4,
+          "output_bytes": 16777216,
+          "output_sha256_by_stream": [
+            "033a883764f6853ba5f992b7bc5677cde7fb7a7a2884eb78bdb15a70c9ef9867",
+            "a85e2e6ef10f2c8af58653262a1b2b173ee32f602e87a7e3e9ea722d1cf23454",
+            "336ea12134b601dab66ad1de6e3c8d6519adbfe685baf6e68f3feab037814724",
+            "82f0d75a11521b52d6146e42a228331aa989b4da513fbffbb83bac47e10e5de9"
+          ],
+          "source_read_count": "not instrumented: path-backed aiofiles sources"
+        },
+        {
+          "duration_seconds": 0.012694980949163437,
+          "stream_count": 4,
+          "maximum_active_handles": 4,
+          "output_bytes": 16777216,
+          "output_sha256_by_stream": [
+            "033a883764f6853ba5f992b7bc5677cde7fb7a7a2884eb78bdb15a70c9ef9867",
+            "a85e2e6ef10f2c8af58653262a1b2b173ee32f602e87a7e3e9ea722d1cf23454",
+            "336ea12134b601dab66ad1de6e3c8d6519adbfe685baf6e68f3feab037814724",
+            "82f0d75a11521b52d6146e42a228331aa989b4da513fbffbb83bac47e10e5de9"
+          ],
+          "source_read_count": "not instrumented: path-backed aiofiles sources"
+        },
+        {
+          "duration_seconds": 0.01238627778366208,
+          "stream_count": 4,
+          "maximum_active_handles": 4,
+          "output_bytes": 16777216,
+          "output_sha256_by_stream": [
+            "033a883764f6853ba5f992b7bc5677cde7fb7a7a2884eb78bdb15a70c9ef9867",
+            "a85e2e6ef10f2c8af58653262a1b2b173ee32f602e87a7e3e9ea722d1cf23454",
+            "336ea12134b601dab66ad1de6e3c8d6519adbfe685baf6e68f3feab037814724",
+            "82f0d75a11521b52d6146e42a228331aa989b4da513fbffbb83bac47e10e5de9"
+          ],
+          "source_read_count": "not instrumented: path-backed aiofiles sources"
+        },
+        {
+          "duration_seconds": 0.012958509847521782,
+          "stream_count": 4,
+          "maximum_active_handles": 4,
+          "output_bytes": 16777216,
+          "output_sha256_by_stream": [
+            "033a883764f6853ba5f992b7bc5677cde7fb7a7a2884eb78bdb15a70c9ef9867",
+            "a85e2e6ef10f2c8af58653262a1b2b173ee32f602e87a7e3e9ea722d1cf23454",
+            "336ea12134b601dab66ad1de6e3c8d6519adbfe685baf6e68f3feab037814724",
+            "82f0d75a11521b52d6146e42a228331aa989b4da513fbffbb83bac47e10e5de9"
+          ],
+          "source_read_count": "not instrumented: path-backed aiofiles sources"
+        }
+      ]
+    }
+  ],
+  "discarded_or_excluded_runs": []
+}
