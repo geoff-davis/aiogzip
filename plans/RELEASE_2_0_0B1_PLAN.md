@@ -1456,49 +1456,49 @@ confirmation on its exact release-candidate head.
 - [x] Ensure `SECURITY.md` supports the latest beta line.
 - [x] Ensure dependency floors match tested floors.
 - [x] Run version-sync tests.
-- [ ] Run full lint, formatting, typing, docs, and test suites.
+- [x] Run full lint, formatting, typing, docs, and test suites.
 - [x] Run public API contract generation in check mode.
-- [ ] Build wheel and sdist from a clean checkout.
-- [ ] Run `twine check` or repository-equivalent metadata validation.
-- [ ] Inspect wheel and sdist file lists.
-- [ ] Confirm `py.typed` is present.
-- [ ] Confirm examples, docs, changelog, security policy, and required source files are included according to packaging policy.
-- [ ] Confirm no benchmark raw data or local artifacts are accidentally packaged unless intended.
-- [ ] Install wheel and sdist in clean environments.
+- [x] Build wheel and sdist from a clean checkout.
+- [x] Run `twine check` or repository-equivalent metadata validation.
+- [x] Inspect wheel and sdist file lists.
+- [x] Confirm `py.typed` is present.
+- [x] Confirm examples, docs, changelog, security policy, and required source files are included according to packaging policy.
+- [x] Confirm no benchmark raw data or local artifacts are accidentally packaged unless intended.
+- [x] Install wheel and sdist in clean environments.
 - [ ] Run installed-artifact matrix.
-- [ ] Build artifacts a second time with identical `SOURCE_DATE_EPOCH`.
-- [ ] Compare wheel hashes exactly.
-- [ ] Compare sdist hashes exactly.
-- [ ] Record sizes and SHA-256 values.
-- [ ] Record exact source commit and clean status.
+- [x] Build artifacts a second time with identical `SOURCE_DATE_EPOCH`.
+- [x] Compare wheel hashes exactly.
+- [x] Compare sdist hashes exactly.
+- [x] Record sizes and SHA-256 values.
+- [x] Record exact source commit and clean status.
 - [ ] Record all CI workflow run identifiers once available.
-- [ ] Prepare GitHub release notes.
-- [ ] Prepare PyPI smoke commands.
-- [ ] Prepare documentation-deployment verification commands.
+- [x] Prepare GitHub release notes.
+- [x] Prepare PyPI smoke commands.
+- [x] Prepare documentation-deployment verification commands.
 
 #### WP8 release-note content
 
-- [ ] Explain that this is the first beta and the 2.0 public API is frozen.
-- [ ] Summarize the machine-readable API and typing contract.
-- [ ] Summarize minimum-dependency CI and the corrected `aiofiles>=23.2.1` and `aiocsv>=1.2.3` floors.
-- [ ] Summarize beta documentation and support-policy updates.
-- [ ] State that runtime behavior is intentionally preserved from `a4`.
-- [ ] State that AnyIO/Trio and indexed access remain deferred.
-- [ ] State the small-write semantics and batching recommendation without claiming the historical difference from `v1.11.0` was optimized away.
-- [ ] State that issue `#86` is being closed as an accepted 2.0 design tradeoff, while the tiny-write benchmark remains part of regression testing.
-- [ ] Link the maintained examples.
-- [ ] Include Python and engine support.
+- [x] Explain that this is the first beta and the 2.0 public API is frozen.
+- [x] Summarize the machine-readable API and typing contract.
+- [x] Summarize minimum-dependency CI and the corrected `aiofiles>=23.2.1` and `aiocsv>=1.2.3` floors.
+- [x] Summarize beta documentation and support-policy updates.
+- [x] State that runtime behavior is intentionally preserved from `a4`.
+- [x] State that AnyIO/Trio and indexed access remain deferred.
+- [x] State the small-write semantics and batching recommendation without claiming the historical difference from `v1.11.0` was optimized away.
+- [x] State that issue `#86` is being closed as an accepted 2.0 design tradeoff, while the tiny-write benchmark remains part of regression testing.
+- [x] Link the maintained examples.
+- [x] Include Python and engine support.
 - [ ] Include artifact hashes and provenance after publication evidence exists.
-- [ ] Avoid new benchmark marketing claims unsupported by candidate evidence.
+- [x] Avoid new benchmark marketing claims unsupported by candidate evidence.
 
 #### WP8 exit criteria
 
-- [ ] The candidate version and classifier are correct.
+- [x] The candidate version and classifier are correct.
 - [ ] All release gates pass on the exact candidate SHA.
-- [ ] Artifacts are reproducible.
-- [ ] Wheel and sdist installed tests pass.
+- [x] Artifacts are reproducible.
+- [x] Wheel and sdist installed tests pass.
 - [ ] Independent approval covers the exact candidate.
-- [ ] No maintainer-only action is falsely marked complete.
+- [x] No maintainer-only action is falsely marked complete.
 
 **Suggested commit:** `Release: prepare aiogzip 2.0.0b1`
 
