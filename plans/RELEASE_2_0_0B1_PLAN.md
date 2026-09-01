@@ -1352,9 +1352,12 @@ The corrected record enumerates gated throughput slowdowns, the -6.13%
 same-source speedup, and the +8.08% duration change in an informational
 `tracemalloc` row. One reverse-order minimum crossed 10%. The subsequent
 targeted captures do not establish a 5% minimum-statistic noise floor: the
-high-level FCOMMENT row drifts during each run, its v3 first-half minima exceed
-the threshold in both orientations, and the high-level FNAME row has a 6.90
-percentage-point same-source swing between v2 and v3. Those rows are now
+zlib-ng high-level FCOMMENT row drifts during its retained focused runs and its
+v3 first-half minima exceed the threshold in both orientations. The v2 stdlib
+FCOMMENT record has only about 3% quarter-median spread and is not classified
+as drift. The high-level FNAME row has a 6.90 percentage-point same-source
+swing between v2 and v3 plus a -7.67% canonical first-half minimum in the
+swapped v3 capture. Those rows are now
 classified as methodologically inconclusive rather than cleared by the final
 full-capture minimum. The release attribution instead relies on the exact-a4
 and b1 runtime implementation being byte-identical apart from `__version__`;
@@ -1423,12 +1426,12 @@ The review must cover the actual candidate commit, not an earlier code head.
 - [ ] Review evidence names the reviewer, date, exact commit, scope, commands, and conclusion.
 - [ ] Codex does not claim the review complete on the reviewer's behalf.
 
-The reviews of `fa507af`, `e412cc6`, `4a6fb9f`, `5f53e96`, `daadbd0`, and
-`cdfb4d7` produced recorded findings and local dispositions, but every reviewed
-SHA is superseded and
-the supplied review text names no reviewer. The WP7 boxes above apply only to
-the eventual exact candidate head and remain unchecked until an independent
-reviewer covers that SHA.
+The reviews of `fa507af`, `e412cc6`, `4a6fb9f`, `5f53e96`, `daadbd0`,
+`cdfb4d7`, `ab9c977`, and `1f3c6a2` produced recorded findings and local
+dispositions, but every reviewed SHA is superseded and the supplied review
+text names no reviewer. The WP7 boxes above apply only to the eventual exact
+candidate head and remain unchecked until an independent reviewer covers that
+SHA.
 
 #### WP7 exit criteria
 
