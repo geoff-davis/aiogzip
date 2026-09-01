@@ -256,6 +256,7 @@ so a late failure preserves completed measurements with `status: failed`:
 taskset -c 0 uv run python benchmarks/investigate_b1_timing.py \
   --baseline-root /tmp/aiogzip-v2.0.0a4 \
   --candidate-root . \
+  --canonical-candidate-commit "$(git rev-parse HEAD)" \
   --engine stdlib --warmup-cycles 25 --cycles 50 \
   --output /tmp/aiogzip-b1-targeted-stdlib.json
 ```
@@ -263,7 +264,9 @@ taskset -c 0 uv run python benchmarks/investigate_b1_timing.py \
 Run it once per required engine only after retaining the original threshold
 crossing and the interleaved process-level follow-up. If the raw baseline and
 candidate sides are reversed, pass `--canonical-candidate-side baseline` so
-the record and comparator can orient every delta consistently. Treat its
+the record and comparator can orient every delta consistently. The required
+`--canonical-candidate-commit` independently binds that side choice to the
+expected exact source commit. Treat its
 minimum comparison as an investigation result, not a standalone performance
 claim; inspect medians and temporal slices for drift before using it to
 adjudicate a threshold.

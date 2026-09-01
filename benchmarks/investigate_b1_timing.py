@@ -282,12 +282,14 @@ def _checkpoint(
 
 def _capture_command(args: argparse.Namespace) -> list[str]:
     """Record either the exact CLI or an equivalent programmatic invocation."""
-    command = getattr(args, "command", None)
-    if (
-        isinstance(command, list)
-        and command
-        and all(isinstance(argument, str) and argument for argument in command)
-    ):
+    if hasattr(args, "command"):
+        command = args.command
+        if not (
+            isinstance(command, list)
+            and command
+            and all(isinstance(argument, str) and argument for argument in command)
+        ):
+            raise ValueError("args.command must be a non-empty list of strings")
         return list(command)
     return [
         "programmatic:investigate_b1_timing.run",
@@ -297,6 +299,7 @@ def _capture_command(args: argparse.Namespace) -> list[str]:
         f"cycles={args.cycles}",
         f"warmup_cycles={args.warmup_cycles}",
         f"canonical_candidate_side={args.canonical_candidate_side}",
+        f"canonical_candidate_commit={args.canonical_candidate_commit}",
     ]
 
 
@@ -305,6 +308,13 @@ async def run(
     *,
     checkpoint: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
+    canonical_candidate_commit = getattr(args, "canonical_candidate_commit", None)
+    if (
+        not isinstance(canonical_candidate_commit, str)
+        or not canonical_candidate_commit
+    ):
+        raise ValueError("args.canonical_candidate_commit must be a non-empty string")
+    command = _capture_command(args)
     # Git and cleanliness checks intentionally precede package loading and all
     # fixture construction so invalid provenance fails before a timed run.
     baseline_identity = _source_identity(args.baseline_root)
@@ -325,14 +335,9 @@ async def run(
     candidate_record = _complete_identity(
         candidate_identity, candidate, candidate_engines
     )
-    selected_record = (
-        baseline_record
-        if args.canonical_candidate_side == "baseline"
-        else candidate_record
-    )
     orientation = {
         "canonical_candidate_side": args.canonical_candidate_side,
-        "canonical_candidate_commit": selected_record["commit"],
+        "canonical_candidate_commit": canonical_candidate_commit,
     }
     validate_canonical_orientation(
         orientation,
@@ -359,7 +364,7 @@ async def run(
             "process_policy": "both source trees loaded under package aliases",
             "checkpoint_policy": "atomic write before timing and after every case",
         },
-        "command": _capture_command(args),
+        "command": command,
         "host": {
             "os_name": platform.system(),
             "platform": platform.platform(),
@@ -470,6 +475,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("baseline", "candidate"),
         default="candidate",
         help="which raw side is the candidate in the canonical comparison",
+    )
+    parser.add_argument(
+        "--canonical-candidate-commit",
+        required=True,
+        help="expected exact commit for the canonical candidate source",
     )
     parser.add_argument("--output", type=Path, required=True)
     return parser

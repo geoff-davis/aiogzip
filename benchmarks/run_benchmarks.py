@@ -211,24 +211,35 @@ def assert_requested_engine(
     *,
     source_label: str,
     system_name: str | None = None,
+    allow_unknown_system: bool = False,
 ) -> dict[str, str]:
     """Require the exact default engines expected for an evidence capture."""
     if requested not in {"stdlib", "zlib-ng"}:
         raise ValueError(f"unsupported requested engine: {requested}")
-    system_name = system_name or platform.system()
-    expected = {
-        "compression": "stdlib-zlib",
-        "decompression": "zlib-ng" if requested == "zlib-ng" else "stdlib-zlib",
-        "crc32": (
+    if system_name is None and not allow_unknown_system:
+        system_name = platform.system()
+    crc32_expected: str | set[str]
+    if requested == "zlib-ng" and system_name is None:
+        crc32_expected = {"stdlib-zlib", "zlib-ng"}
+    else:
+        crc32_expected = (
             "zlib-ng"
             if requested == "zlib-ng" and system_name != "Darwin"
             else "stdlib-zlib"
-        ),
+        )
+    expected = {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng" if requested == "zlib-ng" else "stdlib-zlib",
+        "crc32": crc32_expected,
     }
     mismatches = {
         field: {"expected": expected_value, "actual": engines.get(field)}
         for field, expected_value in expected.items()
-        if engines.get(field) != expected_value
+        if (
+            engines.get(field) not in expected_value
+            if isinstance(expected_value, set)
+            else engines.get(field) != expected_value
+        )
     }
     if mismatches:
         raise RuntimeError(

@@ -9,6 +9,12 @@ RAW_CHANGE_FORMULA = "(raw candidate / raw baseline - 1) * 100"
 CANONICAL_SIDES = {"baseline", "candidate"}
 
 
+def _is_archived_b1_version(version: object) -> bool:
+    return isinstance(version, str) and (
+        version == "2.0.0b1" or version.startswith("2.0.0b1.")
+    )
+
+
 def _legacy_b1_candidate_side(
     baseline: dict[str, Any], candidate: dict[str, Any]
 ) -> str | None:
@@ -19,9 +25,7 @@ def _legacy_b1_candidate_side(
     }
     a4_sides = [side for side, version in versions.items() if version == "2.0.0a4"]
     b1_sides = [
-        side
-        for side, version in versions.items()
-        if isinstance(version, str) and version.startswith("2.0.0b1")
+        side for side, version in versions.items() if _is_archived_b1_version(version)
     ]
     if len(a4_sides) == 1 and len(b1_sides) == 1 and a4_sides != b1_sides:
         return b1_sides[0]
@@ -55,7 +59,7 @@ def validate_canonical_orientation(
         warnings.append(
             f"{label}: canonical candidate side inferred from source versions"
         )
-    elif candidate_side not in CANONICAL_SIDES:
+    elif not isinstance(candidate_side, str) or candidate_side not in CANONICAL_SIDES:
         raise ValueError(f"{label} has invalid canonical_candidate_side")
 
     canonical_commit = configuration.get("canonical_candidate_commit")

@@ -237,7 +237,7 @@ def compare_results(
 
 
 def canonical_change_percent(reported: float, candidate_side: str) -> float:
-    """Orient a reported candidate/baseline delta as canonical b1 versus a4."""
+    """Orient a raw candidate/baseline delta as canonical candidate versus peer."""
     if candidate_side == "candidate":
         return reported
     if candidate_side == "baseline":
@@ -246,10 +246,15 @@ def canonical_change_percent(reported: float, candidate_side: str) -> float:
 
 
 def _quarters(samples: list[float]) -> list[list[float]]:
-    """Split retained samples into four ordered, non-empty temporal slices."""
+    """Split retained samples into at most four ordered, non-empty slices."""
+    slice_count = min(4, len(samples))
     return [
-        samples[start * len(samples) // 4 : (start + 1) * len(samples) // 4]
-        for start in range(4)
+        samples[
+            start * len(samples) // slice_count : (start + 1)
+            * len(samples)
+            // slice_count
+        ]
+        for start in range(slice_count)
     ]
 
 
@@ -346,30 +351,14 @@ def _targeted_identity(
     if active_by_side["baseline"] != active_by_side["candidate"]:
         raise ValueError(f"{label} has different active engines on its two sides")
 
-    if system_name is not None or requested == "stdlib":
-        assert_requested_engine(
-            active_by_side["baseline"],
-            requested,
-            source_label=f"{label} targeted capture",
-            system_name=system_name or "unknown",
-        )
-    else:
-        engines = active_by_side["baseline"]
-        if engines.get("compression") != "stdlib-zlib":
-            raise RuntimeError(
-                f"{label} targeted capture: compression engine mismatch: "
-                f"expected 'stdlib-zlib', got {engines.get('compression')!r}"
-            )
-        if engines.get("decompression") != "zlib-ng":
-            raise RuntimeError(
-                f"{label} targeted capture: decompression engine mismatch: "
-                f"expected 'zlib-ng', got {engines.get('decompression')!r}"
-            )
-        if engines.get("crc32") not in {"stdlib-zlib", "zlib-ng"}:
-            raise RuntimeError(
-                f"{label} targeted capture: unrecognized crc32 engine: "
-                f"{engines.get('crc32')!r}"
-            )
+    assert_requested_engine(
+        active_by_side["baseline"],
+        requested,
+        source_label=f"{label} targeted capture",
+        system_name=system_name,
+        allow_unknown_system=system_name is None,
+    )
+    if system_name is None and requested == "zlib-ng":
         warnings.append(
             f"{label}: crc32 engine cannot be checked against the platform "
             "because capture-time host OS provenance is absent"
@@ -383,6 +372,11 @@ def _targeted_identity(
         allow_legacy=allow_legacy,
     )
     warnings.extend(orientation_warnings)
+    if attestations["baseline"]["commit"] == attestations["candidate"]["commit"]:
+        warnings.append(
+            f"{label}: both sides attest the same source commit; canonical "
+            "candidate side labels measurement orientation only"
+        )
 
     return {
         "requested_engine": requested,
@@ -440,14 +434,19 @@ def summarize_targeted(
             f"{canonical_min:>+9.2f}% {canonical_median:>+9.2f}% "
             f"{canonical_first_half:>+12.2f}%"
         )
-        baseline_quarters = [
-            statistics.median(part) * 1000 for part in _quarters(baseline_samples)
-        ]
+        baseline_parts = _quarters(baseline_samples)
+        candidate_parts = _quarters(candidate_samples)
+        baseline_quarters = [statistics.median(part) * 1000 for part in baseline_parts]
         candidate_quarters = [
-            statistics.median(part) * 1000 for part in _quarters(candidate_samples)
+            statistics.median(part) * 1000 for part in candidate_parts
         ]
+        slice_label = (
+            "quarter medians"
+            if len(baseline_parts) == len(candidate_parts) == 4
+            else f"temporal slice medians ({len(baseline_parts)}/{len(candidate_parts)})"
+        )
         print(
-            "  quarter medians (ms), raw baseline/candidate: "
+            f"  {slice_label} (ms), raw baseline/candidate: "
             f"{_format_quarters(baseline_quarters)} / "
             f"{_format_quarters(candidate_quarters)}"
         )

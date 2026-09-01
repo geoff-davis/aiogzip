@@ -219,6 +219,42 @@ def test_shared_engine_guard_checks_each_field():
     )
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("compression", "unknown"),
+        ("decompression", "stdlib-zlib"),
+        ("crc32", "unknown"),
+    ],
+)
+def test_shared_engine_guard_validates_platform_unknown_records(field, value):
+    engines = {
+        "compression": "stdlib-zlib",
+        "decompression": "zlib-ng",
+        "crc32": "stdlib-zlib",
+    }
+    assert_requested_engine(
+        engines,
+        "zlib-ng",
+        source_label="legacy",
+        allow_unknown_system=True,
+    )
+    assert_requested_engine(
+        {**engines, "crc32": "zlib-ng"},
+        "zlib-ng",
+        source_label="legacy",
+        allow_unknown_system=True,
+    )
+
+    with pytest.raises(RuntimeError, match=field):
+        assert_requested_engine(
+            {**engines, field: value},
+            "zlib-ng",
+            source_label="legacy",
+            allow_unknown_system=True,
+        )
+
+
 def test_b1_investigation_attests_clean_source_before_timing(tmp_path, monkeypatch):
     package_init = tmp_path / "src" / "aiogzip" / "__init__.py"
     package_init.parent.mkdir(parents=True)
@@ -331,7 +367,13 @@ def test_b1_output_bound_discards_decoder_when_iteration_fails():
 
 
 def _mock_b1_investigation_sources(
-    tmp_path, monkeypatch, *, baseline_version="test", candidate_version="test"
+    tmp_path,
+    monkeypatch,
+    *,
+    baseline_version="test",
+    candidate_version="test",
+    baseline_commit="1111111111111111111111111111111111111111",
+    candidate_commit="2222222222222222222222222222222222222222",
 ):
     from aiogzip import EngineInfo
 
@@ -345,7 +387,7 @@ def _mock_b1_investigation_sources(
     def identity(root):
         return {
             "source_root": str(root),
-            "commit": root.name,
+            "commit": baseline_commit if root == baseline_root else candidate_commit,
             "describe": root.name,
             "dirty_tracked": False,
         }
@@ -407,6 +449,7 @@ def test_b1_investigation_checkpoints_partial_results_on_late_failure(
         cycles=1,
         warmup_cycles=1,
         canonical_candidate_side="candidate",
+        canonical_candidate_commit="2222222222222222222222222222222222222222",
     )
 
     with pytest.raises(RuntimeError, match="late failure"):
@@ -463,6 +506,7 @@ def test_b1_programmatic_capture_round_trips_through_strict_reader(
         cycles=2,
         warmup_cycles=1,
         canonical_candidate_side="candidate",
+        canonical_candidate_commit="2222222222222222222222222222222222222222",
     )
 
     capture = asyncio.run(b1_run(args))
@@ -470,11 +514,11 @@ def test_b1_programmatic_capture_round_trips_through_strict_reader(
 
     assert capture["status"] == "complete"
     assert capture["command"][0] == "programmatic:investigate_b1_timing.run"
-    assert capture["configuration"]["canonical_candidate_commit"] == "candidate"
+    assert capture["configuration"]["canonical_candidate_commit"] == "2" * 40
     assert "Canonical candidate side: candidate" in capsys.readouterr().out
 
 
-def test_b1_producer_rejects_misflagged_a4_b1_orientation_before_timing(
+def test_b1_producer_rejects_side_that_does_not_match_expected_commit(
     tmp_path, monkeypatch
 ):
     baseline_root, candidate_root = _mock_b1_investigation_sources(
@@ -495,9 +539,31 @@ def test_b1_producer_rejects_misflagged_a4_b1_orientation_before_timing(
         cycles=1,
         warmup_cycles=1,
         canonical_candidate_side="candidate",
+        canonical_candidate_commit="1111111111111111111111111111111111111111",
     )
 
-    with pytest.raises(ValueError, match="contradicts the archived a4/b1"):
+    with pytest.raises(ValueError, match="contradicts the candidate source commit"):
+        asyncio.run(b1_run(args))
+
+
+@pytest.mark.parametrize("command", [None, [], "python", ["python", ""]])
+def test_b1_capture_command_rejects_malformed_present_value(command):
+    with pytest.raises(ValueError, match="args.command must be"):
+        investigate_b1_timing._capture_command(SimpleNamespace(command=command))
+
+
+def test_b1_run_rejects_malformed_cli_command_before_source_loading(monkeypatch):
+    monkeypatch.setattr(
+        investigate_b1_timing,
+        "_source_identity",
+        lambda _root: pytest.fail("source loaded after malformed CLI provenance"),
+    )
+    args = argparse.Namespace(
+        command=["python", ""],
+        canonical_candidate_commit="2" * 40,
+    )
+
+    with pytest.raises(ValueError, match="args.command must be"):
         asyncio.run(b1_run(args))
 
 
@@ -1243,7 +1309,7 @@ def test_main_verifies_engine_without_source_root(monkeypatch, capsys):
         benchmark_started = True
         raise AssertionError("benchmark ran after failed engine verification")
 
-    monkeypatch.setenv("AIOGZIP_ENGINE", "restore-after-test")
+    monkeypatch.setenv("AIOGZIP_ENGINE", "stdlib")
     monkeypatch.setitem(sys.modules, "aiogzip", fake_aiogzip)
     monkeypatch.setattr(run_benchmarks, "run_category", fail_if_started)
     monkeypatch.setattr(
@@ -1252,16 +1318,13 @@ def test_main_verifies_engine_without_source_root(monkeypatch, capsys):
         ["run_benchmarks.py", "--quick", "--engine", "zlib-ng"],
     )
 
-    with monkeypatch.context() as engine_environment:
-        engine_environment.setenv("AIOGZIP_ENGINE", "stdlib")
-        with pytest.raises(SystemExit, match="2"):
-            asyncio.run(run_benchmarks.main())
+    with pytest.raises(SystemExit, match="2"):
+        asyncio.run(run_benchmarks.main())
 
     error = capsys.readouterr().err
     assert "engine fields do not match" in error
     assert "decompression" in error
     assert not benchmark_started
-    assert run_benchmarks.os.environ["AIOGZIP_ENGINE"] == "restore-after-test"
 
 
 def test_main_checkpoints_completed_categories_on_late_failure(tmp_path, monkeypatch):
@@ -1552,6 +1615,62 @@ def test_targeted_invalid_orientation_fails_before_output(capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_targeted_unhashable_orientation_reports_value_error(capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["canonical_candidate_side"] = []
+
+    with pytest.raises(ValueError, match="invalid canonical_candidate_side"):
+        bench_compare.summarize_targeted(capture, "invalid-list")
+
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("version", ["2.0.0b10", "2.0.0b1rc1"])
+def test_non_archival_version_is_not_treated_as_archived_b1(version, capsys):
+    capture = _targeted_capture()
+    capture["candidate"]["version"] = version
+    capture["configuration"].pop("canonical_candidate_side")
+    capture["configuration"].pop("canonical_candidate_commit")
+
+    with pytest.raises(ValueError, match="orientation cannot be inferred"):
+        bench_compare.summarize_targeted(capture, "b10", allow_legacy=True)
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_strict_mode_requires_candidate_commit_binding(capsys):
+    capture = _targeted_capture()
+    capture["configuration"].pop("canonical_candidate_commit")
+
+    with pytest.raises(
+        ValueError, match="lacks canonical_candidate_commit; use --allow-legacy"
+    ):
+        bench_compare.summarize_targeted(capture, "missing-commit")
+
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("commit", ["", 7, ["b1-commit"]])
+def test_targeted_rejects_invalid_candidate_commit_binding(commit, capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["canonical_candidate_commit"] = commit
+
+    with pytest.raises(ValueError, match="invalid canonical_candidate_commit"):
+        bench_compare.summarize_targeted(capture, "invalid-commit")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_targeted_rejects_contradictory_candidate_commit_binding(capsys):
+    capture = _targeted_capture()
+    capture["configuration"]["canonical_candidate_commit"] = "wrong-commit"
+
+    with pytest.raises(ValueError, match="contradicts the candidate source commit"):
+        bench_compare.summarize_targeted(capture, "wrong-commit")
+
+    assert capsys.readouterr().out == ""
+
+
 def test_targeted_orientation_must_match_source_versions():
     capture = _targeted_capture()
     capture["configuration"]["canonical_candidate_side"] = "baseline"
@@ -1586,7 +1705,35 @@ def test_targeted_strict_orientation_supports_future_and_same_source_pairs(
         capture, "same-source" if same_source else "future"
     )
 
-    assert "Canonical candidate side: candidate" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Canonical candidate side: candidate" in output
+    if same_source:
+        assert "both sides attest the same source commit" in output
+
+
+def test_targeted_same_source_quick_capture_uses_nonempty_temporal_slices(capsys):
+    capture = _targeted_capture()
+    capture["baseline"].update(
+        commit="same-commit",
+        describe="same-commit",
+        version="2.1.0",
+    )
+    capture["candidate"].update(
+        commit="same-commit",
+        describe="same-commit",
+        version="2.1.0",
+    )
+    capture["configuration"]["canonical_candidate_commit"] = "same-commit"
+    capture["configuration"]["cycles"] = 1
+    capture["configuration"]["samples_per_side_per_case"] = 2
+    capture["results"][0]["baseline"]["samples_seconds"] = [1.0, 1.1]
+    capture["results"][0]["candidate"]["samples_seconds"] = [1.01, 1.11]
+
+    bench_compare.summarize_targeted(capture, "quick-a-a")
+
+    output = capsys.readouterr().out
+    assert "both sides attest the same source commit" in output
+    assert "temporal slice medians (2/2)" in output
 
 
 @pytest.mark.parametrize("field", ["commit", "describe"])
