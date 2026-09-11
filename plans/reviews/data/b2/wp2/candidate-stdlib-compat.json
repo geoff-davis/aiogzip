@@ -1,0 +1,1514 @@
+{
+  "schema": 2,
+  "extended": true,
+  "source": {
+    "sha": "f66c92bbd55267eb650abd13ec1a855ab5b77d57",
+    "tree": "ff8214853f6226656a82ae3d9be3f38e3d1739cd",
+    "status": "",
+    "import": "/tmp/aiogzip-wp2-worker/src/aiogzip/__init__.py"
+  },
+  "harness": {
+    "sha": "a923f225575133dac9ca595cd7b1e8a78caa5430",
+    "tree": "d3f55d872f4949db75a6334785d29ef0fb01a9ec",
+    "status": "",
+    "path": "/tmp/aiogzip-wp2-harness/scripts/capture_file_state_trace.py"
+  },
+  "harness_sha256": "71c2a5e9ae3740c7f4f3ada600ade0dbfff6bd5c6e06a9768e53dc7d8d54d09b",
+  "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "engines": {
+    "compression": "stdlib-zlib",
+    "decompression": "stdlib-zlib",
+    "crc32": "stdlib-zlib"
+  },
+  "dependencies": {
+    "aiofiles": "25.1.0",
+    "zlib-ng": "1.0.0"
+  },
+  "fixture_sha256": "852ff69881b1e313e0dd7a7c57fb947baf36f65f2531aa76fd0663a64519ec36",
+  "command": [
+    "/tmp/aiogzip-wp2-harness/scripts/capture_file_state_trace.py",
+    "--source-root",
+    "/tmp/aiogzip-wp2-worker",
+    "--engine",
+    "stdlib",
+    "--require-clean",
+    "--extended",
+    "--output",
+    "/tmp/aiogzip-wp2-worker-evidence/candidate-stdlib-compat.json"
+  ],
+  "semantic": {
+    "text-cookie-newline=None": [
+      [
+        "H1.read",
+        2,
+        "α\n"
+      ],
+      [
+        "H1.tell",
+        "H1:C1"
+      ],
+      [
+        "H1.read",
+        5,
+        "beta\n"
+      ],
+      [
+        "H1.seek",
+        "H1:C1",
+        "H1:C1"
+      ],
+      [
+        "H1.read",
+        5,
+        "beta\n"
+      ],
+      [
+        "H2.seek",
+        "foreign:H1:C1",
+        "OSError"
+      ],
+      [
+        "H1.seek",
+        0,
+        0
+      ],
+      [
+        "H1.read",
+        -1,
+        "α\nbeta\ngamma\nlast"
+      ],
+      [
+        "H1.newlines",
+        [
+          "\r",
+          "\n",
+          "\r\n"
+        ]
+      ],
+      [
+        "H1.mtime",
+        123
+      ],
+      [
+        "closed",
+        [
+          true,
+          true
+        ]
+      ]
+    ],
+    "text-cookie-newline=''": [
+      [
+        "H1.read",
+        2,
+        "α\r"
+      ],
+      [
+        "H1.tell",
+        "H1:C1"
+      ],
+      [
+        "H1.read",
+        5,
+        "\nbeta"
+      ],
+      [
+        "H1.seek",
+        "H1:C1",
+        "H1:C1"
+      ],
+      [
+        "H1.read",
+        5,
+        "\nbeta"
+      ],
+      [
+        "H2.seek",
+        "foreign:H1:C1",
+        "OSError"
+      ],
+      [
+        "H1.seek",
+        0,
+        0
+      ],
+      [
+        "H1.read",
+        -1,
+        "α\r\nbeta\rgamma\nlast"
+      ],
+      [
+        "H1.newlines",
+        [
+          "\r",
+          "\n",
+          "\r\n"
+        ]
+      ],
+      [
+        "H1.mtime",
+        123
+      ],
+      [
+        "closed",
+        [
+          true,
+          true
+        ]
+      ]
+    ],
+    "text-cookie-newline='\\n'": [
+      [
+        "H1.read",
+        2,
+        "α\r"
+      ],
+      [
+        "H1.tell",
+        "H1:C1"
+      ],
+      [
+        "H1.read",
+        5,
+        "\nbeta"
+      ],
+      [
+        "H1.seek",
+        "H1:C1",
+        "H1:C1"
+      ],
+      [
+        "H1.read",
+        5,
+        "\nbeta"
+      ],
+      [
+        "H2.seek",
+        "foreign:H1:C1",
+        "OSError"
+      ],
+      [
+        "H1.seek",
+        0,
+        0
+      ],
+      [
+        "H1.read",
+        -1,
+        "α\r\nbeta\rgamma\nlast"
+      ],
+      [
+        "H1.newlines",
+        null
+      ],
+      [
+        "H1.mtime",
+        123
+      ],
+      [
+        "closed",
+        [
+          true,
+          true
+        ]
+      ]
+    ],
+    "text-cookie-newline='\\r'": [
+      [
+        "H1.read",
+        2,
+        "α\r"
+      ],
+      [
+        "H1.tell",
+        "H1:C1"
+      ],
+      [
+        "H1.read",
+        5,
+        "\nbeta"
+      ],
+      [
+        "H1.seek",
+        "H1:C1",
+        "H1:C1"
+      ],
+      [
+        "H1.read",
+        5,
+        "\nbeta"
+      ],
+      [
+        "H2.seek",
+        "foreign:H1:C1",
+        "OSError"
+      ],
+      [
+        "H1.seek",
+        0,
+        0
+      ],
+      [
+        "H1.read",
+        -1,
+        "α\r\nbeta\rgamma\nlast"
+      ],
+      [
+        "H1.newlines",
+        null
+      ],
+      [
+        "H1.mtime",
+        123
+      ],
+      [
+        "closed",
+        [
+          true,
+          true
+        ]
+      ]
+    ],
+    "text-cookie-newline='\\r\\n'": [
+      [
+        "H1.read",
+        2,
+        "α\r"
+      ],
+      [
+        "H1.tell",
+        "H1:C1"
+      ],
+      [
+        "H1.read",
+        5,
+        "\nbeta"
+      ],
+      [
+        "H1.seek",
+        "H1:C1",
+        "H1:C1"
+      ],
+      [
+        "H1.read",
+        5,
+        "\nbeta"
+      ],
+      [
+        "H2.seek",
+        "foreign:H1:C1",
+        "OSError"
+      ],
+      [
+        "H1.seek",
+        0,
+        0
+      ],
+      [
+        "H1.read",
+        -1,
+        "α\r\nbeta\rgamma\nlast"
+      ],
+      [
+        "H1.newlines",
+        null
+      ],
+      [
+        "H1.mtime",
+        123
+      ],
+      [
+        "closed",
+        [
+          true,
+          true
+        ]
+      ]
+    ],
+    "binary-position": [
+      [
+        "read",
+        3,
+        "ceb10d"
+      ],
+      [
+        "tell",
+        3
+      ],
+      [
+        "peek-preserves-position",
+        true
+      ],
+      [
+        "read",
+        -1,
+        "0a626574610d67616d6d610a6c617374"
+      ],
+      [
+        "eof",
+        ""
+      ]
+    ],
+    "binary-surfaces-and-seek": [
+      [
+        "read1(3)",
+        {
+          "bytes": "616c70"
+        }
+      ],
+      [
+        "readinto(2)",
+        2
+      ],
+      [
+        "destination",
+        {
+          "bytes": "6861"
+        }
+      ],
+      [
+        "readinto1(2)",
+        2
+      ],
+      [
+        "destination",
+        {
+          "bytes": "0a62"
+        }
+      ],
+      [
+        "peek(1) prefix matches unread",
+        true
+      ],
+      [
+        "tell",
+        7
+      ],
+      [
+        "readline(5)",
+        {
+          "bytes": "6574610a"
+        }
+      ],
+      [
+        "readlines(1)",
+        [
+          {
+            "bytes": "67616d6d610a"
+          }
+        ]
+      ],
+      [
+        "readlines(-1)",
+        [
+          {
+            "bytes": "6c617374"
+          }
+        ]
+      ],
+      [
+        "seek(0)",
+        0
+      ],
+      [
+        "seek(5)",
+        5
+      ],
+      [
+        "read(2)",
+        {
+          "bytes": "0a62"
+        }
+      ]
+    ],
+    "binary-crc-salvage": [
+      [
+        "read over failure",
+        {
+          "error": "BadGzipFile",
+          "prefix": "Error decompressing gzip data:"
+        }
+      ],
+      [
+        "salvage",
+        {
+          "bytes": "616c7068610a626574610a67616d6d610a6c617374"
+        }
+      ],
+      [
+        "exhausted salvage",
+        {
+          "error": "OSError",
+          "prefix": "read stream is broken"
+        }
+      ],
+      [
+        "rewind recovery",
+        0
+      ],
+      [
+        "recovered read",
+        {
+          "bytes": "616c7068610a626574610a67616d6d610a6c617374"
+        }
+      ]
+    ],
+    "binary-limit-salvage": [
+      [
+        "read over failure",
+        {
+          "error": "OSError",
+          "prefix": "decompressed output exceeded max_decompressed_size"
+        }
+      ],
+      [
+        "limit salvage",
+        {
+          "bytes": ""
+        }
+      ],
+      [
+        "exhausted salvage",
+        {
+          "error": "OSError",
+          "prefix": "read stream is broken"
+        }
+      ]
+    ],
+    "binary-transient-rollback": [
+      [
+        "readlines transient",
+        {
+          "error": "OSError",
+          "prefix": "transient source failure"
+        }
+      ],
+      [
+        "readlines retry",
+        [
+          {
+            "bytes": "616c7068610a"
+          },
+          {
+            "bytes": "626574610a"
+          },
+          {
+            "bytes": "67616d6d610a"
+          },
+          {
+            "bytes": "6c617374"
+          }
+        ]
+      ]
+    ],
+    "binary-cancel-no-effect": [
+      [
+        "overlap",
+        "ConcurrentOperationError"
+      ],
+      [
+        "caller",
+        "CancelledError"
+      ],
+      [
+        "no-effect cancellation retry",
+        {
+          "bytes": "616c7068610a626574610a67616d6d610a6c617374"
+        }
+      ]
+    ],
+    "text-crc-salvage": [
+      [
+        "read over failure",
+        {
+          "error": "BadGzipFile",
+          "prefix": "Error decompressing gzip data:"
+        }
+      ],
+      [
+        "salvage",
+        "alpha\nbeta\ngamma\nlast"
+      ],
+      [
+        "exhausted salvage",
+        {
+          "error": "OSError",
+          "prefix": "read stream is broken"
+        }
+      ],
+      [
+        "rewind recovery",
+        0
+      ],
+      [
+        "recovered read",
+        "alpha\nbeta\ngamma\nlast"
+      ]
+    ],
+    "text-limit-salvage": [
+      [
+        "read over failure",
+        {
+          "error": "OSError",
+          "prefix": "decompressed output exceeded max_decompressed_size"
+        }
+      ],
+      [
+        "limit salvage",
+        ""
+      ],
+      [
+        "exhausted salvage",
+        {
+          "error": "OSError",
+          "prefix": "read stream is broken"
+        }
+      ]
+    ],
+    "text-transient-rollback": [
+      [
+        "readlines transient",
+        {
+          "error": "OSError",
+          "prefix": "transient source failure"
+        }
+      ],
+      [
+        "readlines retry",
+        [
+          "alpha\n",
+          "beta\n",
+          "gamma\n",
+          "last"
+        ]
+      ],
+      [
+        "buffer.close closes text",
+        true
+      ]
+    ],
+    "text-cancel-no-effect": [
+      [
+        "overlap",
+        "ConcurrentOperationError"
+      ],
+      [
+        "caller",
+        "CancelledError"
+      ],
+      [
+        "no-effect cancellation retry",
+        "alpha\nbeta\ngamma\nlast"
+      ]
+    ],
+    "nonseekable-cache-None": [
+      [
+        "read(2)",
+        {
+          "bytes": "616c"
+        }
+      ],
+      [
+        "cache rewind",
+        0
+      ],
+      [
+        "replay",
+        {
+          "bytes": "616c7068610a626574610a67616d6d610a6c617374"
+        }
+      ]
+    ],
+    "nonseekable-cache-1": [
+      [
+        "read(2)",
+        {
+          "bytes": "616c"
+        }
+      ],
+      [
+        "cache exhausted rewind",
+        {
+          "error": "OSError",
+          "prefix": "Underlying file is not seekable"
+        }
+      ]
+    ],
+    "failed-no-effect-rewind": [
+      [
+        "read(2)",
+        {
+          "bytes": "616c"
+        }
+      ],
+      [
+        "failed rewind",
+        {
+          "error": "OSError",
+          "prefix": "injected no-effect seek failure"
+        }
+      ],
+      [
+        "read after failed rewind",
+        {
+          "bytes": "7068610a626574610a67616d6d610a6c617374"
+        }
+      ]
+    ],
+    "cookie-encoding-utf-8": [
+      [
+        "read(2)",
+        "日本"
+      ],
+      [
+        "tell",
+        "H1:C1"
+      ],
+      [
+        "read remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "seek",
+        "H1:C1"
+      ],
+      [
+        "replay remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "invalid cookie",
+        {
+          "error": "OSError",
+          "prefix": "Cannot seek to invalid text cookie"
+        }
+      ]
+    ],
+    "cookie-encoding-utf-16": [
+      [
+        "read(2)",
+        "日本"
+      ],
+      [
+        "tell",
+        "H1:C1"
+      ],
+      [
+        "read remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "seek",
+        "H1:C1"
+      ],
+      [
+        "replay remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "invalid cookie",
+        {
+          "error": "OSError",
+          "prefix": "Cannot seek to invalid text cookie"
+        }
+      ]
+    ],
+    "cookie-encoding-iso2022_jp": [
+      [
+        "read(2)",
+        "日本"
+      ],
+      [
+        "tell",
+        "H1:C1"
+      ],
+      [
+        "read remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "seek",
+        "H1:C1"
+      ],
+      [
+        "replay remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "invalid cookie",
+        {
+          "error": "OSError",
+          "prefix": "Cannot seek to invalid text cookie"
+        }
+      ]
+    ],
+    "write-closefd-False": [
+      [
+        "write",
+        21
+      ],
+      [
+        "tell",
+        21
+      ],
+      [
+        "sink closed",
+        false
+      ]
+    ],
+    "sink-failure-closefd-False": [
+      [
+        "write fails in same call",
+        {
+          "error": "OSError",
+          "prefix": "injected sink failure"
+        }
+      ],
+      [
+        "position uncommitted",
+        0
+      ],
+      [
+        "later write",
+        {
+          "error": "OSError",
+          "prefix": "write stream is broken"
+        }
+      ]
+    ],
+    "write-closefd-True": [
+      [
+        "write",
+        21
+      ],
+      [
+        "tell",
+        21
+      ],
+      [
+        "sink closed",
+        true
+      ]
+    ],
+    "sink-failure-closefd-True": [
+      [
+        "write fails in same call",
+        {
+          "error": "OSError",
+          "prefix": "injected sink failure"
+        }
+      ],
+      [
+        "position uncommitted",
+        0
+      ],
+      [
+        "later write",
+        {
+          "error": "OSError",
+          "prefix": "write stream is broken"
+        }
+      ]
+    ]
+  },
+  "diagnostic": {
+    "text-cookie-newline=None": {
+      "H1": [
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        }
+      ],
+      "H2": []
+    },
+    "text-cookie-newline=''": {
+      "H1": [
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        }
+      ],
+      "H2": []
+    },
+    "text-cookie-newline='\\n'": {
+      "H1": [
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        }
+      ],
+      "H2": []
+    },
+    "text-cookie-newline='\\r'": {
+      "H1": [
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        }
+      ],
+      "H2": []
+    },
+    "text-cookie-newline='\\r\\n'": {
+      "H1": [
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        }
+      ],
+      "H2": []
+    },
+    "binary-position": [
+      {
+        "requested": 262144,
+        "returned": 39
+      },
+      {
+        "requested": 262144,
+        "returned": 0
+      }
+    ],
+    "binary-surfaces-and-seek": [
+      {
+        "requested": 262144,
+        "returned": 41
+      },
+      {
+        "requested": 262144,
+        "returned": 0
+      },
+      {
+        "requested": 262144,
+        "returned": 41
+      }
+    ],
+    "binary-crc-salvage": [
+      {
+        "requested": 262144,
+        "returned": 41
+      },
+      {
+        "requested": 262144,
+        "returned": 41
+      },
+      {
+        "requested": 262144,
+        "returned": 0
+      }
+    ],
+    "binary-limit-salvage": [
+      {
+        "requested": 262144,
+        "returned": 41
+      }
+    ],
+    "binary-transient-rollback": [
+      {
+        "requested": 12,
+        "returned": 12
+      },
+      {
+        "requested": 12,
+        "returned": 12
+      },
+      {
+        "requested": 12,
+        "returned": 12
+      },
+      {
+        "requested": 12,
+        "returned": 5
+      },
+      {
+        "requested": 12,
+        "returned": 0
+      }
+    ],
+    "binary-cancel-no-effect": [
+      {
+        "requested": 262144,
+        "returned": 41
+      },
+      {
+        "requested": 262144,
+        "returned": 0
+      }
+    ],
+    "text-crc-salvage": [
+      {
+        "requested": 262144,
+        "returned": 41
+      },
+      {
+        "requested": 262144,
+        "returned": 41
+      },
+      {
+        "requested": 262144,
+        "returned": 0
+      }
+    ],
+    "text-limit-salvage": [
+      {
+        "requested": 262144,
+        "returned": 41
+      }
+    ],
+    "text-transient-rollback": [
+      {
+        "requested": 12,
+        "returned": 12
+      },
+      {
+        "requested": 12,
+        "returned": 12
+      },
+      {
+        "requested": 12,
+        "returned": 12
+      },
+      {
+        "requested": 12,
+        "returned": 5
+      },
+      {
+        "requested": 12,
+        "returned": 0
+      }
+    ],
+    "text-cancel-no-effect": [
+      {
+        "requested": 262144,
+        "returned": 41
+      },
+      {
+        "requested": 262144,
+        "returned": 0
+      }
+    ],
+    "nonseekable-cache-None": [
+      {
+        "requested": 262144,
+        "returned": 41
+      },
+      {
+        "requested": 262144,
+        "returned": 0
+      }
+    ],
+    "nonseekable-cache-1": [
+      {
+        "requested": 262144,
+        "returned": 41
+      }
+    ],
+    "failed-no-effect-rewind": [
+      {
+        "requested": 262144,
+        "returned": 41
+      },
+      {
+        "requested": 262144,
+        "returned": 0
+      }
+    ],
+    "cookie-encoding-utf-8": [
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 1
+      },
+      {
+        "requested": 3,
+        "returned": 0
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 1
+      },
+      {
+        "requested": 3,
+        "returned": 0
+      }
+    ],
+    "cookie-encoding-utf-16": [
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 2
+      },
+      {
+        "requested": 3,
+        "returned": 0
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 2
+      },
+      {
+        "requested": 3,
+        "returned": 0
+      }
+    ],
+    "cookie-encoding-iso2022_jp": [
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 0
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 3
+      },
+      {
+        "requested": 3,
+        "returned": 0
+      }
+    ],
+    "write-closefd-False": [
+      10,
+      23,
+      8
+    ],
+    "sink-failure-closefd-False": [
+      10
+    ],
+    "write-closefd-True": [
+      10,
+      23,
+      8
+    ],
+    "sink-failure-closefd-True": [
+      10
+    ]
+  }
+}

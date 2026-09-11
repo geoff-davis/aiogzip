@@ -1,0 +1,58 @@
+{
+  "source_sha": "1b7e0e633a5c103116dc5a9b82a28fbaaf8a6230",
+  "source_status": "",
+  "script_sha256": "4382840604707675302a283a079c9f373ed2e0ecae9dfa695121f2044ebbf01a",
+  "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+  "engine": {
+    "compression": "stdlib-zlib",
+    "decompression": "stdlib-zlib",
+    "crc32": "stdlib-zlib"
+  },
+  "load_average": [
+    2.52099609375,
+    2.1435546875,
+    2.01318359375
+  ],
+  "fixture_sha256": "44efd61e56b65337db9b31f142131a9c24ec5d12e0dccfd0c80890fcfc1494ce",
+  "method": "11 samples after warmup. Source-boundary: 10000 calls/sample, 256KiB slice, cache disabled, cursor reset outside each call but inside timing; read-all: one public 4MiB read/sample. Independent diagnostic, not committed-harness qualification.",
+  "rows": [
+    {
+      "case": "source-boundary",
+      "seconds": [
+        2.006206475198269e-06,
+        2.053034119307995e-06,
+        2.057241089642048e-06,
+        2.191800717264414e-06,
+        2.028856473043561e-06,
+        2.0353296771645546e-06,
+        2.1785186138004064e-06,
+        2.0552873611450195e-06,
+        2.0810542162507775e-06,
+        2.086786972358823e-06,
+        2.140574809163809e-06
+      ],
+      "minimum_seconds": 2.006206475198269e-06,
+      "median_seconds": 2.057241089642048e-06,
+      "mad_seconds": 2.8384616598486914e-08
+    },
+    {
+      "case": "read-all",
+      "seconds": [
+        0.0024279928766191006,
+        0.0017957580275833607,
+        0.002254716120660305,
+        0.0018400712870061398,
+        0.0017484980635344982,
+        0.0017834138125181198,
+        0.0017183208838105202,
+        0.0017162468284368515,
+        0.0017490992322564125,
+        0.0019491184502840042,
+        0.0020307116210460663
+      ],
+      "minimum_seconds": 0.0017162468284368515,
+      "median_seconds": 0.0017957580275833607,
+      "mad_seconds": 7.74371437728405e-05
+    }
+  ]
+}

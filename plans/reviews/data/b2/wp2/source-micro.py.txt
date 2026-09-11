@@ -1,0 +1,51 @@
+"""Focused WP2 diagnostic; clean source, standalone script hash, no release qualification."""
+import asyncio
+import dataclasses
+import gzip
+import hashlib
+import json
+import os
+from pathlib import Path
+import statistics
+import subprocess
+import sys
+import time
+
+root=Path(sys.argv[1]).resolve()
+sys.path.insert(0,str(root/'src'))
+import aiogzip
+raw=hashlib.shake_256(b'WP2 incompressible fixture').digest(4*1024*1024)
+wire=gzip.compress(raw,mtime=123)
+class Source:
+    def __init__(self): self.offset=0
+    def tell(self): return self.offset
+    async def seekable(self): return True
+    async def read(self,size=-1):
+        end=len(wire) if size<0 else self.offset+size
+        data=wire[self.offset:end]; self.offset+=len(data); return data
+
+async def main():
+    rows=[]
+    for mode in ('source-boundary','read-all'):
+        samples=[]
+        for sample in range(12):
+            source=Source()
+            async with aiogzip.AsyncGzipBinaryFile(None,'rb',fileobj=source,closefd=False) as f:
+                if mode=='source-boundary':
+                    f._cache_rewindable_reads=False
+                    iterations=10000
+                    start=time.perf_counter()
+                    for _ in range(iterations):
+                        source.offset=0
+                        result=await f._read_compressed_chunk()
+                    elapsed=(time.perf_counter()-start)/iterations
+                    assert result==wire[:f._chunk_size]
+                else:
+                    start=time.perf_counter(); result=await f.read();elapsed=time.perf_counter()-start
+                    assert result==raw
+            if sample:samples.append(elapsed)
+        median=statistics.median(samples)
+        rows.append(dict(case=mode,seconds=samples,minimum_seconds=min(samples),median_seconds=median,mad_seconds=statistics.median(abs(x-median) for x in samples)))
+    return rows
+record=dict(source_sha=subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip(),source_status=subprocess.check_output(['git','-C',str(root),'status','--porcelain'],text=True).strip(),script_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),python=sys.version,engine=dataclasses.asdict(aiogzip.engine_info()),load_average=os.getloadavg(),fixture_sha256=hashlib.sha256(wire).hexdigest(),method='11 samples after warmup. Source-boundary: 10000 calls/sample, 256KiB slice, cache disabled, cursor reset outside each call but inside timing; read-all: one public 4MiB read/sample. Independent diagnostic, not committed-harness qualification.',rows=asyncio.run(main()))
+Path(sys.argv[2]).write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')

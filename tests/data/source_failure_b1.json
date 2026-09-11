@@ -1,0 +1,374 @@
+{
+  "source": {
+    "sha": "048700fe9f6030f8a2b6da92b685bcd108a17dd1",
+    "tree": "356a83360d4d570fea91c603c29f61f51ac6f7a1",
+    "status": ""
+  },
+  "harness": {
+    "sha": "a923f225575133dac9ca595cd7b1e8a78caa5430",
+    "tree": "d3f55d872f4949db75a6334785d29ef0fb01a9ec",
+    "status": ""
+  },
+  "harness_sha256": "9203464e3ac3c36dd1142f494e7e64f941674d0976030f268f8ac9810ce5e74b",
+  "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+  "engines": {
+    "compression": "stdlib-zlib",
+    "decompression": "stdlib-zlib",
+    "crc32": "stdlib-zlib"
+  },
+  "fixture_sha256": "f5c0961e49a01f993ea5de7f6c361108aa27af3e4f32d9d1dcc6ecda0f4ebb8e",
+  "semantic": {
+    "binary-custom-cancel-consumed-False-checkpoint-False": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220410a6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "binary-custom-error-consumed-False-checkpoint-False": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220410a6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "binary-custom-cancel-consumed-False-checkpoint-True": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220410a6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "binary-custom-error-consumed-False-checkpoint-True": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220410a6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "binary-custom-cancel-consumed-True-checkpoint-False": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "binary-custom-error-consumed-True-checkpoint-False": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "binary-custom-cancel-consumed-True-checkpoint-True": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "binary-custom-error-consumed-True-checkpoint-True": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "binary-native-consumed-cancel": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "text-custom-cancel-consumed-False-checkpoint-False": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "member A\nmember B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ],
+    "text-custom-error-consumed-False-checkpoint-False": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "member A\nmember B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ],
+    "text-custom-cancel-consumed-False-checkpoint-True": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "member A\nmember B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ],
+    "text-custom-error-consumed-False-checkpoint-True": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "member A\nmember B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ],
+    "text-custom-cancel-consumed-True-checkpoint-False": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "member B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ],
+    "text-custom-error-consumed-True-checkpoint-False": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "member B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ],
+    "text-custom-cancel-consumed-True-checkpoint-True": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "member B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ],
+    "text-custom-error-consumed-True-checkpoint-True": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "member B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ],
+    "text-native-consumed-cancel": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "member B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ]
+  },
+  "diagnostic": {
+    "binary-custom-cancel-consumed-False-checkpoint-False": {
+      "physical_position": 58
+    },
+    "binary-custom-error-consumed-False-checkpoint-False": {
+      "physical_position": 58
+    },
+    "binary-custom-cancel-consumed-False-checkpoint-True": {
+      "physical_position": 58
+    },
+    "binary-custom-error-consumed-False-checkpoint-True": {
+      "physical_position": 58
+    },
+    "binary-custom-cancel-consumed-True-checkpoint-False": {
+      "physical_position": 58
+    },
+    "binary-custom-error-consumed-True-checkpoint-False": {
+      "physical_position": 58
+    },
+    "binary-custom-cancel-consumed-True-checkpoint-True": {
+      "physical_position": 58
+    },
+    "binary-custom-error-consumed-True-checkpoint-True": {
+      "physical_position": 58
+    },
+    "binary-native-consumed-cancel": {
+      "physical_position": 58
+    },
+    "text-custom-cancel-consumed-False-checkpoint-False": {
+      "physical_position": 58
+    },
+    "text-custom-error-consumed-False-checkpoint-False": {
+      "physical_position": 58
+    },
+    "text-custom-cancel-consumed-False-checkpoint-True": {
+      "physical_position": 58
+    },
+    "text-custom-error-consumed-False-checkpoint-True": {
+      "physical_position": 58
+    },
+    "text-custom-cancel-consumed-True-checkpoint-False": {
+      "physical_position": 58
+    },
+    "text-custom-error-consumed-True-checkpoint-False": {
+      "physical_position": 58
+    },
+    "text-custom-cancel-consumed-True-checkpoint-True": {
+      "physical_position": 58
+    },
+    "text-custom-error-consumed-True-checkpoint-True": {
+      "physical_position": 58
+    },
+    "text-native-consumed-cancel": {
+      "physical_position": 58
+    }
+  }
+}
