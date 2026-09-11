@@ -1,0 +1,114 @@
+{
+  "reviewed_source": "a75de3d",
+  "fixed_source_and_shared_harness": "003ca5f",
+  "gate": "G04 reopened then requalified locally; final maintainer review pending; no WP3 push or new G17 qualification",
+  "scope": "Control-flow cleanup failures outrank ordinary opening errors after settlement; retain original context when implicit context absent; do not replace existing causes/contexts. Previously-cancelled acquisition still preserves its first cancellation.",
+  "validation": {
+    "default": "2785 passed, 1 skipped, 3 xfailed",
+    "stdlib": "2785 passed, 1 skipped, 3 xfailed",
+    "coverage": "93.02% combined; 95.19% statements, 87.56% branches",
+    "floor": "Python 3.11.14/3.12.12 aiofiles 23.2.1 both engines: 217 passed each",
+    "floor_files": "test_open_settlement, test_open_qualification, test_open_cleanup_control_flow, test_open_cleanup_trace, test_open_trace, test_b2_open_ownership, test_file_lifecycle, test_file_state_trace, test_source_failure_trace",
+    "selection": "Floor runs use explicit checkout PYTHONPATH and AIOGZIP_ENGINE=stdlib or zlib-ng. Linux source results only."
+  },
+  "trace": "Eight scenarios. compare-reviewed-* intentionally reports eight unallowed regressions; compare-fixed-* passes with zero differences from b1. Original 30-scenario BC3 fixture and 26 allowances unchanged. Trace waits independently for native close and isolates control flow, not return-before-settlement timing.",
+  "before": "All six corrected existing expectations failed before the production fix. Nine new direct cases and two trace tests added.",
+  "execution_hashes": {
+    "src/aiogzip/_opening.py": "30c7478962964b9ff027b358434ae26d26de3a15b2e694baf95f1cb129991ee1",
+    "src/aiogzip/_binary.py": "164d86c2d5f737fa1927eeb4fc395c6bc6dcf5252da5c2088eafcf86a24135ed",
+    "src/aiogzip/_text.py": "999ac1643dd64c6c0146c3cff9170a1e8f595a171f6ed3fc1080585b512aa2ee",
+    "tests/test_open_qualification.py": "0f10428cdf3b039464e8d85d4d9c4a3cca89f81dd62f66e6abb1ae396f08cafb",
+    "tests/test_open_cleanup_control_flow.py": "60aebef019945248fffa08ef549a3fc61a4168a9a3cf39d7bab845de6bd2e00d",
+    "tests/test_open_cleanup_trace.py": "a0a9b41da6202f42bce8b547d854947555277f800ded67ed4972db6f5154d3eb",
+    "tests/data/open_cleanup_b1.json": "8bf64f775b71b7e241d3b2dd3a118894eb36a3caffb355efef11ad23deb00a88",
+    "scripts/capture_b2_cleanup_trace.py": "8d2b65d9d905a8b0d9ac361c5aa0198b8b5aa896a32a12d182049a078bb9be69"
+  },
+  "files": {
+    "311-stdlib.log": {
+      "sha256": "c4ce270f7d79dffab7777cb45bf282fda0b5874518472ce7548bc53f1a57ea91",
+      "bytes": 340
+    },
+    "311-zlib-ng.log": {
+      "sha256": "cda5a4729fd9942993939a1d82dfdad8244e7642a7e709f2f797af0e8250bd78",
+      "bytes": 340
+    },
+    "312-stdlib.log": {
+      "sha256": "c95835158d283a021199fcc8ed8bdb735cca8f70cf65b07728edb781209f4cc2",
+      "bytes": 340
+    },
+    "312-zlib-ng.log": {
+      "sha256": "c45ebbe3f6177180e83fdbc09ff14e2c71c31ecaf7d87499b7a44a191196212d",
+      "bytes": 340
+    },
+    "b1-stdlib.json": {
+      "sha256": "8bf64f775b71b7e241d3b2dd3a118894eb36a3caffb355efef11ad23deb00a88",
+      "bytes": 3078
+    },
+    "b1-zlib-ng.json": {
+      "sha256": "b9474cf4a4a5ba3361c6faa0e55eafaad3f6d36c68dc77cc99be2e659ac40859",
+      "bytes": 3070
+    },
+    "before.log.gz": {
+      "sha256": "e042f2044712a27900653ca60a84c5c01fd28bfc944c9df1465e6984f83ff06f",
+      "bytes": 2100,
+      "uncompressed_sha256": "7ed1f32c6bb410fdafa25d598a5db544b86c21c378861faf3d87c314a425da6e"
+    },
+    "compare-fixed-stdlib.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-fixed-zlib-ng.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-reviewed-stdlib.json": {
+      "sha256": "7bb38355cd6eb3f7c36a46aa971ea28adcc96321743c418fbcc1cf7b08b65315",
+      "bytes": 5830
+    },
+    "compare-reviewed-zlib-ng.json": {
+      "sha256": "7bb38355cd6eb3f7c36a46aa971ea28adcc96321743c418fbcc1cf7b08b65315",
+      "bytes": 5830
+    },
+    "coverage.json.gz": {
+      "sha256": "0ec079bdb69fb4960c45b660e1dd91179c6822c66ca498523c4ab097091ad881",
+      "bytes": 41205,
+      "uncompressed_sha256": "5850c520383924b0c8ad395ae1f6e70e929c5ee26278b9d36703944bb85aba37"
+    },
+    "default.log": {
+      "sha256": "8170067ca61ef1fee189344aad4c2d7ca5edd4ad88f16c4fd8b9e849cda3c906",
+      "bytes": 8908
+    },
+    "docs.log": {
+      "sha256": "b76dc60193f9e0aee5f02f93c087dc91b1b961c9404a78833101259dafe5bec8",
+      "bytes": 993
+    },
+    "environments.json": {
+      "sha256": "a0c172ab900b80f3ab925167a13698dca6160391c055a96e9ca82295a8a40afd",
+      "bytes": 868
+    },
+    "fixed-stdlib.json": {
+      "sha256": "c8e7edff9df631ae8ec359f4c78ca127fb546f13083b787f7879da66ec90bc17",
+      "bytes": 3078
+    },
+    "fixed-zlib-ng.json": {
+      "sha256": "e5bbf2e958a27b938bfb2dbf9a13ae1bdeb53d28ae94757d473ab7783daf6250",
+      "bytes": 3070
+    },
+    "reviewed-stdlib.json": {
+      "sha256": "6e7ce52bd8c1025025568486458aa915751c478288383a209cfa07e604e6baef",
+      "bytes": 3222
+    },
+    "reviewed-zlib-ng.json": {
+      "sha256": "84834aa8ee6cfebbd82cd564f3836ef1e068afab4441fa0163cd514e04aa8ddf",
+      "bytes": 3214
+    },
+    "stdlib.log": {
+      "sha256": "4db7e156fac0c28e7a5fc2cd64e02d538d27ff9243cda201824caab6cf2141ca",
+      "bytes": 8671
+    },
+    "prek.log": {
+      "sha256": "91d1970f9de59a1317b4234a061d225c680c84f2e80e65de048202f9c3c03ce6",
+      "bytes": 1040
+    }
+  }
+}
