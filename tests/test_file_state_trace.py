@@ -1,12 +1,18 @@
 """Checkout-source trace continuity; not installed-wheel qualification."""
 
+import importlib.util
 import json
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 
-def test_symbolic_trace_matches_b1_in_independent_processes(tmp_path):
+
+@pytest.mark.parametrize("engine", ["stdlib", "zlib-ng"])
+def test_symbolic_trace_matches_b1_in_independent_processes(tmp_path, engine):
+    if engine == "zlib-ng" and importlib.util.find_spec("zlib_ng") is None:
+        pytest.skip("optional zlib-ng engine is not installed")
     root = Path(__file__).resolve().parents[1]
     historical = json.loads(
         (root / "tests/data/file_state_b1.json").read_text(encoding="utf-8")
@@ -24,7 +30,8 @@ def test_symbolic_trace_matches_b1_in_independent_processes(tmp_path):
                 "--source-root",
                 str(root),
                 "--engine",
-                "stdlib",
+                engine,
+                "--extended",
                 "--output",
                 str(output),
             ],

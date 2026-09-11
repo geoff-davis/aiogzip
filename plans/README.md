@@ -5,8 +5,12 @@ An exact byte copy of the supplied revision is retained as
 [review input](reviews/inputs/b2/RELEASE_2_0_0B2_PLAN_REVISION_2.md.txt).
 The `.txt` suffix preserves the original Markdown without formatter changes.
 
-- [Preflight and remaining WP0 work](reviews/v2.0.0b2-preflight.md)
+- [Completed WP0 preflight](reviews/v2.0.0b2-preflight.md)
 - [Findings and evidence limitations](reviews/v2.0.0b2-findings.md)
+- [WP0 local qualification](reviews/v2.0.0b2-qualification.md)
+- [State and ownership inventory](design/v2.0.0b2-file-state-model.md)
+- [Baseline measurements](benchmarks/v2.0.0b2-results.md)
+- [Behavior-exception ledger](reviews/v2.0.0b2-behavior-exceptions.md)
 
 The G00–G22 register in the active plan is authoritative. Reproducing a defect
 does not complete its repair gate, and local tests do not establish release readiness.

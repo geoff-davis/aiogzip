@@ -1,0 +1,5041 @@
+{
+  "source": {
+    "sha": "dc8950cb334e1cf4082f2bf50074464e06c72287",
+    "tree": "820a775b067cf5bf17a179c20f81c7c7b1f9f37b",
+    "status": ""
+  },
+  "harness": {
+    "sha": "440ed71ebdbeeebcdb526590f86fa8f9f0533a5e",
+    "tree": "e09c10129f8b408fab919334001ccb6164dceabb",
+    "status": ""
+  },
+  "harness_sha256": "b993d1bf8cca2501e81248fdb4e80770f0dfb35276aa5e66ee74166b706eeca7",
+  "modules": {
+    "_binary.py": {
+      "sha256": "b9de745e4f1fb49a7b00d06e90327988f29aba0ab65dd022c9a36952d5b4be4c",
+      "sites": [
+        {
+          "line": 51,
+          "scope": "_decompression_error_message",
+          "kind": "assignment",
+          "target": "detail"
+        },
+        {
+          "line": 53,
+          "scope": "_decompression_error_message",
+          "kind": "assignment",
+          "target": "detail"
+        },
+        {
+          "line": 55,
+          "scope": "_decompression_error_message",
+          "kind": "assignment",
+          "target": "detail"
+        },
+        {
+          "line": 57,
+          "scope": "_decompression_error_message",
+          "kind": "assignment",
+          "target": "detail"
+        },
+        {
+          "line": 72,
+          "scope": "_BinaryReadReservation",
+          "kind": "assignment",
+          "target": "__slots__"
+        },
+        {
+          "line": 80,
+          "scope": "_BinaryReadReservation.__init__",
+          "kind": "assignment",
+          "target": "self._file"
+        },
+        {
+          "line": 81,
+          "scope": "_BinaryReadReservation.__init__",
+          "kind": "assignment",
+          "target": "self._recover_broken"
+        },
+        {
+          "line": 84,
+          "scope": "_BinaryReadReservation.__enter__",
+          "kind": "assignment",
+          "target": "file"
+        },
+        {
+          "line": 88,
+          "scope": "_BinaryReadReservation.__enter__",
+          "kind": "assignment",
+          "target": "file._read_call_active"
+        },
+        {
+          "line": 97,
+          "scope": "_BinaryWriteReservation",
+          "kind": "assignment",
+          "target": "__slots__"
+        },
+        {
+          "line": 100,
+          "scope": "_BinaryWriteReservation.__init__",
+          "kind": "assignment",
+          "target": "self._file"
+        },
+        {
+          "line": 103,
+          "scope": "_BinaryWriteReservation.__enter__",
+          "kind": "assignment",
+          "target": "file"
+        },
+        {
+          "line": 105,
+          "scope": "_BinaryWriteReservation.__enter__",
+          "kind": "assignment",
+          "target": "encoder"
+        },
+        {
+          "line": 108,
+          "scope": "_BinaryWriteReservation.__enter__",
+          "kind": "assignment",
+          "target": "file._write_call_active"
+        },
+        {
+          "line": 112,
+          "scope": "_BinaryWriteReservation.__exit__",
+          "kind": "assignment",
+          "target": "file"
+        },
+        {
+          "line": 113,
+          "scope": "_BinaryWriteReservation.__exit__",
+          "kind": "assignment",
+          "target": "encoder"
+        },
+        {
+          "line": 119,
+          "scope": "_BinaryWriteReservation.__exit__",
+          "kind": "assignment",
+          "target": "file._write_call_active"
+        },
+        {
+          "line": 163,
+          "scope": "AsyncGzipBinaryFile",
+          "kind": "assignment",
+          "target": "__slots__"
+        },
+        {
+          "line": 216,
+          "scope": "AsyncGzipBinaryFile",
+          "kind": "assignment",
+          "target": "DEFAULT_CHUNK_SIZE"
+        },
+        {
+          "line": 220,
+          "scope": "AsyncGzipBinaryFile",
+          "kind": "assignment",
+          "target": "BUFFER_COMPACTION_THRESHOLD"
+        },
+        {
+          "line": 222,
+          "scope": "AsyncGzipBinaryFile",
+          "kind": "assignment",
+          "target": "_SEEK_ZERO_CHUNK_SIZE"
+        },
+        {
+          "line": 241,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "validated_closefd"
+        },
+        {
+          "line": 242,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "validated_strict_size"
+        },
+        {
+          "line": 243,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "validated_fast_compress"
+        },
+        {
+          "line": 252,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "(mode_op, saw_b, saw_t, plus)"
+        },
+        {
+          "line": 257,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._filename"
+        },
+        {
+          "line": 258,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._mode"
+        },
+        {
+          "line": 259,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._mode_op"
+        },
+        {
+          "line": 260,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._mode_plus"
+        },
+        {
+          "line": 261,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._writing_mode"
+        },
+        {
+          "line": 264,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._fast_compress"
+        },
+        {
+          "line": 276,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._chunk_size"
+        },
+        {
+          "line": 277,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._compresslevel"
+        },
+        {
+          "line": 278,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._header_mtime"
+        },
+        {
+          "line": 279,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._header_filename_override"
+        },
+        {
+          "line": 280,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._external_file"
+        },
+        {
+          "line": 281,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._closefd"
+        },
+        {
+          "line": 286,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "file_mode_suffix"
+        },
+        {
+          "line": 287,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._file_mode"
+        },
+        {
+          "line": 289,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "augmented assignment",
+          "target": "self._file_mode"
+        },
+        {
+          "line": 291,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._file"
+        },
+        {
+          "line": 292,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._encoder"
+        },
+        {
+          "line": 293,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._decoder"
+        },
+        {
+          "line": 294,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._buffer"
+        },
+        {
+          "line": 295,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 296,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._is_closed"
+        },
+        {
+          "line": 297,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._eof"
+        },
+        {
+          "line": 298,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._owns_file"
+        },
+        {
+          "line": 299,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 300,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._mtime"
+        },
+        {
+          "line": 301,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._decoder_header_generation"
+        },
+        {
+          "line": 302,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._compressed_cache"
+        },
+        {
+          "line": 303,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._replay_offset"
+        },
+        {
+          "line": 304,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._cache_rewindable_reads"
+        },
+        {
+          "line": 305,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._underlying_seekable"
+        },
+        {
+          "line": 306,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._max_rewind_cache_size"
+        },
+        {
+          "line": 307,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._write_broken"
+        },
+        {
+          "line": 308,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._write_call_active"
+        },
+        {
+          "line": 309,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._read_call_active"
+        },
+        {
+          "line": 310,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._salvage_read_call"
+        },
+        {
+          "line": 314,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._recovery_read_call"
+        },
+        {
+          "line": 318,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._write_call"
+        },
+        {
+          "line": 319,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._active_call_waiter"
+        },
+        {
+          "line": 320,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._close_lock"
+        },
+        {
+          "line": 321,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._closed_observer"
+        },
+        {
+          "line": 322,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._read_poison_observer"
+        },
+        {
+          "line": 323,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._read_broken"
+        },
+        {
+          "line": 324,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._read_validation_failed"
+        },
+        {
+          "line": 325,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._max_decompressed_size"
+        },
+        {
+          "line": 326,
+          "scope": "AsyncGzipBinaryFile.__init__",
+          "kind": "assignment",
+          "target": "self._strict_size"
+        },
+        {
+          "line": 349,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._file"
+        },
+        {
+          "line": 350,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._owns_file"
+        },
+        {
+          "line": 355,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._file"
+        },
+        {
+          "line": 358,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._owns_file"
+        },
+        {
+          "line": 362,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "header_filename"
+        },
+        {
+          "line": 364,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "header_filename"
+        },
+        {
+          "line": 374,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._encoder"
+        },
+        {
+          "line": 387,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._decoder"
+        },
+        {
+          "line": 396,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._eof"
+        },
+        {
+          "line": 397,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._read_call_active"
+        },
+        {
+          "line": 398,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._read_broken"
+        },
+        {
+          "line": 399,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._read_validation_failed"
+        },
+        {
+          "line": 400,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 401,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._mtime"
+        },
+        {
+          "line": 402,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._decoder_header_generation"
+        },
+        {
+          "line": 403,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "mutation/completion call",
+          "target": "self._compressed_cache.clear"
+        },
+        {
+          "line": 404,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._replay_offset"
+        },
+        {
+          "line": 405,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._underlying_seekable"
+        },
+        {
+          "line": 406,
+          "scope": "AsyncGzipBinaryFile.open",
+          "kind": "assignment",
+          "target": "self._cache_rewindable_reads"
+        },
+        {
+          "line": 525,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "target"
+        },
+        {
+          "line": 527,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "target"
+        },
+        {
+          "line": 532,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "count"
+        },
+        {
+          "line": 534,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "zero_chunk"
+        },
+        {
+          "line": 535,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 538,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "chunk"
+        },
+        {
+          "line": 544,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "augmented assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 547,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "position_before"
+        },
+        {
+          "line": 548,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "rewound"
+        },
+        {
+          "line": 557,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "rewound"
+        },
+        {
+          "line": 564,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "target"
+        },
+        {
+          "line": 566,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "target"
+        },
+        {
+          "line": 570,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "buffered"
+        },
+        {
+          "line": 572,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 573,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "augmented assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 574,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "deletion",
+          "target": "self._buffer[:]"
+        },
+        {
+          "line": 575,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 576,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "target"
+        },
+        {
+          "line": 578,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "target"
+        },
+        {
+          "line": 580,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "target"
+        },
+        {
+          "line": 589,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "rewound"
+        },
+        {
+          "line": 598,
+          "scope": "AsyncGzipBinaryFile.seek",
+          "kind": "assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 618,
+          "scope": "AsyncGzipBinaryFile.name",
+          "kind": "assignment",
+          "target": "candidate"
+        },
+        {
+          "line": 642,
+          "scope": "AsyncGzipBinaryFile.fileno",
+          "kind": "assignment",
+          "target": "fileno_method"
+        },
+        {
+          "line": 645,
+          "scope": "AsyncGzipBinaryFile.fileno",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 649,
+          "scope": "AsyncGzipBinaryFile.fileno",
+          "kind": "assignment",
+          "target": "close_method"
+        },
+        {
+          "line": 661,
+          "scope": "AsyncGzipBinaryFile.isatty",
+          "kind": "assignment",
+          "target": "isatty_method"
+        },
+        {
+          "line": 664,
+          "scope": "AsyncGzipBinaryFile.isatty",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 666,
+          "scope": "AsyncGzipBinaryFile.isatty",
+          "kind": "assignment",
+          "target": "close_method"
+        },
+        {
+          "line": 695,
+          "scope": "AsyncGzipBinaryFile.peek",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 696,
+          "scope": "AsyncGzipBinaryFile.peek",
+          "kind": "assignment",
+          "target": "target"
+        },
+        {
+          "line": 698,
+          "scope": "AsyncGzipBinaryFile.peek",
+          "kind": "assignment",
+          "target": "target"
+        },
+        {
+          "line": 703,
+          "scope": "AsyncGzipBinaryFile.peek",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 707,
+          "scope": "AsyncGzipBinaryFile.peek",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 718,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "assignment",
+          "target": "buf"
+        },
+        {
+          "line": 719,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "assignment",
+          "target": "offset"
+        },
+        {
+          "line": 720,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 723,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "assignment",
+          "target": "n"
+        },
+        {
+          "line": 725,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "assignment",
+          "target": "n"
+        },
+        {
+          "line": 726,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "assignment",
+          "target": "view[written:written + n]"
+        },
+        {
+          "line": 727,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "assignment",
+          "target": "new_offset"
+        },
+        {
+          "line": 728,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "augmented assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 730,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "deletion",
+          "target": "buf[:]"
+        },
+        {
+          "line": 731,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 733,
+          "scope": "AsyncGzipBinaryFile._copy_into_view",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 744,
+          "scope": "AsyncGzipBinaryFile._fill_until",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 745,
+          "scope": "AsyncGzipBinaryFile._fill_until",
+          "kind": "assignment",
+          "target": "threshold"
+        },
+        {
+          "line": 748,
+          "scope": "AsyncGzipBinaryFile._fill_until",
+          "kind": "deletion",
+          "target": "self._buffer[:self._buffer_offset]"
+        },
+        {
+          "line": 749,
+          "scope": "AsyncGzipBinaryFile._fill_until",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 751,
+          "scope": "AsyncGzipBinaryFile._fill_until",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 770,
+          "scope": "AsyncGzipBinaryFile.readinto",
+          "kind": "assignment",
+          "target": "view"
+        },
+        {
+          "line": 775,
+          "scope": "AsyncGzipBinaryFile.readinto",
+          "kind": "assignment",
+          "target": "view"
+        },
+        {
+          "line": 777,
+          "scope": "AsyncGzipBinaryFile.readinto",
+          "kind": "assignment",
+          "target": "total"
+        },
+        {
+          "line": 806,
+          "scope": "AsyncGzipBinaryFile.read1",
+          "kind": "assignment",
+          "target": "size"
+        },
+        {
+          "line": 810,
+          "scope": "AsyncGzipBinaryFile.read1",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 813,
+          "scope": "AsyncGzipBinaryFile.read1",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 816,
+          "scope": "AsyncGzipBinaryFile.read1",
+          "kind": "assignment",
+          "target": "actual_read_size"
+        },
+        {
+          "line": 818,
+          "scope": "AsyncGzipBinaryFile.read1",
+          "kind": "assignment",
+          "target": "actual_read_size"
+        },
+        {
+          "line": 820,
+          "scope": "AsyncGzipBinaryFile.read1",
+          "kind": "assignment",
+          "target": "data_to_return"
+        },
+        {
+          "line": 825,
+          "scope": "AsyncGzipBinaryFile.read1",
+          "kind": "augmented assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 826,
+          "scope": "AsyncGzipBinaryFile.read1",
+          "kind": "augmented assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 829,
+          "scope": "AsyncGzipBinaryFile.read1",
+          "kind": "deletion",
+          "target": "self._buffer[:]"
+        },
+        {
+          "line": 830,
+          "scope": "AsyncGzipBinaryFile.read1",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 852,
+          "scope": "AsyncGzipBinaryFile.readinto1",
+          "kind": "assignment",
+          "target": "view"
+        },
+        {
+          "line": 855,
+          "scope": "AsyncGzipBinaryFile.readinto1",
+          "kind": "assignment",
+          "target": "view"
+        },
+        {
+          "line": 857,
+          "scope": "AsyncGzipBinaryFile.readinto1",
+          "kind": "assignment",
+          "target": "total"
+        },
+        {
+          "line": 861,
+          "scope": "AsyncGzipBinaryFile.readinto1",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 881,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "limit"
+        },
+        {
+          "line": 888,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "buf"
+        },
+        {
+          "line": 889,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "start"
+        },
+        {
+          "line": 890,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "buf_len"
+        },
+        {
+          "line": 891,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "newline_index"
+        },
+        {
+          "line": 893,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 895,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 897,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 901,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 906,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 907,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 908,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "augmented assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 910,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "deletion",
+          "target": "buf[:]"
+        },
+        {
+          "line": 911,
+          "scope": "AsyncGzipBinaryFile.readline",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 919,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "buf"
+        },
+        {
+          "line": 920,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "start"
+        },
+        {
+          "line": 921,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "search_from"
+        },
+        {
+          "line": 922,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "compacted"
+        },
+        {
+          "line": 924,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "buf_len"
+        },
+        {
+          "line": 925,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "newline_index"
+        },
+        {
+          "line": 927,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 929,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 931,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 936,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 938,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "search_from"
+        },
+        {
+          "line": 940,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "deletion",
+          "target": "buf[:start]"
+        },
+        {
+          "line": 941,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 942,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "start"
+        },
+        {
+          "line": 943,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "search_from"
+        },
+        {
+          "line": 944,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "compacted"
+        },
+        {
+          "line": 949,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 950,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 951,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "augmented assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 953,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "deletion",
+          "target": "buf[:]"
+        },
+        {
+          "line": 954,
+          "scope": "AsyncGzipBinaryFile._readline_reserved",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 968,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "annotated assignment",
+          "target": "lines"
+        },
+        {
+          "line": 969,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "assignment",
+          "target": "total"
+        },
+        {
+          "line": 970,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "assignment",
+          "target": "position_before"
+        },
+        {
+          "line": 974,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "assignment",
+          "target": "line"
+        },
+        {
+          "line": 977,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "mutation/completion call",
+          "target": "lines.append"
+        },
+        {
+          "line": 978,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "augmented assignment",
+          "target": "total"
+        },
+        {
+          "line": 993,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "assignment",
+          "target": "unread"
+        },
+        {
+          "line": 994,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "assignment",
+          "target": "restored"
+        },
+        {
+          "line": 995,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "assignment",
+          "target": "self._buffer"
+        },
+        {
+          "line": 996,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 997,
+          "scope": "AsyncGzipBinaryFile.readlines",
+          "kind": "assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 1012,
+          "scope": "AsyncGzipBinaryFile.writelines",
+          "kind": "assignment",
+          "target": "pending"
+        },
+        {
+          "line": 1013,
+          "scope": "AsyncGzipBinaryFile.writelines",
+          "kind": "assignment",
+          "target": "iterator"
+        },
+        {
+          "line": 1017,
+          "scope": "AsyncGzipBinaryFile.writelines",
+          "kind": "assignment",
+          "target": "line"
+        },
+        {
+          "line": 1026,
+          "scope": "AsyncGzipBinaryFile.writelines",
+          "kind": "assignment",
+          "target": "data"
+        },
+        {
+          "line": 1032,
+          "scope": "AsyncGzipBinaryFile.writelines",
+          "kind": "assignment",
+          "target": "length"
+        },
+        {
+          "line": 1036,
+          "scope": "AsyncGzipBinaryFile.writelines",
+          "kind": "mutation/completion call",
+          "target": "pending.clear"
+        },
+        {
+          "line": 1041,
+          "scope": "AsyncGzipBinaryFile.writelines",
+          "kind": "mutation/completion call",
+          "target": "pending.clear"
+        },
+        {
+          "line": 1042,
+          "scope": "AsyncGzipBinaryFile.writelines",
+          "kind": "mutation/completion call",
+          "target": "pending.extend"
+        },
+        {
+          "line": 1086,
+          "scope": "AsyncGzipBinaryFile.write",
+          "kind": "assignment",
+          "target": "payload"
+        },
+        {
+          "line": 1087,
+          "scope": "AsyncGzipBinaryFile.write",
+          "kind": "assignment",
+          "target": "encoder"
+        },
+        {
+          "line": 1094,
+          "scope": "AsyncGzipBinaryFile.write",
+          "kind": "assignment",
+          "target": "self._write_call_active"
+        },
+        {
+          "line": 1102,
+          "scope": "AsyncGzipBinaryFile._write_reserved",
+          "kind": "assignment",
+          "target": "length"
+        },
+        {
+          "line": 1105,
+          "scope": "AsyncGzipBinaryFile._write_reserved",
+          "kind": "assignment",
+          "target": "operation"
+        },
+        {
+          "line": 1120,
+          "scope": "AsyncGzipBinaryFile._write_reserved",
+          "kind": "assignment",
+          "target": "self._write_broken"
+        },
+        {
+          "line": 1121,
+          "scope": "AsyncGzipBinaryFile._write_reserved",
+          "kind": "mutation/completion call",
+          "target": "encoder.discard"
+        },
+        {
+          "line": 1135,
+          "scope": "AsyncGzipBinaryFile._write_reserved",
+          "kind": "assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 1160,
+          "scope": "AsyncGzipBinaryFile._write_all",
+          "kind": "assignment",
+          "target": "offset"
+        },
+        {
+          "line": 1161,
+          "scope": "AsyncGzipBinaryFile._write_all",
+          "kind": "assignment",
+          "target": "length"
+        },
+        {
+          "line": 1163,
+          "scope": "AsyncGzipBinaryFile._write_all",
+          "kind": "assignment",
+          "target": "written"
+        },
+        {
+          "line": 1169,
+          "scope": "AsyncGzipBinaryFile._write_all",
+          "kind": "assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 1177,
+          "scope": "AsyncGzipBinaryFile._write_all",
+          "kind": "augmented assignment",
+          "target": "offset"
+        },
+        {
+          "line": 1204,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "size"
+        },
+        {
+          "line": 1206,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "size"
+        },
+        {
+          "line": 1213,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "chunks"
+        },
+        {
+          "line": 1214,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "total_read"
+        },
+        {
+          "line": 1215,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "buf"
+        },
+        {
+          "line": 1216,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "offset"
+        },
+        {
+          "line": 1218,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "chunk"
+        },
+        {
+          "line": 1219,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "mutation/completion call",
+          "target": "chunks.append"
+        },
+        {
+          "line": 1220,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "augmented assignment",
+          "target": "total_read"
+        },
+        {
+          "line": 1224,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "deletion",
+          "target": "buf[:]"
+        },
+        {
+          "line": 1225,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 1236,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "mutation/completion call",
+          "target": "chunks.append"
+        },
+        {
+          "line": 1237,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "augmented assignment",
+          "target": "total_read"
+        },
+        {
+          "line": 1249,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "failed_feed"
+        },
+        {
+          "line": 1250,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "deletion",
+          "target": "buf[:]"
+        },
+        {
+          "line": 1252,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "mutation/completion call",
+          "target": "buf.extend"
+        },
+        {
+          "line": 1253,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "mutation/completion call",
+          "target": "buf.extend"
+        },
+        {
+          "line": 1256,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "augmented assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 1259,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "buf"
+        },
+        {
+          "line": 1260,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "offset"
+        },
+        {
+          "line": 1261,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 1265,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 1266,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "data_to_return"
+        },
+        {
+          "line": 1267,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 1268,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "augmented assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 1270,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "deletion",
+          "target": "buf[:]"
+        },
+        {
+          "line": 1271,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 1277,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 1280,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "actual_read_size"
+        },
+        {
+          "line": 1281,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "offset"
+        },
+        {
+          "line": 1282,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "data_to_return"
+        },
+        {
+          "line": 1285,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "augmented assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 1286,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "augmented assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 1289,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "deletion",
+          "target": "self._buffer[:]"
+        },
+        {
+          "line": 1290,
+          "scope": "AsyncGzipBinaryFile.read",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 1311,
+          "scope": "AsyncGzipBinaryFile._decompress_next",
+          "kind": "assignment",
+          "target": "compressed_chunk"
+        },
+        {
+          "line": 1312,
+          "scope": "AsyncGzipBinaryFile._decompress_next",
+          "kind": "assignment",
+          "target": "decoder"
+        },
+        {
+          "line": 1319,
+          "scope": "AsyncGzipBinaryFile._decompress_next",
+          "kind": "assignment",
+          "target": "self._eof"
+        },
+        {
+          "line": 1320,
+          "scope": "AsyncGzipBinaryFile._decompress_next",
+          "kind": "annotated assignment",
+          "target": "pieces"
+        },
+        {
+          "line": 1324,
+          "scope": "AsyncGzipBinaryFile._decompress_next",
+          "kind": "mutation/completion call",
+          "target": "pieces.append"
+        },
+        {
+          "line": 1350,
+          "scope": "AsyncGzipBinaryFile._decompress_next",
+          "kind": "annotated assignment",
+          "target": "feed_pieces"
+        },
+        {
+          "line": 1352,
+          "scope": "AsyncGzipBinaryFile._decompress_next",
+          "kind": "assignment",
+          "target": "operation"
+        },
+        {
+          "line": 1359,
+          "scope": "AsyncGzipBinaryFile._decompress_next",
+          "kind": "mutation/completion call",
+          "target": "feed_pieces.append"
+        },
+        {
+          "line": 1386,
+          "scope": "AsyncGzipBinaryFile._sync_decoder_mtime",
+          "kind": "assignment",
+          "target": "self._decoder_header_generation"
+        },
+        {
+          "line": 1387,
+          "scope": "AsyncGzipBinaryFile._sync_decoder_mtime",
+          "kind": "assignment",
+          "target": "self._mtime"
+        },
+        {
+          "line": 1392,
+          "scope": "AsyncGzipBinaryFile._retain_validation_pieces",
+          "kind": "mutation/completion call",
+          "target": "self._buffer.extend"
+        },
+        {
+          "line": 1439,
+          "scope": "AsyncGzipBinaryFile._finish_read_call",
+          "kind": "assignment",
+          "target": "self._read_call_active"
+        },
+        {
+          "line": 1443,
+          "scope": "AsyncGzipBinaryFile._finish_read_call",
+          "kind": "mutation/completion call",
+          "target": "self._decoder.discard"
+        },
+        {
+          "line": 1449,
+          "scope": "AsyncGzipBinaryFile._wait_for_active_call",
+          "kind": "assignment",
+          "target": "waiter"
+        },
+        {
+          "line": 1451,
+          "scope": "AsyncGzipBinaryFile._wait_for_active_call",
+          "kind": "assignment",
+          "target": "waiter"
+        },
+        {
+          "line": 1452,
+          "scope": "AsyncGzipBinaryFile._wait_for_active_call",
+          "kind": "assignment",
+          "target": "self._active_call_waiter"
+        },
+        {
+          "line": 1458,
+          "scope": "AsyncGzipBinaryFile._notify_active_call_finished",
+          "kind": "assignment",
+          "target": "waiter"
+        },
+        {
+          "line": 1461,
+          "scope": "AsyncGzipBinaryFile._notify_active_call_finished",
+          "kind": "assignment",
+          "target": "self._active_call_waiter"
+        },
+        {
+          "line": 1463,
+          "scope": "AsyncGzipBinaryFile._notify_active_call_finished",
+          "kind": "mutation/completion call",
+          "target": "waiter.set_result"
+        },
+        {
+          "line": 1473,
+          "scope": "AsyncGzipBinaryFile._check_read_usable",
+          "kind": "assignment",
+          "target": "recovery"
+        },
+        {
+          "line": 1475,
+          "scope": "AsyncGzipBinaryFile._check_read_usable",
+          "kind": "assignment",
+          "target": "recovery"
+        },
+        {
+          "line": 1487,
+          "scope": "AsyncGzipBinaryFile._poison_read",
+          "kind": "assignment",
+          "target": "self._read_broken"
+        },
+        {
+          "line": 1488,
+          "scope": "AsyncGzipBinaryFile._poison_read",
+          "kind": "assignment",
+          "target": "self._read_validation_failed"
+        },
+        {
+          "line": 1489,
+          "scope": "AsyncGzipBinaryFile._poison_read",
+          "kind": "assignment",
+          "target": "self._eof"
+        },
+        {
+          "line": 1490,
+          "scope": "AsyncGzipBinaryFile._poison_read",
+          "kind": "assignment",
+          "target": "observer"
+        },
+        {
+          "line": 1493,
+          "scope": "AsyncGzipBinaryFile._poison_read",
+          "kind": "mutation/completion call",
+          "target": "decoder.discard"
+        },
+        {
+          "line": 1512,
+          "scope": "AsyncGzipBinaryFile._finish_write_call",
+          "kind": "assignment",
+          "target": "self._write_call_active"
+        },
+        {
+          "line": 1516,
+          "scope": "AsyncGzipBinaryFile._finish_write_call",
+          "kind": "mutation/completion call",
+          "target": "encoder.discard"
+        },
+        {
+          "line": 1520,
+          "scope": "AsyncGzipBinaryFile._mark_closed",
+          "kind": "assignment",
+          "target": "self._is_closed"
+        },
+        {
+          "line": 1521,
+          "scope": "AsyncGzipBinaryFile._mark_closed",
+          "kind": "assignment",
+          "target": "self._read_poison_observer"
+        },
+        {
+          "line": 1522,
+          "scope": "AsyncGzipBinaryFile._mark_closed",
+          "kind": "assignment",
+          "target": "observer"
+        },
+        {
+          "line": 1523,
+          "scope": "AsyncGzipBinaryFile._mark_closed",
+          "kind": "assignment",
+          "target": "self._closed_observer"
+        },
+        {
+          "line": 1535,
+          "scope": "AsyncGzipBinaryFile._fill_buffer",
+          "kind": "mutation/completion call",
+          "target": "self._buffer.extend"
+        },
+        {
+          "line": 1539,
+          "scope": "AsyncGzipBinaryFile._consume_bytes",
+          "kind": "assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 1541,
+          "scope": "AsyncGzipBinaryFile._consume_bytes",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 1546,
+          "scope": "AsyncGzipBinaryFile._consume_bytes",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 1549,
+          "scope": "AsyncGzipBinaryFile._consume_bytes",
+          "kind": "assignment",
+          "target": "take"
+        },
+        {
+          "line": 1550,
+          "scope": "AsyncGzipBinaryFile._consume_bytes",
+          "kind": "augmented assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 1551,
+          "scope": "AsyncGzipBinaryFile._consume_bytes",
+          "kind": "augmented assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 1552,
+          "scope": "AsyncGzipBinaryFile._consume_bytes",
+          "kind": "augmented assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 1554,
+          "scope": "AsyncGzipBinaryFile._consume_bytes",
+          "kind": "deletion",
+          "target": "self._buffer[:]"
+        },
+        {
+          "line": 1555,
+          "scope": "AsyncGzipBinaryFile._consume_bytes",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 1561,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "assignment",
+          "target": "seek_method"
+        },
+        {
+          "line": 1563,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 1570,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "assignment",
+          "target": "self._replay_offset"
+        },
+        {
+          "line": 1574,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "mutation/completion call",
+          "target": "self._decoder.discard"
+        },
+        {
+          "line": 1575,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "assignment",
+          "target": "self._decoder"
+        },
+        {
+          "line": 1579,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "assignment",
+          "target": "self._decoder_header_generation"
+        },
+        {
+          "line": 1580,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "assignment",
+          "target": "self._read_broken"
+        },
+        {
+          "line": 1581,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "assignment",
+          "target": "self._read_validation_failed"
+        },
+        {
+          "line": 1582,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "deletion",
+          "target": "self._buffer[:]"
+        },
+        {
+          "line": 1583,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "assignment",
+          "target": "self._buffer_offset"
+        },
+        {
+          "line": 1584,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "assignment",
+          "target": "self._eof"
+        },
+        {
+          "line": 1585,
+          "scope": "AsyncGzipBinaryFile._rewind_reader",
+          "kind": "assignment",
+          "target": "self._position"
+        },
+        {
+          "line": 1592,
+          "scope": "AsyncGzipBinaryFile._probe_underlying_seekable",
+          "kind": "assignment",
+          "target": "seek_method"
+        },
+        {
+          "line": 1596,
+          "scope": "AsyncGzipBinaryFile._probe_underlying_seekable",
+          "kind": "assignment",
+          "target": "seekable_method"
+        },
+        {
+          "line": 1601,
+          "scope": "AsyncGzipBinaryFile._probe_underlying_seekable",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 1603,
+          "scope": "AsyncGzipBinaryFile._probe_underlying_seekable",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 1614,
+          "scope": "AsyncGzipBinaryFile._read_compressed_chunk",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 1617,
+          "scope": "AsyncGzipBinaryFile._read_compressed_chunk",
+          "kind": "assignment",
+          "target": "chunk"
+        },
+        {
+          "line": 1618,
+          "scope": "AsyncGzipBinaryFile._read_compressed_chunk",
+          "kind": "assignment",
+          "target": "self._replay_offset"
+        },
+        {
+          "line": 1620,
+          "scope": "AsyncGzipBinaryFile._read_compressed_chunk",
+          "kind": "assignment",
+          "target": "self._replay_offset"
+        },
+        {
+          "line": 1624,
+          "scope": "AsyncGzipBinaryFile._read_compressed_chunk",
+          "kind": "assignment",
+          "target": "chunk"
+        },
+        {
+          "line": 1632,
+          "scope": "AsyncGzipBinaryFile._read_compressed_chunk",
+          "kind": "assignment",
+          "target": "cap"
+        },
+        {
+          "line": 1634,
+          "scope": "AsyncGzipBinaryFile._read_compressed_chunk",
+          "kind": "mutation/completion call",
+          "target": "self._compressed_cache.clear"
+        },
+        {
+          "line": 1635,
+          "scope": "AsyncGzipBinaryFile._read_compressed_chunk",
+          "kind": "assignment",
+          "target": "self._cache_rewindable_reads"
+        },
+        {
+          "line": 1637,
+          "scope": "AsyncGzipBinaryFile._read_compressed_chunk",
+          "kind": "mutation/completion call",
+          "target": "self._compressed_cache.extend"
+        },
+        {
+          "line": 1648,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "assignment",
+          "target": "file"
+        },
+        {
+          "line": 1649,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "assignment",
+          "target": "owns_file"
+        },
+        {
+          "line": 1654,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "assignment",
+          "target": "self._file"
+        },
+        {
+          "line": 1655,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "assignment",
+          "target": "self._owns_file"
+        },
+        {
+          "line": 1656,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "assignment",
+          "target": "encoder"
+        },
+        {
+          "line": 1657,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "assignment",
+          "target": "self._encoder"
+        },
+        {
+          "line": 1659,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "mutation/completion call",
+          "target": "encoder.discard"
+        },
+        {
+          "line": 1660,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "assignment",
+          "target": "decoder"
+        },
+        {
+          "line": 1661,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "assignment",
+          "target": "self._decoder"
+        },
+        {
+          "line": 1663,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "mutation/completion call",
+          "target": "decoder.discard"
+        },
+        {
+          "line": 1667,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "assignment",
+          "target": "close_method"
+        },
+        {
+          "line": 1669,
+          "scope": "AsyncGzipBinaryFile._cleanup_failed_enter",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 1708,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "assignment",
+          "target": "operation"
+        },
+        {
+          "line": 1714,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "assignment",
+          "target": "flush_method"
+        },
+        {
+          "line": 1716,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 1729,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "assignment",
+          "target": "self._write_broken"
+        },
+        {
+          "line": 1730,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "mutation/completion call",
+          "target": "encoder.discard"
+        },
+        {
+          "line": 1733,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "assignment",
+          "target": "self._write_broken"
+        },
+        {
+          "line": 1734,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "mutation/completion call",
+          "target": "encoder.discard"
+        },
+        {
+          "line": 1736,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "assignment",
+          "target": "detail"
+        },
+        {
+          "line": 1740,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "assignment",
+          "target": "self._write_broken"
+        },
+        {
+          "line": 1741,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "mutation/completion call",
+          "target": "encoder.discard"
+        },
+        {
+          "line": 1744,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "assignment",
+          "target": "self._write_broken"
+        },
+        {
+          "line": 1745,
+          "scope": "AsyncGzipBinaryFile._flush_writer",
+          "kind": "mutation/completion call",
+          "target": "encoder.discard"
+        },
+        {
+          "line": 1765,
+          "scope": "AsyncGzipBinaryFile._close_locked",
+          "kind": "assignment",
+          "target": "close_file"
+        },
+        {
+          "line": 1770,
+          "scope": "AsyncGzipBinaryFile._close_locked",
+          "kind": "assignment",
+          "target": "write_failed"
+        },
+        {
+          "line": 1773,
+          "scope": "AsyncGzipBinaryFile._close_locked",
+          "kind": "assignment",
+          "target": "encoder"
+        },
+        {
+          "line": 1779,
+          "scope": "AsyncGzipBinaryFile._close_locked",
+          "kind": "assignment",
+          "target": "write_failed"
+        },
+        {
+          "line": 1780,
+          "scope": "AsyncGzipBinaryFile._close_locked",
+          "kind": "assignment",
+          "target": "self._write_broken"
+        },
+        {
+          "line": 1782,
+          "scope": "AsyncGzipBinaryFile._close_locked",
+          "kind": "mutation/completion call",
+          "target": "self._encoder.discard"
+        },
+        {
+          "line": 1787,
+          "scope": "AsyncGzipBinaryFile._close_locked",
+          "kind": "mutation/completion call",
+          "target": "self._encoder.discard"
+        },
+        {
+          "line": 1789,
+          "scope": "AsyncGzipBinaryFile._close_locked",
+          "kind": "mutation/completion call",
+          "target": "self._decoder.discard"
+        },
+        {
+          "line": 1807,
+          "scope": "AsyncGzipBinaryFile._abort_active_call_on_exit",
+          "kind": "assignment",
+          "target": "self._write_broken"
+        },
+        {
+          "line": 1809,
+          "scope": "AsyncGzipBinaryFile._abort_active_call_on_exit",
+          "kind": "assignment",
+          "target": "self._read_broken"
+        },
+        {
+          "line": 1810,
+          "scope": "AsyncGzipBinaryFile._abort_active_call_on_exit",
+          "kind": "assignment",
+          "target": "self._read_validation_failed"
+        },
+        {
+          "line": 1811,
+          "scope": "AsyncGzipBinaryFile._abort_active_call_on_exit",
+          "kind": "assignment",
+          "target": "self._eof"
+        },
+        {
+          "line": 1813,
+          "scope": "AsyncGzipBinaryFile._abort_active_call_on_exit",
+          "kind": "assignment",
+          "target": "close_file"
+        },
+        {
+          "line": 1828,
+          "scope": "AsyncGzipBinaryFile._close_underlying",
+          "kind": "assignment",
+          "target": "close_method"
+        },
+        {
+          "line": 1830,
+          "scope": "AsyncGzipBinaryFile._close_underlying",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 1842,
+          "scope": "AsyncGzipBinaryFile.__anext__",
+          "kind": "assignment",
+          "target": "line"
+        }
+      ]
+    },
+    "_text.py": {
+      "sha256": "4c52ec0f9ecacc05f54fec721f27e49f5f1eee6de3b00d38f48c052c603d9dde",
+      "sites": [
+        {
+          "line": 47,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_LINE_RE_LF"
+        },
+        {
+          "line": 48,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_LINE_RE_CR"
+        },
+        {
+          "line": 55,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_SPLITLINES_UNSAFE_LF"
+        },
+        {
+          "line": 56,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_SPLITLINES_UNSAFE_CR"
+        },
+        {
+          "line": 68,
+          "scope": "_TextReadReservation",
+          "kind": "assignment",
+          "target": "__slots__"
+        },
+        {
+          "line": 71,
+          "scope": "_TextReadReservation.__init__",
+          "kind": "assignment",
+          "target": "self._file"
+        },
+        {
+          "line": 74,
+          "scope": "_TextReadReservation.__enter__",
+          "kind": "assignment",
+          "target": "file"
+        },
+        {
+          "line": 78,
+          "scope": "_TextReadReservation.__enter__",
+          "kind": "assignment",
+          "target": "file._read_call_active"
+        },
+        {
+          "line": 81,
+          "scope": "_TextReadReservation.__exit__",
+          "kind": "assignment",
+          "target": "self._file._read_call_active"
+        },
+        {
+          "line": 92,
+          "scope": "_TextWriteReservation",
+          "kind": "assignment",
+          "target": "__slots__"
+        },
+        {
+          "line": 95,
+          "scope": "_TextWriteReservation.__init__",
+          "kind": "assignment",
+          "target": "self._file"
+        },
+        {
+          "line": 98,
+          "scope": "_TextWriteReservation.__enter__",
+          "kind": "assignment",
+          "target": "file"
+        },
+        {
+          "line": 100,
+          "scope": "_TextWriteReservation.__enter__",
+          "kind": "assignment",
+          "target": "file._write_call_active"
+        },
+        {
+          "line": 103,
+          "scope": "_TextWriteReservation.__exit__",
+          "kind": "assignment",
+          "target": "self._file._write_call_active"
+        },
+        {
+          "line": 143,
+          "scope": "AsyncGzipTextFile",
+          "kind": "assignment",
+          "target": "__slots__"
+        },
+        {
+          "line": 198,
+          "scope": "AsyncGzipTextFile",
+          "kind": "assignment",
+          "target": "_SEEN_CR"
+        },
+        {
+          "line": 199,
+          "scope": "AsyncGzipTextFile",
+          "kind": "assignment",
+          "target": "_SEEN_LF"
+        },
+        {
+          "line": 200,
+          "scope": "AsyncGzipTextFile",
+          "kind": "assignment",
+          "target": "_SEEN_CRLF"
+        },
+        {
+          "line": 201,
+          "scope": "AsyncGzipTextFile",
+          "kind": "assignment",
+          "target": "_COOKIE_VERSION"
+        },
+        {
+          "line": 202,
+          "scope": "AsyncGzipTextFile",
+          "kind": "assignment",
+          "target": "_COOKIE_HEADER"
+        },
+        {
+          "line": 207,
+          "scope": "AsyncGzipTextFile",
+          "kind": "assignment",
+          "target": "_TEXT_COMPACTION_THRESHOLD"
+        },
+        {
+          "line": 213,
+          "scope": "AsyncGzipTextFile",
+          "kind": "assignment",
+          "target": "_LINE_BATCH_CHARS"
+        },
+        {
+          "line": 218,
+          "scope": "AsyncGzipTextFile",
+          "kind": "assignment",
+          "target": "DEFAULT_BATCH_HINT"
+        },
+        {
+          "line": 240,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "validated_closefd"
+        },
+        {
+          "line": 241,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "validated_strict_size"
+        },
+        {
+          "line": 242,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "validated_fast_compress"
+        },
+        {
+          "line": 252,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "encoding"
+        },
+        {
+          "line": 256,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "errors"
+        },
+        {
+          "line": 260,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "(mode_op, saw_b, saw_t, plus)"
+        },
+        {
+          "line": 265,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._filename"
+        },
+        {
+          "line": 266,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._mode"
+        },
+        {
+          "line": 267,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._mode_op"
+        },
+        {
+          "line": 268,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._mode_plus"
+        },
+        {
+          "line": 269,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._writing_mode"
+        },
+        {
+          "line": 272,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._chunk_size"
+        },
+        {
+          "line": 273,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._encoding"
+        },
+        {
+          "line": 274,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._errors"
+        },
+        {
+          "line": 275,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._newline"
+        },
+        {
+          "line": 276,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._compresslevel"
+        },
+        {
+          "line": 277,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._header_mtime"
+        },
+        {
+          "line": 278,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._header_filename_override"
+        },
+        {
+          "line": 279,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._external_file"
+        },
+        {
+          "line": 280,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._closefd"
+        },
+        {
+          "line": 285,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._binary_mode"
+        },
+        {
+          "line": 287,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "augmented assignment",
+          "target": "self._binary_mode"
+        },
+        {
+          "line": 289,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._binary_file"
+        },
+        {
+          "line": 290,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._is_closed"
+        },
+        {
+          "line": 291,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._close_complete"
+        },
+        {
+          "line": 292,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._close_lock"
+        },
+        {
+          "line": 293,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._read_call_active"
+        },
+        {
+          "line": 294,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._read_poisoned"
+        },
+        {
+          "line": 295,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._write_call_active"
+        },
+        {
+          "line": 296,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._read_call"
+        },
+        {
+          "line": 297,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._write_call"
+        },
+        {
+          "line": 302,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._decoder"
+        },
+        {
+          "line": 305,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._encoder"
+        },
+        {
+          "line": 310,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._encoder_used"
+        },
+        {
+          "line": 311,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._text_buffer"
+        },
+        {
+          "line": 312,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 313,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._trailing_cr"
+        },
+        {
+          "line": 314,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._seen_newline_types"
+        },
+        {
+          "line": 319,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._decoder_byte_position"
+        },
+        {
+          "line": 320,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._cookie_nonce"
+        },
+        {
+          "line": 321,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "initial_decoder_state"
+        },
+        {
+          "line": 322,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._buffer_origin_offset"
+        },
+        {
+          "line": 323,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._buffer_origin_decoder_state"
+        },
+        {
+          "line": 324,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._buffer_origin_trailing_cr"
+        },
+        {
+          "line": 325,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._buffer_origin_seen_newline_types"
+        },
+        {
+          "line": 326,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 327,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._universal_newlines"
+        },
+        {
+          "line": 328,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._max_decompressed_size"
+        },
+        {
+          "line": 329,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._max_rewind_cache_size"
+        },
+        {
+          "line": 330,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._strict_size"
+        },
+        {
+          "line": 331,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._fast_compress"
+        },
+        {
+          "line": 340,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._line_term"
+        },
+        {
+          "line": 344,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._line_split_re"
+        },
+        {
+          "line": 347,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._splitlines_unsafe"
+        },
+        {
+          "line": 351,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._line_term"
+        },
+        {
+          "line": 352,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._line_split_re"
+        },
+        {
+          "line": 353,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "assignment",
+          "target": "self._splitlines_unsafe"
+        },
+        {
+          "line": 354,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._pending_lines"
+        },
+        {
+          "line": 355,
+          "scope": "AsyncGzipTextFile.__init__",
+          "kind": "annotated assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 376,
+          "scope": "AsyncGzipTextFile.open",
+          "kind": "assignment",
+          "target": "filename"
+        },
+        {
+          "line": 377,
+          "scope": "AsyncGzipTextFile.open",
+          "kind": "assignment",
+          "target": "self._binary_file"
+        },
+        {
+          "line": 398,
+          "scope": "AsyncGzipTextFile.open",
+          "kind": "mutation/completion call",
+          "target": "self._binary_file.close"
+        },
+        {
+          "line": 401,
+          "scope": "AsyncGzipTextFile.open",
+          "kind": "assignment",
+          "target": "self._binary_file"
+        },
+        {
+          "line": 403,
+          "scope": "AsyncGzipTextFile.open",
+          "kind": "assignment",
+          "target": "self._binary_file._closed_observer"
+        },
+        {
+          "line": 404,
+          "scope": "AsyncGzipTextFile.open",
+          "kind": "assignment",
+          "target": "self._binary_file._read_poison_observer"
+        },
+        {
+          "line": 418,
+          "scope": "AsyncGzipTextFile.__aexit__",
+          "kind": "assignment",
+          "target": "binary_file"
+        },
+        {
+          "line": 420,
+          "scope": "AsyncGzipTextFile.__aexit__",
+          "kind": "mutation/completion call",
+          "target": "self.close"
+        },
+        {
+          "line": 464,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "decoder_state"
+        },
+        {
+          "line": 469,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "origin_offset"
+        },
+        {
+          "line": 470,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "decoder_state"
+        },
+        {
+          "line": 471,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "trailing_cr"
+        },
+        {
+          "line": 472,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "seen_newlines"
+        },
+        {
+          "line": 473,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "chars_to_skip"
+        },
+        {
+          "line": 475,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "origin_offset"
+        },
+        {
+          "line": 476,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "decoder_state"
+        },
+        {
+          "line": 477,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "trailing_cr"
+        },
+        {
+          "line": 478,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "seen_newlines"
+        },
+        {
+          "line": 479,
+          "scope": "AsyncGzipTextFile.tell",
+          "kind": "assignment",
+          "target": "chars_to_skip"
+        },
+        {
+          "line": 514,
+          "scope": "AsyncGzipTextFile.seek",
+          "kind": "assignment",
+          "target": "(origin_offset, decoder_state, trailing_cr, seen_newlines, chars_to_skip)"
+        },
+        {
+          "line": 522,
+          "scope": "AsyncGzipTextFile.seek",
+          "kind": "assignment",
+          "target": "self._read_poisoned"
+        },
+        {
+          "line": 524,
+          "scope": "AsyncGzipTextFile.seek",
+          "kind": "assignment",
+          "target": "self._decoder_byte_position"
+        },
+        {
+          "line": 525,
+          "scope": "AsyncGzipTextFile.seek",
+          "kind": "assignment",
+          "target": "self._trailing_cr"
+        },
+        {
+          "line": 526,
+          "scope": "AsyncGzipTextFile.seek",
+          "kind": "assignment",
+          "target": "self._seen_newline_types"
+        },
+        {
+          "line": 593,
+          "scope": "AsyncGzipTextFile._sync_closed_from_binary",
+          "kind": "assignment",
+          "target": "self._is_closed"
+        },
+        {
+          "line": 597,
+          "scope": "AsyncGzipTextFile._mark_binary_closed",
+          "kind": "assignment",
+          "target": "self._is_closed"
+        },
+        {
+          "line": 601,
+          "scope": "AsyncGzipTextFile._mark_binary_read_poisoned",
+          "kind": "assignment",
+          "target": "self._read_poisoned"
+        },
+        {
+          "line": 620,
+          "scope": "AsyncGzipTextFile._check_text_read_usable",
+          "kind": "assignment",
+          "target": "binary_file"
+        },
+        {
+          "line": 650,
+          "scope": "AsyncGzipTextFile.newlines",
+          "kind": "assignment",
+          "target": "seen"
+        },
+        {
+          "line": 652,
+          "scope": "AsyncGzipTextFile.newlines",
+          "kind": "mutation/completion call",
+          "target": "seen.append"
+        },
+        {
+          "line": 654,
+          "scope": "AsyncGzipTextFile.newlines",
+          "kind": "mutation/completion call",
+          "target": "seen.append"
+        },
+        {
+          "line": 656,
+          "scope": "AsyncGzipTextFile.newlines",
+          "kind": "mutation/completion call",
+          "target": "seen.append"
+        },
+        {
+          "line": 709,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "text_to_encode"
+        },
+        {
+          "line": 712,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "text_to_encode"
+        },
+        {
+          "line": 714,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "text_to_encode"
+        },
+        {
+          "line": 723,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "self._write_call_active"
+        },
+        {
+          "line": 725,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "encoder"
+        },
+        {
+          "line": 727,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "encoder_state"
+        },
+        {
+          "line": 728,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "encoder_was_used"
+        },
+        {
+          "line": 729,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "self._encoder_used"
+        },
+        {
+          "line": 731,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "encoded_data"
+        },
+        {
+          "line": 732,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "binary_file"
+        },
+        {
+          "line": 737,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "self._encoder_used"
+        },
+        {
+          "line": 741,
+          "scope": "AsyncGzipTextFile.write",
+          "kind": "assignment",
+          "target": "self._write_call_active"
+        },
+        {
+          "line": 748,
+          "scope": "AsyncGzipTextFile._write_reserved",
+          "kind": "assignment",
+          "target": "encoder"
+        },
+        {
+          "line": 750,
+          "scope": "AsyncGzipTextFile._write_reserved",
+          "kind": "assignment",
+          "target": "encoder_state"
+        },
+        {
+          "line": 751,
+          "scope": "AsyncGzipTextFile._write_reserved",
+          "kind": "assignment",
+          "target": "encoder_was_used"
+        },
+        {
+          "line": 752,
+          "scope": "AsyncGzipTextFile._write_reserved",
+          "kind": "assignment",
+          "target": "self._encoder_used"
+        },
+        {
+          "line": 754,
+          "scope": "AsyncGzipTextFile._write_reserved",
+          "kind": "assignment",
+          "target": "encoded_data"
+        },
+        {
+          "line": 755,
+          "scope": "AsyncGzipTextFile._write_reserved",
+          "kind": "assignment",
+          "target": "binary_file"
+        },
+        {
+          "line": 762,
+          "scope": "AsyncGzipTextFile._write_reserved",
+          "kind": "assignment",
+          "target": "self._encoder_used"
+        },
+        {
+          "line": 770,
+          "scope": "AsyncGzipTextFile._write_batch_reserved",
+          "kind": "assignment",
+          "target": "text_to_encode"
+        },
+        {
+          "line": 772,
+          "scope": "AsyncGzipTextFile._write_batch_reserved",
+          "kind": "assignment",
+          "target": "text_to_encode"
+        },
+        {
+          "line": 774,
+          "scope": "AsyncGzipTextFile._write_batch_reserved",
+          "kind": "assignment",
+          "target": "text_to_encode"
+        },
+        {
+          "line": 783,
+          "scope": "AsyncGzipTextFile._set_buffer",
+          "kind": "assignment",
+          "target": "self._text_buffer"
+        },
+        {
+          "line": 784,
+          "scope": "AsyncGzipTextFile._set_buffer",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 788,
+          "scope": "AsyncGzipTextFile._set_buffer",
+          "kind": "assignment",
+          "target": "self._pending_lines"
+        },
+        {
+          "line": 789,
+          "scope": "AsyncGzipTextFile._set_buffer",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 795,
+          "scope": "AsyncGzipTextFile._append_buffer",
+          "kind": "augmented assignment",
+          "target": "self._text_buffer"
+        },
+        {
+          "line": 799,
+          "scope": "AsyncGzipTextFile._append_buffer",
+          "kind": "augmented assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 800,
+          "scope": "AsyncGzipTextFile._append_buffer",
+          "kind": "assignment",
+          "target": "self._text_buffer"
+        },
+        {
+          "line": 801,
+          "scope": "AsyncGzipTextFile._append_buffer",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 805,
+          "scope": "AsyncGzipTextFile._consume_buffer",
+          "kind": "assignment",
+          "target": "buf"
+        },
+        {
+          "line": 806,
+          "scope": "AsyncGzipTextFile._consume_buffer",
+          "kind": "assignment",
+          "target": "start"
+        },
+        {
+          "line": 807,
+          "scope": "AsyncGzipTextFile._consume_buffer",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 810,
+          "scope": "AsyncGzipTextFile._consume_buffer",
+          "kind": "augmented assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 811,
+          "scope": "AsyncGzipTextFile._consume_buffer",
+          "kind": "assignment",
+          "target": "self._text_buffer"
+        },
+        {
+          "line": 812,
+          "scope": "AsyncGzipTextFile._consume_buffer",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 814,
+          "scope": "AsyncGzipTextFile._consume_buffer",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 815,
+          "scope": "AsyncGzipTextFile._consume_buffer",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 820,
+          "scope": "AsyncGzipTextFile._can_use_plain_position",
+          "kind": "assignment",
+          "target": "(decoder_bytes, decoder_flag)"
+        },
+        {
+          "line": 833,
+          "scope": "AsyncGzipTextFile._reset_to_start",
+          "kind": "assignment",
+          "target": "self._read_poisoned"
+        },
+        {
+          "line": 835,
+          "scope": "AsyncGzipTextFile._reset_to_start",
+          "kind": "assignment",
+          "target": "self._decoder_byte_position"
+        },
+        {
+          "line": 837,
+          "scope": "AsyncGzipTextFile._reset_to_start",
+          "kind": "assignment",
+          "target": "self._trailing_cr"
+        },
+        {
+          "line": 838,
+          "scope": "AsyncGzipTextFile._reset_to_start",
+          "kind": "assignment",
+          "target": "self._seen_newline_types"
+        },
+        {
+          "line": 855,
+          "scope": "AsyncGzipTextFile._set_buffer_origin",
+          "kind": "assignment",
+          "target": "self._buffer_origin_offset"
+        },
+        {
+          "line": 856,
+          "scope": "AsyncGzipTextFile._set_buffer_origin",
+          "kind": "assignment",
+          "target": "self._buffer_origin_decoder_state"
+        },
+        {
+          "line": 857,
+          "scope": "AsyncGzipTextFile._set_buffer_origin",
+          "kind": "assignment",
+          "target": "self._buffer_origin_trailing_cr"
+        },
+        {
+          "line": 858,
+          "scope": "AsyncGzipTextFile._set_buffer_origin",
+          "kind": "assignment",
+          "target": "self._buffer_origin_seen_newline_types"
+        },
+        {
+          "line": 859,
+          "scope": "AsyncGzipTextFile._set_buffer_origin",
+          "kind": "assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 863,
+          "scope": "AsyncGzipTextFile._capture_buffer_origin",
+          "kind": "assignment",
+          "target": "bf"
+        },
+        {
+          "line": 866,
+          "scope": "AsyncGzipTextFile._capture_buffer_origin",
+          "kind": "assignment",
+          "target": "self._text_buffer"
+        },
+        {
+          "line": 867,
+          "scope": "AsyncGzipTextFile._capture_buffer_origin",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 892,
+          "scope": "AsyncGzipTextFile._seek_to_plain_position",
+          "kind": "assignment",
+          "target": "(decoder_bytes, decoder_flag)"
+        },
+        {
+          "line": 906,
+          "scope": "AsyncGzipTextFile._seek_to_plain_position",
+          "kind": "assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 909,
+          "scope": "AsyncGzipTextFile._seek_to_plain_position",
+          "kind": "assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 912,
+          "scope": "AsyncGzipTextFile._seek_to_plain_position",
+          "kind": "assignment",
+          "target": "raw_chunk"
+        },
+        {
+          "line": 913,
+          "scope": "AsyncGzipTextFile._seek_to_plain_position",
+          "kind": "assignment",
+          "target": "self._decoder_byte_position"
+        },
+        {
+          "line": 916,
+          "scope": "AsyncGzipTextFile._seek_to_plain_position",
+          "kind": "augmented assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 917,
+          "scope": "AsyncGzipTextFile._seek_to_plain_position",
+          "kind": "assignment",
+          "target": "decoded_chunk"
+        },
+        {
+          "line": 925,
+          "scope": "AsyncGzipTextFile._seek_to_plain_position",
+          "kind": "assignment",
+          "target": "final_decoded"
+        },
+        {
+          "line": 948,
+          "scope": "AsyncGzipTextFile._encode_cookie",
+          "kind": "assignment",
+          "target": "(decoder_bytes, decoder_flag)"
+        },
+        {
+          "line": 949,
+          "scope": "AsyncGzipTextFile._encode_cookie",
+          "kind": "assignment",
+          "target": "payload"
+        },
+        {
+          "line": 959,
+          "scope": "AsyncGzipTextFile._encode_cookie",
+          "kind": "augmented assignment",
+          "target": "payload"
+        },
+        {
+          "line": 969,
+          "scope": "AsyncGzipTextFile._decode_cookie",
+          "kind": "assignment",
+          "target": "payload_int"
+        },
+        {
+          "line": 970,
+          "scope": "AsyncGzipTextFile._decode_cookie",
+          "kind": "assignment",
+          "target": "raw"
+        },
+        {
+          "line": 974,
+          "scope": "AsyncGzipTextFile._decode_cookie",
+          "kind": "assignment",
+          "target": "(version, nonce, origin_offset, chars_to_skip, decoder_flag, trailing_cr, seen_newlines, decoder_len)"
+        },
+        {
+          "line": 984,
+          "scope": "AsyncGzipTextFile._decode_cookie",
+          "kind": "assignment",
+          "target": "decoder_bytes"
+        },
+        {
+          "line": 1003,
+          "scope": "AsyncGzipTextFile._replay_characters",
+          "kind": "assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 1006,
+          "scope": "AsyncGzipTextFile._replay_characters",
+          "kind": "assignment",
+          "target": "has_more"
+        },
+        {
+          "line": 1016,
+          "scope": "AsyncGzipTextFile._replay_characters",
+          "kind": "assignment",
+          "target": "take"
+        },
+        {
+          "line": 1018,
+          "scope": "AsyncGzipTextFile._replay_characters",
+          "kind": "augmented assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 1026,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "bf"
+        },
+        {
+          "line": 1032,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "self._text_buffer"
+        },
+        {
+          "line": 1033,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1034,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "self._buffer_origin_offset"
+        },
+        {
+          "line": 1035,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "self._buffer_origin_decoder_state"
+        },
+        {
+          "line": 1036,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "self._buffer_origin_trailing_cr"
+        },
+        {
+          "line": 1037,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "self._buffer_origin_seen_newline_types"
+        },
+        {
+          "line": 1038,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 1040,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "raw_chunk"
+        },
+        {
+          "line": 1041,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "self._decoder_byte_position"
+        },
+        {
+          "line": 1043,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "final_decoded"
+        },
+        {
+          "line": 1047,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "augmented assignment",
+          "target": "self._seen_newline_types"
+        },
+        {
+          "line": 1048,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "self._trailing_cr"
+        },
+        {
+          "line": 1051,
+          "scope": "AsyncGzipTextFile._read_chunk_and_decode",
+          "kind": "assignment",
+          "target": "decoded_chunk"
+        },
+        {
+          "line": 1074,
+          "scope": "AsyncGzipTextFile._decode_next_chunk",
+          "kind": "assignment",
+          "target": "bf"
+        },
+        {
+          "line": 1078,
+          "scope": "AsyncGzipTextFile._decode_next_chunk",
+          "kind": "assignment",
+          "target": "raw_chunk"
+        },
+        {
+          "line": 1079,
+          "scope": "AsyncGzipTextFile._decode_next_chunk",
+          "kind": "assignment",
+          "target": "self._decoder_byte_position"
+        },
+        {
+          "line": 1081,
+          "scope": "AsyncGzipTextFile._decode_next_chunk",
+          "kind": "assignment",
+          "target": "final_decoded"
+        },
+        {
+          "line": 1082,
+          "scope": "AsyncGzipTextFile._decode_next_chunk",
+          "kind": "assignment",
+          "target": "translated"
+        },
+        {
+          "line": 1088,
+          "scope": "AsyncGzipTextFile._decode_next_chunk",
+          "kind": "assignment",
+          "target": "decoded_chunk"
+        },
+        {
+          "line": 1090,
+          "scope": "AsyncGzipTextFile._decode_next_chunk",
+          "kind": "assignment",
+          "target": "translated"
+        },
+        {
+          "line": 1098,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "available"
+        },
+        {
+          "line": 1100,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "buffer"
+        },
+        {
+          "line": 1101,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "offset"
+        },
+        {
+          "line": 1102,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "prefix"
+        },
+        {
+          "line": 1103,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "needed"
+        },
+        {
+          "line": 1105,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "bf"
+        },
+        {
+          "line": 1111,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "augmented assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 1114,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "annotated assignment",
+          "target": "pieces"
+        },
+        {
+          "line": 1115,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "added"
+        },
+        {
+          "line": 1116,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "annotated assignment",
+          "target": "fresh_origin"
+        },
+        {
+          "line": 1117,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "origin_chars"
+        },
+        {
+          "line": 1125,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "fresh_origin"
+        },
+        {
+          "line": 1131,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "origin_chars"
+        },
+        {
+          "line": 1132,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "(text, more)"
+        },
+        {
+          "line": 1134,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "mutation/completion call",
+          "target": "pieces.append"
+        },
+        {
+          "line": 1135,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "augmented assignment",
+          "target": "added"
+        },
+        {
+          "line": 1147,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "augmented assignment",
+          "target": "self._text_buffer"
+        },
+        {
+          "line": 1150,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "fresh"
+        },
+        {
+          "line": 1151,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "consumed_fresh"
+        },
+        {
+          "line": 1152,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 1156,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1167,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "augmented assignment",
+          "target": "self._text_buffer"
+        },
+        {
+          "line": 1168,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1179,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 1181,
+          "scope": "AsyncGzipTextFile._read_sized_reserved",
+          "kind": "augmented assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 1210,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "size"
+        },
+        {
+          "line": 1212,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "size"
+        },
+        {
+          "line": 1222,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "buf"
+        },
+        {
+          "line": 1223,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "off"
+        },
+        {
+          "line": 1224,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "prefix"
+        },
+        {
+          "line": 1226,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "bf"
+        },
+        {
+          "line": 1227,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "decoder"
+        },
+        {
+          "line": 1228,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "apply_nl"
+        },
+        {
+          "line": 1233,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "raw_all"
+        },
+        {
+          "line": 1234,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "self._decoder_byte_position"
+        },
+        {
+          "line": 1235,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "chunks"
+        },
+        {
+          "line": 1237,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "decoded"
+        },
+        {
+          "line": 1239,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "mutation/completion call",
+          "target": "chunks.append"
+        },
+        {
+          "line": 1241,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "final"
+        },
+        {
+          "line": 1243,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "mutation/completion call",
+          "target": "chunks.append"
+        },
+        {
+          "line": 1251,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "buffered"
+        },
+        {
+          "line": 1254,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "self._pending_lines"
+        },
+        {
+          "line": 1255,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1259,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "self._pending_lines"
+        },
+        {
+          "line": 1260,
+          "scope": "AsyncGzipTextFile.read",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1281,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "buf"
+        },
+        {
+          "line": 1282,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "buf_end"
+        },
+        {
+          "line": 1283,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "search_start"
+        },
+        {
+          "line": 1284,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "base"
+        },
+        {
+          "line": 1285,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "bf"
+        },
+        {
+          "line": 1289,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "pos_n"
+        },
+        {
+          "line": 1290,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "pos_r"
+        },
+        {
+          "line": 1298,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "cr_length"
+        },
+        {
+          "line": 1299,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "cr_is_trailing"
+        },
+        {
+          "line": 1300,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "should_wait_for_lf"
+        },
+        {
+          "line": 1306,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "rel_pos"
+        },
+        {
+          "line": 1313,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "pos"
+        },
+        {
+          "line": 1316,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "pos"
+        },
+        {
+          "line": 1319,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "pos"
+        },
+        {
+          "line": 1322,
+          "scope": "AsyncGzipTextFile._find_line_terminator",
+          "kind": "assignment",
+          "target": "pos"
+        },
+        {
+          "line": 1339,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "seen"
+        },
+        {
+          "line": 1342,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "crlf_completed"
+        },
+        {
+          "line": 1346,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "augmented assignment",
+          "target": "seen"
+        },
+        {
+          "line": 1348,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "pending_trailing_cr"
+        },
+        {
+          "line": 1355,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "need"
+        },
+        {
+          "line": 1357,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "start"
+        },
+        {
+          "line": 1358,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 1370,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "augmented assignment",
+          "target": "seen"
+        },
+        {
+          "line": 1371,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "self._seen_newline_types"
+        },
+        {
+          "line": 1372,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "self._trailing_cr"
+        },
+        {
+          "line": 1375,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "crlf"
+        },
+        {
+          "line": 1377,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "augmented assignment",
+          "target": "seen"
+        },
+        {
+          "line": 1379,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "augmented assignment",
+          "target": "seen"
+        },
+        {
+          "line": 1381,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "augmented assignment",
+          "target": "seen"
+        },
+        {
+          "line": 1383,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "self._seen_newline_types"
+        },
+        {
+          "line": 1386,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "self._trailing_cr"
+        },
+        {
+          "line": 1393,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "text"
+        },
+        {
+          "line": 1395,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "self._trailing_cr"
+        },
+        {
+          "line": 1400,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "text"
+        },
+        {
+          "line": 1401,
+          "scope": "AsyncGzipTextFile._apply_newline_decoding",
+          "kind": "assignment",
+          "target": "text"
+        },
+        {
+          "line": 1406,
+          "scope": "AsyncGzipTextFile._finalize_pending_newline_state",
+          "kind": "assignment",
+          "target": "bf"
+        },
+        {
+          "line": 1412,
+          "scope": "AsyncGzipTextFile._finalize_pending_newline_state",
+          "kind": "augmented assignment",
+          "target": "self._seen_newline_types"
+        },
+        {
+          "line": 1413,
+          "scope": "AsyncGzipTextFile._finalize_pending_newline_state",
+          "kind": "assignment",
+          "target": "self._trailing_cr"
+        },
+        {
+          "line": 1421,
+          "scope": "AsyncGzipTextFile",
+          "kind": "assignment",
+          "target": "_FAST_READLINE_NEWLINES"
+        },
+        {
+          "line": 1425,
+          "scope": "AsyncGzipTextFile._take_first_refilled_line",
+          "kind": "assignment",
+          "target": "pending"
+        },
+        {
+          "line": 1427,
+          "scope": "AsyncGzipTextFile._take_first_refilled_line",
+          "kind": "assignment",
+          "target": "line"
+        },
+        {
+          "line": 1428,
+          "scope": "AsyncGzipTextFile._take_first_refilled_line",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1429,
+          "scope": "AsyncGzipTextFile._take_first_refilled_line",
+          "kind": "augmented assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1442,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "term"
+        },
+        {
+          "line": 1443,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "split_re"
+        },
+        {
+          "line": 1451,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "buf"
+        },
+        {
+          "line": 1452,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "start"
+        },
+        {
+          "line": 1453,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "window_end"
+        },
+        {
+          "line": 1454,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "last"
+        },
+        {
+          "line": 1460,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "last"
+        },
+        {
+          "line": 1462,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "region"
+        },
+        {
+          "line": 1467,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "unsafe"
+        },
+        {
+          "line": 1471,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "self._pending_lines"
+        },
+        {
+          "line": 1474,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "self._pending_lines"
+        },
+        {
+          "line": 1475,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1482,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "prefix"
+        },
+        {
+          "line": 1483,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "bf"
+        },
+        {
+          "line": 1485,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "fresh_origin"
+        },
+        {
+          "line": 1491,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "annotated assignment",
+          "target": "pieces"
+        },
+        {
+          "line": 1492,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "added"
+        },
+        {
+          "line": 1493,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "annotated assignment",
+          "target": "fresh_line_size"
+        },
+        {
+          "line": 1496,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "(text, more)"
+        },
+        {
+          "line": 1498,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "i"
+        },
+        {
+          "line": 1499,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "mutation/completion call",
+          "target": "pieces.append"
+        },
+        {
+          "line": 1501,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "fresh_line_size"
+        },
+        {
+          "line": 1503,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "augmented assignment",
+          "target": "added"
+        },
+        {
+          "line": 1507,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "bf"
+        },
+        {
+          "line": 1512,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "fresh"
+        },
+        {
+          "line": 1514,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 1517,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1532,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 1535,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 1543,
+          "scope": "AsyncGzipTextFile._next_fast_line",
+          "kind": "assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 1548,
+          "scope": "AsyncGzipTextFile._validation_line_salvage_complete",
+          "kind": "assignment",
+          "target": "bf"
+        },
+        {
+          "line": 1553,
+          "scope": "AsyncGzipTextFile._validation_line_salvage_complete",
+          "kind": "assignment",
+          "target": "(position, _)"
+        },
+        {
+          "line": 1563,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "total_size"
+        },
+        {
+          "line": 1566,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "idx"
+        },
+        {
+          "line": 1567,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "pending"
+        },
+        {
+          "line": 1569,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 1570,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "remaining_size"
+        },
+        {
+          "line": 1576,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "mutation/completion call",
+          "target": "lines.extend"
+        },
+        {
+          "line": 1577,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1578,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "augmented assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1579,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "augmented assignment",
+          "target": "total_size"
+        },
+        {
+          "line": 1586,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "text_offset"
+        },
+        {
+          "line": 1588,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "line"
+        },
+        {
+          "line": 1589,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "augmented assignment",
+          "target": "idx"
+        },
+        {
+          "line": 1590,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "line_size"
+        },
+        {
+          "line": 1591,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "mutation/completion call",
+          "target": "lines.append"
+        },
+        {
+          "line": 1592,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "augmented assignment",
+          "target": "total_size"
+        },
+        {
+          "line": 1593,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "augmented assignment",
+          "target": "text_offset"
+        },
+        {
+          "line": 1595,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1596,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1602,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1603,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1612,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "assignment",
+          "target": "refilled"
+        },
+        {
+          "line": 1615,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "mutation/completion call",
+          "target": "lines.append"
+        },
+        {
+          "line": 1616,
+          "scope": "AsyncGzipTextFile._readlines_fast",
+          "kind": "augmented assignment",
+          "target": "total_size"
+        },
+        {
+          "line": 1634,
+          "scope": "AsyncGzipTextFile.__anext__",
+          "kind": "assignment",
+          "target": "idx"
+        },
+        {
+          "line": 1635,
+          "scope": "AsyncGzipTextFile.__anext__",
+          "kind": "assignment",
+          "target": "pending"
+        },
+        {
+          "line": 1637,
+          "scope": "AsyncGzipTextFile.__anext__",
+          "kind": "assignment",
+          "target": "line"
+        },
+        {
+          "line": 1638,
+          "scope": "AsyncGzipTextFile.__anext__",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1639,
+          "scope": "AsyncGzipTextFile.__anext__",
+          "kind": "augmented assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1642,
+          "scope": "AsyncGzipTextFile.__anext__",
+          "kind": "assignment",
+          "target": "refilled"
+        },
+        {
+          "line": 1647,
+          "scope": "AsyncGzipTextFile.__anext__",
+          "kind": "assignment",
+          "target": "search_from"
+        },
+        {
+          "line": 1649,
+          "scope": "AsyncGzipTextFile.__anext__",
+          "kind": "assignment",
+          "target": "(pos, length)"
+        },
+        {
+          "line": 1655,
+          "scope": "AsyncGzipTextFile.__anext__",
+          "kind": "assignment",
+          "target": "buf_len"
+        },
+        {
+          "line": 1661,
+          "scope": "AsyncGzipTextFile._anext_buffered_reserved",
+          "kind": "assignment",
+          "target": "search_from"
+        },
+        {
+          "line": 1663,
+          "scope": "AsyncGzipTextFile._anext_buffered_reserved",
+          "kind": "assignment",
+          "target": "has_more"
+        },
+        {
+          "line": 1665,
+          "scope": "AsyncGzipTextFile._anext_buffered_reserved",
+          "kind": "assignment",
+          "target": "remaining"
+        },
+        {
+          "line": 1669,
+          "scope": "AsyncGzipTextFile._anext_buffered_reserved",
+          "kind": "assignment",
+          "target": "(pos, length)"
+        },
+        {
+          "line": 1672,
+          "scope": "AsyncGzipTextFile._anext_buffered_reserved",
+          "kind": "assignment",
+          "target": "buf_len"
+        },
+        {
+          "line": 1673,
+          "scope": "AsyncGzipTextFile._anext_buffered_reserved",
+          "kind": "assignment",
+          "target": "search_from"
+        },
+        {
+          "line": 1708,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "limit"
+        },
+        {
+          "line": 1716,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "idx"
+        },
+        {
+          "line": 1717,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "pending"
+        },
+        {
+          "line": 1719,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "line"
+        },
+        {
+          "line": 1720,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1721,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "augmented assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1724,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "refilled"
+        },
+        {
+          "line": 1730,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "self._pending_lines"
+        },
+        {
+          "line": 1731,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1735,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "(pos, length)"
+        },
+        {
+          "line": 1737,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 1739,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 1741,
+          "scope": "AsyncGzipTextFile.readline",
+          "kind": "assignment",
+          "target": "buf_len"
+        },
+        {
+          "line": 1749,
+          "scope": "AsyncGzipTextFile._take_buffered_line",
+          "kind": "assignment",
+          "target": "(pos, length)"
+        },
+        {
+          "line": 1751,
+          "scope": "AsyncGzipTextFile._take_buffered_line",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 1753,
+          "scope": "AsyncGzipTextFile._take_buffered_line",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 1755,
+          "scope": "AsyncGzipTextFile._take_buffered_line",
+          "kind": "assignment",
+          "target": "current"
+        },
+        {
+          "line": 1762,
+          "scope": "AsyncGzipTextFile._readline_buffered_reserved",
+          "kind": "assignment",
+          "target": "search_from"
+        },
+        {
+          "line": 1764,
+          "scope": "AsyncGzipTextFile._readline_buffered_reserved",
+          "kind": "assignment",
+          "target": "has_more"
+        },
+        {
+          "line": 1765,
+          "scope": "AsyncGzipTextFile._readline_buffered_reserved",
+          "kind": "assignment",
+          "target": "(pos, length)"
+        },
+        {
+          "line": 1767,
+          "scope": "AsyncGzipTextFile._readline_buffered_reserved",
+          "kind": "assignment",
+          "target": "end"
+        },
+        {
+          "line": 1772,
+          "scope": "AsyncGzipTextFile._readline_buffered_reserved",
+          "kind": "assignment",
+          "target": "current"
+        },
+        {
+          "line": 1777,
+          "scope": "AsyncGzipTextFile._readline_buffered_reserved",
+          "kind": "assignment",
+          "target": "search_from"
+        },
+        {
+          "line": 1781,
+          "scope": "AsyncGzipTextFile._readline_generic_reserved",
+          "kind": "assignment",
+          "target": "buffered_line"
+        },
+        {
+          "line": 1784,
+          "scope": "AsyncGzipTextFile._readline_generic_reserved",
+          "kind": "assignment",
+          "target": "current"
+        },
+        {
+          "line": 1807,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "binary_file"
+        },
+        {
+          "line": 1810,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "(original_buffer, original_offset, origin_offset, origin_decoder_state, origin_trailing_cr, origin_seen_newlines, origin_chars_to_skip)"
+        },
+        {
+          "line": 1819,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "unread"
+        },
+        {
+          "line": 1820,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "self._text_buffer"
+        },
+        {
+          "line": 1821,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "self._text_buffer_offset"
+        },
+        {
+          "line": 1822,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "self._buffer_origin_offset"
+        },
+        {
+          "line": 1823,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "self._buffer_origin_decoder_state"
+        },
+        {
+          "line": 1824,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "self._buffer_origin_trailing_cr"
+        },
+        {
+          "line": 1825,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "self._buffer_origin_seen_newline_types"
+        },
+        {
+          "line": 1826,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "self._buffer_origin_chars_to_skip"
+        },
+        {
+          "line": 1827,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "self._pending_lines"
+        },
+        {
+          "line": 1828,
+          "scope": "AsyncGzipTextFile._rollback_readlines",
+          "kind": "assignment",
+          "target": "self._pending_idx"
+        },
+        {
+          "line": 1862,
+          "scope": "AsyncGzipTextFile.readlines",
+          "kind": "assignment",
+          "target": "state"
+        },
+        {
+          "line": 1863,
+          "scope": "AsyncGzipTextFile.readlines",
+          "kind": "annotated assignment",
+          "target": "lines"
+        },
+        {
+          "line": 1869,
+          "scope": "AsyncGzipTextFile.readlines",
+          "kind": "assignment",
+          "target": "total_size"
+        },
+        {
+          "line": 1871,
+          "scope": "AsyncGzipTextFile.readlines",
+          "kind": "assignment",
+          "target": "line"
+        },
+        {
+          "line": 1874,
+          "scope": "AsyncGzipTextFile.readlines",
+          "kind": "mutation/completion call",
+          "target": "lines.append"
+        },
+        {
+          "line": 1875,
+          "scope": "AsyncGzipTextFile.readlines",
+          "kind": "augmented assignment",
+          "target": "total_size"
+        },
+        {
+          "line": 1930,
+          "scope": "AsyncGzipTextFile._iter_batches",
+          "kind": "assignment",
+          "target": "batch"
+        },
+        {
+          "line": 1960,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "annotated assignment",
+          "target": "pending"
+        },
+        {
+          "line": 1961,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "assignment",
+          "target": "pending_chars"
+        },
+        {
+          "line": 1962,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "assignment",
+          "target": "iterator"
+        },
+        {
+          "line": 1966,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "assignment",
+          "target": "line"
+        },
+        {
+          "line": 1980,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "assignment",
+          "target": "length"
+        },
+        {
+          "line": 1984,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "assignment",
+          "target": "pending"
+        },
+        {
+          "line": 1985,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "assignment",
+          "target": "pending_chars"
+        },
+        {
+          "line": 1990,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "assignment",
+          "target": "pending"
+        },
+        {
+          "line": 1991,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "assignment",
+          "target": "pending_chars"
+        },
+        {
+          "line": 1992,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "mutation/completion call",
+          "target": "pending.append"
+        },
+        {
+          "line": 1993,
+          "scope": "AsyncGzipTextFile.writelines",
+          "kind": "augmented assignment",
+          "target": "pending_chars"
+        },
+        {
+          "line": 2039,
+          "scope": "AsyncGzipTextFile.close",
+          "kind": "assignment",
+          "target": "binary_file"
+        },
+        {
+          "line": 2041,
+          "scope": "AsyncGzipTextFile.close",
+          "kind": "assignment",
+          "target": "self._is_closed"
+        },
+        {
+          "line": 2042,
+          "scope": "AsyncGzipTextFile.close",
+          "kind": "assignment",
+          "target": "self._close_complete"
+        },
+        {
+          "line": 2059,
+          "scope": "AsyncGzipTextFile.close",
+          "kind": "mutation/completion call",
+          "target": "binary_file.close"
+        },
+        {
+          "line": 2063,
+          "scope": "AsyncGzipTextFile.close",
+          "kind": "assignment",
+          "target": "self._close_complete"
+        },
+        {
+          "line": 2067,
+          "scope": "AsyncGzipTextFile._close_text_writer",
+          "kind": "assignment",
+          "target": "encoder_failed"
+        },
+        {
+          "line": 2070,
+          "scope": "AsyncGzipTextFile._close_text_writer",
+          "kind": "assignment",
+          "target": "encoder"
+        },
+        {
+          "line": 2072,
+          "scope": "AsyncGzipTextFile._close_text_writer",
+          "kind": "assignment",
+          "target": "final_data"
+        },
+        {
+          "line": 2076,
+          "scope": "AsyncGzipTextFile._close_text_writer",
+          "kind": "assignment",
+          "target": "encoder_failed"
+        },
+        {
+          "line": 2080,
+          "scope": "AsyncGzipTextFile._close_text_writer",
+          "kind": "mutation/completion call",
+          "target": "binary_file.close"
+        },
+        {
+          "line": 2089,
+          "scope": "AsyncGzipTextFile._close_text_writer",
+          "kind": "assignment",
+          "target": "self._close_complete"
+        }
+      ]
+    },
+    "_codec_async.py": {
+      "sha256": "713cf117e6d72ab402f8aedacfe8b705bda83144c095e1ac198d86f6afe1c2eb",
+      "sites": [
+        {
+          "line": 12,
+          "scope": "",
+          "kind": "annotated assignment",
+          "target": "_DONE"
+        },
+        {
+          "line": 14,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_ZLIB_OFFLOAD_THRESHOLD"
+        },
+        {
+          "line": 19,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_DECODE_OFFLOAD_THRESHOLD"
+        },
+        {
+          "line": 20,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_INLINE_OUTPUT_BYTES_CHECKPOINT"
+        },
+        {
+          "line": 21,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_INLINE_OUTPUT_CHUNKS_CHECKPOINT"
+        },
+        {
+          "line": 22,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_NO_OUTPUT_BYTES_CHECKPOINT"
+        },
+        {
+          "line": 23,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_NO_OUTPUT_STEPS_CHECKPOINT"
+        },
+        {
+          "line": 25,
+          "scope": "",
+          "kind": "assignment",
+          "target": "_T"
+        },
+        {
+          "line": 30,
+          "scope": "_run_in_thread",
+          "kind": "assignment",
+          "target": "loop"
+        },
+        {
+          "line": 45,
+          "scope": "_raw_next_or_done",
+          "kind": "mutation/completion call",
+          "target": "operation._advance_raw"
+        },
+        {
+          "line": 54,
+          "scope": "_offloaded_next",
+          "kind": "assignment",
+          "target": "advance"
+        },
+        {
+          "line": 55,
+          "scope": "_offloaded_next",
+          "kind": "assignment",
+          "target": "worker"
+        },
+        {
+          "line": 83,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "completed"
+        },
+        {
+          "line": 84,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "advancing_first"
+        },
+        {
+          "line": 85,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "failed"
+        },
+        {
+          "line": 86,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "inline_output_bytes"
+        },
+        {
+          "line": 87,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "inline_output_chunks"
+        },
+        {
+          "line": 88,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "no_output_bytes"
+        },
+        {
+          "line": 89,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "no_output_steps"
+        },
+        {
+          "line": 92,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "should_offload"
+        },
+        {
+          "line": 94,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 95,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "inline_output_bytes"
+        },
+        {
+          "line": 96,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "inline_output_chunks"
+        },
+        {
+          "line": 97,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "no_output_bytes"
+        },
+        {
+          "line": 98,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "no_output_steps"
+        },
+        {
+          "line": 100,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "result"
+        },
+        {
+          "line": 101,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "advancing_first"
+        },
+        {
+          "line": 103,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "completed"
+        },
+        {
+          "line": 107,
+          "scope": "_drive_operation",
+          "kind": "augmented assignment",
+          "target": "no_output_bytes"
+        },
+        {
+          "line": 108,
+          "scope": "_drive_operation",
+          "kind": "augmented assignment",
+          "target": "no_output_steps"
+        },
+        {
+          "line": 111,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "no_output_bytes"
+        },
+        {
+          "line": 112,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "no_output_steps"
+        },
+        {
+          "line": 114,
+          "scope": "_drive_operation",
+          "kind": "augmented assignment",
+          "target": "inline_output_bytes"
+        },
+        {
+          "line": 115,
+          "scope": "_drive_operation",
+          "kind": "augmented assignment",
+          "target": "inline_output_chunks"
+        },
+        {
+          "line": 117,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "should_checkpoint"
+        },
+        {
+          "line": 125,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "inline_output_bytes"
+        },
+        {
+          "line": 126,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "inline_output_chunks"
+        },
+        {
+          "line": 127,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "no_output_bytes"
+        },
+        {
+          "line": 128,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "no_output_steps"
+        },
+        {
+          "line": 133,
+          "scope": "_drive_operation",
+          "kind": "assignment",
+          "target": "failed"
+        },
+        {
+          "line": 138,
+          "scope": "_drive_operation",
+          "kind": "mutation/completion call",
+          "target": "operation.close"
+        }
+      ]
+    }
+  },
+  "scope": "All attribute and local assignment targets, deletes, common buffer mutations, and completion calls. Local aliases are retained in targets; semantic ownership and mutating helper effects require the design record."
+}

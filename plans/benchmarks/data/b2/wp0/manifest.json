@@ -1,0 +1,65 @@
+{
+  "source_sha": "dc8950cb334e1cf4082f2bf50074464e06c72287",
+  "source_tree": "820a775b067cf5bf17a179c20f81c7c7b1f9f37b",
+  "harness_sha": "440ed71ebdbeeebcdb526590f86fa8f9f0533a5e",
+  "harness_tree": "e09c10129f8b408fab919334001ccb6164dceabb",
+  "source_dirty": false,
+  "harness_dirty": false,
+  "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "dependencies": {
+    "aiofiles": "25.1.0",
+    "zlib-ng": "1.0.0",
+    "pytest": "9.1.1",
+    "hypothesis": "6.165.10",
+    "mypy": "2.3.1",
+    "ty": "0.0.74",
+    "ruff": "0.15.20",
+    "prek": "0.4.14"
+  },
+  "files": {
+    "scaling-zlib-ng.json": {
+      "sha256": "08c8d107897d1b2e3ac341f50b0871d9e23d275c3b7a606df0edd4c4867d5d76",
+      "bytes": 45672
+    },
+    "baseline-zlib-ng.json": {
+      "sha256": "6b07521fcbba52074df607325bfc1375ceacd80c35283d3f8baeb4ed5843097a",
+      "bytes": 68151
+    },
+    "baseline-stdlib-executor.log": {
+      "sha256": "8b4b03ac3fb179727d1d13e229e93d51cedc163990d375e6735b3b794c81d338",
+      "bytes": 31070
+    },
+    "baseline-zlib-ng.log": {
+      "sha256": "03cbb45b3095c10e29f3bc026e711bb314707068a198e7f8d65bc7f5ceb21e38",
+      "bytes": 31123
+    },
+    "baseline-stdlib-executor.json": {
+      "sha256": "8f99f72a960189fd70a9e8515ab23112770493e63e619ae99114a5edaa7e9f77",
+      "bytes": 67424
+    },
+    "scaling-stdlib.log": {
+      "sha256": "84ccf620670e12e5a298c455531a2f74adf7f64ae7efddc5d7e8b0c543669f07",
+      "bytes": 4456
+    },
+    "scaling-stdlib.json": {
+      "sha256": "fe87631154d53b03b13ceacf95f4e010724bb658b3b4b770097623cfebee691c",
+      "bytes": 45576
+    },
+    "scaling-zlib-ng.log": {
+      "sha256": "573268e63b61c812a0c4544fa686cc269d24e392e066072028ffa4c5110a00b9",
+      "bytes": 4456
+    }
+  },
+  "run_order": [
+    "all-category stdlib",
+    "all-category zlib-ng",
+    "scaling stdlib",
+    "scaling zlib-ng"
+  ],
+  "limitations": [
+    "Legacy general benchmark rows generate random fixtures and do not retain every fixture hash or inner timing. These are suite baselines, not paired release-performance evidence. Deterministic scaling and codec-regression rows retain fixture hashes.",
+    "Host was shared; benchmark environment records load and powersave governor. No speedup or regression threshold claim is made.",
+    "The first restricted-sandbox attempt stalled before any result and was terminated (exit 143); its incomplete checkpoint is not a performance sample. Successful runs used the same execution permissions as the passing test suite."
+  ]
+}

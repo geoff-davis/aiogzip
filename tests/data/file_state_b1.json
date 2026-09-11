@@ -312,10 +312,471 @@
         "eof",
         ""
       ]
+    ],
+    "binary-surfaces-and-seek": [
+      [
+        "read1(3)",
+        {
+          "bytes": "616c70"
+        }
+      ],
+      [
+        "readinto(2)",
+        2
+      ],
+      [
+        "destination",
+        {
+          "bytes": "6861"
+        }
+      ],
+      [
+        "readinto1(2)",
+        2
+      ],
+      [
+        "destination",
+        {
+          "bytes": "0a62"
+        }
+      ],
+      [
+        "peek(1) prefix matches unread",
+        true
+      ],
+      [
+        "tell",
+        7
+      ],
+      [
+        "readline(5)",
+        {
+          "bytes": "6574610a"
+        }
+      ],
+      [
+        "readlines(1)",
+        [
+          {
+            "bytes": "67616d6d610a"
+          }
+        ]
+      ],
+      [
+        "readlines(-1)",
+        [
+          {
+            "bytes": "6c617374"
+          }
+        ]
+      ],
+      [
+        "seek(0)",
+        0
+      ],
+      [
+        "seek(5)",
+        5
+      ],
+      [
+        "read(2)",
+        {
+          "bytes": "0a62"
+        }
+      ]
+    ],
+    "binary-crc-salvage": [
+      [
+        "read over failure",
+        {
+          "error": "BadGzipFile",
+          "prefix": "Error decompressing gzip data:"
+        }
+      ],
+      [
+        "salvage",
+        {
+          "bytes": "616c7068610a626574610a67616d6d610a6c617374"
+        }
+      ],
+      [
+        "exhausted salvage",
+        {
+          "error": "OSError",
+          "prefix": "read stream is broken"
+        }
+      ],
+      [
+        "rewind recovery",
+        0
+      ],
+      [
+        "recovered read",
+        {
+          "bytes": "616c7068610a626574610a67616d6d610a6c617374"
+        }
+      ]
+    ],
+    "binary-limit-salvage": [
+      [
+        "read over failure",
+        {
+          "error": "OSError",
+          "prefix": "decompressed output exceeded max_decompressed_size"
+        }
+      ],
+      [
+        "limit salvage",
+        {
+          "bytes": ""
+        }
+      ],
+      [
+        "exhausted salvage",
+        {
+          "error": "OSError",
+          "prefix": "read stream is broken"
+        }
+      ]
+    ],
+    "binary-transient-rollback": [
+      [
+        "readlines transient",
+        {
+          "error": "OSError",
+          "prefix": "transient source failure"
+        }
+      ],
+      [
+        "readlines retry",
+        [
+          {
+            "bytes": "616c7068610a"
+          },
+          {
+            "bytes": "626574610a"
+          },
+          {
+            "bytes": "67616d6d610a"
+          },
+          {
+            "bytes": "6c617374"
+          }
+        ]
+      ]
+    ],
+    "binary-cancel-no-effect": [
+      [
+        "overlap",
+        "ConcurrentOperationError"
+      ],
+      [
+        "caller",
+        "CancelledError"
+      ],
+      [
+        "no-effect cancellation retry",
+        {
+          "bytes": "616c7068610a626574610a67616d6d610a6c617374"
+        }
+      ]
+    ],
+    "text-crc-salvage": [
+      [
+        "read over failure",
+        {
+          "error": "BadGzipFile",
+          "prefix": "Error decompressing gzip data:"
+        }
+      ],
+      [
+        "salvage",
+        "alpha\nbeta\ngamma\nlast"
+      ],
+      [
+        "exhausted salvage",
+        {
+          "error": "OSError",
+          "prefix": "read stream is broken"
+        }
+      ],
+      [
+        "rewind recovery",
+        0
+      ],
+      [
+        "recovered read",
+        "alpha\nbeta\ngamma\nlast"
+      ]
+    ],
+    "text-limit-salvage": [
+      [
+        "read over failure",
+        {
+          "error": "OSError",
+          "prefix": "decompressed output exceeded max_decompressed_size"
+        }
+      ],
+      [
+        "limit salvage",
+        ""
+      ],
+      [
+        "exhausted salvage",
+        {
+          "error": "OSError",
+          "prefix": "read stream is broken"
+        }
+      ]
+    ],
+    "text-transient-rollback": [
+      [
+        "readlines transient",
+        {
+          "error": "OSError",
+          "prefix": "transient source failure"
+        }
+      ],
+      [
+        "readlines retry",
+        [
+          "alpha\n",
+          "beta\n",
+          "gamma\n",
+          "last"
+        ]
+      ],
+      [
+        "buffer.close closes text",
+        true
+      ]
+    ],
+    "text-cancel-no-effect": [
+      [
+        "overlap",
+        "ConcurrentOperationError"
+      ],
+      [
+        "caller",
+        "CancelledError"
+      ],
+      [
+        "no-effect cancellation retry",
+        "alpha\nbeta\ngamma\nlast"
+      ]
+    ],
+    "nonseekable-cache-None": [
+      [
+        "read(2)",
+        {
+          "bytes": "616c"
+        }
+      ],
+      [
+        "cache rewind",
+        0
+      ],
+      [
+        "replay",
+        {
+          "bytes": "616c7068610a626574610a67616d6d610a6c617374"
+        }
+      ]
+    ],
+    "nonseekable-cache-1": [
+      [
+        "read(2)",
+        {
+          "bytes": "616c"
+        }
+      ],
+      [
+        "cache exhausted rewind",
+        {
+          "error": "OSError",
+          "prefix": "Underlying file is not seekable"
+        }
+      ]
+    ],
+    "failed-no-effect-rewind": [
+      [
+        "read(2)",
+        {
+          "bytes": "616c"
+        }
+      ],
+      [
+        "failed rewind",
+        {
+          "error": "OSError",
+          "prefix": "injected no-effect seek failure"
+        }
+      ],
+      [
+        "read after failed rewind",
+        {
+          "bytes": "7068610a626574610a67616d6d610a6c617374"
+        }
+      ]
+    ],
+    "cookie-encoding-utf-8": [
+      [
+        "read(2)",
+        "日本"
+      ],
+      [
+        "tell",
+        "H1:C1"
+      ],
+      [
+        "read remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "seek",
+        "H1:C1"
+      ],
+      [
+        "replay remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "invalid cookie",
+        {
+          "error": "OSError",
+          "prefix": "Cannot seek to invalid text cookie"
+        }
+      ]
+    ],
+    "cookie-encoding-utf-16": [
+      [
+        "read(2)",
+        "日本"
+      ],
+      [
+        "tell",
+        "H1:C1"
+      ],
+      [
+        "read remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "seek",
+        "H1:C1"
+      ],
+      [
+        "replay remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "invalid cookie",
+        {
+          "error": "OSError",
+          "prefix": "Cannot seek to invalid text cookie"
+        }
+      ]
+    ],
+    "cookie-encoding-iso2022_jp": [
+      [
+        "read(2)",
+        "日本"
+      ],
+      [
+        "tell",
+        "H1:C1"
+      ],
+      [
+        "read remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "seek",
+        "H1:C1"
+      ],
+      [
+        "replay remainder",
+        "語\r\nabc\r終\n"
+      ],
+      [
+        "invalid cookie",
+        {
+          "error": "OSError",
+          "prefix": "Cannot seek to invalid text cookie"
+        }
+      ]
+    ],
+    "write-closefd-False": [
+      [
+        "write",
+        21
+      ],
+      [
+        "tell",
+        21
+      ],
+      [
+        "sink closed",
+        false
+      ]
+    ],
+    "sink-failure-closefd-False": [
+      [
+        "write fails in same call",
+        {
+          "error": "OSError",
+          "prefix": "injected sink failure"
+        }
+      ],
+      [
+        "position uncommitted",
+        0
+      ],
+      [
+        "later write",
+        {
+          "error": "OSError",
+          "prefix": "write stream is broken"
+        }
+      ]
+    ],
+    "write-closefd-True": [
+      [
+        "write",
+        21
+      ],
+      [
+        "tell",
+        21
+      ],
+      [
+        "sink closed",
+        true
+      ]
+    ],
+    "sink-failure-closefd-True": [
+      [
+        "write fails in same call",
+        {
+          "error": "OSError",
+          "prefix": "injected sink failure"
+        }
+      ],
+      [
+        "position uncommitted",
+        0
+      ],
+      [
+        "later write",
+        {
+          "error": "OSError",
+          "prefix": "write stream is broken"
+        }
+      ]
     ]
   },
   "fixture_sha256": "852ff69881b1e313e0dd7a7c57fb947baf36f65f2531aa76fd0663a64519ec36",
-  "harness_sha256": "007257058eabcc907ee1c96475ae4e8b2cd602c38b5cd97fc09544226a4aa243",
+  "harness_sha256": "13329c1298fd34536acf23e138049755d9f20a3fee86fa0c1f4fa39ccc2a76b8",
   "source": {
     "sha": "048700fe9f6030f8a2b6da92b685bcd108a17dd1",
     "tree": "356a83360d4d570fea91c603c29f61f51ac6f7a1",
@@ -323,9 +784,10 @@
     "import": "/tmp/aiogzip-b2-b1-reference/src/aiogzip/__init__.py"
   },
   "harness": {
-    "sha": "3709027c985eb9a9476211b8ee60e153c986a28d",
-    "tree": "ce1c34331f6b3ccba917d63b7f16622b5e092515",
+    "sha": "440ed71ebdbeeebcdb526590f86fa8f9f0533a5e",
+    "tree": "e09c10129f8b408fab919334001ccb6164dceabb",
     "status": "",
-    "path": "/tmp/aiogzip-b2-reviewed-harness-3709027/scripts/capture_file_state_trace.py"
-  }
+    "path": "/tmp/aiogzip-wp0-harness-440ed71/scripts/capture_file_state_trace.py"
+  },
+  "extended": true
 }
