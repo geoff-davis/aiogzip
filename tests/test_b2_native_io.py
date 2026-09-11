@@ -19,16 +19,21 @@ from aiogzip import AsyncGzipBinaryFile, _codec_async
 
 
 @pytest.mark.parametrize("cancellations", [1, 3])
+@pytest.mark.parametrize("cancel_helper", [False, True])
+@pytest.mark.parametrize("kind", ["encoder", "decoder"])
 async def test_real_codec_worker_settles_before_caller_cancellation(
-    monkeypatch, cancellations
+    monkeypatch, cancellations, cancel_helper, kind
 ):
-    """Control case: caller-only cancellation retains the real encoder operation."""
+    """Caller/helper cancellation retains real encoder and decoder operations."""
     loop = asyncio.get_running_loop()
     entered = asyncio.Event()
     release, settled = threading.Event(), threading.Event()
     original = _codec_async._run_in_thread
+    helpers = []
 
     async def gated(method, data):
+        helpers.append(asyncio.current_task())
+
         def advance(workload):
             loop.call_soon_threadsafe(entered.set)
             try:
@@ -41,25 +46,31 @@ async def test_real_codec_worker_settles_before_caller_cancellation(
         return await original(advance, data)
 
     monkeypatch.setattr(_codec_async, "_run_in_thread", gated)
-    encoder = aiogzip.GzipEncoder(mtime=0)
-    list(encoder.start())
     payload = hashlib.shake_256(b"native codec control").digest(350_000)
-    stream = _codec_async._drive_operation(encoder.feed(payload), workload=payload)
+    if kind == "encoder":
+        codec = aiogzip.GzipEncoder(mtime=0)
+        list(codec.start())
+    else:
+        codec = aiogzip.GzipDecoder(output_chunk_size=1024)
+        payload = gzip.compress(payload, mtime=0)
+    stream = _codec_async._drive_operation(codec.feed(payload), workload=payload)
     caller = asyncio.create_task(anext(stream))
     try:
         await asyncio.wait_for(entered.wait(), 5)
         for _ in range(cancellations):
             caller.cancel()
+            if cancel_helper:
+                helpers[0].cancel()
             await asyncio.sleep(0)
         assert not caller.done()
         with pytest.raises(RuntimeError, match="active operation"):
-            encoder.finish()
+            codec.finish()
         release.set()
         with pytest.raises(asyncio.CancelledError):
             await caller
         assert settled.is_set()
         with pytest.raises(OSError, match="unusable"):
-            encoder.finish()
+            codec.finish()
     finally:
         release.set()
         await asyncio.gather(caller, return_exceptions=True)
@@ -126,11 +137,6 @@ async def test_native_source_consumption_cannot_accept_suffix(monkeypatch, tmp_p
         raw.close()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="F1: runner shutdown cancels native helper",
-)
 def test_actual_runner_shutdown_preserves_native_cleanup_order(tmp_path):
     # asyncio.run really cancels all outstanding tasks in this CHILD process.
     # A timer releases native work independently of the event loop. The parent

@@ -22,11 +22,6 @@ from aiogzip import (
 )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="F1: cancelled helper hides live native work",
-)
 async def test_native_cleanup_follows_final_worker_access(monkeypatch):
     loop = asyncio.get_running_loop()
     entered = asyncio.Event()
