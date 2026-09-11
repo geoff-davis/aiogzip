@@ -1,4 +1,4 @@
-"""WP0 acquisition/initialization evidence; no production repairs yet."""
+"""WP3 acquisition/initialization ownership regressions."""
 
 import asyncio
 import threading
@@ -16,9 +16,6 @@ from aiogzip import (
 
 @pytest.mark.parametrize("text", [False, True])
 @pytest.mark.parametrize("writing", [False, True])
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="F3: close misses late acquisition"
-)
 async def test_close_during_acquisition_has_no_late_resource_owner(
     monkeypatch, text, writing
 ):
@@ -71,11 +68,6 @@ async def test_close_during_acquisition_has_no_late_resource_owner(
 
 @pytest.mark.parametrize("text", [False, True])
 @pytest.mark.parametrize("writing", [False, True])
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="F3: cancelled native open loses its resource",
-)
 async def test_native_acquisition_cancel_has_a_final_owner(
     monkeypatch, tmp_path, text, writing
 ):

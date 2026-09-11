@@ -287,3 +287,17 @@ Notes:
   pass it as `fileobj` to `aiogzip.open(None, "wt", fileobj=...)`.
 - For untrusted buckets, combine this with `max_decompressed_size` — see
   [Processing untrusted gzip input](#processing-untrusted-gzip-input).
+
+## Opening ownership
+
+Await `open()` before sharing a gzip handle with other tasks. A concurrent
+`open()` or `close()` during acquisition or initialization raises
+`ConcurrentOperationError`. Cancellation of a path-backed open waits for native
+acquisition and cleanup; it cannot abandon a file that the executor opens later.
+A handle becomes available only after its codec and initial header or seekability
+probe are ready. Ordinary repeated close and already-open errors are unchanged.
+
+An external file object remains caller-owned if opening fails, preserving failed-open
+retry behavior. After opening succeeds, `closefd` controls whether closing the gzip
+handle also closes that object. Custom async sources/sinks must finish their resource
+access before returning or raising, including cancellation.

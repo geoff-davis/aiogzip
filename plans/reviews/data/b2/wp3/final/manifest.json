@@ -1,0 +1,190 @@
+{
+  "final_production_commit": "1ee90a3",
+  "initial_reviewed_commit": "3ef0266",
+  "reviewed_wp2_commit": "7d83609",
+  "shared_harness_commit": "befb4d7",
+  "b1_commit": "048700fe9f6030f8a2b6da92b685bcd108a17dd1",
+  "gate": "G04 complete locally; WP3 unpushed, final maintainer review pending. G05 onward and G17 remain open; C0 not created.",
+  "trace_scope": {
+    "open": "30 scenarios: 26 exact BC3 corrections, 4 unchanged controls; b1/WP2 identical; initial/final differ in eight follow-up cases",
+    "compatibility": "25 extended scenarios unchanged from b1",
+    "source": "18 cases with existing 14 BC2 allowances unchanged"
+  },
+  "capture_command": "main .venv/bin/python -X warn_default_encoding -W error::EncodingWarning /tmp/aiogzip-wp3-harness/scripts/<script> --source-root <clean-root> --engine <stdlib|zlib-ng> --output <path> --require-clean; compatibility additionally --extended",
+  "validation": {
+    "default": "2774 passed, 1 skipped, 3 xfailed",
+    "stdlib": "2774 passed, 1 skipped, 3 xfailed",
+    "coverage": "93.08% combined; 95.21% statements, 87.73% branches",
+    "floor": "206 passed per interpreter/engine, Python 3.11.14/3.12.12 aiofiles 23.2.1",
+    "floor_command": "PYTHONPATH=/home/geoff/Projects/personal/aiogzip/src AIOGZIP_ENGINE={stdlib,zlib-ng} /tmp/aiogzip-wp2-py{311,312}-floor/bin/python -m pytest tests/test_open_settlement.py tests/test_open_qualification.py tests/test_open_trace.py tests/test_b2_open_ownership.py tests/test_file_lifecycle.py tests/test_file_state_trace.py tests/test_source_failure_trace.py -q",
+    "limits": "Linux source tests only. PR #99 hosted results apply to WP2. No new WP3 performance measurements."
+  },
+  "execution_file_hashes": {
+    "src/aiogzip/_opening.py": "c21f70bf8e321a1b8c1c47bf5738aafe87a988bb3822bf4adf9a1186d3911b4a",
+    "src/aiogzip/_binary.py": "731abaab5fcc6551a2815455732d1e6f25a628f8ac539eeff8b0b948d5813490",
+    "src/aiogzip/_text.py": "233b1f2319b3b3763b1d2b533e6ff82fc20237f5c148a9f3ebf6788ee3b60474",
+    "tests/test_open_qualification.py": "5a8804a8c71d109e17adecb84e2dac5a65467bd507ec63da3612d976de7a9fcd",
+    "tests/test_open_settlement.py": "15c5094803d4f99ff8ef819034e9457b5a8017996d9658b293ebf718d050ed5c",
+    "tests/test_open_trace.py": "92dcd719571b9dabb319d9633df335983f2e9f432417e71039255f45dfb9c6a8",
+    "tests/data/open_b1.json": "3bcb2d5abbdf49a7a6ac26d126ad9977b51687215997d0c2a19b7bcef9f6d797",
+    "tests/data/open_bc3.json": "cfbb03647865f59ea4752e58c16fec33712f36f1599273f6ebc8093a9991394d",
+    "scripts/capture_b2_open_trace.py": "5c31099ca93c0365d8d4e0f5e21bc59c7e29f097503740b7758764c1c4b5e674",
+    "scripts/capture_file_state_trace.py": "71c2a5e9ae3740c7f4f3ada600ade0dbfff6bd5c6e06a9768e53dc7d8d54d09b",
+    "scripts/capture_b2_source_failure_trace.py": "9203464e3ac3c36dd1142f494e7e64f941674d0976030f268f8ac9810ce5e74b"
+  },
+  "files": {
+    "311-stdlib.log": {
+      "sha256": "426f08c319d36dd8b4e5f3fbb2e2c9935d22d0752cd7016c72b496cb9231b3a0",
+      "bytes": 260
+    },
+    "311-zlib-ng.log": {
+      "sha256": "00116bb196d8697df26d5419980fcfb8d9414bd00d4af4c6aacb89e490996b79",
+      "bytes": 260
+    },
+    "312-stdlib.log": {
+      "sha256": "af33042dd27e224f082b39b69a64eb3dd2da314bbb54fbb274c8d446bdc8fd2f",
+      "bytes": 260
+    },
+    "312-zlib-ng.log": {
+      "sha256": "eed874fc59c22327f332acc9aa36ae68c78b75de4f7ee4bba90befa365ad2363",
+      "bytes": 260
+    },
+    "b1-stdlib-compat.json": {
+      "sha256": "1f4448f3867f1254b2d7202765ca8e3f9e039edf960130c895b593269910d31b",
+      "bytes": 25110
+    },
+    "b1-stdlib-open.json": {
+      "sha256": "3bcb2d5abbdf49a7a6ac26d126ad9977b51687215997d0c2a19b7bcef9f6d797",
+      "bytes": 7804
+    },
+    "b1-stdlib-source.json": {
+      "sha256": "22f2b8854cf171ef0e0a480fc16bbcd02c6d219e10b793de1367cb3b4ea1bf43",
+      "bytes": 7377
+    },
+    "b1-zlib-ng-compat.json": {
+      "sha256": "fcc18b4444a0cc3eeb0e569dc111a7864b801f4bb4b0ed677635b42cb3aa8d86",
+      "bytes": 25104
+    },
+    "b1-zlib-ng-open.json": {
+      "sha256": "1174a0a154e1efa1be05bcdb7a857b95d1751b13a6efaba4c602c3c5b2de58fa",
+      "bytes": 7796
+    },
+    "b1-zlib-ng-source.json": {
+      "sha256": "111ee952ec548f75bab40dad938b1bc46cfe50779ebe101281782bf3dcc38a2e",
+      "bytes": 7369
+    },
+    "bc3-exceptions.json": {
+      "sha256": "cfbb03647865f59ea4752e58c16fec33712f36f1599273f6ebc8093a9991394d",
+      "bytes": 15815
+    },
+    "candidate-stdlib-compat.json": {
+      "sha256": "216e78edaeb27bcb42a1961d9ea9cc4c9227899df354fa5fae968396cb70d2f2",
+      "bytes": 25121
+    },
+    "candidate-stdlib-open.json": {
+      "sha256": "cec149be84e26a006d1f94af5f02563b0b961d41b51503664cbbc5bbd6cc58d5",
+      "bytes": 10100
+    },
+    "candidate-stdlib-source.json": {
+      "sha256": "f096506477e46242bf69c0434a840e74686d5d95b5985b7666ec139e31ee0714",
+      "bytes": 7765
+    },
+    "candidate-zlib-ng-compat.json": {
+      "sha256": "05502a2269664f7d56a37d4089351a1a38cd7838ce93607ca6c0a842c4ea1647",
+      "bytes": 25115
+    },
+    "candidate-zlib-ng-open.json": {
+      "sha256": "a67f61cdd508bc26661a2190c5f580b68cc357a5c1aa08dc59c1d358e3d8b01d",
+      "bytes": 10092
+    },
+    "candidate-zlib-ng-source.json": {
+      "sha256": "6efb800f73454fafc19cbf5bdd985a023b9d4bd50458857f559ee2e4a1754e70",
+      "bytes": 7757
+    },
+    "compare-candidate-stdlib-compat.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-candidate-stdlib-open.json": {
+      "sha256": "5916c258d317da8442bc5aa84ab1013b15800153fe65b5fc3b84904b4a452269",
+      "bytes": 17865
+    },
+    "compare-candidate-stdlib-source.json": {
+      "sha256": "34b17793fbd19346236437bc9c98ac3d546f3e156f0fdf969e84a80be1e781a4",
+      "bytes": 9428
+    },
+    "compare-candidate-zlib-ng-compat.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-candidate-zlib-ng-open.json": {
+      "sha256": "5916c258d317da8442bc5aa84ab1013b15800153fe65b5fc3b84904b4a452269",
+      "bytes": 17865
+    },
+    "compare-candidate-zlib-ng-source.json": {
+      "sha256": "34b17793fbd19346236437bc9c98ac3d546f3e156f0fdf969e84a80be1e781a4",
+      "bytes": 9428
+    },
+    "compare-wp2-stdlib-open.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-wp2-zlib-ng-open.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "coverage.json.gz": {
+      "sha256": "abaf2f745ad86ea2b204715477dddcfe8e9c7f940ee045a37e94bf6b5bdaf47d",
+      "bytes": 40950,
+      "uncompressed_sha256": "eb8bd8642ade69c2a9a9851cf1f821b16b6c0d37e8ba4fef1530017872ed5101"
+    },
+    "default.log": {
+      "sha256": "6b9f2163fc2ccc5d37220c0d60b58bfbaed19a5daa9953470aa57611fc5b02a6",
+      "bytes": 8741
+    },
+    "docs.log": {
+      "sha256": "638c5b343c8cc5a61d0cacd28fd2c5f612290a51c67d52fffae147cd9acee165",
+      "bytes": 993
+    },
+    "environments.json": {
+      "sha256": "a0c172ab900b80f3ab925167a13698dca6160391c055a96e9ca82295a8a40afd",
+      "bytes": 868
+    },
+    "initial-stdlib-open.json": {
+      "sha256": "8064594842f8e7da5f03bc5ddad647594eeeff1deca41dc7d944b5e4fcb3edd9",
+      "bytes": 10170
+    },
+    "initial-to-final-stdlib.json": {
+      "sha256": "5f90e863d65da08fbd941afba824e1d091f5e77172006b4e1715571c7fafbfa8",
+      "bytes": 6086
+    },
+    "initial-to-final-zlib-ng.json": {
+      "sha256": "5f90e863d65da08fbd941afba824e1d091f5e77172006b4e1715571c7fafbfa8",
+      "bytes": 6086
+    },
+    "initial-zlib-ng-open.json": {
+      "sha256": "8e1c2190aeeecaa57e8311c2f6a120a9f516d4b90be3498ca6bfbf10b8e59a64",
+      "bytes": 10162
+    },
+    "qualification.log": {
+      "sha256": "c9c4fddb494a2aeca21e4a1f14151e0ffa5bc8def63efd7abc8e678384c6933e",
+      "bytes": 179
+    },
+    "stdlib.log": {
+      "sha256": "633cdde53f97df448d011749fd37ca2e473f75c296cc7d6f43c46d1f0de0191a",
+      "bytes": 8511
+    },
+    "wp2-stdlib-open.json": {
+      "sha256": "b43179471227df2892e64ff884dc49c9702af0d02bf1d953f36b1dbd70c70f6e",
+      "bytes": 7804
+    },
+    "wp2-zlib-ng-open.json": {
+      "sha256": "c9c59a89ea055c949c3c5679a07e6f21d5a054523542a461d8def8a929d0c971",
+      "bytes": 7796
+    },
+    "prek.log": {
+      "sha256": "91d1970f9de59a1317b4234a061d225c680c84f2e80e65de048202f9c3c03ce6",
+      "bytes": 1040
+    }
+  }
+}

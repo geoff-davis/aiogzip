@@ -9,6 +9,7 @@ The `.txt` suffix preserves the original Markdown without formatter changes.
 - [Findings and evidence limitations](reviews/v2.0.0b2-findings.md)
 - [Completed WP1 native settlement](reviews/v2.0.0b2-wp1-completion.md)
 - [Completed WP2 source settlement](reviews/v2.0.0b2-wp2-completion.md)
+- [Completed WP3 opening ownership](reviews/v2.0.0b2-wp3-completion.md)
 - [Source consumption policy](design/v2.0.0b2-source-consumption.md)
 - [Native completion ownership](design/v2.0.0b2-native-settlement.md)
 - [WP0 local qualification](reviews/v2.0.0b2-qualification.md)

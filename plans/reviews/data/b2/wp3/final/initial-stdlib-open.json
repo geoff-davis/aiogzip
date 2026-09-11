@@ -1,0 +1,441 @@
+{
+  "source": {
+    "sha": "3ef0266ce6be86f6ee6195245ca3ac89a23a5b48",
+    "tree": "3a680b0b35a2b2835b03d62638b5383c38824d40",
+    "status": ""
+  },
+  "harness": {
+    "sha": "befb4d7eb1177bce64070827dd9dcb1695147b11",
+    "tree": "1f7bfffb08afa37200829be95c14c03e9cb5829b",
+    "status": ""
+  },
+  "script_sha256": "5c31099ca93c0365d8d4e0f5e21bc59c7e29f097503740b7758764c1c4b5e674",
+  "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+  "engines": {
+    "compression": "stdlib-zlib",
+    "decompression": "stdlib-zlib",
+    "crc32": "stdlib-zlib"
+  },
+  "fixture_sha256": "0ecd0913052711a49cc1bae4cdffa9aa83d7060368152ec2040ae34a973718a7",
+  "semantic": {
+    "binary-read-normal": {
+      "opener": "ok",
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "binary-read-open": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "open() is already in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "binary-read-close": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "binary-read-clean-exit": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "binary-read-body-exit": {
+      "opener": "ok",
+      "contender": "ok",
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "binary-read-native-cancel": {
+      "opener": {
+        "type": "CancelledError",
+        "message": "cancel open",
+        "cause": null,
+        "notes": []
+      },
+      "close": "ok",
+      "acquired_closed": [
+        true
+      ],
+      "closed": true
+    },
+    "binary-write-normal": {
+      "opener": "ok",
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "binary-write-open": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "open() is already in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "binary-write-close": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "binary-write-clean-exit": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "binary-write-body-exit": {
+      "opener": "ok",
+      "contender": "ok",
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "binary-write-native-cancel": {
+      "opener": {
+        "type": "CancelledError",
+        "message": "cancel open",
+        "cause": null,
+        "notes": []
+      },
+      "close": "ok",
+      "acquired_closed": [
+        true
+      ],
+      "closed": true
+    },
+    "binary-header-cleanup-cause-False": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": {
+          "type": "RuntimeError",
+          "message": "cleanup failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "binary-header-cleanup-cause-True": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": {
+          "type": "RuntimeError",
+          "message": "cleanup failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "binary-wrap-cleanup-cause": {
+      "open": {
+        "type": "RuntimeError",
+        "message": "wrap failure",
+        "cause": {
+          "type": "OSError",
+          "message": "raw close failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "acquired_closed": [
+        true
+      ],
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-read-normal": {
+      "opener": "ok",
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-read-open": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "open() is already in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-read-close": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-read-clean-exit": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-read-body-exit": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-read-native-cancel": {
+      "opener": {
+        "type": "CancelledError",
+        "message": "cancel open",
+        "cause": null,
+        "notes": []
+      },
+      "close": "ok",
+      "acquired_closed": [
+        true
+      ],
+      "closed": true
+    },
+    "text-write-normal": {
+      "opener": "ok",
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-write-open": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "open() is already in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-write-close": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-write-clean-exit": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-write-body-exit": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "text-write-native-cancel": {
+      "opener": {
+        "type": "CancelledError",
+        "message": "cancel open",
+        "cause": null,
+        "notes": []
+      },
+      "close": "ok",
+      "acquired_closed": [
+        true
+      ],
+      "closed": true
+    },
+    "text-header-cleanup-cause-False": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": {
+          "type": "RuntimeError",
+          "message": "cleanup failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "text-header-cleanup-cause-True": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": {
+          "type": "RuntimeError",
+          "message": "cleanup failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "text-wrap-cleanup-cause": {
+      "open": {
+        "type": "RuntimeError",
+        "message": "wrap failure",
+        "cause": {
+          "type": "OSError",
+          "message": "raw close failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "acquired_closed": [
+        true
+      ],
+      "resource_closes": [
+        1
+      ]
+    }
+  },
+  "diagnostic": {}
+}

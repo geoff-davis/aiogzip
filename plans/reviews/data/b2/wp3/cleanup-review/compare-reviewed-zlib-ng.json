@@ -1,0 +1,250 @@
+{
+  "passed": false,
+  "differences": [
+    {
+      "scenario": "binary-custom-cancel",
+      "before": {
+        "outcome": {
+          "type": "CancelledError",
+          "message": "cleanup cancellation",
+          "cause": null,
+          "notes": []
+        },
+        "cancelled": true,
+        "cancelling": 1,
+        "closes": 1
+      },
+      "after": {
+        "outcome": {
+          "type": "OSError",
+          "message": "header failed",
+          "cause": null,
+          "notes": [
+            "Opening cleanup also failed: CancelledError('cleanup cancellation')"
+          ]
+        },
+        "cancelled": false,
+        "cancelling": 1,
+        "closes": 1
+      },
+      "exception_id": null
+    },
+    {
+      "scenario": "binary-custom-timeout",
+      "before": {
+        "outcome": {
+          "type": "TimeoutError",
+          "message": "",
+          "cause": {
+            "type": "CancelledError",
+            "message": "",
+            "cause": null,
+            "notes": []
+          },
+          "notes": []
+        },
+        "cancelled": false,
+        "cancelling": 0,
+        "closes": 1
+      },
+      "after": {
+        "outcome": {
+          "type": "OSError",
+          "message": "header failed",
+          "cause": null,
+          "notes": [
+            "Opening cleanup also failed: CancelledError()"
+          ]
+        },
+        "cancelled": false,
+        "cancelling": 0,
+        "closes": 1
+      },
+      "exception_id": null
+    },
+    {
+      "scenario": "binary-native-cancel",
+      "before": {
+        "outcome": {
+          "type": "CancelledError",
+          "message": "cleanup cancellation",
+          "cause": null,
+          "notes": []
+        },
+        "cancelled": true,
+        "cancelling": 1,
+        "closes": 1
+      },
+      "after": {
+        "outcome": {
+          "type": "OSError",
+          "message": "header failed",
+          "cause": null,
+          "notes": [
+            "Opening cleanup also failed: CancelledError('cleanup cancellation')"
+          ]
+        },
+        "cancelled": false,
+        "cancelling": 1,
+        "closes": 1
+      },
+      "exception_id": null
+    },
+    {
+      "scenario": "binary-native-timeout",
+      "before": {
+        "outcome": {
+          "type": "TimeoutError",
+          "message": "",
+          "cause": {
+            "type": "CancelledError",
+            "message": "",
+            "cause": null,
+            "notes": []
+          },
+          "notes": []
+        },
+        "cancelled": false,
+        "cancelling": 0,
+        "closes": 1
+      },
+      "after": {
+        "outcome": {
+          "type": "OSError",
+          "message": "header failed",
+          "cause": null,
+          "notes": [
+            "Opening cleanup also failed: CancelledError()"
+          ]
+        },
+        "cancelled": false,
+        "cancelling": 0,
+        "closes": 1
+      },
+      "exception_id": null
+    },
+    {
+      "scenario": "text-custom-cancel",
+      "before": {
+        "outcome": {
+          "type": "CancelledError",
+          "message": "cleanup cancellation",
+          "cause": null,
+          "notes": []
+        },
+        "cancelled": true,
+        "cancelling": 1,
+        "closes": 1
+      },
+      "after": {
+        "outcome": {
+          "type": "OSError",
+          "message": "header failed",
+          "cause": null,
+          "notes": [
+            "Opening cleanup also failed: CancelledError('cleanup cancellation')"
+          ]
+        },
+        "cancelled": false,
+        "cancelling": 1,
+        "closes": 1
+      },
+      "exception_id": null
+    },
+    {
+      "scenario": "text-custom-timeout",
+      "before": {
+        "outcome": {
+          "type": "TimeoutError",
+          "message": "",
+          "cause": {
+            "type": "CancelledError",
+            "message": "",
+            "cause": null,
+            "notes": []
+          },
+          "notes": []
+        },
+        "cancelled": false,
+        "cancelling": 0,
+        "closes": 1
+      },
+      "after": {
+        "outcome": {
+          "type": "OSError",
+          "message": "header failed",
+          "cause": null,
+          "notes": [
+            "Opening cleanup also failed: CancelledError()"
+          ]
+        },
+        "cancelled": false,
+        "cancelling": 0,
+        "closes": 1
+      },
+      "exception_id": null
+    },
+    {
+      "scenario": "text-native-cancel",
+      "before": {
+        "outcome": {
+          "type": "CancelledError",
+          "message": "cleanup cancellation",
+          "cause": null,
+          "notes": []
+        },
+        "cancelled": true,
+        "cancelling": 1,
+        "closes": 1
+      },
+      "after": {
+        "outcome": {
+          "type": "OSError",
+          "message": "header failed",
+          "cause": null,
+          "notes": [
+            "Opening cleanup also failed: CancelledError('cleanup cancellation')"
+          ]
+        },
+        "cancelled": false,
+        "cancelling": 1,
+        "closes": 1
+      },
+      "exception_id": null
+    },
+    {
+      "scenario": "text-native-timeout",
+      "before": {
+        "outcome": {
+          "type": "TimeoutError",
+          "message": "",
+          "cause": {
+            "type": "CancelledError",
+            "message": "",
+            "cause": null,
+            "notes": []
+          },
+          "notes": []
+        },
+        "cancelled": false,
+        "cancelling": 0,
+        "closes": 1
+      },
+      "after": {
+        "outcome": {
+          "type": "OSError",
+          "message": "header failed",
+          "cause": null,
+          "notes": [
+            "Opening cleanup also failed: CancelledError()"
+          ]
+        },
+        "cancelled": false,
+        "cancelling": 0,
+        "closes": 1
+      },
+      "exception_id": null
+    }
+  ],
+  "diagnostics_equal": true
+}
