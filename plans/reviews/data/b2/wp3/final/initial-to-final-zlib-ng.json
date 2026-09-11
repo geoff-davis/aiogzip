@@ -1,0 +1,278 @@
+{
+  "binary-header-cleanup-cause-False": {
+    "before": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": {
+          "type": "RuntimeError",
+          "message": "cleanup failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "after": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": null,
+        "notes": [
+          "Opening cleanup also failed: RuntimeError('cleanup failure')"
+        ]
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "exception_id": "BC3"
+  },
+  "binary-header-cleanup-cause-True": {
+    "before": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": {
+          "type": "RuntimeError",
+          "message": "cleanup failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "after": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": {
+          "type": "ValueError",
+          "message": "original sink cause",
+          "cause": null,
+          "notes": []
+        },
+        "notes": [
+          "Opening cleanup also failed: RuntimeError('cleanup failure')"
+        ]
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "exception_id": "BC3"
+  },
+  "binary-wrap-cleanup-cause": {
+    "before": {
+      "open": {
+        "type": "RuntimeError",
+        "message": "wrap failure",
+        "cause": {
+          "type": "OSError",
+          "message": "raw close failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "acquired_closed": [
+        true
+      ],
+      "resource_closes": [
+        1
+      ]
+    },
+    "after": {
+      "open": {
+        "type": "RuntimeError",
+        "message": "wrap failure",
+        "cause": {
+          "type": "ValueError",
+          "message": "original wrap cause",
+          "cause": null,
+          "notes": []
+        },
+        "notes": [
+          "Opening cleanup also failed: OSError('raw close failure')"
+        ]
+      },
+      "close": "ok",
+      "acquired_closed": [
+        true
+      ],
+      "resource_closes": [
+        1
+      ]
+    },
+    "exception_id": "BC3"
+  },
+  "text-read-body-exit": {
+    "before": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "after": {
+      "opener": "ok",
+      "contender": "ok",
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "exception_id": "BC3"
+  },
+  "text-write-body-exit": {
+    "before": {
+      "opener": "ok",
+      "contender": {
+        "type": "ConcurrentOperationError",
+        "message": "close() called while open() is in progress",
+        "cause": null,
+        "notes": []
+      },
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "after": {
+      "opener": "ok",
+      "contender": "ok",
+      "closed_after_open": false,
+      "close": "ok",
+      "closed": true,
+      "resource_closes": [
+        1
+      ]
+    },
+    "exception_id": "BC3"
+  },
+  "text-header-cleanup-cause-False": {
+    "before": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": {
+          "type": "RuntimeError",
+          "message": "cleanup failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "after": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": null,
+        "notes": [
+          "Opening cleanup also failed: RuntimeError('cleanup failure')"
+        ]
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "exception_id": "BC3"
+  },
+  "text-header-cleanup-cause-True": {
+    "before": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": {
+          "type": "RuntimeError",
+          "message": "cleanup failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "after": {
+      "open": {
+        "type": "OSError",
+        "message": "header failure",
+        "cause": {
+          "type": "ValueError",
+          "message": "original sink cause",
+          "cause": null,
+          "notes": []
+        },
+        "notes": [
+          "Opening cleanup also failed: RuntimeError('cleanup failure')"
+        ]
+      },
+      "close": "ok",
+      "resource_closes": 1
+    },
+    "exception_id": "BC3"
+  },
+  "text-wrap-cleanup-cause": {
+    "before": {
+      "open": {
+        "type": "RuntimeError",
+        "message": "wrap failure",
+        "cause": {
+          "type": "OSError",
+          "message": "raw close failure",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "close": "ok",
+      "acquired_closed": [
+        true
+      ],
+      "resource_closes": [
+        1
+      ]
+    },
+    "after": {
+      "open": {
+        "type": "RuntimeError",
+        "message": "wrap failure",
+        "cause": {
+          "type": "ValueError",
+          "message": "original wrap cause",
+          "cause": null,
+          "notes": []
+        },
+        "notes": [
+          "Opening cleanup also failed: OSError('raw close failure')"
+        ]
+      },
+      "close": "ok",
+      "acquired_closed": [
+        true
+      ],
+      "resource_closes": [
+        1
+      ]
+    },
+    "exception_id": "BC3"
+  }
+}

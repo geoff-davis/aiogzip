@@ -1,7 +1,7 @@
 # aiogzip 2.0.0b2: Correctness, Performance, and File-State Plan
 
 > **Revision 2 — 2026-09-07. Supersedes the September 1 b2 plan.**
-> **Status:** WP0–WP2 completed locally; WP3 onward and release qualification remain pending.
+> **Status:** WP0–WP3 completed locally; WP4 onward and release qualification remain pending.
 > **Target:** `2.0.0b2`.
 > **Commit this file as:** `plans/RELEASE_2_0_0B2_PLAN.md`.
 > **Historical reviewed starting point:** `dc8950cb334e1cf4082f2bf50074464e06c72287`.
@@ -291,7 +291,7 @@ create competing copies of the same checkboxes in every section.
 * [x] G01 — [Oracle and local qualification](reviews/v2.0.0b2-qualification.md#wp0-local-completion)
 * [x] G02 — [Native settlement repair and paired evidence](reviews/v2.0.0b2-wp1-completion.md)
 * [x] G03 — [Source settlement, BC2 policy and verification](reviews/v2.0.0b2-wp2-completion.md#maintainer-review-correction)
-* [ ] G04
+* [x] G04 — [Opening ownership and exact BC3 qualification](reviews/v2.0.0b2-wp3-completion.md)
 * [ ] G05
 * [ ] G06
 * [ ] G07

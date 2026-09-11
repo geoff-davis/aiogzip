@@ -507,3 +507,99 @@ async def test_cooperative_cleanup_finishes_before_releasing_open_reservation(
         release.set()
         await asyncio.gather(opener, return_exceptions=True)
         await f.close()
+
+
+@pytest.mark.parametrize("text", [False, True])
+@pytest.mark.parametrize("writing", [False, True])
+async def test_cancelled_acquisition_retains_close_through_more_cancellation(
+    monkeypatch, tmp_path, text, writing
+):
+    loop = asyncio.get_running_loop()
+    entered_open, entered_close = asyncio.Event(), asyncio.Event()
+    release_open, release_close = threading.Event(), threading.Event()
+    acquired = []
+
+    class File(io.FileIO):
+        closes = 0
+
+        def close(self):
+            loop.call_soon_threadsafe(entered_close.set)
+            if not release_close.wait(5):
+                raise RuntimeError("cleanup watchdog expired")
+            self.closes += 1
+            super().close()
+
+    def acquire(*args):
+        raw = File(*args)
+        acquired.append(raw)
+        loop.call_soon_threadsafe(entered_open.set)
+        if not release_open.wait(5):
+            raise RuntimeError("open watchdog expired")
+        return raw
+
+    monkeypatch.setattr(aiofiles.threadpool, "sync_open", acquire)
+    path = tmp_path / "two-phases.gz"
+    path.write_bytes(b"")
+    f = handle(text, writing, path)
+    opener = asyncio.create_task(f.open())
+    try:
+        await asyncio.wait_for(entered_open.wait(), 5)
+        opener.cancel("original acquisition cancel")
+        release_open.set()
+        await asyncio.wait_for(entered_close.wait(), 5)
+        for _ in range(2):
+            opener.cancel("later cleanup cancel")
+            await asyncio.sleep(0)
+        assert not opener.done() and not acquired[0].closed
+        with pytest.raises(ConcurrentOperationError):
+            await f.close()
+        release_close.set()
+        with pytest.raises(
+            asyncio.CancelledError, match="original acquisition cancel"
+        ) as caught:
+            await opener
+        assert caught.value.__cause__ is None
+        assert any("later cleanup cancel" in note for note in caught.value.__notes__)
+        assert acquired[0].closed and acquired[0].closes == 1
+        assert (f._binary_file if text else f._file) is None
+        await f.close()
+    finally:
+        release_open.set()
+        release_close.set()
+        await asyncio.gather(opener, return_exceptions=True)
+        for raw in acquired:
+            if not raw.closed:
+                raw.close()
+        await f.close()
+
+
+@pytest.mark.parametrize("writing", [False, True])
+async def test_native_initialization_uses_supplied_executor(tmp_path, writing):
+    threads = []
+
+    class File(io.FileIO):
+        def write(self, data):
+            threads.append(threading.current_thread().name)
+            return super().write(data)
+
+        def seekable(self):
+            threads.append(threading.current_thread().name)
+            return super().seekable()
+
+    path = tmp_path / "executor.gz"
+    path.write_bytes(b"")
+    raw = File(path, "wb" if writing else "rb")
+    with ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix="wp3-initial"
+    ) as executor:
+        source = aiofiles.threadpool.wrap(
+            raw, loop=asyncio.get_running_loop(), executor=executor
+        )
+        f = handle(False, writing, fileobj=source, closefd=False)
+        try:
+            await f.open()
+            assert threads and all(name.startswith("wp3-initial") for name in threads)
+            await f.close()
+        finally:
+            await f.close()
+            raw.close()
