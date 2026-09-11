@@ -7,6 +7,7 @@ Only test-owned tasks are cancelled. Native gates always have a watchdog and cle
 import asyncio
 import gzip
 import io
+import random
 import threading
 
 import pytest
@@ -21,7 +22,11 @@ from aiogzip import (
 )
 
 
-@pytest.mark.xfail(strict=True, reason="F1: cancelled helper hides live native work")
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="F1: cancelled helper hides live native work",
+)
 async def test_native_cleanup_follows_final_worker_access(monkeypatch):
     loop = asyncio.get_running_loop()
     entered = asyncio.Event()
@@ -71,7 +76,11 @@ async def test_native_cleanup_follows_final_worker_access(monkeypatch):
     assert events == ["last native access", "cleanup"]
 
 
-@pytest.mark.xfail(strict=True, reason="F2: consumed member A can disappear on cancel")
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="F2: consumed member A can disappear on cancel",
+)
 async def test_consumed_member_cannot_be_replaced_by_successful_suffix():
     consumed = asyncio.Event()
     release = asyncio.Event()
@@ -107,7 +116,11 @@ async def test_consumed_member_cannot_be_replaced_by_successful_suffix():
         assert result == a + b, f"accepted suffix-only stream: {result!r}"
 
 
-@pytest.mark.xfail(strict=True, reason="F3: overlapping opens acquire two resources")
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="F3: overlapping opens acquire two resources",
+)
 async def test_overlapping_open_has_one_resource_owner(monkeypatch):
     entered = asyncio.Event()
     release = asyncio.Event()
@@ -155,7 +168,11 @@ async def test_overlapping_open_has_one_resource_owner(monkeypatch):
     assert len(acquired) == 1 and counts == [1], counts
 
 
-@pytest.mark.xfail(strict=True, reason="F4: every tiny hint copies the pending suffix")
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="F4: every tiny hint copies the pending suffix",
+)
 async def test_pending_batch_drain_has_linear_copy_work(tmp_path):
     class CountedBatch(list):
         copied = 0
@@ -187,7 +204,11 @@ async def test_pending_batch_drain_has_linear_copy_work(tmp_path):
 
 
 @pytest.mark.parametrize("wrapper", [compress_chunks, decompress_chunks])
-@pytest.mark.xfail(strict=True, reason="F7: empty ready items bypass checkpoints")
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="F7: empty ready items bypass checkpoints",
+)
 async def test_empty_source_allows_sibling_progress_before_exhaustion(wrapper):
     ticks = 0
     ticks_before_last = None
@@ -222,23 +243,29 @@ async def test_empty_source_allows_sibling_progress_before_exhaustion(wrapper):
     assert ticks_before_last is not None and ticks_before_last > 0
 
 
-async def test_partial_read_characterizes_full_source_item_inflation():
-    """F6 observation, not a consumer-demand memory bound or a timing assertion."""
-    payload = b"x" * (16 * 1024 * 1024)
+@pytest.mark.parametrize("compressible", [True, False])
+async def test_partial_read_preserves_data_across_compression_ratios(compressible):
+    """Gate public data correctness; read-ahead belongs in measured diagnostics."""
+    payload = (
+        b"x" * (16 * 1024 * 1024)
+        if compressible
+        else random.Random(0).randbytes(2 * AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE)
+    )
+    wire = gzip.compress(payload, mtime=0)
+    if compressible:
+        assert len(wire) < AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE
+    else:
+        assert len(wire) > AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE
 
     class Source:
         def __init__(self):
-            self.data = io.BytesIO(gzip.compress(payload, mtime=0))
-            self.bytes_read = 0
+            self.data = io.BytesIO(wire)
 
         async def read(self, size=-1):
             chunk = self.data.read(size)
-            self.bytes_read += len(chunk)
             return chunk
 
     source = Source()
     async with AsyncGzipBinaryFile(None, "rb", fileobj=source, closefd=False) as f:
-        assert await f.read(1) == b"x"
-        assert source.bytes_read == len(source.data.getvalue())
-        assert len(f._buffer) - f._buffer_offset == len(payload) - 1
+        assert await f.read(1) == payload[:1]
         assert await f.read() == payload[1:]

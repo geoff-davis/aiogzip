@@ -39,6 +39,23 @@ class Source:
         return True
 
 
+def git_metadata(root: Path) -> dict[str, str | None]:
+    """Identify an exact checkout, including untracked files; sdists have no Git."""
+
+    def git(*arguments: str) -> str | None:
+        if not (root / ".git").exists():
+            return None
+        return subprocess.check_output(
+            ["git", "-C", str(root), *arguments], text=True, encoding="utf-8"
+        ).strip()
+
+    return {
+        "sha": git("rev-parse", "HEAD"),
+        "tree": git("rev-parse", "HEAD^{tree}"),
+        "status": git("status", "--short"),
+    }
+
+
 async def capture(package):
     semantic = {}
     diagnostics = {}
@@ -121,8 +138,23 @@ def main() -> None:
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--require-clean",
+        action="store_true",
+        help="Require committed, clean source and harness checkouts for retained evidence.",
+    )
     args = parser.parse_args()
     root = args.source_root.resolve()
+    harness_path = Path(__file__).resolve()
+    source_metadata = git_metadata(root)
+    harness_metadata = git_metadata(harness_path.parents[1])
+    if args.require_clean:
+        for label, metadata in (
+            ("source", source_metadata),
+            ("harness", harness_metadata),
+        ):
+            if metadata["sha"] is None or metadata["status"] != "":
+                raise RuntimeError(f"{label} must be a clean Git checkout: {metadata}")
     os.environ["AIOGZIP_ENGINE"] = args.engine
     sys.path.insert(0, str(root / "src"))
     import aiogzip
@@ -136,13 +168,6 @@ def main() -> None:
     else:
         assert engines["decompression"] == "zlib-ng", engines
 
-    def git(*arguments: str) -> str | None:
-        if not (root / ".git").exists():
-            return None  # An unpacked sdist has no Git provenance.
-        return subprocess.check_output(
-            ["git", "-C", str(root), *arguments], text=True
-        ).strip()
-
     dependencies = {}
     for name in ("aiofiles", "zlib-ng"):
         try:
@@ -152,14 +177,13 @@ def main() -> None:
 
     semantic, diagnostics, fixture_hash = asyncio.run(capture(aiogzip))
     record = {
-        "schema": 1,
+        "schema": 2,
         "source": {
-            "sha": git("rev-parse", "HEAD"),
-            "tree": git("rev-parse", "HEAD^{tree}"),
-            "status": git("status", "--short"),
+            **source_metadata,
             "import": str(origin),
         },
-        "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "harness": {**harness_metadata, "path": str(harness_path)},
+        "harness_sha256": hashlib.sha256(harness_path.read_bytes()).hexdigest(),
         "python": sys.version,
         "platform": platform.platform(),
         "engines": engines,
@@ -170,7 +194,7 @@ def main() -> None:
         "diagnostic": diagnostics,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    with args.output.open("x") as output:
+    with args.output.open("x", encoding="utf-8") as output:
         json.dump(record, output, indent=2, ensure_ascii=False)
         output.write("\n")
 

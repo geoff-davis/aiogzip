@@ -13,10 +13,15 @@ from pathlib import Path
 import aiofiles.threadpool
 import pytest
 
+import aiogzip
 from aiogzip import AsyncGzipBinaryFile
 
 
-@pytest.mark.xfail(strict=True, reason="F2: aiofiles read loses consumed member A")
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="F2: aiofiles read loses consumed member A",
+)
 async def test_native_source_consumption_cannot_accept_suffix(monkeypatch, tmp_path):
     loop = asyncio.get_running_loop()
     entered = asyncio.Event()
@@ -70,8 +75,12 @@ async def test_native_source_consumption_cannot_accept_suffix(monkeypatch, tmp_p
         raw.close()
 
 
-@pytest.mark.xfail(strict=True, reason="F1: runner shutdown cancels native helper")
-def test_actual_runner_shutdown_preserves_native_cleanup_order():
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="F1: runner shutdown cancels native helper",
+)
+def test_actual_runner_shutdown_preserves_native_cleanup_order(tmp_path):
     # asyncio.run really cancels all outstanding tasks in this CHILD process.
     # A timer releases native work independently of the event loop. The parent
     # has a separate process timeout; neither watchdog depends on asyncio progress.
@@ -79,6 +88,7 @@ def test_actual_runner_shutdown_preserves_native_cleanup_order():
 import asyncio
 import json
 import threading
+import aiogzip
 from aiogzip._codec_async import _drive_operation
 
 events = []
@@ -115,17 +125,24 @@ finally:
     release.set()
     if timer is not None:
         timer.join()
-print(json.dumps(events))
+print(json.dumps({"events": events, "import": aiogzip.__file__}))
 """
-    root = Path(__file__).resolve().parents[1]
+    # Follow the parent import: installed-wheel lanes must exercise that wheel,
+    # while source lanes exercise source. An isolated cwd avoids implicit imports.
+    origin = Path(aiogzip.__file__).resolve()
     environment = os.environ.copy()
-    environment["PYTHONPATH"] = str(root / "src")
+    environment["PYTHONPATH"] = str(origin.parent.parent)
     result = subprocess.run(
         [sys.executable, "-c", program],
         env=environment,
+        cwd=tmp_path,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=15,
         check=True,
     )
-    assert json.loads(result.stdout) == ["last native access", "cleanup"]
+    report = json.loads(result.stdout)
+    if Path(report["import"]).resolve() != origin:
+        raise RuntimeError(f"shutdown child imported a different package: {report}")
+    assert report["events"] == ["last native access", "cleanup"]
