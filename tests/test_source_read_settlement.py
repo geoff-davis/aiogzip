@@ -660,7 +660,7 @@ async def test_queued_native_read_retains_input_in_configured_executor(
         for _ in range(3):
             caller.cancel()
             await asyncio.sleep(0)
-            assert not caller.done()
+            # Cancellation may atomically prevent entry while still queued.
             assert raw.tell() == 0
         release.set()
         with pytest.raises(asyncio.CancelledError):
@@ -752,3 +752,63 @@ print(json.dumps({"events": events, "import": aiogzip.__file__}))
     if Path(report["import"]).resolve() != origin:
         raise RuntimeError(f"shutdown child imported a different package: {report}")
     assert report["events"] == ["last access", "close"]
+
+
+async def test_cancel_can_prevent_native_entry_after_executor_start(
+    tmp_path, monkeypatch
+):
+    """The entry lock prevents late access even when executor cancellation loses."""
+    from aiogzip._source_io import _NativeSourceCall
+
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    release, settled = threading.Event(), threading.Event()
+    original = _NativeSourceCall.__call__
+    first = True
+    accesses = []
+    path = tmp_path / "entry.gz"
+    path.write_bytes(WIRE)
+
+    class Reader(io.BufferedReader):
+        def read(self, size=-1):
+            accesses.append(self.closed)
+            return super().read(size)
+
+    def gated(call):
+        nonlocal first
+        if first:
+            first = False
+            loop.call_soon_threadsafe(entered.set)
+            try:
+                if not release.wait(5):
+                    raise RuntimeError("entry watchdog expired")
+                return original(call)
+            finally:
+                settled.set()
+        return original(call)
+
+    raw = Reader(io.FileIO(path, "rb"))
+    f = wrapper(aiofiles.threadpool.wrap(raw, loop=loop), False, closefd=True)
+    caller = None
+    try:
+        await f.open()
+        monkeypatch.setattr(_NativeSourceCall, "__call__", gated)
+        caller = asyncio.create_task(f.read())
+        await asyncio.wait_for(entered.wait(), 5)
+        caller.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(caller, 2)
+        # The executor is already running the callable, but its guarded native
+        # entry was atomically prevented. Closing before releasing it is safe.
+        await f.close()
+        assert raw.closed
+        release.set()
+        assert await asyncio.to_thread(settled.wait, 5)
+        assert accesses == []
+    finally:
+        release.set()
+        if caller is not None:
+            await asyncio.gather(caller, return_exceptions=True)
+        await f.close()
+        if not raw.closed:
+            raw.close()

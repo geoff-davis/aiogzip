@@ -188,6 +188,7 @@ class AsyncGzipBinaryFile:
         "_decoder_header_generation",
         "_compressed_cache",
         "_source_work",
+        "_source_native_call",
         "_source_owner",
         "_source_abort_requested",
         "_pending_compressed_chunk",
@@ -307,6 +308,7 @@ class AsyncGzipBinaryFile:
         self._decoder_header_generation: int = 0
         self._compressed_cache = bytearray()
         self._source_work: Optional[asyncio.Future[Any]] = None
+        self._source_native_call: Optional[_NativeSourceCall] = None
         self._source_owner: Optional[asyncio.Task[Any]] = None
         self._source_abort_requested = False
         self._pending_compressed_chunk: Optional[bytes] = None
@@ -1701,39 +1703,48 @@ class AsyncGzipBinaryFile:
                 waiter.set_result(None)
 
     async def _call_native_source(self, method: str, *args: Any) -> Any:
-        """Retain aiofiles' actual executor future and any cancelled read result."""
+        """Retain native completion and input independently of executor cancellation."""
         source = self._file
         loop = asyncio.get_running_loop()
         if source._loop is not loop:
             raise RuntimeError("aiofiles source belongs to a different event loop")
-        call = _NativeSourceCall(source._file, method, args)
-        # Match aiofiles' configured loop/executor, but own the future directly:
-        # cancelling a task around source.read() could otherwise lose native work.
+        call = _NativeSourceCall(source._file, method, args, loop)
+        # Preserve aiofiles' loop/executor policy. The worker-owned call record,
+        # rather than this cancellable notification, proves native completion.
         work = loop.run_in_executor(source._executor, call)
-        self._source_work = work
+        self._source_native_call = call
         try:
-            return await _settle_before_cancel(work)
-        except asyncio.CancelledError:
+            return await work
+        except asyncio.CancelledError as cancellation:
             try:
-                result = work.result()
-            except BaseException:
+                await _settle_before_cancel(call.completion(cancel_pending=True))
+            except asyncio.CancelledError:
+                # Repeated cancellation cannot replace the first outcome or
+                # interrupt settlement; _settle_before_cancel has finished it.
+                pass
+            if call.prevented:
+                raise cancellation
+            try:
+                result = call.result()
+            except BaseException as failure:
                 if not call.no_effect:
                     self._poison_source()
+                raise cancellation from failure
             else:
                 if method == "read":
                     if not self._is_closed and not self._read_broken:
                         self._pending_compressed_chunk = result
                 else:
-                    # A cancelled rewind must not leave old codec state aligned
+                    # A cancelled rewind cannot leave old codec state aligned
                     # with a new physical cursor, even if the seek succeeded.
                     self._poison_source()
-            raise
+            raise cancellation
         except BaseException:
             if not call.no_effect:
                 self._poison_source()
             raise
         finally:
-            self._source_work = None
+            self._source_native_call = None
 
     async def _cleanup_failed_enter(self) -> None:
         """Close internally opened resources after __aenter__ setup failures.
@@ -1919,6 +1930,8 @@ class AsyncGzipBinaryFile:
                     work = asyncio.get_running_loop().create_future()
                     self._source_work = work
                 owner.cancel()
+            elif self._source_native_call is not None:
+                work = self._source_native_call.completion()
             if work is not None:
                 try:
                     await _settle_before_cancel(work)
