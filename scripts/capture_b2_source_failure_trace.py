@@ -20,8 +20,8 @@ async def capture(package):
     import aiofiles.threadpool
 
     a, b = b"member A\n", b"member B\n"
-    wire_a = gzip.compress(a, mtime=0)
-    wire = wire_a + gzip.compress(b, mtime=0)
+    wire_a = gzip.compress(a, mtime=123)
+    wire = wire_a + gzip.compress(b, mtime=123)
     semantic, diagnostic = {}, {}
 
     async def finish_trace(file, caller, events):

@@ -35,54 +35,70 @@ async def measure(package, repeats):
     payload = "".join(
         content[start : start + 256] + "\n" for start in range(0, len(content), 256)
     )
-    wire = gzip.compress(payload.encode(), mtime=0)
-    assert len(wire) > package.AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE
+    fixtures = [
+        ("hex-lines", payload.encode(), "utf-8"),
+        (
+            "random-bytes",
+            hashlib.shake_256(b"WP2 incompressible fixture").digest(4 * 1024 * 1024),
+            "latin-1",
+        ),
+    ]
     with tempfile.TemporaryDirectory(prefix="aiogzip-wp2-") as directory:
         path = Path(directory) / "fixture.gz"
-        path.write_bytes(wire)
-        for source_kind in ("native", "custom"):
-            for text in (False, True):
-                cls = package.AsyncGzipTextFile if text else package.AsyncGzipBinaryFile
-                expected = payload if text else payload.encode()
-                for surface in ("read-all", "read-sized", "readline"):
-                    samples = []
-                    for iteration in range(repeats + 1):
-                        options = {"newline": ""} if text else {}
-                        if source_kind == "custom":
-                            options.update(fileobj=Source(wire), closefd=False)
-                        f = cls(
-                            path if source_kind == "native" else None,
-                            "rt" if text else "rb",
-                            **options,
-                        )
-                        async with f:
-                            start = time.perf_counter()
-                            if surface == "read-all":
-                                result = await f.read()
-                            else:
-                                pieces = []
-                                while piece := await (
-                                    f.read(65536)
-                                    if surface == "read-sized"
-                                    else f.readline()
-                                ):
-                                    pieces.append(piece)
-                                result = ("" if text else b"").join(pieces)
-                            elapsed = time.perf_counter() - start
-                        assert result == expected
-                        if iteration:
-                            samples.append(elapsed)
-                    rows.append(
-                        {
-                            "source_kind": source_kind,
-                            "text": text,
-                            "surface": surface,
-                            "payload_bytes": len(payload),
-                            "wire_bytes": len(wire),
-                            "fixture_sha256": hashlib.sha256(wire).hexdigest(),
-                            **summarize(samples),
-                        }
+        for family, raw, encoding in fixtures:
+            wire = gzip.compress(raw, mtime=123)
+            assert len(wire) > package.AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE
+            path.write_bytes(wire)
+            for source_kind in ("native", "custom"):
+                for text in (False, True):
+                    cls = (
+                        package.AsyncGzipTextFile
+                        if text
+                        else package.AsyncGzipBinaryFile
                     )
+                    expected = raw.decode(encoding) if text else raw
+                    for surface in ("read-all", "read-sized", "readline"):
+                        samples = []
+                        for iteration in range(repeats + 1):
+                            options = (
+                                {"newline": "", "encoding": encoding} if text else {}
+                            )
+                            if source_kind == "custom":
+                                options.update(fileobj=Source(wire), closefd=False)
+                            f = cls(
+                                path if source_kind == "native" else None,
+                                "rt" if text else "rb",
+                                **options,
+                            )
+                            async with f:
+                                start = time.perf_counter()
+                                if surface == "read-all":
+                                    result = await f.read()
+                                else:
+                                    pieces = []
+                                    while piece := await (
+                                        f.read(65536)
+                                        if surface == "read-sized"
+                                        else f.readline()
+                                    ):
+                                        pieces.append(piece)
+                                    result = ("" if text else b"").join(pieces)
+                                elapsed = time.perf_counter() - start
+                            assert result == expected
+                            if iteration:
+                                samples.append(elapsed)
+                        rows.append(
+                            {
+                                "source_kind": source_kind,
+                                "text": text,
+                                "surface": surface,
+                                "family": family,
+                                "payload_bytes": len(raw),
+                                "wire_bytes": len(wire),
+                                "fixture_sha256": hashlib.sha256(wire).hexdigest(),
+                                **summarize(samples),
+                            }
+                        )
     return rows
 
 
@@ -113,7 +129,7 @@ def main():
         "engines": dataclasses.asdict(aiogzip.engine_info()),
         "load_average": os.getloadavg() if hasattr(os, "getloadavg") else None,
         "qualification": "Provisional unless a quiet host is independently established; G17 remains open.",
-        "method": "Identical deterministic fixture; one warmup then all samples retained. Setup/open/close/validation outside timing; collection and join inside timing. No allocation measurement. Default chunk sizes. Deterministic random hex lines; compressed fixture guarded above one default input chunk. Warm filesystem cache; not a storage-device throughput qualification.",
+        "method": "Identical deterministic fixture; one warmup then all samples retained. Setup/open/close/validation outside timing; collection and join inside timing. No allocation measurement. Default chunk sizes. Deterministic random hex lines and incompressible bytes (Latin-1 for text); both compressed fixtures guarded above one default input chunk. Warm filesystem cache; not a storage-device throughput qualification.",
         "rows": asyncio.run(measure(aiogzip, args.repeats)),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
