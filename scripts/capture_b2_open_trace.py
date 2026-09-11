@@ -130,8 +130,9 @@ async def capture(package):
                     entered=entered,
                     release=release,
                     settled=settled,
+                    **kwargs,
                 ):
-                    raw = original_sync(*args)
+                    raw = original_sync(*args, **kwargs)
                     acquired.append(raw)
                     loop.call_soon_threadsafe(entered.set)
                     try:
@@ -210,8 +211,10 @@ async def capture(package):
                     super().close()
                     raise OSError("raw close failure")
 
-            def acquire_raw(*args, acquired=acquired):
-                raw = File(*args)
+            def acquire_raw(*args, acquired=acquired, **kwargs):
+                filename = args[0] if args else kwargs["file"]
+                mode = args[1] if len(args) > 1 else kwargs["mode"]
+                raw = File(filename, mode)
                 acquired.append(raw)
                 return raw
 
