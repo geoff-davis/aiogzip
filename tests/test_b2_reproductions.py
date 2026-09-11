@@ -108,11 +108,6 @@ async def test_consumed_member_cannot_be_replaced_by_successful_suffix():
         assert result == a + b, f"accepted suffix-only stream: {result!r}"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="F3: overlapping opens acquire two resources",
-)
 async def test_overlapping_open_has_one_resource_owner(monkeypatch):
     entered = asyncio.Event()
     release = asyncio.Event()

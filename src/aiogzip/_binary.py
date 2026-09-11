@@ -44,6 +44,12 @@ from ._common import (
     _validate_optional_positive_int,
     _validate_original_filename,
 )
+from ._opening import (
+    _acquire_path,
+    _initial_call,
+    _initial_seekable,
+    _write_initial_header,
+)
 from ._source_io import _is_native_source, _NativeSourceCall, _source_position
 from .codec import GzipDecoder, GzipEncoder, _AsyncDrivableOperation
 
@@ -181,6 +187,7 @@ class AsyncGzipBinaryFile:
         "_buffer",
         "_buffer_offset",
         "_is_closed",
+        "_opening",
         "_eof",
         "_owns_file",
         "_position",
@@ -300,6 +307,7 @@ class AsyncGzipBinaryFile:
         self._decoder: Optional[GzipDecoder] = None
         self._buffer = bytearray()  # Use bytearray for efficient buffer growth
         self._buffer_offset: int = 0  # Offset to the start of valid data in _buffer
+        self._opening = False
         self._is_closed: bool = False
         self._eof: bool = False
         self._owns_file: bool = False
@@ -355,19 +363,26 @@ class AsyncGzipBinaryFile:
             ValueError: if the file is already open, or has already been closed
                 (a closed instance cannot be reopened, matching io objects).
         """
+        if self._opening:
+            raise ConcurrentOperationError("open() is already in progress")
         _check_can_open(self._is_closed, self._file is not None)
+        self._opening = True
+        resource = None
+        owns_file = False
+        encoder = None
+        decoder = None
         try:
             if self._external_file is not None:
-                self._file = cast(Any, self._external_file)
-                self._owns_file = False
+                resource = cast(Any, self._external_file)
+                owns_file = False
             else:
                 # __init__'s _validate_filename guarantees a filename exists
                 # whenever no fileobj was given; assert keeps the narrowing.
                 assert self._filename is not None
-                self._file = await aiofiles.open(  # type: ignore
-                    self._filename, self._file_mode
+                resource = await _acquire_path(
+                    self._filename, self._file_mode, aiofiles.open
                 )
-                self._owns_file = True
+                owns_file = True
 
             # Initialize compression/decompression engine based on mode
             if self._writing_mode:
@@ -383,7 +398,7 @@ class AsyncGzipBinaryFile:
                         "ignore",
                         message="fast_compress=True requested.*",
                     )
-                    self._encoder = GzipEncoder(
+                    encoder = GzipEncoder(
                         compresslevel=self._compresslevel,
                         mtime=self._header_mtime,
                         original_filename=header_filename,
@@ -393,10 +408,10 @@ class AsyncGzipBinaryFile:
                             self._chunk_size, self.DEFAULT_CHUNK_SIZE
                         ),
                     )
-                for header_chunk in self._encoder.start():
-                    await self._write_all(header_chunk)
+                for header_chunk in encoder.start():
+                    await _write_initial_header(resource, header_chunk)
             else:  # read mode
-                self._decoder = GzipDecoder(
+                decoder = GzipDecoder(
                     # ``chunk_size`` governs transport reads and write
                     # batching. Preserve the codec's tuned bounded-output
                     # floor so tiny compatibility-test read sizes do not turn
@@ -415,16 +430,24 @@ class AsyncGzipBinaryFile:
                 self._compressed_cache.clear()
                 self._pending_compressed_chunk = None
                 self._replay_offset = None
-                self._underlying_seekable = await self._probe_underlying_seekable()
+                self._underlying_seekable = await _initial_seekable(resource)
                 self._cache_rewindable_reads = not self._underlying_seekable
 
+            # Publication has no suspension: only fully initialized resources
+            # become reachable through the live handle.
+            self._file = resource
+            self._owns_file = owns_file
+            self._encoder = encoder
+            self._decoder = decoder
             return self
-        except BaseException:
-            # BaseException, not Exception: a task cancelled mid-open (e.g.
-            # during the header write) must not leave _file set — the handle
-            # would leak and every retry would hit "File is already open".
-            await self._cleanup_failed_enter()
+        except BaseException as failure:
+            try:
+                await self._cleanup_failed_enter(resource, owns_file, encoder, decoder)
+            except BaseException as cleanup:
+                raise failure from cleanup
             raise
+        finally:
+            self._opening = False
 
     async def __aenter__(self) -> "AsyncGzipBinaryFile":
         """Enter the async context manager and initialize resources."""
@@ -1600,27 +1623,6 @@ class AsyncGzipBinaryFile:
         self._eof = False
         self._position = 0
 
-    async def _probe_underlying_seekable(self) -> bool:
-        """Return whether the underlying file should be rewound with seek()."""
-        if self._file is None:
-            return False
-
-        seek_method = getattr(self._file, "seek", None)
-        if not callable(seek_method):
-            return False
-
-        seekable_method = getattr(self._file, "seekable", None)
-        if not callable(seekable_method):
-            return True
-
-        try:
-            result = seekable_method()
-            if hasattr(result, "__await__"):
-                result = await result
-        except Exception:
-            return False
-        return bool(result)
-
     async def _read_compressed_chunk(self) -> bytes:
         """Read the next compressed chunk from cache replay or the underlying file."""
         if self._file is None:
@@ -1753,38 +1755,20 @@ class AsyncGzipBinaryFile:
         finally:
             self._source_native_call = None
 
-    async def _cleanup_failed_enter(self) -> None:
-        """Close internally opened resources after __aenter__ setup failures.
-
-        If the underlying close() raises (e.g., because the half-open
-        file is already in a bad state), the instance still has to end
-        up with _file cleared — otherwise the next caller can reach a
-        handle we no longer own.
-        """
-        file = self._file
-        owns_file = self._owns_file
-        # Clear the handle up front (even for external fileobjs we must not
-        # close) so a failed open() never leaves the instance looking open —
-        # otherwise a retry would hit the "File is already open" guard and
-        # write() could emit compressed data for a stream with no header.
-        self._file = None
-        self._owns_file = False
-        encoder = self._encoder
-        self._encoder = None
+    async def _cleanup_failed_enter(
+        self,
+        file: Any,
+        owns_file: bool,
+        encoder: Optional[GzipEncoder],
+        decoder: Optional[GzipDecoder],
+    ) -> None:
+        """Dispose unpublished codecs and the resource owned by this opener."""
         if encoder is not None:
             encoder.discard()
-        decoder = self._decoder
-        self._decoder = None
         if decoder is not None:
             decoder.discard()
-        if file is None or not owns_file:
-            return
-
-        close_method = getattr(file, "close", None)
-        if callable(close_method):
-            result = close_method()
-            if hasattr(result, "__await__"):
-                await result
+        if file is not None and owns_file and callable(getattr(file, "close", None)):
+            await _initial_call(file, "close")
 
     async def flush(self) -> None:
         """
@@ -1864,6 +1848,10 @@ class AsyncGzipBinaryFile:
     async def close(self) -> None:
         """Flushes any remaining compressed data and closes the file."""
         async with self._close_lock:
+            if self._opening:
+                raise ConcurrentOperationError(
+                    "close() called while open() is in progress"
+                )
             await self._close_locked()
 
     async def _close_locked(self) -> None:
@@ -1917,6 +1905,10 @@ class AsyncGzipBinaryFile:
     async def _abort_active_call_on_exit(self) -> None:
         """Close resources without touching a codec operation owned elsewhere."""
         async with self._close_lock:
+            if self._opening:
+                raise ConcurrentOperationError(
+                    "context exit called while open() is in progress"
+                )
             if self._is_closed:
                 return
             if self._writing_mode:

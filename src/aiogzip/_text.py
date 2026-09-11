@@ -158,6 +158,7 @@ class AsyncGzipTextFile:
         "_binary_mode",
         "_binary_file",
         "_is_closed",
+        "_opening",
         "_close_complete",
         "_close_lock",
         "_read_call_active",
@@ -287,6 +288,7 @@ class AsyncGzipTextFile:
             self._binary_mode += "+"
 
         self._binary_file: Optional[AsyncGzipBinaryFile] = None
+        self._opening = False
         self._is_closed: bool = False
         self._close_complete: bool = False
         self._close_lock = asyncio.Lock()
@@ -372,37 +374,40 @@ class AsyncGzipTextFile:
             ValueError: if the file is already open, or has already been closed
                 (a closed instance cannot be reopened, matching io objects).
         """
+        if self._opening:
+            raise ConcurrentOperationError("open() is already in progress")
         _check_can_open(self._is_closed, self._binary_file is not None)
-        filename = os.fspath(self._filename) if self._filename is not None else None
-        self._binary_file = AsyncGzipBinaryFile(
-            filename=filename,
-            mode=self._binary_mode,
-            chunk_size=self._chunk_size,
-            compresslevel=self._compresslevel,
-            mtime=self._header_mtime,
-            original_filename=self._header_filename_override,
-            fileobj=self._external_file,
-            closefd=self._closefd,
-            max_decompressed_size=self._max_decompressed_size,
-            max_rewind_cache_size=self._max_rewind_cache_size,
-            strict_size=self._strict_size,
-            fast_compress=self._fast_compress,
-        )
+        self._opening = True
         try:
-            await self._binary_file.open()
-        except BaseException:
-            # BaseException, not Exception: a cancelled open must not leave
-            # _binary_file set, or the instance wedges on "File is already
-            # open" at the next attempt.
+            filename = os.fspath(self._filename) if self._filename is not None else None
+            binary_file = AsyncGzipBinaryFile(
+                filename=filename,
+                mode=self._binary_mode,
+                chunk_size=self._chunk_size,
+                compresslevel=self._compresslevel,
+                mtime=self._header_mtime,
+                original_filename=self._header_filename_override,
+                fileobj=self._external_file,
+                closefd=self._closefd,
+                max_decompressed_size=self._max_decompressed_size,
+                max_rewind_cache_size=self._max_rewind_cache_size,
+                strict_size=self._strict_size,
+                fast_compress=self._fast_compress,
+            )
             try:
-                await self._binary_file.close()
-            except Exception:
-                pass
-            self._binary_file = None
-            raise
-        self._binary_file._closed_observer = self._mark_binary_closed
-        self._binary_file._read_poison_observer = self._mark_binary_read_poisoned
-        return self
+                await binary_file.open()
+            except BaseException as failure:
+                try:
+                    await binary_file.close()
+                except BaseException as cleanup:
+                    raise failure from cleanup
+                raise
+            binary_file._closed_observer = self._mark_binary_closed
+            binary_file._read_poison_observer = self._mark_binary_read_poisoned
+            self._binary_file = binary_file
+            return self
+        finally:
+            self._opening = False
 
     async def __aenter__(self) -> "AsyncGzipTextFile":
         """Enter the async context manager and initialize resources."""
@@ -2029,6 +2034,10 @@ class AsyncGzipTextFile:
         # close cannot finalize the same encoder while the first awaits its
         # trailer write.
         async with self._close_lock:
+            if self._opening:
+                raise ConcurrentOperationError(
+                    "close() called while open() is in progress"
+                )
             # `_is_closed` mirrors effective binary closure so data methods fail
             # immediately after `buffer.close()`. `_close_complete` separately
             # records text-layer cleanup: binary closure must not skip encoder
