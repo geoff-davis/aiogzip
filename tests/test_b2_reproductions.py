@@ -27,12 +27,12 @@ async def test_native_cleanup_follows_final_worker_access(monkeypatch):
     entered = asyncio.Event()
     release = threading.Event()
     settled = threading.Event()
-    helpers = []
+    owners = []
     events = []
     original = _codec_async._run_in_thread
 
     async def observed_worker(method, data):
-        helpers.append(asyncio.current_task())
+        owners.append(asyncio.current_task())
         return await original(method, data)
 
     class Operation:
@@ -57,14 +57,15 @@ async def test_native_cleanup_follows_final_worker_access(monkeypatch):
     try:
         await asyncio.wait_for(entered.wait(), 5)
         caller.cancel()
-        helpers[0].cancel()
+        # The old helper is gone; cancel the equivalent executor-owning task.
+        owners[0].cancel()
         # A callback barrier lets cancellation propagate without wall-clock sleeps.
         for _ in range(8):
             await asyncio.sleep(0)
         premature = "cleanup" in events
     finally:
         release.set()
-        await asyncio.gather(caller, *helpers, return_exceptions=True)
+        await asyncio.gather(caller, *owners, return_exceptions=True)
         assert await asyncio.to_thread(settled.wait, 5)
         await stream.aclose()
     assert not premature, events

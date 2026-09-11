@@ -162,7 +162,7 @@ class TestIncrementalGzipEncoder:
         assert calls == [len(payload)]
         assert gzip.decompress(b"".join(output)) == payload
 
-    async def test_cancelled_offload_makes_encoder_unusable(self, monkeypatch):
+    async def test_cancelled_offload_makes_encoder_unusable(self, mock_codec_executor):
         started = asyncio.Event()
         release = asyncio.Event()
 
@@ -171,7 +171,7 @@ class TestIncrementalGzipEncoder:
             await release.wait()
             return method(data)
 
-        monkeypatch.setattr(async_module, "_run_in_thread", blocked_offload)
+        mock_codec_executor(blocked_offload)
         encoder = _encoder()
         list(encoder.start())
         payload = os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1)

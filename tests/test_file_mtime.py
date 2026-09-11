@@ -196,7 +196,7 @@ class TestBinaryLiveMtime:
             assert stream.mtime == 606
 
     async def test_cancellation_after_header_completion_synchronizes_mtime(
-        self, monkeypatch
+        self, mock_codec_executor
     ):
         threshold = _codec_async._DECODE_OFFLOAD_THRESHOLD
         body = os.urandom(2 * threshold)
@@ -212,7 +212,7 @@ class TestBinaryLiveMtime:
             await release.wait()
             return result
 
-        monkeypatch.setattr(_codec_async, "_run_in_thread", advance_then_block)
+        mock_codec_executor(advance_then_block)
         stream = AsyncGzipBinaryFile(
             None,
             "rb",
@@ -236,7 +236,7 @@ class TestBinaryLiveMtime:
             await stream.close()
 
     async def test_cancellation_before_header_completion_does_not_update(
-        self, monkeypatch
+        self, mock_codec_executor
     ):
         threshold = _codec_async._DECODE_OFFLOAD_THRESHOLD
         incomplete = b"\x1f\x8b\x08\x08" + b"\x00" * 6 + b"x" * (threshold - 10)
@@ -249,7 +249,7 @@ class TestBinaryLiveMtime:
             await release.wait()
             return method(data)
 
-        monkeypatch.setattr(_codec_async, "_run_in_thread", block_before_advance)
+        mock_codec_executor(block_before_advance)
         stream = AsyncGzipBinaryFile(
             None,
             "rb",

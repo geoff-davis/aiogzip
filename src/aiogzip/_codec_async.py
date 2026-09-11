@@ -78,10 +78,9 @@ async def _offloaded_next(
     workload: bytes,
 ) -> bytes | _CodecProgress | object:
     advance = partial(_raw_next_or_done, operation)
-    worker = asyncio.create_task(_run_in_thread(advance, workload))
-    # The helper itself retains the executor future through direct cancellation
-    # (including runner shutdown). Its terminal state now proves settlement.
-    return await _settle_before_cancel(worker)
+    # No separately cancellable helper: the driver retains the executor future
+    # through _run_in_thread until native completion, even during shutdown.
+    return await _run_in_thread(advance, workload)
 
 
 async def _drive_operation(

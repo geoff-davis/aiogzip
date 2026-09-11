@@ -16,7 +16,7 @@ class NativeFailure(Exception):
     pass
 
 
-@pytest.mark.parametrize("target", ["caller", "helper", "both"])
+@pytest.mark.parametrize("target", ["caller", "shield", "both"])
 @pytest.mark.parametrize("repetitions", [1, 3])
 @pytest.mark.parametrize("fails", [False, True])
 async def test_cancel_retains_native_input_and_cleanup_order(
@@ -25,8 +25,8 @@ async def test_cancel_retains_native_input_and_cleanup_order(
     loop = asyncio.get_running_loop()
     entered = asyncio.Event()
     release = threading.Event()
-    events, helpers = [], []
-    original_run = _codec_async._run_in_thread
+    events, waiters = [], []
+    original_shield = asyncio.shield
     original_submit = loop.run_in_executor
     failure = NativeFailure("native failure after mutation")
 
@@ -35,9 +35,10 @@ async def test_cancel_retains_native_input_and_cleanup_order(
         future.add_done_callback(lambda _: events.append("published"))
         return future
 
-    async def observed(method, data):
-        helpers.append(asyncio.current_task())
-        return await original_run(method, data)
+    def observed(work):
+        waiter = original_shield(work)
+        waiters.append(waiter)
+        return waiter
 
     class Input(bytearray):
         pass
@@ -57,7 +58,7 @@ async def test_cancel_retains_native_input_and_cleanup_order(
             events.append("cleanup")
 
     monkeypatch.setattr(loop, "run_in_executor", submit)
-    monkeypatch.setattr(_codec_async, "_run_in_thread", observed)
+    monkeypatch.setattr(asyncio, "shield", observed)
     payload = Input(b"x")
     reference = weakref.ref(payload)
     finalizer = weakref.finalize(payload, events.append, "input released")
@@ -71,12 +72,12 @@ async def test_cancel_retains_native_input_and_cleanup_order(
         for _ in range(repetitions):
             if target in ("caller", "both"):
                 caller.cancel("caller cancelled")
-            if target in ("helper", "both"):
-                helpers[0].cancel("helper cancelled")
+            if target in ("shield", "both"):
+                waiters[0].cancel("helper cancelled")
             for _ in range(4):
                 await asyncio.sleep(0)
             assert not caller.done()
-            assert not helpers[0].done()
+            assert "published" not in events
             assert "cleanup" not in events
             assert reference() is not None
         release.set()
@@ -92,11 +93,11 @@ async def test_cancel_retains_native_input_and_cleanup_order(
         assert events[:4] == ["entered", "last access", "published", "cleanup"]
     finally:
         release.set()
-        await asyncio.gather(caller, *helpers, return_exceptions=True)
+        await asyncio.gather(caller, *waiters, return_exceptions=True)
         await stream.aclose()
     # Exception tracebacks legitimately retain inputs until diagnostics are released.
     if not fails:
-        del caller, helpers, stream, caught
+        del caller, waiters, stream, caught
         await asyncio.sleep(0)  # Release gather/shield callback references.
         gc.collect()
         assert reference() is None
@@ -104,20 +105,21 @@ async def test_cancel_retains_native_input_and_cleanup_order(
         assert events[-1] == "input released"
 
 
-@pytest.mark.parametrize("target", ["caller", "helper", "both"])
+@pytest.mark.parametrize("target", ["caller", "shield", "both"])
 async def test_queued_native_work_settles_before_cleanup(monkeypatch, target):
     loop = asyncio.get_running_loop()
     executor = ThreadPoolExecutor(max_workers=1)
     release = threading.Event()
     blocked, submitted = asyncio.Event(), asyncio.Event()
-    events, helpers = [], []
-    original_run = _codec_async._run_in_thread
+    events, waiters = [], []
+    original_shield = asyncio.shield
 
-    async def observed(method, data):
-        helpers.append(asyncio.current_task())
-        return await original_run(method, data)
+    def observed(work):
+        waiter = original_shield(work)
+        waiters.append(waiter)
+        return waiter
 
-    monkeypatch.setattr(_codec_async, "_run_in_thread", observed)
+    monkeypatch.setattr(asyncio, "shield", observed)
     original_submit = loop.run_in_executor
 
     def blocker():
@@ -151,8 +153,8 @@ async def test_queued_native_work_settles_before_cleanup(monkeypatch, target):
         await asyncio.wait_for(submitted.wait(), 5)
         if target in ("caller", "both"):
             caller.cancel()
-        if target in ("helper", "both"):
-            helpers[0].cancel()
+        if target in ("shield", "both"):
+            waiters[0].cancel()
         for _ in range(4):
             await asyncio.sleep(0)
         assert not caller.done()
@@ -271,14 +273,34 @@ async def test_structured_cancellation_waits_for_native_work(structured):
             timer.join()
 
 
-async def test_helper_cancelled_before_submission_never_starts(monkeypatch):
+async def test_driver_does_not_create_a_cancellable_helper(monkeypatch):
     calls = []
-    original_create = asyncio.create_task
 
-    def create_cancelled(coroutine):
-        helper = original_create(coroutine)
-        helper.cancel()
-        return helper
+    def unexpected_helper(coroutine):
+        coroutine.close()
+        raise AssertionError("driver must own the executor future directly")
+
+    class Operation:
+        def _advance_raw(self):
+            calls.append("native access")
+            raise StopIteration
+
+        def close(self):
+            calls.append("cleanup")
+
+    monkeypatch.setattr(asyncio, "create_task", unexpected_helper)
+    stream = _codec_async._drive_operation(
+        Operation(), workload=b"x", offload_threshold=1
+    )
+    assert [part async for part in stream] == []
+    assert calls == ["native access"]
+
+
+async def test_submission_failure_closes_without_native_access(monkeypatch):
+    calls = []
+
+    def rejected(*args):
+        raise RuntimeError("executor unavailable")
 
     class Operation:
         def _advance_raw(self):
@@ -288,10 +310,10 @@ async def test_helper_cancelled_before_submission_never_starts(monkeypatch):
         def close(self):
             calls.append("cleanup")
 
-    monkeypatch.setattr(asyncio, "create_task", create_cancelled)
+    monkeypatch.setattr(asyncio.get_running_loop(), "run_in_executor", rejected)
     stream = _codec_async._drive_operation(
         Operation(), workload=b"x", offload_threshold=1
     )
-    with pytest.raises(asyncio.CancelledError):
+    with pytest.raises(RuntimeError, match="executor unavailable"):
         await anext(stream)
     assert calls == ["cleanup"]

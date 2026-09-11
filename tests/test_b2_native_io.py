@@ -19,21 +19,27 @@ from aiogzip import AsyncGzipBinaryFile, _codec_async
 
 
 @pytest.mark.parametrize("cancellations", [1, 3])
-@pytest.mark.parametrize("cancel_helper", [False, True])
+@pytest.mark.parametrize("cancel_waiter", [False, True])
 @pytest.mark.parametrize("kind", ["encoder", "decoder"])
 async def test_real_codec_worker_settles_before_caller_cancellation(
-    monkeypatch, cancellations, cancel_helper, kind
+    monkeypatch, cancellations, cancel_waiter, kind
 ):
-    """Caller/helper cancellation retains real encoder and decoder operations."""
+    """Caller/shield-waiter cancellation retains real encoder and decoder operations."""
     loop = asyncio.get_running_loop()
     entered = asyncio.Event()
     release, settled = threading.Event(), threading.Event()
     original = _codec_async._run_in_thread
-    helpers = []
+    waiters = []
+    original_shield = asyncio.shield
+
+    def shield(work):
+        waiter = original_shield(work)
+        waiters.append(waiter)
+        return waiter
+
+    monkeypatch.setattr(asyncio, "shield", shield)
 
     async def gated(method, data):
-        helpers.append(asyncio.current_task())
-
         def advance(workload):
             loop.call_soon_threadsafe(entered.set)
             try:
@@ -59,8 +65,8 @@ async def test_real_codec_worker_settles_before_caller_cancellation(
         await asyncio.wait_for(entered.wait(), 5)
         for _ in range(cancellations):
             caller.cancel()
-            if cancel_helper:
-                helpers[0].cancel()
+            if cancel_waiter:
+                waiters[0].cancel()
             await asyncio.sleep(0)
         assert not caller.done()
         with pytest.raises(RuntimeError, match="active operation"):
