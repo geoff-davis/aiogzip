@@ -1,0 +1,1533 @@
+{
+  "source": {
+    "sha": "dc8950cb334e1cf4082f2bf50074464e06c72287",
+    "tree": "820a775b067cf5bf17a179c20f81c7c7b1f9f37b",
+    "status": ""
+  },
+  "harness": {
+    "sha": "440ed71ebdbeeebcdb526590f86fa8f9f0533a5e",
+    "tree": "e09c10129f8b408fab919334001ccb6164dceabb",
+    "status": ""
+  },
+  "import": "/tmp/aiogzip-b2-reviewed-baseline-dc8950c/src/aiogzip/__init__.py",
+  "harness_sha256": "b7d251d8cd99ce197f30c8d8a780198927d70b986abcf8d9cd9fffcda229e249",
+  "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "engines": {
+    "compression": "stdlib-zlib",
+    "decompression": "stdlib-zlib",
+    "crc32": "stdlib-zlib"
+  },
+  "aiofiles": "25.1.0",
+  "command": [
+    "/tmp/aiogzip-wp0-harness-440ed71/scripts/measure_b2_scaling.py",
+    "--source-root",
+    "/tmp/aiogzip-b2-reviewed-baseline-dc8950c",
+    "--engine",
+    "stdlib",
+    "--repeat",
+    "3",
+    "--output",
+    "/tmp/aiogzip-wp0-completion/scaling-stdlib.json"
+  ],
+  "repeat": 3,
+  "order": "size, encoding, newline; consecutive repeats, then instrumented sample",
+  "limitations": "Single-host baseline, not a candidate speed claim. Fixtures/open and validation excluded from timings. Small-hint timings include result-list collection/join. Growing-buffer characters count lengths presented to concatenation, not measured allocator copies. Tracemalloc excludes native allocations. No long-line terminator; wider WP5 boundary/entropy/chunk-size matrix remains required.",
+  "rows": [
+    {
+      "family": "small-hint",
+      "size": 2048,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": 1,
+      "fixture_sha256": "0b50cf64ab2898b8b392c85610df7af0f157fbc9bcf2d94ef1d601005994176d",
+      "compressed_bytes": 40,
+      "logical_characters": 4096,
+      "seconds": [
+        0.015513898804783821,
+        0.01569651486352086,
+        0.01649946393445134
+      ],
+      "median_seconds": 0.01569651486352086,
+      "mad_seconds": 0.00018261605873703957,
+      "instrumented": {
+        "seconds": 0.020878628827631474,
+        "peak_python_bytes": 131090,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 2048,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": 32,
+      "fixture_sha256": "0b50cf64ab2898b8b392c85610df7af0f157fbc9bcf2d94ef1d601005994176d",
+      "compressed_bytes": 40,
+      "logical_characters": 4096,
+      "seconds": [
+        0.0012190062552690506,
+        0.001110580749809742,
+        0.0011109020560979843
+      ],
+      "median_seconds": 0.0011109020560979843,
+      "mad_seconds": 3.213062882423401e-07,
+      "instrumented": {
+        "seconds": 0.002835082821547985,
+        "peak_python_bytes": 130134,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 2048,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": -1,
+      "fixture_sha256": "0b50cf64ab2898b8b392c85610df7af0f157fbc9bcf2d94ef1d601005994176d",
+      "compressed_bytes": 40,
+      "logical_characters": 4096,
+      "seconds": [
+        0.00013120798394083977,
+        8.06618481874466e-05,
+        7.633399218320847e-05
+      ],
+      "median_seconds": 8.06618481874466e-05,
+      "mad_seconds": 4.327856004238129e-06,
+      "instrumented": {
+        "seconds": 0.0009768991731107235,
+        "peak_python_bytes": 145806,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 4096,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": 1,
+      "fixture_sha256": "3505b0fc159d005ef6697a5cd9e29d2d429cdfa39d219050e0c90fef88386070",
+      "compressed_bytes": 45,
+      "logical_characters": 8192,
+      "seconds": [
+        0.062278041150420904,
+        0.0645005451515317,
+        0.0638755732215941
+      ],
+      "median_seconds": 0.0638755732215941,
+      "mad_seconds": 0.0006249719299376011,
+      "instrumented": {
+        "seconds": 0.06864329194650054,
+        "peak_python_bytes": 255146,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 4096,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": 32,
+      "fixture_sha256": "3505b0fc159d005ef6697a5cd9e29d2d429cdfa39d219050e0c90fef88386070",
+      "compressed_bytes": 45,
+      "logical_characters": 8192,
+      "seconds": [
+        0.0040649911388754845,
+        0.003961504902690649,
+        0.004000798799097538
+      ],
+      "median_seconds": 0.004000798799097538,
+      "mad_seconds": 3.929389640688896e-05,
+      "instrumented": {
+        "seconds": 0.007380563300102949,
+        "peak_python_bytes": 255650,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 4096,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": -1,
+      "fixture_sha256": "3505b0fc159d005ef6697a5cd9e29d2d429cdfa39d219050e0c90fef88386070",
+      "compressed_bytes": 45,
+      "logical_characters": 8192,
+      "seconds": [
+        0.00024254899471998215,
+        0.00015751831233501434,
+        0.00013976404443383217
+      ],
+      "median_seconds": 0.00015751831233501434,
+      "mad_seconds": 1.7754267901182175e-05,
+      "instrumented": {
+        "seconds": 0.001819932833313942,
+        "peak_python_bytes": 285586,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 8192,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": 1,
+      "fixture_sha256": "2e792032ab5527c8a153daa9777a13d7d61831b9a6c81e81cec29fb03ab1aead",
+      "compressed_bytes": 53,
+      "logical_characters": 16384,
+      "seconds": [
+        0.24645984405651689,
+        0.2741129291243851,
+        0.24294668715447187
+      ],
+      "median_seconds": 0.24645984405651689,
+      "mad_seconds": 0.0035131569020450115,
+      "instrumented": {
+        "seconds": 0.2610417897813022,
+        "peak_python_bytes": 510186,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 8192,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": 32,
+      "fixture_sha256": "2e792032ab5527c8a153daa9777a13d7d61831b9a6c81e81cec29fb03ab1aead",
+      "compressed_bytes": 53,
+      "logical_characters": 16384,
+      "seconds": [
+        0.015194686129689217,
+        0.01535467803478241,
+        0.015160861890763044
+      ],
+      "median_seconds": 0.015194686129689217,
+      "mad_seconds": 3.3824238926172256e-05,
+      "instrumented": {
+        "seconds": 0.023399387951940298,
+        "peak_python_bytes": 511746,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 8192,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": -1,
+      "fixture_sha256": "2e792032ab5527c8a153daa9777a13d7d61831b9a6c81e81cec29fb03ab1aead",
+      "compressed_bytes": 53,
+      "logical_characters": 16384,
+      "seconds": [
+        0.00034062378108501434,
+        0.0002261078916490078,
+        0.00021896418184041977
+      ],
+      "median_seconds": 0.0002261078916490078,
+      "mad_seconds": 7.143709808588028e-06,
+      "instrumented": {
+        "seconds": 0.003723012749105692,
+        "peak_python_bytes": 569618,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 16384,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": 1,
+      "fixture_sha256": "3a86d23e98e6d78ececce0aed5f20f158eae7c11cfabce206cfc8aa5f9768cb0",
+      "compressed_bytes": 68,
+      "logical_characters": 32768,
+      "seconds": [
+        0.927298684604466,
+        0.9148268587887287,
+        0.92003970220685
+      ],
+      "median_seconds": 0.92003970220685,
+      "mad_seconds": 0.005212843418121338,
+      "instrumented": {
+        "seconds": 1.0552516309544444,
+        "peak_python_bytes": 1021482,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 16384,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": 32,
+      "fixture_sha256": "3a86d23e98e6d78ececce0aed5f20f158eae7c11cfabce206cfc8aa5f9768cb0",
+      "compressed_bytes": 68,
+      "logical_characters": 32768,
+      "seconds": [
+        0.06488512270152569,
+        0.059876827988773584,
+        0.06631959602236748
+      ],
+      "median_seconds": 0.06488512270152569,
+      "mad_seconds": 0.0014344733208417892,
+      "instrumented": {
+        "seconds": 0.07935483707115054,
+        "peak_python_bytes": 1021178,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 16384,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": -1,
+      "fixture_sha256": "3a86d23e98e6d78ececce0aed5f20f158eae7c11cfabce206cfc8aa5f9768cb0",
+      "compressed_bytes": 68,
+      "logical_characters": 32768,
+      "seconds": [
+        0.000635883305221796,
+        0.00048304302617907524,
+        0.00045148516073822975
+      ],
+      "median_seconds": 0.00048304302617907524,
+      "mad_seconds": 3.155786544084549e-05,
+      "instrumented": {
+        "seconds": 0.008167933207005262,
+        "peak_python_bytes": 1138738,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 32768,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": 1,
+      "fixture_sha256": "76c903c86e3127b51dd6c464227e58fe5f9170e7729a781f0258237221303535",
+      "compressed_bytes": 99,
+      "logical_characters": 65536,
+      "seconds": [
+        3.83955532964319,
+        5.241544684860855,
+        3.8573647323064506
+      ],
+      "median_seconds": 3.8573647323064506,
+      "mad_seconds": 0.0178094026632607,
+      "instrumented": {
+        "seconds": 3.896533945109695,
+        "peak_python_bytes": 2046250,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 32768,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": 32,
+      "fixture_sha256": "76c903c86e3127b51dd6c464227e58fe5f9170e7729a781f0258237221303535",
+      "compressed_bytes": 99,
+      "logical_characters": 65536,
+      "seconds": [
+        0.2333941450342536,
+        0.23397117713466287,
+        0.23563904175534844
+      ],
+      "median_seconds": 0.23397117713466287,
+      "mad_seconds": 0.0005770321004092693,
+      "instrumented": {
+        "seconds": 0.2634503170847893,
+        "peak_python_bytes": 2045498,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "small-hint",
+      "size": 32768,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": -1,
+      "fixture_sha256": "76c903c86e3127b51dd6c464227e58fe5f9170e7729a781f0258237221303535",
+      "compressed_bytes": 99,
+      "logical_characters": 65536,
+      "seconds": [
+        0.000917977187782526,
+        0.0008421139791607857,
+        0.0008132089860737324
+      ],
+      "median_seconds": 0.0008421139791607857,
+      "mad_seconds": 2.89049930870533e-05,
+      "instrumented": {
+        "seconds": 0.014912823215126991,
+        "peak_python_bytes": 2280178,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 1,
+      "newline": null,
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "b53bc17684d895d797f2c5a5ef8f0cab33586dea1486b50299253843acaad596",
+      "compressed_bytes": 1052,
+      "logical_characters": 1048576,
+      "seconds": [
+        0.0020580128766596317,
+        0.0019108550623059273,
+        0.0019083796069025993
+      ],
+      "median_seconds": 0.0019108550623059273,
+      "mad_seconds": 2.475455403327942e-06,
+      "instrumented": {
+        "seconds": 0.002091557253152132,
+        "peak_python_bytes": 2100489,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 1,
+      "newline": "",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "b53bc17684d895d797f2c5a5ef8f0cab33586dea1486b50299253843acaad596",
+      "compressed_bytes": 1052,
+      "logical_characters": 1048576,
+      "seconds": [
+        0.0024352367036044598,
+        0.00259250495582819,
+        0.0022510490380227566
+      ],
+      "median_seconds": 0.0024352367036044598,
+      "mad_seconds": 0.0001572682522237301,
+      "instrumented": {
+        "seconds": 0.0025185649283230305,
+        "peak_python_bytes": 3082109,
+        "append_calls": 16,
+        "growing_buffer_characters": 8912896
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 1,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "b53bc17684d895d797f2c5a5ef8f0cab33586dea1486b50299253843acaad596",
+      "compressed_bytes": 1052,
+      "logical_characters": 1048576,
+      "seconds": [
+        0.001980176195502281,
+        0.0018555899150669575,
+        0.001848176121711731
+      ],
+      "median_seconds": 0.0018555899150669575,
+      "mad_seconds": 7.413793355226517e-06,
+      "instrumented": {
+        "seconds": 0.002217514906078577,
+        "peak_python_bytes": 2100489,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 1,
+      "newline": "\r",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "b53bc17684d895d797f2c5a5ef8f0cab33586dea1486b50299253843acaad596",
+      "compressed_bytes": 1052,
+      "logical_characters": 1048576,
+      "seconds": [
+        0.002015443053096533,
+        0.002060087863355875,
+        0.0020320136100053787
+      ],
+      "median_seconds": 0.0020320136100053787,
+      "mad_seconds": 1.65705569088459e-05,
+      "instrumented": {
+        "seconds": 0.002247392199933529,
+        "peak_python_bytes": 2100489,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 1,
+      "newline": "\r\n",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "b53bc17684d895d797f2c5a5ef8f0cab33586dea1486b50299253843acaad596",
+      "compressed_bytes": 1052,
+      "logical_characters": 1048576,
+      "seconds": [
+        0.0031084008514881134,
+        0.0025946679525077343,
+        0.0025833072140812874
+      ],
+      "median_seconds": 0.0025946679525077343,
+      "mad_seconds": 1.1360738426446915e-05,
+      "instrumented": {
+        "seconds": 0.0028363759629428387,
+        "peak_python_bytes": 3082109,
+        "append_calls": 16,
+        "growing_buffer_characters": 8912896
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 1,
+      "newline": null,
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "e737689df6c54f3295abd3692930bec027077716bbaf3b3f98447cef32b15f4b",
+      "compressed_bytes": 2077,
+      "logical_characters": 1048576,
+      "seconds": [
+        0.00662793917581439,
+        0.006839399226009846,
+        0.007112746126949787
+      ],
+      "median_seconds": 0.006839399226009846,
+      "mad_seconds": 0.00021146005019545555,
+      "instrumented": {
+        "seconds": 0.007193128112703562,
+        "peak_python_bytes": 4656516,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 1,
+      "newline": "",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "e737689df6c54f3295abd3692930bec027077716bbaf3b3f98447cef32b15f4b",
+      "compressed_bytes": 2077,
+      "logical_characters": 1048576,
+      "seconds": [
+        0.007781201042234898,
+        0.007819713093340397,
+        0.007802381180226803
+      ],
+      "median_seconds": 0.007802381180226803,
+      "mad_seconds": 1.7331913113594055e-05,
+      "instrumented": {
+        "seconds": 0.008059357292950153,
+        "peak_python_bytes": 6620531,
+        "append_calls": 33,
+        "growing_buffer_characters": 18350016
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 1,
+      "newline": "\n",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "e737689df6c54f3295abd3692930bec027077716bbaf3b3f98447cef32b15f4b",
+      "compressed_bytes": 2077,
+      "logical_characters": 1048576,
+      "seconds": [
+        0.006640602834522724,
+        0.005962589755654335,
+        0.005960696376860142
+      ],
+      "median_seconds": 0.005962589755654335,
+      "mad_seconds": 1.8933787941932678e-06,
+      "instrumented": {
+        "seconds": 0.006566041614860296,
+        "peak_python_bytes": 4656740,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 1,
+      "newline": "\r",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "e737689df6c54f3295abd3692930bec027077716bbaf3b3f98447cef32b15f4b",
+      "compressed_bytes": 2077,
+      "logical_characters": 1048576,
+      "seconds": [
+        0.0066360547207295895,
+        0.006498192902654409,
+        0.006500807590782642
+      ],
+      "median_seconds": 0.006500807590782642,
+      "mad_seconds": 2.614688128232956e-06,
+      "instrumented": {
+        "seconds": 0.006982138846069574,
+        "peak_python_bytes": 4656740,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 1,
+      "newline": "\r\n",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "e737689df6c54f3295abd3692930bec027077716bbaf3b3f98447cef32b15f4b",
+      "compressed_bytes": 2077,
+      "logical_characters": 1048576,
+      "seconds": [
+        0.008240969851613045,
+        0.007629383821040392,
+        0.008000205736607313
+      ],
+      "median_seconds": 0.008000205736607313,
+      "mad_seconds": 0.00024076411500573158,
+      "instrumented": {
+        "seconds": 0.008353462908416986,
+        "peak_python_bytes": 6620787,
+        "append_calls": 33,
+        "growing_buffer_characters": 18350016
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 2,
+      "newline": null,
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "14ad965470bb6be6e1442b9030aeda692b820bbadabe594312f313c09c442849",
+      "compressed_bytes": 2068,
+      "logical_characters": 2097152,
+      "seconds": [
+        0.004196108318865299,
+        0.004267172887921333,
+        0.004759864881634712
+      ],
+      "median_seconds": 0.004267172887921333,
+      "mad_seconds": 7.106456905603409e-05,
+      "instrumented": {
+        "seconds": 0.004757200367748737,
+        "peak_python_bytes": 4198085,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 2,
+      "newline": "",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "14ad965470bb6be6e1442b9030aeda692b820bbadabe594312f313c09c442849",
+      "compressed_bytes": 2068,
+      "logical_characters": 2097152,
+      "seconds": [
+        0.005108394660055637,
+        0.004802175331860781,
+        0.005374818108975887
+      ],
+      "median_seconds": 0.005108394660055637,
+      "mad_seconds": 0.00026642344892024994,
+      "instrumented": {
+        "seconds": 0.005496709141880274,
+        "peak_python_bytes": 6227617,
+        "append_calls": 32,
+        "growing_buffer_characters": 34603008
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 2,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "14ad965470bb6be6e1442b9030aeda692b820bbadabe594312f313c09c442849",
+      "compressed_bytes": 2068,
+      "logical_characters": 2097152,
+      "seconds": [
+        0.004083435051143169,
+        0.0046769678592681885,
+        0.004276440013200045
+      ],
+      "median_seconds": 0.004276440013200045,
+      "mad_seconds": 0.00019300496205687523,
+      "instrumented": {
+        "seconds": 0.004634939134120941,
+        "peak_python_bytes": 4198205,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 2,
+      "newline": "\r",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "14ad965470bb6be6e1442b9030aeda692b820bbadabe594312f313c09c442849",
+      "compressed_bytes": 2068,
+      "logical_characters": 2097152,
+      "seconds": [
+        0.0041213068179786205,
+        0.00376282911747694,
+        0.0037177628837525845
+      ],
+      "median_seconds": 0.00376282911747694,
+      "mad_seconds": 4.50662337243557e-05,
+      "instrumented": {
+        "seconds": 0.004125324077904224,
+        "peak_python_bytes": 4198325,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 2,
+      "newline": "\r\n",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "14ad965470bb6be6e1442b9030aeda692b820bbadabe594312f313c09c442849",
+      "compressed_bytes": 2068,
+      "logical_characters": 2097152,
+      "seconds": [
+        0.006449482403695583,
+        0.006204899400472641,
+        0.006070674862712622
+      ],
+      "median_seconds": 0.006204899400472641,
+      "mad_seconds": 0.0001342245377600193,
+      "instrumented": {
+        "seconds": 0.006430345121771097,
+        "peak_python_bytes": 6227801,
+        "append_calls": 32,
+        "growing_buffer_characters": 34603008
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 2,
+      "newline": null,
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "2e288aace333d16e7d9d312c70f2a1a5298d05fc50195e186cd7b35e12bc0d88",
+      "compressed_bytes": 4108,
+      "logical_characters": 2097152,
+      "seconds": [
+        0.014330300968140364,
+        0.012517771683633327,
+        0.014298259746283293
+      ],
+      "median_seconds": 0.014298259746283293,
+      "mad_seconds": 3.204122185707092e-05,
+      "instrumented": {
+        "seconds": 0.012976499274373055,
+        "peak_python_bytes": 8820698,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 2,
+      "newline": "",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "2e288aace333d16e7d9d312c70f2a1a5298d05fc50195e186cd7b35e12bc0d88",
+      "compressed_bytes": 4108,
+      "logical_characters": 2097152,
+      "seconds": [
+        0.01657512690871954,
+        0.015843754168599844,
+        0.01595186861231923
+      ],
+      "median_seconds": 0.01595186861231923,
+      "mad_seconds": 0.00010811444371938705,
+      "instrumented": {
+        "seconds": 0.015873670112341642,
+        "peak_python_bytes": 12879785,
+        "append_calls": 65,
+        "growing_buffer_characters": 70254464
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 2,
+      "newline": "\n",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "2e288aace333d16e7d9d312c70f2a1a5298d05fc50195e186cd7b35e12bc0d88",
+      "compressed_bytes": 4108,
+      "logical_characters": 2097152,
+      "seconds": [
+        0.012856482062488794,
+        0.011954165995121002,
+        0.011711736675351858
+      ],
+      "median_seconds": 0.011954165995121002,
+      "mad_seconds": 0.00024242931976914406,
+      "instrumented": {
+        "seconds": 0.012915323954075575,
+        "peak_python_bytes": 8820698,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 2,
+      "newline": "\r",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "2e288aace333d16e7d9d312c70f2a1a5298d05fc50195e186cd7b35e12bc0d88",
+      "compressed_bytes": 4108,
+      "logical_characters": 2097152,
+      "seconds": [
+        0.012305901385843754,
+        0.012160816229879856,
+        0.012018628418445587
+      ],
+      "median_seconds": 0.012160816229879856,
+      "mad_seconds": 0.00014218781143426895,
+      "instrumented": {
+        "seconds": 0.012969837058335543,
+        "peak_python_bytes": 8820698,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 2,
+      "newline": "\r\n",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "2e288aace333d16e7d9d312c70f2a1a5298d05fc50195e186cd7b35e12bc0d88",
+      "compressed_bytes": 4108,
+      "logical_characters": 2097152,
+      "seconds": [
+        0.016290880274027586,
+        0.01612220099195838,
+        0.016171904746443033
+      ],
+      "median_seconds": 0.016171904746443033,
+      "mad_seconds": 4.970375448465347e-05,
+      "instrumented": {
+        "seconds": 0.01633240794762969,
+        "peak_python_bytes": 12879785,
+        "append_calls": 65,
+        "growing_buffer_characters": 70254464
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 4,
+      "newline": null,
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "f1dc14f769f61f46627c27ee9ed24fec378f5123d13370eef9e6bf4c94284763",
+      "compressed_bytes": 4099,
+      "logical_characters": 4194304,
+      "seconds": [
+        0.008160388097167015,
+        0.007516731042414904,
+        0.007534875068813562
+      ],
+      "median_seconds": 0.007534875068813562,
+      "mad_seconds": 1.8144026398658752e-05,
+      "instrumented": {
+        "seconds": 0.008104222360998392,
+        "peak_python_bytes": 8623614,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 4,
+      "newline": "",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "f1dc14f769f61f46627c27ee9ed24fec378f5123d13370eef9e6bf4c94284763",
+      "compressed_bytes": 4099,
+      "logical_characters": 4194304,
+      "seconds": [
+        0.010895562823861837,
+        0.010685855988413095,
+        0.010727213695645332
+      ],
+      "median_seconds": 0.010727213695645332,
+      "mad_seconds": 4.135770723223686e-05,
+      "instrumented": {
+        "seconds": 0.011388314887881279,
+        "peak_python_bytes": 12748674,
+        "append_calls": 64,
+        "growing_buffer_characters": 136314880
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 4,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "f1dc14f769f61f46627c27ee9ed24fec378f5123d13370eef9e6bf4c94284763",
+      "compressed_bytes": 4099,
+      "logical_characters": 4194304,
+      "seconds": [
+        0.0075643910095095634,
+        0.008089483715593815,
+        0.00745804887264967
+      ],
+      "median_seconds": 0.0075643910095095634,
+      "mad_seconds": 0.0001063421368598938,
+      "instrumented": {
+        "seconds": 0.007996459025889635,
+        "peak_python_bytes": 8623614,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 4,
+      "newline": "\r",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "f1dc14f769f61f46627c27ee9ed24fec378f5123d13370eef9e6bf4c94284763",
+      "compressed_bytes": 4099,
+      "logical_characters": 4194304,
+      "seconds": [
+        0.007493496406823397,
+        0.007360314950346947,
+        0.007397225126624107
+      ],
+      "median_seconds": 0.007397225126624107,
+      "mad_seconds": 3.6910176277160645e-05,
+      "instrumented": {
+        "seconds": 0.007964177057147026,
+        "peak_python_bytes": 8623614,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 4,
+      "newline": "\r\n",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "f1dc14f769f61f46627c27ee9ed24fec378f5123d13370eef9e6bf4c94284763",
+      "compressed_bytes": 4099,
+      "logical_characters": 4194304,
+      "seconds": [
+        0.01343785272911191,
+        0.013270705938339233,
+        0.01334707997739315
+      ],
+      "median_seconds": 0.01334707997739315,
+      "mad_seconds": 7.637403905391693e-05,
+      "instrumented": {
+        "seconds": 0.013929341919720173,
+        "peak_python_bytes": 12748674,
+        "append_calls": 64,
+        "growing_buffer_characters": 136314880
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 4,
+      "newline": null,
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "bf3d6bf0e64b16008aee746d1d1d54bfc4c1288df2df93556a435d7a61d789d2",
+      "compressed_bytes": 8190,
+      "logical_characters": 4194304,
+      "seconds": [
+        0.025039820931851864,
+        0.024817490950226784,
+        0.02489071898162365
+      ],
+      "median_seconds": 0.02489071898162365,
+      "mad_seconds": 7.322803139686584e-05,
+      "instrumented": {
+        "seconds": 0.02609610976651311,
+        "peak_python_bytes": 17442974,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 4,
+      "newline": "",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "bf3d6bf0e64b16008aee746d1d1d54bfc4c1288df2df93556a435d7a61d789d2",
+      "compressed_bytes": 8190,
+      "logical_characters": 4194304,
+      "seconds": [
+        0.04049179516732693,
+        0.0411033108830452,
+        0.042982887011021376
+      ],
+      "median_seconds": 0.0411033108830452,
+      "mad_seconds": 0.0006115157157182693,
+      "instrumented": {
+        "seconds": 0.04139882978051901,
+        "peak_python_bytes": 25692077,
+        "append_calls": 129,
+        "growing_buffer_characters": 274726656
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 4,
+      "newline": "\n",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "bf3d6bf0e64b16008aee746d1d1d54bfc4c1288df2df93556a435d7a61d789d2",
+      "compressed_bytes": 8190,
+      "logical_characters": 4194304,
+      "seconds": [
+        0.025260428432375193,
+        0.02435164013877511,
+        0.024446047842502594
+      ],
+      "median_seconds": 0.024446047842502594,
+      "mad_seconds": 9.440770372748375e-05,
+      "instrumented": {
+        "seconds": 0.026334610767662525,
+        "peak_python_bytes": 17442974,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 4,
+      "newline": "\r",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "bf3d6bf0e64b16008aee746d1d1d54bfc4c1288df2df93556a435d7a61d789d2",
+      "compressed_bytes": 8190,
+      "logical_characters": 4194304,
+      "seconds": [
+        0.024166759103536606,
+        0.023829050827771425,
+        0.024066879879683256
+      ],
+      "median_seconds": 0.024066879879683256,
+      "mad_seconds": 9.987922385334969e-05,
+      "instrumented": {
+        "seconds": 0.02616405813023448,
+        "peak_python_bytes": 17442974,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 4,
+      "newline": "\r\n",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "bf3d6bf0e64b16008aee746d1d1d54bfc4c1288df2df93556a435d7a61d789d2",
+      "compressed_bytes": 8190,
+      "logical_characters": 4194304,
+      "seconds": [
+        0.03599459631368518,
+        0.033229195047169924,
+        0.033050396014004946
+      ],
+      "median_seconds": 0.033229195047169924,
+      "mad_seconds": 0.00017879903316497803,
+      "instrumented": {
+        "seconds": 0.03473156690597534,
+        "peak_python_bytes": 25692077,
+        "append_calls": 129,
+        "growing_buffer_characters": 274726656
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 8,
+      "newline": null,
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "1e7873056511dd3f30069e6a896f0871c4a04e5e1c005267df8c4b6ed19eb812",
+      "compressed_bytes": 8176,
+      "logical_characters": 8388608,
+      "seconds": [
+        0.015371421352028847,
+        0.014939934015274048,
+        0.014980700798332691
+      ],
+      "median_seconds": 0.014980700798332691,
+      "mad_seconds": 4.076678305864334e-05,
+      "instrumented": {
+        "seconds": 0.01616358896717429,
+        "peak_python_bytes": 17244798,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 8,
+      "newline": "",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "1e7873056511dd3f30069e6a896f0871c4a04e5e1c005267df8c4b6ed19eb812",
+      "compressed_bytes": 8176,
+      "logical_characters": 8388608,
+      "seconds": [
+        0.025580424815416336,
+        0.02321377582848072,
+        0.02311382768675685
+      ],
+      "median_seconds": 0.02321377582848072,
+      "mad_seconds": 9.994814172387123e-05,
+      "instrumented": {
+        "seconds": 0.024491814896464348,
+        "peak_python_bytes": 25560962,
+        "append_calls": 128,
+        "growing_buffer_characters": 541065216
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 8,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "1e7873056511dd3f30069e6a896f0871c4a04e5e1c005267df8c4b6ed19eb812",
+      "compressed_bytes": 8176,
+      "logical_characters": 8388608,
+      "seconds": [
+        0.015268336050212383,
+        0.01509770192205906,
+        0.014788308180868626
+      ],
+      "median_seconds": 0.01509770192205906,
+      "mad_seconds": 0.00017063412815332413,
+      "instrumented": {
+        "seconds": 0.0160936969332397,
+        "peak_python_bytes": 17244798,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 8,
+      "newline": "\r",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "1e7873056511dd3f30069e6a896f0871c4a04e5e1c005267df8c4b6ed19eb812",
+      "compressed_bytes": 8176,
+      "logical_characters": 8388608,
+      "seconds": [
+        0.016751551069319248,
+        0.015335262287408113,
+        0.015513287857174873
+      ],
+      "median_seconds": 0.015513287857174873,
+      "mad_seconds": 0.00017802556976675987,
+      "instrumented": {
+        "seconds": 0.0163771640509367,
+        "peak_python_bytes": 17244798,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 8,
+      "newline": "\r\n",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "1e7873056511dd3f30069e6a896f0871c4a04e5e1c005267df8c4b6ed19eb812",
+      "compressed_bytes": 8176,
+      "logical_characters": 8388608,
+      "seconds": [
+        0.033185341861099005,
+        0.03454501321539283,
+        0.034736244939267635
+      ],
+      "median_seconds": 0.03454501321539283,
+      "mad_seconds": 0.00019123172387480736,
+      "instrumented": {
+        "seconds": 0.03594070393592119,
+        "peak_python_bytes": 25560962,
+        "append_calls": 128,
+        "growing_buffer_characters": 541065216
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 8,
+      "newline": null,
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "44c1fe2e2dad441ef16274a4aa90a77e129c93acf776c2e3e65bb62060b2ca9a",
+      "compressed_bytes": 16345,
+      "logical_characters": 8388608,
+      "seconds": [
+        0.05700196931138635,
+        0.04901065956801176,
+        0.052021846640855074
+      ],
+      "median_seconds": 0.052021846640855074,
+      "mad_seconds": 0.0030111870728433132,
+      "instrumented": {
+        "seconds": 0.05405840976163745,
+        "peak_python_bytes": 33802782,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 8,
+      "newline": "",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "44c1fe2e2dad441ef16274a4aa90a77e129c93acf776c2e3e65bb62060b2ca9a",
+      "compressed_bytes": 16345,
+      "logical_characters": 8388608,
+      "seconds": [
+        0.1187615180388093,
+        0.1263021039776504,
+        0.13933098316192627
+      ],
+      "median_seconds": 0.1263021039776504,
+      "mad_seconds": 0.0075405859388411045,
+      "instrumented": {
+        "seconds": 0.13431888120248914,
+        "peak_python_bytes": 50431981,
+        "append_calls": 257,
+        "growing_buffer_characters": 1086324224
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 8,
+      "newline": "\n",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "44c1fe2e2dad441ef16274a4aa90a77e129c93acf776c2e3e65bb62060b2ca9a",
+      "compressed_bytes": 16345,
+      "logical_characters": 8388608,
+      "seconds": [
+        0.05255217989906669,
+        0.049574657808989286,
+        0.04963326780125499
+      ],
+      "median_seconds": 0.04963326780125499,
+      "mad_seconds": 5.8609992265701294e-05,
+      "instrumented": {
+        "seconds": 0.05344505002722144,
+        "peak_python_bytes": 33802782,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 8,
+      "newline": "\r",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "44c1fe2e2dad441ef16274a4aa90a77e129c93acf776c2e3e65bb62060b2ca9a",
+      "compressed_bytes": 16345,
+      "logical_characters": 8388608,
+      "seconds": [
+        0.05086195282638073,
+        0.05450874241068959,
+        0.0534486067481339
+      ],
+      "median_seconds": 0.0534486067481339,
+      "mad_seconds": 0.0010601356625556946,
+      "instrumented": {
+        "seconds": 0.055809603072702885,
+        "peak_python_bytes": 33802782,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 8,
+      "newline": "\r\n",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "44c1fe2e2dad441ef16274a4aa90a77e129c93acf776c2e3e65bb62060b2ca9a",
+      "compressed_bytes": 16345,
+      "logical_characters": 8388608,
+      "seconds": [
+        0.10440236330032349,
+        0.09738122997805476,
+        0.09554831311106682
+      ],
+      "median_seconds": 0.09738122997805476,
+      "mad_seconds": 0.0018329168669879436,
+      "instrumented": {
+        "seconds": 0.10232255794107914,
+        "peak_python_bytes": 50431981,
+        "append_calls": 257,
+        "growing_buffer_characters": 1086324224
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 16,
+      "newline": null,
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "8c4aa0ef187b134ba75b237a3a6b0a00c6b3562fd7684a3db63e7c2feac4bb23",
+      "compressed_bytes": 16329,
+      "logical_characters": 16777216,
+      "seconds": [
+        0.03215921996161342,
+        0.034254484344273806,
+        0.03470346378162503
+      ],
+      "median_seconds": 0.034254484344273806,
+      "mad_seconds": 0.0004489794373512268,
+      "instrumented": {
+        "seconds": 0.036399382166564465,
+        "peak_python_bytes": 33602398,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 16,
+      "newline": "",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "8c4aa0ef187b134ba75b237a3a6b0a00c6b3562fd7684a3db63e7c2feac4bb23",
+      "compressed_bytes": 16329,
+      "logical_characters": 16777216,
+      "seconds": [
+        0.08490353403612971,
+        0.0824137139134109,
+        0.08465551538392901
+      ],
+      "median_seconds": 0.08465551538392901,
+      "mad_seconds": 0.00024801865220069885,
+      "instrumented": {
+        "seconds": 0.08309962088242173,
+        "peak_python_bytes": 50300838,
+        "append_calls": 256,
+        "growing_buffer_characters": 2155872256
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 16,
+      "newline": "\n",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "8c4aa0ef187b134ba75b237a3a6b0a00c6b3562fd7684a3db63e7c2feac4bb23",
+      "compressed_bytes": 16329,
+      "logical_characters": 16777216,
+      "seconds": [
+        0.032694653142243624,
+        0.033881599083542824,
+        0.03383442014455795
+      ],
+      "median_seconds": 0.03383442014455795,
+      "mad_seconds": 4.717893898487091e-05,
+      "instrumented": {
+        "seconds": 0.036043789237737656,
+        "peak_python_bytes": 33602398,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 16,
+      "newline": "\r",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "8c4aa0ef187b134ba75b237a3a6b0a00c6b3562fd7684a3db63e7c2feac4bb23",
+      "compressed_bytes": 16329,
+      "logical_characters": 16777216,
+      "seconds": [
+        0.033229155000299215,
+        0.031142658088356256,
+        0.031264388002455235
+      ],
+      "median_seconds": 0.031264388002455235,
+      "mad_seconds": 0.00012172991409897804,
+      "instrumented": {
+        "seconds": 0.03341841232031584,
+        "peak_python_bytes": 33602398,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 16,
+      "newline": "\r\n",
+      "encoding": "utf-8",
+      "hint": null,
+      "fixture_sha256": "8c4aa0ef187b134ba75b237a3a6b0a00c6b3562fd7684a3db63e7c2feac4bb23",
+      "compressed_bytes": 16329,
+      "logical_characters": 16777216,
+      "seconds": [
+        0.11233524978160858,
+        0.11242205463349819,
+        0.10810031881555915
+      ],
+      "median_seconds": 0.11233524978160858,
+      "mad_seconds": 8.680485188961029e-05,
+      "instrumented": {
+        "seconds": 0.10751625429838896,
+        "peak_python_bytes": 50300838,
+        "append_calls": 256,
+        "growing_buffer_characters": 2155872256
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 16,
+      "newline": null,
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "862b9ad2545c7c318f347bc83bd70729972469bd4e518e39b748d4c42c82ba88",
+      "compressed_bytes": 32654,
+      "logical_characters": 16777216,
+      "seconds": [
+        0.115808320697397,
+        0.11464075185358524,
+        0.1123862573876977
+      ],
+      "median_seconds": 0.11464075185358524,
+      "mad_seconds": 0.0011675688438117504,
+      "instrumented": {
+        "seconds": 0.11708529712632298,
+        "peak_python_bytes": 69471230,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 16,
+      "newline": "",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "862b9ad2545c7c318f347bc83bd70729972469bd4e518e39b748d4c42c82ba88",
+      "compressed_bytes": 32654,
+      "logical_characters": 16777216,
+      "seconds": [
+        1.7770460243336856,
+        0.4317031349055469,
+        0.41653505014255643
+      ],
+      "median_seconds": 0.4317031349055469,
+      "mad_seconds": 0.015168084762990475,
+      "instrumented": {
+        "seconds": 0.4251054232008755,
+        "peak_python_bytes": 102860785,
+        "append_calls": 513,
+        "growing_buffer_characters": 4320132096
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 16,
+      "newline": "\n",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "862b9ad2545c7c318f347bc83bd70729972469bd4e518e39b748d4c42c82ba88",
+      "compressed_bytes": 32654,
+      "logical_characters": 16777216,
+      "seconds": [
+        0.10339955613017082,
+        0.1056700311601162,
+        0.10674333199858665
+      ],
+      "median_seconds": 0.1056700311601162,
+      "mad_seconds": 0.001073300838470459,
+      "instrumented": {
+        "seconds": 0.11179644102230668,
+        "peak_python_bytes": 69471230,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 16,
+      "newline": "\r",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "862b9ad2545c7c318f347bc83bd70729972469bd4e518e39b748d4c42c82ba88",
+      "compressed_bytes": 32654,
+      "logical_characters": 16777216,
+      "seconds": [
+        0.1035233298316598,
+        0.10415781009942293,
+        0.12292946362867951
+      ],
+      "median_seconds": 0.10415781009942293,
+      "mad_seconds": 0.0006344802677631378,
+      "instrumented": {
+        "seconds": 0.11734704207628965,
+        "peak_python_bytes": 69471230,
+        "append_calls": 0,
+        "growing_buffer_characters": 0
+      }
+    },
+    {
+      "family": "long-line",
+      "size": 16,
+      "newline": "\r\n",
+      "encoding": "iso2022_jp",
+      "hint": null,
+      "fixture_sha256": "862b9ad2545c7c318f347bc83bd70729972469bd4e518e39b748d4c42c82ba88",
+      "compressed_bytes": 32654,
+      "logical_characters": 16777216,
+      "seconds": [
+        0.4913455587811768,
+        0.4732900010421872,
+        0.4173047346994281
+      ],
+      "median_seconds": 0.4732900010421872,
+      "mad_seconds": 0.01805555773898959,
+      "instrumented": {
+        "seconds": 0.4370010676793754,
+        "peak_python_bytes": 102860785,
+        "append_calls": 513,
+        "growing_buffer_characters": 4320132096
+      }
+    }
+  ]
+}

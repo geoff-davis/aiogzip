@@ -1,0 +1,133 @@
+{
+  "scope": "WP0 local baseline/oracle; not release qualification",
+  "source": {
+    "sha": "dc8950cb334e1cf4082f2bf50074464e06c72287",
+    "tree": "820a775b067cf5bf17a179c20f81c7c7b1f9f37b",
+    "status": ""
+  },
+  "harness": {
+    "sha": "440ed71ebdbeeebcdb526590f86fa8f9f0533a5e",
+    "tree": "e09c10129f8b408fab919334001ccb6164dceabb",
+    "status": ""
+  },
+  "runtime_source_unchanged": true,
+  "trace_scenarios": 25,
+  "trace_roots": [
+    "b1",
+    "baseline",
+    "candidate"
+  ],
+  "trace_engines": [
+    "stdlib",
+    "zlib-ng"
+  ],
+  "comparison_exceptions": {},
+  "fixture_origin": "b1-stdlib-trace.json",
+  "suite_environment": {
+    "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+    "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+    "dependencies": {
+      "aiofiles": "25.1.0",
+      "zlib-ng": "1.0.0",
+      "pytest": "9.1.1",
+      "hypothesis": "6.165.10",
+      "mypy": "2.3.1",
+      "ty": "0.0.74",
+      "ruff": "0.15.20",
+      "prek": "0.4.14"
+    }
+  },
+  "quality": {
+    "default": {
+      "passed": 2488,
+      "skipped": 1,
+      "xfailed": 16,
+      "seconds": 25.31,
+      "coverage_percent": 92.87
+    },
+    "forced_stdlib": {
+      "passed": 2488,
+      "skipped": 1,
+      "xfailed": 16,
+      "seconds": 18.85
+    },
+    "source_state": "Working checkout with final extended test fixture; production identical to reviewed source. Test and fixture hashes recorded separately; do not treat this as a clean release-candidate suite.",
+    "coverage_storage": "gzip archive preserves original coverage JSON bytes without newline normalization"
+  },
+  "final_test_sha256": "2af0b9484a8f136c0f53ed72ba108a3c638405242fa0a63d1e6a5ec0010b2aa0",
+  "fixture_sha256": "e06bfa0c1650c1b48feed72035ab175ef0f50b3f85f3a420d7022f20039e1030",
+  "interrupted_attempt": {
+    "file": "interrupted-sandbox-benchmark.json",
+    "exit_code": 143,
+    "results_produced": 0,
+    "included_in_performance_samples": false
+  },
+  "files": {
+    "b1-stdlib-trace.json": {
+      "sha256": "c34b2544cb7aa42850083b7690abc504d187ca0fd9d31dbee252f3291c1830c6",
+      "bytes": 25121
+    },
+    "b1-zlib-ng-trace.json": {
+      "sha256": "e3e812be6ab7c05403616c53000fc77b2d86777e0d44322688e842604b8accdf",
+      "bytes": 25115
+    },
+    "baseline-stdlib-trace.json": {
+      "sha256": "a9e16fb63321fe2e4bd374858c64ba6add12335fc02384eab6aa1b1ee99b269f",
+      "bytes": 25153
+    },
+    "baseline-zlib-ng-trace.json": {
+      "sha256": "3b1962370ac91b8d8d4623dab488d40dce9aa5a409eaab0760b9dafa046de21f",
+      "bytes": 25147
+    },
+    "candidate-stdlib-trace.json": {
+      "sha256": "dcde0491054ff87a2a5246dd7fd2cc61d586acba308d46cefea57193a1c87393",
+      "bytes": 25136
+    },
+    "candidate-zlib-ng-trace.json": {
+      "sha256": "7bfa2abe1ff57bdfd3c1b9c1637c00f1cb769b0853d29ea130a8e412904392c2",
+      "bytes": 25130
+    },
+    "compare-b1-baseline-stdlib.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-b1-baseline-zlib-ng.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-b1-candidate-stdlib.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-b1-candidate-zlib-ng.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "coverage-final.log": {
+      "sha256": "d748f6c8efeae9c3a75cf8d6fbe972de6466157ec96b09668abe756b463ce178",
+      "bytes": 10611
+    },
+    "engine-identities.json": {
+      "sha256": "3c42993db0337bad3c55a73004264ea223d7bcdf4cbcc37ab1531f43361abe74",
+      "bytes": 1665
+    },
+    "interrupted-sandbox-benchmark.json": {
+      "sha256": "49aa703c8df6f11c1c01707bc2cbb22c6ecaa792e9614019754e62cc0e743710",
+      "bytes": 3174
+    },
+    "inventory.json": {
+      "sha256": "705b6ddf0208a2198b1765d6cab536e6ad9e7d253d323d08bacdc71df58eaf0c",
+      "bytes": 141842
+    },
+    "stdlib.log": {
+      "sha256": "18ca509341ccc2e5d5245207bad23ad2770f0507dafd7e1aa5855c5f98d4a2ae",
+      "bytes": 2845
+    },
+    "coverage-final.json.gz": {
+      "sha256": "b9a4f8577f65f0e9767d1fcfe893d54d3ccecbb928d9305485a50931920cae5d",
+      "bytes": 38609,
+      "uncompressed_sha256": "88fb5c7c97c18abe5f189e5efcb0af3e00dd1572545052c8a951b52894f3045e",
+      "uncompressed_bytes": 328141
+    }
+  }
+}

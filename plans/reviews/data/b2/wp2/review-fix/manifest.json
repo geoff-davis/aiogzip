@@ -1,0 +1,53 @@
+{
+  "reviewed_commit": "156ae27",
+  "production_base": "f66c92b",
+  "correction": "Remove exactly one context-owned cancellation request when translating CancelledError to read-aborted OSError; preserve outside counts.",
+  "source_hashes": {
+    "src/aiogzip/_binary.py": "b7e1cca40b839e6fb53b3fccbb4b85c46f00500a6ac666a9283669bcabf21c74",
+    "tests/test_source_read_settlement.py": "2b419bc6ceb355c02db3ae1c3ffb58055ec955500e09149cd8b51624110db2fa"
+  },
+  "validation": "Linux Python 3.14.2: 2653 passed, 1 skipped, 12 xfailed under each engine; Python 3.11.14/3.12.12 aiofiles 23.2.1 focused matrix: 258 passed, 4 version-specific skips each engine. No Python 3.13 run.",
+  "floor_command": "PYTHONPATH=/home/geoff/Projects/personal/aiogzip/src AIOGZIP_ENGINE={stdlib,zlib-ng} /tmp/aiogzip-wp2-py{311,312}-floor/bin/python -m pytest tests/test_source_read_settlement.py tests/test_source_failure_trace.py tests/test_file_lifecycle.py tests/test_file_state_matrix.py tests/test_b2_native_io.py -q",
+  "environment_reference": "../environments.json",
+  "before": "Eight new primary regressions fail against unpatched code on Python 3.14.2. Two outside-cancellation controls added after fix.",
+  "performance": "No new timings; maintainer measurements attributed in completion record; G17 retains small-chunk cost.",
+  "files": {
+    "311-stdlib.log": {
+      "sha256": "317f9a92dc4af04c74cb4128d930e0c0296a5affe2221a32c4a2bff96e7bf994",
+      "bytes": 351
+    },
+    "311-zlib-ng.log": {
+      "sha256": "5bd6ed2c3f58b3fdf654d2ce85f591b0f080d8b3c3107b055a8a487ea87c5550",
+      "bytes": 351
+    },
+    "312-stdlib.log": {
+      "sha256": "38ae21a9ab870f1f7356b2049007948f07deb5dde6174d016732969976b9f5b5",
+      "bytes": 351
+    },
+    "312-zlib-ng.log": {
+      "sha256": "3bf45717f202efd049f22aa35b692cc41ed773d1a3d3f7b3b3089f8c8643507d",
+      "bytes": 351
+    },
+    "default.log": {
+      "sha256": "770c842fe688830f81b8eba59e7226800f49432961f6ae28ff1d61a66ef4b4b3",
+      "bytes": 8191
+    },
+    "docs.log": {
+      "sha256": "663efcec6b88e1c6877e0f70f57b7d298be235ffe29a953571a342ae2d9c6f5f",
+      "bytes": 993
+    },
+    "prek.log": {
+      "sha256": "91d1970f9de59a1317b4234a061d225c680c84f2e80e65de048202f9c3c03ce6",
+      "bytes": 1040
+    },
+    "stdlib.log": {
+      "sha256": "ca92eb7675c499a1d0fe158744141cb88d49f6f5c0620f755c45d3d19850c508",
+      "bytes": 8191
+    },
+    "before.log.gz": {
+      "sha256": "c8ad6161187cb3ee695b4dd15329215fb65893a0d4aab4f0fab5d99f5c37e86c",
+      "bytes": 1431,
+      "uncompressed_sha256": "82fc05aff1f4ce8b000ba05fdb26cfc39cb728e0cf15421bdefc686fd2dbbbaf"
+    }
+  }
+}

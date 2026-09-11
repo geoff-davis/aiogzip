@@ -524,6 +524,9 @@ async def test_text_readlines_restores_lines_after_transient_source_error(newlin
             self._reads = 0
             self.failed = False
 
+        def tell(self):
+            return self._buffer.tell()
+
         async def read(self, size=-1):
             self._reads += 1
             if self._reads == 5:

@@ -1,6 +1,8 @@
+import asyncio
 import os
 import struct
 import tempfile
+from functools import partial
 from pathlib import Path
 from typing import Dict, Union
 
@@ -95,3 +97,30 @@ def parse_gzip_header_bytes(
         assert terminator != -1
         filename = raw[10:terminator]
     return {"flags": flags, "mtime": mtime, "filename": filename}
+
+
+@pytest.fixture
+def mock_codec_executor(monkeypatch):
+    """Gate logical codec advancement at submission, preserving the real driver.
+
+    These wrapper-state tests use async gates instead of native work. The native
+    settlement suite separately exercises real executor threads and shutdown.
+    Unrelated file I/O continues through the actual executor.
+    """
+    from aiogzip import _codec_async
+
+    def install(advance):
+        loop = asyncio.get_running_loop()
+        original = loop.run_in_executor
+
+        def submit(executor, method, *args):
+            if (
+                isinstance(method, partial)
+                and method.func is _codec_async._raw_next_or_done
+            ):
+                return asyncio.create_task(advance(method, *args))
+            return original(executor, method, *args)
+
+        monkeypatch.setattr(loop, "run_in_executor", submit)
+
+    return install

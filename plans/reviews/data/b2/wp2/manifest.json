@@ -1,0 +1,334 @@
+{
+  "final_production_commit": "f66c92b",
+  "initial_production_commit": "ddc8e95",
+  "baseline_commit": "1b7e0e6",
+  "b1_commit": "048700fe9f6030f8a2b6da92b685bcd108a17dd1",
+  "shared_trace_and_timing_harness_commit": "a923f22",
+  "gate": "G03 complete locally; G17 and G04 onward remain open; no C0 or WP2 push",
+  "compatibility": "25 unchanged scenarios plus 18 source scenarios with 14 exact BC2 corrections under both engines; b1 fixture is exact clean capture",
+  "performance_disposition": "Provisional shared-host A/B/B/A captures. Minimum, median and baseline drift retained for every case. Custom binary read-all overhead unresolved; focused standalone diagnostic has script hash and clean sources, not committed-harness qualification. No performance waiver or general speedup.",
+  "validation": {
+    "default": "2643 passed, 1 skipped, 12 xfailed",
+    "forced_stdlib": "2643 passed, 1 skipped, 12 xfailed",
+    "coverage": "92.79% combined, 95.01% statements, 87.20% branches",
+    "floor": "Python 3.11.14/3.12.12, aiofiles 23.2.1, both engines: 280 passed, 4 xfailed each",
+    "floor_selection": "PYTHONPATH=/home/geoff/Projects/personal/aiogzip/src; AIOGZIP_ENGINE=stdlib for forced runs; optional engine installed for default runs. Trace test explicitly verifies both engine requests.",
+    "floor_tests": "test_source_read_settlement, test_b2_native_io, test_b2_reproductions, test_native_work_settlement, test_file_lifecycle, test_file_state_matrix, test_source_failure_trace",
+    "limits": "Linux source tests only; no hosted, Windows/macOS or installed-wheel claim"
+  },
+  "execution_file_hashes": {
+    "src/aiogzip/_binary.py": "4b7ee67f352009596572d82eb3f1e36954142b625376ca140da67dc831b892b7",
+    "src/aiogzip/_source_io.py": "b859ff941c98beee4fbd8ead355f41d9f801923b76ce58f2b7c3065ff4b64848",
+    "tests/test_source_read_settlement.py": "fb518e2effb97e1327cb29959eba4fcf74e1447345ba253f9325338a934178b4",
+    "tests/test_source_failure_trace.py": "4fec934502e2f2533765132777658f00da1f7ec6e54660482af219806f496f5c",
+    "tests/data/source_failure_b1.json": "1a7e64142619f554867c277538d90cd750a5284558c0e238f66420d270d7f452",
+    "tests/data/source_failure_bc2.json": "54cf50e91fcd1f88530192ee1a95c4b263198925ad95992d884e15c1373e280f",
+    "scripts/capture_file_state_trace.py": "71c2a5e9ae3740c7f4f3ada600ade0dbfff6bd5c6e06a9768e53dc7d8d54d09b",
+    "scripts/capture_b2_source_failure_trace.py": "9203464e3ac3c36dd1142f494e7e64f941674d0976030f268f8ac9810ce5e74b",
+    "scripts/measure_b2_source_reads.py": "e32af0e9f4d87af6bfa3187de21583fe3dad256691055aa5c5ce37e539b5033e"
+  },
+  "files": {
+    "b1-stdlib-compat.json": {
+      "sha256": "72e4535dea7bcfdffbbe6ac8138781df45485166108e03c385cf92d060abbabf",
+      "bytes": 25110
+    },
+    "b1-stdlib-source.json": {
+      "sha256": "1a7e64142619f554867c277538d90cd750a5284558c0e238f66420d270d7f452",
+      "bytes": 7377
+    },
+    "b1-zlib-ng-compat.json": {
+      "sha256": "0650ac19919815be24718c41aa3a973bf784b5b04ad1cd034cb88ec21950018b",
+      "bytes": 25104
+    },
+    "b1-zlib-ng-source.json": {
+      "sha256": "f28bac6e0d5c196528f2aa45a4c116c5e230969499db07bdb84f2861f03bcb9c",
+      "bytes": 7369
+    },
+    "baseline-stdlib-compat.json": {
+      "sha256": "0f6f856a190b91b8a2225f09b4dd9990bd9a39ea00ca528a6c3f4a1bde876a73",
+      "bytes": 25126
+    },
+    "baseline-stdlib-micro-reverse.json": {
+      "sha256": "5422258775880b25b3356cf1ff1de47887534a2eb950aa6a18bd7a123b1d29a0",
+      "bytes": 1898
+    },
+    "baseline-stdlib-micro.json": {
+      "sha256": "f6a87293abb8006b98d9fd1ed8f7dd0f61e0581c98302f1c003091bb8a2ea226",
+      "bytes": 1890
+    },
+    "baseline-stdlib-performance-reverse.json": {
+      "sha256": "35807a1687b3f0acf8fca9a9fe0d71eee96232a9236a90adb64a655ad8d36d7d",
+      "bytes": 19798
+    },
+    "baseline-stdlib-performance.json": {
+      "sha256": "f26cdd5dbcdecd88cc108e8db9bf836301dd05c83021b5688d7ac0748a8cf562",
+      "bytes": 19769
+    },
+    "baseline-stdlib-source.json": {
+      "sha256": "0072090a957b45d8f7ebc093c103fe056eddb680fce1f3c5cb144fb21efeb78d",
+      "bytes": 7377
+    },
+    "baseline-zlib-ng-compat.json": {
+      "sha256": "8be7036f42cf384d82b66af4eed5f53ef2f261c35a8e556d17fc191106574b26",
+      "bytes": 25120
+    },
+    "baseline-zlib-ng-micro-reverse.json": {
+      "sha256": "ad6355e6bd360700436c081cced65caa999ea2fe5db029b9dc228e867226f1e2",
+      "bytes": 1894
+    },
+    "baseline-zlib-ng-micro.json": {
+      "sha256": "98bc5e1b47514fd0c352cd19c10abfe86af6f9f8f732edaf98712658d08681cc",
+      "bytes": 1885
+    },
+    "baseline-zlib-ng-performance-reverse.json": {
+      "sha256": "6520e6b4ffd0eadc130e49cd4ecf020fc886e0dea87850826da6b7f9478dc6e8",
+      "bytes": 19784
+    },
+    "baseline-zlib-ng-performance.json": {
+      "sha256": "04af5bee840331a876172c70add578100da7109b477d3d2ba7fbc2bc12a7c5b6",
+      "bytes": 19810
+    },
+    "baseline-zlib-ng-source.json": {
+      "sha256": "e104dd11fbe145b5486f133231059ede210f03c2e9441001dfa2d0bd940807ab",
+      "bytes": 7369
+    },
+    "bc2-exceptions.json": {
+      "sha256": "54cf50e91fcd1f88530192ee1a95c4b263198925ad95992d884e15c1373e280f",
+      "bytes": 8101
+    },
+    "candidate-stdlib-compat.json": {
+      "sha256": "02796b12a0a66c02dd2e24232b3d5648fb11fb2dc6cd9a89c08d32a1ae493b74",
+      "bytes": 25108
+    },
+    "candidate-stdlib-micro-reverse.json": {
+      "sha256": "efd46625614a148f767619ed452c992443976d28ba6628254155e7b8f070608a",
+      "bytes": 1903
+    },
+    "candidate-stdlib-micro.json": {
+      "sha256": "76b2a1f3e596a243cbb84daca2eb07fad63ff8bdc8b4b69a46e9bab2c8c81fff",
+      "bytes": 1892
+    },
+    "candidate-stdlib-performance-reverse.json": {
+      "sha256": "7066d8753e0a7875c1e916429efedab20ed14159aa74540a2f5ee5e6034f3321",
+      "bytes": 19789
+    },
+    "candidate-stdlib-performance.json": {
+      "sha256": "af58eb688b25a9398bf08dd2460266b527b087571c4498dc8206ea97733aa7ec",
+      "bytes": 19757
+    },
+    "candidate-stdlib-source.json": {
+      "sha256": "6d313cf213e0092ae8f25339739f6f08c051e47f4dc8c28af624c214a1c960bb",
+      "bytes": 7765
+    },
+    "candidate-zlib-ng-compat.json": {
+      "sha256": "916de1cc0a6ea7ed1da4198a36458a65bb98c2c4b08aa9db289f91424f3c9b62",
+      "bytes": 25102
+    },
+    "candidate-zlib-ng-micro-reverse.json": {
+      "sha256": "9a2992c36853f467bbb76d0f4e334c0ed90a373777b480da8c8acd27d57357ad",
+      "bytes": 1890
+    },
+    "candidate-zlib-ng-micro.json": {
+      "sha256": "89fc894e107b261f6890039fddd5b4d57505ac7c1cda94f1eb1ef1b94da04736",
+      "bytes": 1892
+    },
+    "candidate-zlib-ng-performance-reverse.json": {
+      "sha256": "a80afd36703db8e09db25cf591baa49dd30fc353457974564c05b8f7c1fc26d4",
+      "bytes": 19779
+    },
+    "candidate-zlib-ng-performance.json": {
+      "sha256": "a03a4143b1705cf5f254be78d2f7f9dd1f8fb7924cc09f32fe56ce8d1484e859",
+      "bytes": 19801
+    },
+    "candidate-zlib-ng-source.json": {
+      "sha256": "4de76259f15f43e965d591e3586b589933811c54eb75f1a8444b8e706788d50a",
+      "bytes": 7757
+    },
+    "compare-candidate-stdlib-compat.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-candidate-stdlib-source.json": {
+      "sha256": "34b17793fbd19346236437bc9c98ac3d546f3e156f0fdf969e84a80be1e781a4",
+      "bytes": 9428
+    },
+    "compare-candidate-zlib-ng-compat.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-candidate-zlib-ng-source.json": {
+      "sha256": "34b17793fbd19346236437bc9c98ac3d546f3e156f0fdf969e84a80be1e781a4",
+      "bytes": 9428
+    },
+    "coverage.json.gz": {
+      "sha256": "6257ff4bcff78da997264738c654a7382ae3ed0e5dce315dac927e636e288d3d",
+      "bytes": 40648,
+      "uncompressed_sha256": "141405416b6e61bdd3a49544cc49cf6ae2131da791ea2d74455b69fec283f7d1",
+      "uncompressed_bytes": 341986
+    },
+    "environments.json": {
+      "sha256": "a0c172ab900b80f3ab925167a13698dca6160391c055a96e9ca82295a8a40afd",
+      "bytes": 868
+    },
+    "initial-direct-shield/b1-stdlib-compat.json": {
+      "sha256": "72e4535dea7bcfdffbbe6ac8138781df45485166108e03c385cf92d060abbabf",
+      "bytes": 25110
+    },
+    "initial-direct-shield/b1-stdlib-source.json": {
+      "sha256": "1a7e64142619f554867c277538d90cd750a5284558c0e238f66420d270d7f452",
+      "bytes": 7377
+    },
+    "initial-direct-shield/b1-zlib-ng-compat.json": {
+      "sha256": "0650ac19919815be24718c41aa3a973bf784b5b04ad1cd034cb88ec21950018b",
+      "bytes": 25104
+    },
+    "initial-direct-shield/b1-zlib-ng-source.json": {
+      "sha256": "f28bac6e0d5c196528f2aa45a4c116c5e230969499db07bdb84f2861f03bcb9c",
+      "bytes": 7369
+    },
+    "initial-direct-shield/baseline-stdlib-compat.json": {
+      "sha256": "0f6f856a190b91b8a2225f09b4dd9990bd9a39ea00ca528a6c3f4a1bde876a73",
+      "bytes": 25126
+    },
+    "initial-direct-shield/baseline-stdlib-performance-reverse.json": {
+      "sha256": "917469ac4ec6cf496d11d454c2cdbec4ffe1aac4c87d22e1a9610e4ed30b5b0a",
+      "bytes": 19776
+    },
+    "initial-direct-shield/baseline-stdlib-performance.json": {
+      "sha256": "6db1ff5bab34e0d9e118b85c1d31cf1e44d2e1bce59cb4a8f556ec0e6135faf7",
+      "bytes": 19802
+    },
+    "initial-direct-shield/baseline-stdlib-source.json": {
+      "sha256": "0072090a957b45d8f7ebc093c103fe056eddb680fce1f3c5cb144fb21efeb78d",
+      "bytes": 7377
+    },
+    "initial-direct-shield/baseline-zlib-ng-compat.json": {
+      "sha256": "8be7036f42cf384d82b66af4eed5f53ef2f261c35a8e556d17fc191106574b26",
+      "bytes": 25120
+    },
+    "initial-direct-shield/baseline-zlib-ng-performance-reverse.json": {
+      "sha256": "af637ed6b6cd60324ad73756aab9da5a89056ba61bf2d7cc719dde47d6de233f",
+      "bytes": 19775
+    },
+    "initial-direct-shield/baseline-zlib-ng-performance.json": {
+      "sha256": "f0da1dda170b1aea174b5f711052633601a325cb41ba923feb8c5c82f3cf7ecb",
+      "bytes": 19788
+    },
+    "initial-direct-shield/baseline-zlib-ng-source.json": {
+      "sha256": "e104dd11fbe145b5486f133231059ede210f03c2e9441001dfa2d0bd940807ab",
+      "bytes": 7369
+    },
+    "initial-direct-shield/bc2-exceptions.json": {
+      "sha256": "54cf50e91fcd1f88530192ee1a95c4b263198925ad95992d884e15c1373e280f",
+      "bytes": 8101
+    },
+    "initial-direct-shield/candidate-stdlib-compat.json": {
+      "sha256": "191b16dfa7b7ab032eabda53a5bd4683b9bcb29be24f811bfec2024ddc7b5709",
+      "bytes": 25109
+    },
+    "initial-direct-shield/candidate-stdlib-performance-reverse.json": {
+      "sha256": "7b6746221dfa517f0d4df8d96fc64ec86f5aa323db0234891f6ca33e9ab763a9",
+      "bytes": 19780
+    },
+    "initial-direct-shield/candidate-stdlib-performance.json": {
+      "sha256": "b29100b12929901237e55a4ae589ee241e7ab761168cc5d31949cf390f9269b5",
+      "bytes": 19777
+    },
+    "initial-direct-shield/candidate-stdlib-source.json": {
+      "sha256": "aaaaba9bf5d2a43c3fcfc4f63fb592dcf25bc2996c8c768855aba0c16e221e24",
+      "bytes": 7765
+    },
+    "initial-direct-shield/candidate-zlib-ng-compat.json": {
+      "sha256": "b855f35b86526d967e2654bfbadf0e04a5ca7654d497faf915857d5f9321f24b",
+      "bytes": 25103
+    },
+    "initial-direct-shield/candidate-zlib-ng-performance-reverse.json": {
+      "sha256": "030918a91cc5132eab5de7c942d29e1cab884c567d4a00ce624b3e0f02a2afbb",
+      "bytes": 19800
+    },
+    "initial-direct-shield/candidate-zlib-ng-performance.json": {
+      "sha256": "6d7197b45848f782e6b1d15d7abdc1d8da3d704c9bbc005af30195f15f46b8fe",
+      "bytes": 19785
+    },
+    "initial-direct-shield/candidate-zlib-ng-source.json": {
+      "sha256": "dbb76e69650a99ab9184b50441efebb5370cc1d95e4cf06e710aff57d8742a90",
+      "bytes": 7757
+    },
+    "initial-direct-shield/compare-baseline-stdlib-compat.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "initial-direct-shield/compare-baseline-stdlib-source.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "initial-direct-shield/compare-baseline-zlib-ng-compat.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "initial-direct-shield/compare-baseline-zlib-ng-source.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "initial-direct-shield/compare-candidate-stdlib-compat.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "initial-direct-shield/compare-candidate-stdlib-source.json": {
+      "sha256": "34b17793fbd19346236437bc9c98ac3d546f3e156f0fdf969e84a80be1e781a4",
+      "bytes": 9428
+    },
+    "initial-direct-shield/compare-candidate-zlib-ng-compat.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "initial-direct-shield/compare-candidate-zlib-ng-source.json": {
+      "sha256": "34b17793fbd19346236437bc9c98ac3d546f3e156f0fdf969e84a80be1e781a4",
+      "bytes": 9428
+    },
+    "initial-direct-shield/performance-summary.csv": {
+      "sha256": "98bb2293aaaca6a4806d9336b03c4d7bc3aed250ebba1d43c2ea538930f01257",
+      "bytes": 19183
+    },
+    "performance-summary.csv": {
+      "sha256": "3cf60214b76a69c387b8520fa7964ae5e9dcad34377b336df22a8f7d51fb5fb7",
+      "bytes": 19190
+    },
+    "pytest-default.log": {
+      "sha256": "d70f64bbf0891984305f0efe1c878c612d6e52d84b3320818f0f8367020394ef",
+      "bytes": 8424
+    },
+    "pytest-py311-floor-stdlib.log": {
+      "sha256": "8608b90c01e0a21a731d625f74f5838d1762203f8749d836c4b12b8211a413dd",
+      "bytes": 351
+    },
+    "pytest-py311-floor-zlib-ng.log": {
+      "sha256": "3e539ff62f68afd7781ad4876dc5a4a4df2452e2fbacb7834f2096fcbbc66530",
+      "bytes": 351
+    },
+    "pytest-py312-floor-stdlib.log": {
+      "sha256": "4f9cd50a6281e54e77978356a943c30220a4a20727a1ca0168dbed6cca7eea2c",
+      "bytes": 351
+    },
+    "pytest-py312-floor-zlib-ng.log": {
+      "sha256": "24f891c25841a543f2092c13f00d5ba805c17c8161888f9cc135ba78ff731b23",
+      "bytes": 351
+    },
+    "pytest-stdlib.log": {
+      "sha256": "31e002b7c03e6d5c70bdbd3feb078a7a2a12d08964039ffa0e6a2501132876e6",
+      "bytes": 8191
+    },
+    "source-micro.py.txt": {
+      "sha256": "4382840604707675302a283a079c9f373ed2e0ecae9dfa695121f2044ebbf01a",
+      "bytes": 2672
+    },
+    "prek.log": {
+      "sha256": "91d1970f9de59a1317b4234a061d225c680c84f2e80e65de048202f9c3c03ce6",
+      "bytes": 1040
+    },
+    "mkdocs.log": {
+      "sha256": "287030fe5bb711eb02fa4493359707b8d8af2fa6860a930fb09a3fa0ea9da45e",
+      "bytes": 993
+    }
+  }
+}

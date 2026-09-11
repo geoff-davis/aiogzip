@@ -222,6 +222,33 @@ With `closefd=False`, closing the gzip wrapper leaves the external object open.
 Pass `closefd=True` only when the wrapper should close it. Non-seekable readers
 use a bounded compressed-input replay cache for backward seeks.
 
+### Source failures and cancellation
+
+An unmodified binary aiofiles source is allowed to finish an outstanding read
+before cancellation propagates. The gzip reader retains the completed bytes for
+its next read, so cancellation cannot silently skip part of the compressed stream.
+Cancellation can therefore wait for blocked native I/O.
+
+Other custom sources must finish all source access before `read()` or `seek()`
+returns or raises, including cancellation. They must not leave hidden background
+work accessing the source. After an error or cancellation, the gzip reader becomes
+broken unless an unchanged, trustworthy synchronous `tell()` proves that no input
+was consumed. That cursor must account for consumption even when the method raises;
+a success-only byte counter does not establish safe retry. Async `tell()` methods
+do not provide this checkpoint.
+
+The custom-source checkpoint calls synchronous `tell()` once before each physical
+read (and seek), plus once after a failure when a valid initial checkpoint exists.
+These are new calls into source code: `tell()` must be observational and inexpensive.
+A successful read does not require a second checkpoint.
+
+A broken source-read path does not expose buffered data as validation salvage.
+Recover with a successfully completed physical `seek(0)`, or reopen the source
+from the beginning. A non-seekable replay cache cannot recover input that the
+source consumed without returning. Treat this as a compatibility correction in
+2.0.0b2: an `OSError` alone no longer implies that retrying a custom source is safe.
+Do not access a borrowed source concurrently through another owner.
+
 ## Gzip over S3 / fsspec
 
 The same `fileobj` mechanism streams gzip straight from object storage:

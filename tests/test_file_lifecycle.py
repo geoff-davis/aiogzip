@@ -431,6 +431,9 @@ class TestResourceCleanup:
                 self.fail_next = False
                 self.failures = 0
 
+            def tell(self):
+                return self.buffer.tell()
+
             async def read(self, size=-1):
                 if self.fail_next:
                     self.fail_next = False

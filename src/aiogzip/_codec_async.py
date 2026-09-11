@@ -26,9 +26,35 @@ _T = TypeVar("_T")
 
 
 async def _run_in_thread(method: Callable[[bytes], _T], data: bytes) -> _T:
-    """Run one codec advancement in the event loop's default executor."""
+    """Retain one executor call until its last native access has completed."""
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, method, data)
+    return await _settle_before_cancel(loop.run_in_executor(None, method, data))
+
+
+async def _settle_before_cancel(work: asyncio.Future[_T]) -> _T:
+    """Delay cancellation until privately owned work reaches its terminal state.
+
+    Never cancel ``work``: an executor wrapper's cancellation cannot prove that
+    its thread stopped. Queued work is allowed to run and settle, too. Retain a
+    simultaneous worker failure as the cancellation's cause, and retrieve every
+    result so no exception is left unobserved.
+    """
+    try:
+        return await asyncio.shield(work)
+    except asyncio.CancelledError as cancellation:
+        while not work.done():
+            try:
+                await asyncio.shield(work)
+            except asyncio.CancelledError:
+                continue
+            except BaseException:
+                break
+        try:
+            work.result()
+        except BaseException as failure:
+            if failure is not cancellation:
+                raise cancellation from failure
+        raise
 
 
 async def _cooperative_checkpoint() -> None:
@@ -52,25 +78,9 @@ async def _offloaded_next(
     workload: bytes,
 ) -> bytes | _CodecProgress | object:
     advance = partial(_raw_next_or_done, operation)
-    worker = asyncio.create_task(_run_in_thread(advance, workload))
-    try:
-        return await asyncio.shield(worker)
-    except asyncio.CancelledError:
-        # Executor cancellation does not stop a running codec call. Wait until
-        # it can no longer mutate the operation before the caller discards it.
-        while not worker.done():
-            try:
-                await asyncio.shield(worker)
-            except asyncio.CancelledError:
-                continue
-            except BaseException:
-                break
-        if worker.done() and not worker.cancelled():
-            try:
-                worker.result()
-            except BaseException:
-                pass
-        raise
+    # No separately cancellable helper: the driver retains the executor future
+    # through _run_in_thread until native completion, even during shutdown.
+    return await _run_in_thread(advance, workload)
 
 
 async def _drive_operation(

@@ -410,7 +410,7 @@ class TestCompressChunks:
         with pytest.raises(StopAsyncIteration):
             await stream.__anext__()
 
-    async def test_cancellation_during_offloaded_compression(self, monkeypatch):
+    async def test_cancellation_during_offloaded_compression(self, mock_codec_executor):
         started = asyncio.Event()
         release = asyncio.Event()
         completed = asyncio.Event()
@@ -423,7 +423,7 @@ class TestCompressChunks:
             finally:
                 completed.set()
 
-        monkeypatch.setattr(async_module, "_run_in_thread", blocked_offload)
+        mock_codec_executor(blocked_offload)
         payload = os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1)
         stream = aiogzip.compress_chunks(_items([payload]), mtime=0)
         assert await stream.__anext__()

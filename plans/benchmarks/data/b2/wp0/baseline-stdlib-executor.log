@@ -1,0 +1,1000 @@
+
+============================================================
+Running IO Benchmarks (median of 3 runs)
+============================================================
+
+Binary I/O (10-byte chunks, stress test): 0.173s
+  aiogzip_write: 0.171s
+  aiogzip_read: 0.002s
+  gzip_write: 0.041s
+  gzip_read: 0.001s
+  speedup: 4.15x slower
+  chunks_written: 104857
+  chunks_per_sec: 613654
+  suite_repeats: 3
+
+Binary I/O (bulk, single write/read): 0.018s
+  aiogzip_write: 0.017s
+  aiogzip_read: 0.001s
+  gzip_write: 0.016s
+  gzip_read: 0.001s
+  speedup: 1.13x slower
+  aiogzip_throughput: 54.4 MB/s
+  gzip_throughput: 61.5 MB/s
+  suite_repeats: 3
+
+Binary I/O (64KB chunks, 16 chunks): 0.018s
+  aiogzip_write: 0.017s
+  aiogzip_read: 0.001s
+  gzip_write: 0.015s
+  gzip_read: 0.000s
+  speedup: 1.13x slower
+  suite_repeats: 3
+
+Text write (bulk, compression level 6): 0.049s
+  aiogzip_time: 0.0490s
+  gzip_time: 0.0531s
+  speedup: 1.08x faster
+  aiogzip_throughput: 20.4 MB/s
+  gzip_throughput: 18.8 MB/s
+  suite_repeats: 3
+
+Text read (bulk, identical fixture): 0.002s
+  aiogzip_time: 0.0024s
+  gzip_time: 0.0016s
+  speedup: 1.50x slower
+  aiogzip_throughput: 410.1 MB/s
+  gzip_throughput: 617.1 MB/s
+  suite_repeats: 3
+
+Text line iteration (default, identical fixture): 0.003s
+  aiogzip_time: 0.0034s
+  gzip_time: 0.0016s
+  speedup: 2.21x slower
+  aiogzip_lines_per_sec: 2740375
+  gzip_lines_per_sec: 6054865
+  lines: 9391
+  suite_repeats: 3
+
+Text line iteration (tuned, identical fixture): 0.003s
+  aiogzip_time: 0.0029s
+  gzip_time: 0.0016s
+  speedup: 1.86x slower
+  aiogzip_lines_per_sec: 3254664
+  gzip_lines_per_sec: 6054865
+  lines: 9391
+  tuning: newline="\n", chunk_size=512 KiB
+  suite_repeats: 3
+
+Flush operations (100 flushes): 0.004s
+  ops_per_sec: 25863
+  suite_repeats: 3
+
+Read-all isolated (compressible, read-only timing): 0.002s
+  aiogzip_read_best: 1.91ms
+  gzip_read_best: 1.78ms
+  aiogzip_throughput: 524.5 MB/s
+  speedup: 1.07x slower
+  suite_repeats: 3
+
+Text large reads (sized read + long line, O(n) accumulation): 0.002s
+  read_size_best: 1.91ms
+  readline_long_best: 1.95ms
+  read_size_throughput: 523.0 Mchar/s
+  suite_repeats: 3
+
+============================================================
+Running MEMORY Benchmarks (median of 3 runs)
+============================================================
+
+Memory efficiency (5MB): 0.101s
+  memory_increase_mb: 8.3
+  memory_ratio: 1.67x
+  status: OK
+  suite_repeats: 3
+
+============================================================
+Running CONCURRENCY Benchmarks (median of 3 runs)
+============================================================
+
+Concurrent I/O (10 files, 10ms delay each): 0.054s
+  async_time: 0.054s
+  sync_time: 0.333s
+  speedup: 6.21x
+  delay_saved: 0.280s
+  async_efficiency: 19%
+  suite_repeats: 3
+
+Mixed operations (5 read/write): 0.019s
+  async_time: 0.019s
+  sync_time: 0.032s
+  speedup: 1.63x
+  suite_repeats: 3
+
+============================================================
+Running COMPRESSION Benchmarks (median of 3 runs)
+============================================================
+
+Compression: random: 0.000s
+  original: 1.0 MB
+  aiogzip_size: 1.0 MB
+  gzip_size: 1.0 MB
+  aiogzip_ratio: 1.00x
+  gzip_ratio: 1.00x
+  suite_repeats: 3
+
+Compression: compressible: 0.000s
+  original: 1.0 MB
+  aiogzip_size: 1.0 KB
+  gzip_size: 1.0 KB
+  aiogzip_ratio: 977.24x
+  gzip_ratio: 979.98x
+  suite_repeats: 3
+
+Compression: text: 0.000s
+  original: 1.0 MB
+  aiogzip_size: 146.5 KB
+  gzip_size: 146.5 KB
+  aiogzip_ratio: 6.99x
+  gzip_ratio: 6.99x
+  suite_repeats: 3
+
+Compression: fast_compress: 0.000s
+  status: skipped (install aiogzip[fast] / unset AIOGZIP_ENGINE)
+  suite_repeats: 3
+
+============================================================
+Running SCENARIOS Benchmarks (median of 3 runs)
+============================================================
+
+JSONL read and parse (identical fixture): 0.012s
+  aiogzip_time: 0.0122s
+  gzip_time: 0.0275s
+  records: 9391
+  speedup: 2.26x faster
+  tuning: newline="\n", chunk_size=512 KiB
+  suite_repeats: 3
+
+JSONL batched readlines and parse (identical fixture): 0.012s
+  aiogzip_time: 0.0125s
+  gzip_time: 0.0137s
+  records: 9391
+  speedup: 1.10x faster
+  tuning: newline="\n", chunk_size=512 KiB, readlines=1 MiB
+  suite_repeats: 3
+
+============================================================
+Running ERRORS Benchmarks (median of 3 runs)
+============================================================
+
+Error handling: 0.002s
+  errors_caught: 3
+  avg_time_per_error: 0.55ms
+  suite_repeats: 3
+
+Corrupted data handling: 0.000s
+  error_detected: True
+  error_type: BadGzipFile
+  suite_repeats: 3
+
+============================================================
+Running INSPECTION Benchmarks (median of 3 runs)
+============================================================
+
+verify (compressible): 0.002s
+  peak_python_mb: 0.92
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+inspect (compressible): 0.002s
+  peak_python_mb: 0.92
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+_read_discard (compressible): 0.002s
+  peak_python_mb: 2.13
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+verify (incompressible): 0.001s
+  peak_python_mb: 1.17
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+inspect (incompressible): 0.001s
+  peak_python_mb: 1.17
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+_read_discard (incompressible): 0.001s
+  peak_python_mb: 2.13
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+verify (many-members): 0.012s
+  peak_python_mb: 0.42
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+inspect (many-members): 0.026s
+  peak_python_mb: 0.73
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+_read_discard (many-members): 0.011s
+  peak_python_mb: 2.25
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+============================================================
+Running STREAMING Benchmarks (median of 3 runs)
+============================================================
+
+stdlib gzip.compress reference: 0.015s
+  input_bytes: 1048576
+  compressed_bytes: 1048914
+  informational: True
+  suite_repeats: 3
+
+sans-I/O codec encode (informational): 0.015s
+  input_bytes: 1048576
+  compressed_bytes: 1048914
+  output_chunks: 7
+  stdlib_reference_seconds: 0.02
+  informational: True
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+stdlib gzip.decompress reference: 0.000s
+  input_bytes: 1048914
+  output_bytes: 1048576
+  informational: True
+  suite_repeats: 3
+
+sans-I/O codec decode (informational): 0.000s
+  input_bytes: 1048914
+  output_bytes: 1048576
+  output_chunks: 5
+  stdlib_reference_seconds: 0.00
+  informational: True
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+decompress_chunks (64K in, 64K out): 0.000s
+  event_loop_ticks: 0
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+decompress_chunks (512K in, 256K out): 0.000s
+  event_loop_ticks: 0
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+file reader (64K output): 0.001s
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+decompress_chunks compressible peak: 0.002s
+  peak_python_mb: 0.23
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+full read compressible peak: 0.002s
+  peak_python_mb: 2.13
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+compress_chunks (64K in, 64K out): 0.016s
+  compressed_bytes: 1048914
+  event_loop_ticks: 0
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+compress_chunks (512K in, 256K out): 0.017s
+  compressed_bytes: 1048914
+  event_loop_ticks: 11500
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+file writer (64K input): 0.047s
+  compressed_bytes: 1048931
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+compress_chunks compressible peak: 0.002s
+  peak_python_mb: 0.38
+  compressed_bytes: 1052
+  engine: stdlib-zlib
+  suite_repeats: 3
+
+============================================================
+Running MICRO Benchmarks (median of 3 runs)
+============================================================
+
+read(-1) - 1MB file: 0.003s
+  iterations: 100
+  avg_time_ms: 3.057ms
+  suite_repeats: 3
+
+Line iteration - 100K lines: 0.023s
+  iterations: 30
+  avg_time_ms: 23.382ms
+  lines_per_sec: 4276816
+  suite_repeats: 3
+
+readline() loop - 100K lines: 0.025s
+  iterations: 30
+  avg_time_ms: 25.263ms
+  lines_per_sec: 3958413
+  suite_repeats: 3
+
+readlines() - 100K lines: 0.008s
+  iterations: 30
+  avg_time_ms: 8.460ms
+  lines_per_sec: 11820993
+  suite_repeats: 3
+
+readlines(1 MiB) batches - 100K lines: 0.009s
+  iterations: 30
+  avg_time_ms: 9.283ms
+  lines_per_sec: 10772285
+  suite_repeats: 3
+
+Small writes (1000 x 120 bytes): 0.002s
+  ops_per_sec: 575789
+  suite_repeats: 3
+
+Text writelines batching (10K lines): 0.002s
+  individual_time: 13.696ms
+  batched_time: 1.872ms
+  speedup: 7.31x
+  suite_repeats: 3
+
+Binary readline (200KB line, 17-byte chunks): 0.002s
+  iterations: 50
+  avg_time_ms: 1.734ms
+  suite_repeats: 3
+
+Binary read1 (2MiB, 4KiB buffers): 0.026s
+  iterations: 30
+  avg_time_ms: 25.788ms
+  suite_repeats: 3
+
+Binary readinto1 (2MiB, 4KiB buffers): 0.027s
+  iterations: 30
+  avg_time_ms: 26.651ms
+  suite_repeats: 3
+
+============================================================
+Running REGRESSIONS Benchmarks (median of 3 runs)
+============================================================
+  START direct decode incompressible 1MiB one-feed 256K-output
+  START direct decode incompressible 1MiB 256K-feeds 256K-output
+  START direct decode incompressible 2MiB one-feed 256K-output
+  START direct decode incompressible 2MiB 256K-feeds 256K-output
+  START direct decode compressible 1MiB one-feed 256K-output
+  START direct decode compressible 1MiB 256K-feeds 256K-output
+  START decompress_chunks 64K-in 64K-out
+  START decompress_chunks 512K-in 256K-out
+  START compress_chunks 64K-in 64K-out
+  START compress_chunks 512K-in 256K-out
+  START direct output bound 1 bytes
+  START direct output bound 1024 bytes
+  START direct output bound 65536 bytes
+  START direct output bound 262144 bytes
+  START header filename 65536 bytes one-feed
+  START header filename 65536 bytes 64K-feeds
+  START header comment 65536 bytes one-feed
+  START header comment 65536 bytes 64K-feeds
+  START direct decode memory 1MiB one-feed
+  START direct decode memory 2MiB one-feed
+  START incomplete filename memory 65536 bytes metadata-off
+  START incomplete filename memory 65536 bytes metadata-on
+  START incomplete comment memory 65536 bytes metadata-off
+  START incomplete comment memory 65536 bytes metadata-on
+  START async ticker baseline
+  START async decode ticker 1MiB one-item
+  START async decode ticker 1MiB 256K-items
+  START async decode ticker 2MiB one-item
+  START async decode ticker 2MiB 256K-items
+  START async decode ticker empty-blocks 2000
+  START direct decode incompressible 1MiB one-feed 256K-output
+  START direct decode incompressible 1MiB 256K-feeds 256K-output
+  START direct decode incompressible 2MiB one-feed 256K-output
+  START direct decode incompressible 2MiB 256K-feeds 256K-output
+  START direct decode compressible 1MiB one-feed 256K-output
+  START direct decode compressible 1MiB 256K-feeds 256K-output
+  START decompress_chunks 64K-in 64K-out
+  START decompress_chunks 512K-in 256K-out
+  START compress_chunks 64K-in 64K-out
+  START compress_chunks 512K-in 256K-out
+  START direct output bound 1 bytes
+  START direct output bound 1024 bytes
+  START direct output bound 65536 bytes
+  START direct output bound 262144 bytes
+  START header filename 65536 bytes one-feed
+  START header filename 65536 bytes 64K-feeds
+  START header comment 65536 bytes one-feed
+  START header comment 65536 bytes 64K-feeds
+  START direct decode memory 1MiB one-feed
+  START direct decode memory 2MiB one-feed
+  START incomplete filename memory 65536 bytes metadata-off
+  START incomplete filename memory 65536 bytes metadata-on
+  START incomplete comment memory 65536 bytes metadata-off
+  START incomplete comment memory 65536 bytes metadata-on
+  START async ticker baseline
+  START async decode ticker 1MiB one-item
+  START async decode ticker 1MiB 256K-items
+  START async decode ticker 2MiB one-item
+  START async decode ticker 2MiB 256K-items
+  START async decode ticker empty-blocks 2000
+  START direct decode incompressible 1MiB one-feed 256K-output
+  START direct decode incompressible 1MiB 256K-feeds 256K-output
+  START direct decode incompressible 2MiB one-feed 256K-output
+  START direct decode incompressible 2MiB 256K-feeds 256K-output
+  START direct decode compressible 1MiB one-feed 256K-output
+  START direct decode compressible 1MiB 256K-feeds 256K-output
+  START decompress_chunks 64K-in 64K-out
+  START decompress_chunks 512K-in 256K-out
+  START compress_chunks 64K-in 64K-out
+  START compress_chunks 512K-in 256K-out
+  START direct output bound 1 bytes
+  START direct output bound 1024 bytes
+  START direct output bound 65536 bytes
+  START direct output bound 262144 bytes
+  START header filename 65536 bytes one-feed
+  START header filename 65536 bytes 64K-feeds
+  START header comment 65536 bytes one-feed
+  START header comment 65536 bytes 64K-feeds
+  START direct decode memory 1MiB one-feed
+  START direct decode memory 2MiB one-feed
+  START incomplete filename memory 65536 bytes metadata-off
+  START incomplete filename memory 65536 bytes metadata-on
+  START incomplete comment memory 65536 bytes metadata-off
+  START incomplete comment memory 65536 bytes metadata-on
+  START async ticker baseline
+  START async decode ticker 1MiB one-item
+  START async decode ticker 1MiB 256K-items
+  START async decode ticker 2MiB one-item
+  START async decode ticker 2MiB 256K-items
+  START async decode ticker empty-blocks 2000
+
+direct decode incompressible 1MiB one-feed 256K-output: 0.001s
+  benchmark_mode: throughput
+  fixture_kind: incompressible
+  fixture_bytes: 1048576
+  fixture_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  compressed_bytes: 1048914
+  compressed_sha256: 6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de
+  output_bytes: 1048576
+  output_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  output_chunks: 5
+  max_output_chunk: 262064
+  throughput_mib_s: 1401.44
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 1048914
+  source_max_bytes: 1048914
+  source_total_bytes: 1048914
+  suite_repeats: 3
+
+direct decode incompressible 1MiB 256K-feeds 256K-output: 0.001s
+  benchmark_mode: throughput
+  fixture_kind: incompressible
+  fixture_bytes: 1048576
+  fixture_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  compressed_bytes: 1048914
+  compressed_sha256: 6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de
+  output_bytes: 1048576
+  output_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  output_chunks: 5
+  max_output_chunk: 262064
+  throughput_mib_s: 1413.03
+  engine: stdlib-zlib
+  source_items: 5
+  source_min_bytes: 338
+  source_max_bytes: 262144
+  source_total_bytes: 1048914
+  suite_repeats: 3
+
+direct decode incompressible 2MiB one-feed 256K-output: 0.001s
+  benchmark_mode: throughput
+  fixture_kind: incompressible
+  fixture_bytes: 2097152
+  fixture_sha256: c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4
+  compressed_bytes: 2097810
+  compressed_sha256: 94677b6de09fea85efcc2e8137328364e5e3b8740a03eb6279c5782046a923f5
+  output_bytes: 2097152
+  output_sha256: c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4
+  output_chunks: 9
+  max_output_chunk: 262064
+  throughput_mib_s: 1435.50
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 2097810
+  source_max_bytes: 2097810
+  source_total_bytes: 2097810
+  suite_repeats: 3
+
+direct decode incompressible 2MiB 256K-feeds 256K-output: 0.001s
+  benchmark_mode: throughput
+  fixture_kind: incompressible
+  fixture_bytes: 2097152
+  fixture_sha256: c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4
+  compressed_bytes: 2097810
+  compressed_sha256: 94677b6de09fea85efcc2e8137328364e5e3b8740a03eb6279c5782046a923f5
+  output_bytes: 2097152
+  output_sha256: c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4
+  output_chunks: 9
+  max_output_chunk: 262064
+  throughput_mib_s: 1448.80
+  engine: stdlib-zlib
+  source_items: 9
+  source_min_bytes: 658
+  source_max_bytes: 262144
+  source_total_bytes: 2097810
+  suite_repeats: 3
+
+direct decode compressible 1MiB one-feed 256K-output: 0.001s
+  benchmark_mode: throughput
+  fixture_kind: compressible
+  fixture_bytes: 1048576
+  fixture_sha256: d1b9693490369f6f29ff9db81b7a20293b870fd8c25eed6fdb1a9b3f04103b77
+  compressed_bytes: 3119
+  compressed_sha256: d11e973d8c1276acb7e672352db7165897d0710724a744d720db3e7303f55452
+  output_bytes: 1048576
+  output_sha256: d1b9693490369f6f29ff9db81b7a20293b870fd8c25eed6fdb1a9b3f04103b77
+  output_chunks: 4
+  max_output_chunk: 262144
+  throughput_mib_s: 1208.67
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 3119
+  source_max_bytes: 3119
+  source_total_bytes: 3119
+  suite_repeats: 3
+
+direct decode compressible 1MiB 256K-feeds 256K-output: 0.001s
+  benchmark_mode: throughput
+  fixture_kind: compressible
+  fixture_bytes: 1048576
+  fixture_sha256: d1b9693490369f6f29ff9db81b7a20293b870fd8c25eed6fdb1a9b3f04103b77
+  compressed_bytes: 3119
+  compressed_sha256: d11e973d8c1276acb7e672352db7165897d0710724a744d720db3e7303f55452
+  output_bytes: 1048576
+  output_sha256: d1b9693490369f6f29ff9db81b7a20293b870fd8c25eed6fdb1a9b3f04103b77
+  output_chunks: 4
+  max_output_chunk: 262144
+  throughput_mib_s: 1225.68
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 3119
+  source_max_bytes: 3119
+  source_total_bytes: 3119
+  suite_repeats: 3
+
+decompress_chunks 64K-in 64K-out: 0.001s
+  benchmark_mode: throughput
+  fixture_bytes: 1048576
+  fixture_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  compressed_sha256: 6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de
+  output_bytes: 1048576
+  output_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  output_chunks: 17
+  max_output_chunk: 65516
+  engine: stdlib-zlib
+  source_items: 17
+  source_min_bytes: 338
+  source_max_bytes: 65536
+  source_total_bytes: 1048914
+  suite_repeats: 3
+
+decompress_chunks 512K-in 256K-out: 0.001s
+  benchmark_mode: throughput
+  fixture_bytes: 1048576
+  fixture_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  compressed_sha256: 6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de
+  output_bytes: 1048576
+  output_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  output_chunks: 5
+  max_output_chunk: 262064
+  engine: stdlib-zlib
+  source_items: 3
+  source_min_bytes: 338
+  source_max_bytes: 524288
+  source_total_bytes: 1048914
+  suite_repeats: 3
+
+compress_chunks 64K-in 64K-out: 0.015s
+  benchmark_mode: throughput
+  fixture_bytes: 1048576
+  fixture_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  compressed_bytes: 1048914
+  compressed_sha256: 6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de
+  output_chunks: 34
+  engine: stdlib-zlib
+  source_items: 16
+  source_min_bytes: 65536
+  source_max_bytes: 65536
+  source_total_bytes: 1048576
+  suite_repeats: 3
+
+compress_chunks 512K-in 256K-out: 0.017s
+  benchmark_mode: throughput
+  fixture_bytes: 1048576
+  fixture_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  compressed_bytes: 1048914
+  compressed_sha256: 6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de
+  output_chunks: 8
+  engine: stdlib-zlib
+  source_items: 2
+  source_min_bytes: 524288
+  source_max_bytes: 524288
+  source_total_bytes: 1048576
+  suite_repeats: 3
+
+direct output bound 1 bytes: 0.031s
+  benchmark_mode: throughput
+  fixture_bytes: 131072
+  fixture_sha256: 066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f
+  compressed_bytes: 131130
+  compressed_sha256: f816ca7a4ef335f9c6292ea6a1ad6e27b94de4c9a13b6694fd9af24888f86600
+  output_bytes: 131072
+  output_sha256: 066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f
+  output_chunks: 131072
+  max_output_chunk: 1
+  output_chunk_size: 1
+  engine_decompress_calls: 2
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 131130
+  source_max_bytes: 131130
+  source_total_bytes: 131130
+  suite_repeats: 3
+
+direct output bound 1024 bytes: 0.000s
+  benchmark_mode: throughput
+  fixture_bytes: 131072
+  fixture_sha256: 066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f
+  compressed_bytes: 131130
+  compressed_sha256: f816ca7a4ef335f9c6292ea6a1ad6e27b94de4c9a13b6694fd9af24888f86600
+  output_bytes: 131072
+  output_sha256: 066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f
+  output_chunks: 128
+  max_output_chunk: 1024
+  output_chunk_size: 1024
+  engine_decompress_calls: 2
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 131130
+  source_max_bytes: 131130
+  source_total_bytes: 131130
+  suite_repeats: 3
+
+direct output bound 65536 bytes: 0.000s
+  benchmark_mode: throughput
+  fixture_bytes: 131072
+  fixture_sha256: 066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f
+  compressed_bytes: 131130
+  compressed_sha256: f816ca7a4ef335f9c6292ea6a1ad6e27b94de4c9a13b6694fd9af24888f86600
+  output_bytes: 131072
+  output_sha256: 066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f
+  output_chunks: 2
+  max_output_chunk: 65536
+  output_chunk_size: 65536
+  engine_decompress_calls: 2
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 131130
+  source_max_bytes: 131130
+  source_total_bytes: 131130
+  suite_repeats: 3
+
+direct output bound 262144 bytes: 0.000s
+  benchmark_mode: throughput
+  fixture_bytes: 131072
+  fixture_sha256: 066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f
+  compressed_bytes: 131130
+  compressed_sha256: f816ca7a4ef335f9c6292ea6a1ad6e27b94de4c9a13b6694fd9af24888f86600
+  output_bytes: 131072
+  output_sha256: 066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f
+  output_chunks: 1
+  max_output_chunk: 131072
+  output_chunk_size: 262144
+  engine_decompress_calls: 1
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 131130
+  source_max_bytes: 131130
+  source_total_bytes: 131130
+  suite_repeats: 3
+
+header filename 65536 bytes one-feed: 0.000s
+  benchmark_mode: throughput
+  header_field: filename
+  header_field_bytes: 65536
+  header_crc: True
+  collect_member_info: False
+  fixture_bytes: 65583
+  fixture_sha256: 599d4cd04a561c8087fb4eeccebb427b7af724af9a53808e9c59679dcf118aa3
+  output_bytes: 24
+  output_sha256: 0581ed587384592c7c9713be7b0891d6ca32f9e817e70798bbed4da76cc59a14
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 65583
+  source_max_bytes: 65583
+  source_total_bytes: 65583
+  suite_repeats: 3
+
+header filename 65536 bytes 64K-feeds: 0.000s
+  benchmark_mode: throughput
+  header_field: filename
+  header_field_bytes: 65536
+  header_crc: True
+  collect_member_info: False
+  fixture_bytes: 65583
+  fixture_sha256: 599d4cd04a561c8087fb4eeccebb427b7af724af9a53808e9c59679dcf118aa3
+  output_bytes: 24
+  output_sha256: 0581ed587384592c7c9713be7b0891d6ca32f9e817e70798bbed4da76cc59a14
+  engine: stdlib-zlib
+  source_items: 2
+  source_min_bytes: 47
+  source_max_bytes: 65536
+  source_total_bytes: 65583
+  suite_repeats: 3
+
+header comment 65536 bytes one-feed: 0.000s
+  benchmark_mode: throughput
+  header_field: comment
+  header_field_bytes: 65536
+  header_crc: True
+  collect_member_info: False
+  fixture_bytes: 65583
+  fixture_sha256: 187b763d6e454d84569771a17e820bb5af11ddfcb23ab654e6e65ef727087015
+  output_bytes: 24
+  output_sha256: 0581ed587384592c7c9713be7b0891d6ca32f9e817e70798bbed4da76cc59a14
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 65583
+  source_max_bytes: 65583
+  source_total_bytes: 65583
+  suite_repeats: 3
+
+header comment 65536 bytes 64K-feeds: 0.000s
+  benchmark_mode: throughput
+  header_field: comment
+  header_field_bytes: 65536
+  header_crc: True
+  collect_member_info: False
+  fixture_bytes: 65583
+  fixture_sha256: 187b763d6e454d84569771a17e820bb5af11ddfcb23ab654e6e65ef727087015
+  output_bytes: 24
+  output_sha256: 0581ed587384592c7c9713be7b0891d6ca32f9e817e70798bbed4da76cc59a14
+  engine: stdlib-zlib
+  source_items: 2
+  source_min_bytes: 47
+  source_max_bytes: 65536
+  source_total_bytes: 65583
+  suite_repeats: 3
+
+direct decode memory 1MiB one-feed: 0.001s
+  benchmark_mode: memory
+  fixture_bytes: 1048576
+  fixture_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  compressed_sha256: 6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de
+  output_bytes: 1048576
+  output_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  output_chunks: 5
+  max_output_chunk: 262064
+  peak_python_bytes: 1091326
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 1048914
+  source_max_bytes: 1048914
+  source_total_bytes: 1048914
+  suite_repeats: 3
+
+direct decode memory 2MiB one-feed: 0.002s
+  benchmark_mode: memory
+  fixture_bytes: 2097152
+  fixture_sha256: c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4
+  compressed_sha256: 94677b6de09fea85efcc2e8137328364e5e3b8740a03eb6279c5782046a923f5
+  output_bytes: 2097152
+  output_sha256: c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4
+  output_chunks: 9
+  max_output_chunk: 262064
+  peak_python_bytes: 1091294
+  engine: stdlib-zlib
+  source_items: 1
+  source_min_bytes: 2097810
+  source_max_bytes: 2097810
+  source_total_bytes: 2097810
+  suite_repeats: 3
+
+incomplete filename memory 65536 bytes metadata-off: 0.000s
+  benchmark_mode: memory
+  header_field: filename
+  header_field_bytes: 65536
+  collect_member_info: False
+  fixture_bytes: 65546
+  fixture_sha256: 2b3501880ddd0d5eb4de2e0638e380fb8c414eec6367ca22cf800e629e20dd7b
+  peak_python_bytes: 1920
+  engine: stdlib-zlib
+  source_items: 2
+  source_min_bytes: 10
+  source_max_bytes: 65536
+  source_total_bytes: 65546
+  suite_repeats: 3
+
+incomplete filename memory 65536 bytes metadata-on: 0.000s
+  benchmark_mode: memory
+  header_field: filename
+  header_field_bytes: 65536
+  collect_member_info: True
+  fixture_bytes: 65546
+  fixture_sha256: 2b3501880ddd0d5eb4de2e0638e380fb8c414eec6367ca22cf800e629e20dd7b
+  peak_python_bytes: 75214
+  engine: stdlib-zlib
+  source_items: 2
+  source_min_bytes: 10
+  source_max_bytes: 65536
+  source_total_bytes: 65546
+  suite_repeats: 3
+
+incomplete comment memory 65536 bytes metadata-off: 0.000s
+  benchmark_mode: memory
+  header_field: comment
+  header_field_bytes: 65536
+  collect_member_info: False
+  fixture_bytes: 65546
+  fixture_sha256: 33917f01513b561b9f3934355e5e5b33b187ea297cb327a69f451cfd276f16d2
+  peak_python_bytes: 1608
+  engine: stdlib-zlib
+  source_items: 2
+  source_min_bytes: 10
+  source_max_bytes: 65536
+  source_total_bytes: 65546
+  suite_repeats: 3
+
+incomplete comment memory 65536 bytes metadata-on: 0.000s
+  benchmark_mode: memory
+  header_field: comment
+  header_field_bytes: 65536
+  collect_member_info: True
+  fixture_bytes: 65546
+  fixture_sha256: 33917f01513b561b9f3934355e5e5b33b187ea297cb327a69f451cfd276f16d2
+  peak_python_bytes: 75246
+  engine: stdlib-zlib
+  source_items: 2
+  source_min_bytes: 10
+  source_max_bytes: 65536
+  source_total_bytes: 65546
+  suite_repeats: 3
+
+async ticker baseline: 0.011s
+  benchmark_mode: ticker
+  ticker_count: 10000
+  ticker_gap_p50_seconds: 0.00
+  ticker_gap_p95_seconds: 0.00
+  ticker_gap_p99_seconds: 0.00
+  ticker_gap_max_seconds: 0.00
+  suite_repeats: 3
+
+async decode ticker 1MiB one-item: 0.001s
+  benchmark_mode: ticker
+  fixture_bytes: 1048576
+  fixture_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  compressed_sha256: 6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de
+  engine: stdlib-zlib
+  ticker_count: 150
+  ticker_gap_p50_seconds: 0.00
+  ticker_gap_p95_seconds: 0.00
+  ticker_gap_p99_seconds: 0.00
+  ticker_gap_max_seconds: 0.00
+  first_output_seconds: 0.00
+  output_bytes: 1048576
+  output_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  output_chunks: 5
+  max_output_chunk: 262064
+  source_items: 1
+  source_min_bytes: 1048914
+  source_max_bytes: 1048914
+  source_total_bytes: 1048914
+  suite_repeats: 3
+
+async decode ticker 1MiB 256K-items: 0.001s
+  benchmark_mode: ticker
+  fixture_bytes: 1048576
+  fixture_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  compressed_sha256: 6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de
+  engine: stdlib-zlib
+  ticker_count: 1
+  ticker_gap_p50_seconds: 0.00
+  ticker_gap_p95_seconds: 0.00
+  ticker_gap_p99_seconds: 0.00
+  ticker_gap_max_seconds: 0.00
+  first_output_seconds: 0.00
+  output_bytes: 1048576
+  output_sha256: 2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6
+  output_chunks: 5
+  max_output_chunk: 262064
+  source_items: 5
+  source_min_bytes: 338
+  source_max_bytes: 262144
+  source_total_bytes: 1048914
+  suite_repeats: 3
+
+async decode ticker 2MiB one-item: 0.002s
+  benchmark_mode: ticker
+  fixture_bytes: 2097152
+  fixture_sha256: c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4
+  compressed_sha256: 94677b6de09fea85efcc2e8137328364e5e3b8740a03eb6279c5782046a923f5
+  engine: stdlib-zlib
+  ticker_count: 57
+  ticker_gap_p50_seconds: 0.00
+  ticker_gap_p95_seconds: 0.00
+  ticker_gap_p99_seconds: 0.00
+  ticker_gap_max_seconds: 0.00
+  first_output_seconds: 0.00
+  output_bytes: 2097152
+  output_sha256: c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4
+  output_chunks: 9
+  max_output_chunk: 262064
+  source_items: 1
+  source_min_bytes: 2097810
+  source_max_bytes: 2097810
+  source_total_bytes: 2097810
+  suite_repeats: 3
+
+async decode ticker 2MiB 256K-items: 0.001s
+  benchmark_mode: ticker
+  fixture_bytes: 2097152
+  fixture_sha256: c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4
+  compressed_sha256: 94677b6de09fea85efcc2e8137328364e5e3b8740a03eb6279c5782046a923f5
+  engine: stdlib-zlib
+  ticker_count: 1
+  ticker_gap_p50_seconds: 0.00
+  ticker_gap_p95_seconds: 0.00
+  ticker_gap_p99_seconds: 0.00
+  ticker_gap_max_seconds: 0.00
+  first_output_seconds: 0.00
+  output_bytes: 2097152
+  output_sha256: c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4
+  output_chunks: 9
+  max_output_chunk: 262064
+  source_items: 9
+  source_min_bytes: 658
+  source_max_bytes: 262144
+  source_total_bytes: 2097810
+  suite_repeats: 3
+
+async decode ticker empty-blocks 2000: 0.000s
+  benchmark_mode: ticker
+  fixture_bytes: 26
+  fixture_sha256: af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd
+  compressed_sha256: bec3cb92aa065ac19fdeb8700f4ee4b98266c866822316571cad4e1963435213
+  empty_blocks: 2000
+  engine_decompress_calls: 1
+  progress_events: unavailable through public API
+  engine: stdlib-zlib
+  ticker_count: 1
+  ticker_gap_p50_seconds: 0.00
+  ticker_gap_p95_seconds: 0.00
+  ticker_gap_p99_seconds: 0.00
+  ticker_gap_max_seconds: 0.00
+  first_output_seconds: 0.00
+  output_bytes: 26
+  output_sha256: af50c59b645ed060b95bc65693280fb6a0c257ed089685e81294b17a9acee1cd
+  output_chunks: 1
+  max_output_chunk: 26
+  source_items: 1
+  source_min_bytes: 10054
+  source_max_bytes: 10054
+  source_total_bytes: 10054
+  suite_repeats: 3
+
+Results saved to /tmp/aiogzip-wp0-completion/baseline-stdlib-executor.json
+
+============================================================
+Benchmarks Complete
+============================================================

@@ -1,0 +1,198 @@
+{
+  "scope": "WP1 local G02 completion; G03 onward remain open",
+  "final_repair_commit": "f39fb8e0f496ad373530eb47ce33472d329f309b",
+  "initial_repair_commit": "c27b48dda7ac2f3d83dcf41c432904d4f8af8355",
+  "source": {
+    "sha": "f39fb8e0f496ad373530eb47ce33472d329f309b",
+    "tree": "d3560487f8f11147d8639efeae8ecf98dd360db0",
+    "status": ""
+  },
+  "harness": {
+    "sha": "c27b48dda7ac2f3d83dcf41c432904d4f8af8355",
+    "tree": "bcd4765399c327769092604a268b0cd7e0454ae7",
+    "status": ""
+  },
+  "quality": {
+    "default": {
+      "passed": 2520,
+      "skipped": 1,
+      "xfailed": 14,
+      "seconds": 21.1,
+      "coverage_percent": 92.93
+    },
+    "forced_stdlib": {
+      "passed": 2520,
+      "skipped": 1,
+      "xfailed": 14,
+      "seconds": 22.7
+    },
+    "run_source": "Main checkout before final repair commit; tested production and test files match final_repair_commit. No installed-platform qualification claimed."
+  },
+  "performance": {
+    "samples_per_case_per_run": 21,
+    "cases_per_run": 10,
+    "final_order_per_engine": [
+      "baseline",
+      "candidate",
+      "candidate-reverse",
+      "baseline-reverse"
+    ],
+    "engines": [
+      "stdlib",
+      "zlib-ng"
+    ],
+    "initial_helper_evidence": "initial-helper/; superseded implementation, retained without overwriting",
+    "disposition": "Observed step medians decreased, but identical-baseline drift prevents a general latency claim. Minimum-time zlib-ng step deltas provide the most consistent signal; decode results are inconclusive. Removing the helper eliminates one task per offloaded step. G17 requires quiet-machine qualification."
+  },
+  "traces": {
+    "scenarios_per_engine": 25,
+    "engines": [
+      "stdlib",
+      "zlib-ng"
+    ],
+    "semantic_differences": 0,
+    "exceptions": {}
+  },
+  "files": {
+    "b1-stdlib-trace.json": {
+      "sha256": "a1259aa79643e607d34d93f5b436f67b7940e786adf208eabe278ca4168bdeb7",
+      "bytes": 25109
+    },
+    "b1-zlib-ng-trace.json": {
+      "sha256": "a0b15d122b9b69e4c360dc9f2b25b518604e365f9261a45863e6ccb4f75f9b5a",
+      "bytes": 25103
+    },
+    "baseline-stdlib-performance-reverse.json": {
+      "sha256": "0e4d23c523450d61e0348ee8cb97997e7e2b50eaf688a331f1cd1deaceed97d4",
+      "bytes": 10629
+    },
+    "baseline-stdlib-performance.json": {
+      "sha256": "b354eb79f4968e952226ea5c72dda6e8e6bf894887a0ba2692fa6242e5b6aba1",
+      "bytes": 10599
+    },
+    "baseline-zlib-ng-performance-reverse.json": {
+      "sha256": "98bd12f002256beb6e8ac80acaf50232c081eef2d30f9d6e010134889a55bdda",
+      "bytes": 10642
+    },
+    "baseline-zlib-ng-performance.json": {
+      "sha256": "54663360dcd0108074b1ebe82812d3dff2b7b44c6a34af6f8bbf805a22cc721e",
+      "bytes": 10647
+    },
+    "candidate-stdlib-performance-reverse.json": {
+      "sha256": "42b90dffdaed1b8420810563b386afa40faf80133c731c0fe606025d82cbf7ac",
+      "bytes": 10630
+    },
+    "candidate-stdlib-performance.json": {
+      "sha256": "a959027995c2988cf07805b168c8a808517f5027161ca37cc49221273004088d",
+      "bytes": 10611
+    },
+    "candidate-stdlib-trace.json": {
+      "sha256": "601bf9fcbb4025f94c4baba6bac7086221e31976b4e4ed62a0bbc91eb4885117",
+      "bytes": 25108
+    },
+    "candidate-zlib-ng-performance-reverse.json": {
+      "sha256": "a0e10a9d8028052be7ba7b6d554cb8856601fba341272b321ff8447b1006d484",
+      "bytes": 10649
+    },
+    "candidate-zlib-ng-performance.json": {
+      "sha256": "7466a6d630c44e4cc58050df17c924fca44aa2b4e7aeac62fa2ab85bbb2648f6",
+      "bytes": 10633
+    },
+    "candidate-zlib-ng-trace.json": {
+      "sha256": "67a8aaf9da07bd466a8d4c8cca12358329d5c523e2c069d762c6eda0ddcb27d6",
+      "bytes": 25102
+    },
+    "compare-stdlib.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "compare-zlib-ng.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "coverage.json.gz": {
+      "sha256": "823891d2bc28a2ab0786f6124c076d58f7041bd06d2796c27f3dd5d08a435707",
+      "bytes": 38624,
+      "uncompressed_sha256": "2419ec520c3e0b0a21c5ce6ed9db448ac021137a556589462aca264b8573c151",
+      "uncompressed_bytes": 328759
+    },
+    "default-suite.log": {
+      "sha256": "ffcad3339f373ed3c54bc1f0958301bfcfad8b0fe21575884d9b651b5aadc3cb",
+      "bytes": 5659
+    },
+    "initial-helper/b1-stdlib-trace.json": {
+      "sha256": "199343a31c43f75da668690abac03162ff7e4558b39882c8f56bd3dde84d0470",
+      "bytes": 25103
+    },
+    "initial-helper/b1-zlib-ng-trace.json": {
+      "sha256": "3f069c5a7c23f4c5990af574d7639a02cc08b079336498ef2728552f5023800a",
+      "bytes": 25097
+    },
+    "initial-helper/baseline-stdlib-performance-reverse.json": {
+      "sha256": "54a1c9c2aba0e55e42a0785d2d201d642374ea18764916e4e3ea80b025876c5e",
+      "bytes": 10639
+    },
+    "initial-helper/baseline-stdlib-performance.json": {
+      "sha256": "224dd5e1903f1d7b82ee6af97931bab282c193e7c17db535d36d3ef4ec7b3c79",
+      "bytes": 10634
+    },
+    "initial-helper/baseline-zlib-ng-performance-reverse.json": {
+      "sha256": "d01715ba67ebe21e176baa70757ac68af9181b20bb9cc8183804d2df25ce09c1",
+      "bytes": 10634
+    },
+    "initial-helper/baseline-zlib-ng-performance.json": {
+      "sha256": "67dd7d4f8e638528e271e59c474bc05c81a52f31c018cb94f508fb0c1c0d88de",
+      "bytes": 10643
+    },
+    "initial-helper/candidate-stdlib-performance-reverse.json": {
+      "sha256": "87da66f8db0c875320179cad4702fa640c28dcab9560d01e20199824e2fe2b68",
+      "bytes": 10622
+    },
+    "initial-helper/candidate-stdlib-performance.json": {
+      "sha256": "ca6f75e17a357ec1cbb41b810f37f87d0b65d17fb00a320ce09702f5565e740c",
+      "bytes": 10631
+    },
+    "initial-helper/candidate-stdlib-trace.json": {
+      "sha256": "b358ff3242b695c763216a312f5774afaa4fec668f89b0c6ac13ca7fb9ec79c4",
+      "bytes": 25102
+    },
+    "initial-helper/candidate-zlib-ng-performance-reverse.json": {
+      "sha256": "70ed261deaa1d02df0878d83eb6d2faa1e8149cc201fa358a7bb3703cfae163d",
+      "bytes": 10635
+    },
+    "initial-helper/candidate-zlib-ng-performance.json": {
+      "sha256": "6c02126d451f710754e8b3803c367694fd230c50e332c62728b40c4ba130cc4a",
+      "bytes": 10660
+    },
+    "initial-helper/candidate-zlib-ng-trace.json": {
+      "sha256": "04348382f5b000cad99ef6688b2da5c0090a56b4743d1316a9f807df47b89662",
+      "bytes": 25096
+    },
+    "initial-helper/compare-stdlib.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "initial-helper/compare-zlib-ng.json": {
+      "sha256": "5dd389feee26df480f2434e1062e64ab9ad1b1f9e8707a2f980c53e41778e65b",
+      "bytes": 71
+    },
+    "initial-helper/coverage.json.gz": {
+      "sha256": "c203f1b72c2908347bee84adf9122534a82d792e721cc907596c4e19ac9afed9",
+      "bytes": 38628,
+      "uncompressed_sha256": "34da2d74ec1afba3d85d6a9eadedeb4907948a12c4005f4a25b30202696290fd",
+      "uncompressed_bytes": 328774
+    },
+    "initial-helper/default-suite.log": {
+      "sha256": "6cb48536adb804c46ecbc8e7426787ecc43005a82ac12453a7bebc887d3c1c85",
+      "bytes": 5652
+    },
+    "initial-helper/stdlib-suite.log": {
+      "sha256": "000b7419e4d8b36568affef3011daee064aec69deb3efd6e58fe75e4b18cf855",
+      "bytes": 2925
+    },
+    "stdlib-suite.log": {
+      "sha256": "d5293953aca9f8341e0fff1c675fb9a4fd7dff1bb7836e6db5ab4c03adc9564e",
+      "bytes": 2925
+    }
+  }
+}

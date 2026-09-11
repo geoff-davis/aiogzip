@@ -86,7 +86,7 @@ async def test_large_decoder_operation_offloads_only_first_step(monkeypatch):
     assert b"".join(output) == payload
 
 
-async def test_cancellation_waits_for_worker_then_poisons_codec(monkeypatch):
+async def test_cancellation_waits_for_worker_then_poisons_codec(mock_codec_executor):
     started = asyncio.Event()
     release = asyncio.Event()
     completed = asyncio.Event()
@@ -99,7 +99,7 @@ async def test_cancellation_waits_for_worker_then_poisons_codec(monkeypatch):
         finally:
             completed.set()
 
-    monkeypatch.setattr(async_module, "_run_in_thread", controlled_offload)
+    mock_codec_executor(controlled_offload)
     payload = os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1)
     encoder = GzipEncoder(mtime=0)
     list(encoder.start())
