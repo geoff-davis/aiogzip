@@ -2,6 +2,7 @@
 
 import asyncio
 import gzip
+import hashlib
 import io
 import json
 import os
@@ -14,7 +15,57 @@ import aiofiles.threadpool
 import pytest
 
 import aiogzip
-from aiogzip import AsyncGzipBinaryFile
+from aiogzip import AsyncGzipBinaryFile, _codec_async
+
+
+@pytest.mark.parametrize("cancellations", [1, 3])
+async def test_real_codec_worker_settles_before_caller_cancellation(
+    monkeypatch, cancellations
+):
+    """Control case: caller-only cancellation retains the real encoder operation."""
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    release, settled = threading.Event(), threading.Event()
+    original = _codec_async._run_in_thread
+
+    async def gated(method, data):
+        def advance(workload):
+            loop.call_soon_threadsafe(entered.set)
+            try:
+                if not release.wait(5):
+                    raise RuntimeError("codec worker watchdog expired")
+                return method(workload)
+            finally:
+                settled.set()
+
+        return await original(advance, data)
+
+    monkeypatch.setattr(_codec_async, "_run_in_thread", gated)
+    encoder = aiogzip.GzipEncoder(mtime=0)
+    list(encoder.start())
+    payload = hashlib.shake_256(b"native codec control").digest(350_000)
+    stream = _codec_async._drive_operation(encoder.feed(payload), workload=payload)
+    caller = asyncio.create_task(anext(stream))
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        for _ in range(cancellations):
+            caller.cancel()
+            await asyncio.sleep(0)
+        assert not caller.done()
+        with pytest.raises(RuntimeError, match="active operation"):
+            encoder.finish()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await caller
+        assert settled.is_set()
+        with pytest.raises(OSError, match="unusable"):
+            encoder.finish()
+    finally:
+        release.set()
+        await asyncio.gather(caller, return_exceptions=True)
+        if entered.is_set():
+            assert await asyncio.to_thread(settled.wait, 5)
+        await stream.aclose()
 
 
 @pytest.mark.xfail(
