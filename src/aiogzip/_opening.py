@@ -47,7 +47,7 @@ async def _acquire_path(filename: Any, mode: str, opener: Any) -> Any:
         try:
             await _settle_before_cancel(loop.run_in_executor(None, raw.close))
         except BaseException as cleanup:
-            raise cancellation from cleanup
+            cancellation.add_note(f"Opening cleanup also failed: {cleanup!r}")
         raise
     try:
         return aiofiles.threadpool.wrap(raw, loop=loop)
@@ -55,7 +55,7 @@ async def _acquire_path(filename: Any, mode: str, opener: Any) -> Any:
         try:
             await _settle_before_cancel(loop.run_in_executor(None, raw.close))
         except BaseException as cleanup:
-            raise failure from cleanup
+            failure.add_note(f"Opening cleanup also failed: {cleanup!r}")
         raise
 
 

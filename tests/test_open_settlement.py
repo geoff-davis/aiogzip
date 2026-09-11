@@ -123,11 +123,14 @@ async def test_cancel_before_open_starts_does_not_acquire(monkeypatch, text, wri
 
 
 @pytest.mark.parametrize("text", [False, True])
+@pytest.mark.parametrize("existing_cause", [False, True])
 async def test_failed_header_preserves_primary_error_when_cleanup_fails(
-    monkeypatch, text
+    monkeypatch, text, existing_cause
 ):
     events = []
     primary = OSError("header failure")
+    original_cause = ValueError("sink cause") if existing_cause else None
+    primary.__cause__ = original_cause
     cleanup = RuntimeError("cleanup failure")
 
     class Resource:
@@ -147,7 +150,10 @@ async def test_failed_header_preserves_primary_error_when_cleanup_fails(
     with pytest.raises(OSError) as caught:
         await f.open()
     assert caught.value is primary
-    assert primary.__cause__ is cleanup
+    assert primary.__cause__ is original_cause
+    assert primary.__notes__ == [
+        "Opening cleanup also failed: RuntimeError('cleanup failure')"
+    ]
     assert events == ["close"]
     assert (f._binary_file if text else f._file) is None
     await f.close()

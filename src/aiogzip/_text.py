@@ -400,7 +400,7 @@ class AsyncGzipTextFile:
                 try:
                     await binary_file.close()
                 except BaseException as cleanup:
-                    raise failure from cleanup
+                    failure.add_note(f"Opening cleanup also failed: {cleanup!r}")
                 raise
             binary_file._closed_observer = self._mark_binary_closed
             binary_file._read_poison_observer = self._mark_binary_read_poisoned
@@ -422,6 +422,11 @@ class AsyncGzipTextFile:
         """Exit the context manager, flushing and closing the file."""
         binary_file = self._binary_file
         if binary_file is None:
+            if self._opening and exc_val is not None:
+                # Match binary exceptional exit: preserve the body's failure.
+                # The concurrent opener still owns its unpublished resource;
+                # this exit neither releases it nor reports it closed.
+                return
             await self.close()
             return
         try:
