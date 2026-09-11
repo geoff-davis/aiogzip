@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import dataclasses
 import gzip
 import hashlib
 import json
@@ -26,7 +27,18 @@ async def measure(args):
         raise RuntimeError("source checkout must be clean")
     sys.path.insert(0, str(root / "src"))
     os.environ["AIOGZIP_ENGINE"] = args.engine
+    import aiogzip
     from aiogzip import AsyncGzipTextFile, engine_info
+
+    if not Path(aiogzip.__file__).resolve().is_relative_to(root / "src"):
+        raise RuntimeError("wrong source import")
+    engines = dataclasses.asdict(engine_info())
+    expected_engine = "stdlib-zlib" if args.engine == "stdlib" else "zlib-ng"
+    if engines["decompression"] != expected_engine:
+        raise RuntimeError("requested engine unavailable")
+    harness = Path(__file__).resolve().parents[1]
+    if git(harness, "status", "--porcelain"):
+        raise RuntimeError("harness checkout must be clean")
 
     rows = []
     cases = (
@@ -85,7 +97,8 @@ async def measure(args):
         commit=git(root, "rev-parse", "HEAD"),
         harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         python=sys.version,
-        engine=engine_info(),
+        engine=engines,
+        harness_commit=git(harness, "rev-parse", "HEAD"),
         load=os.getloadavg(),
         rows=rows,
     )
