@@ -49,6 +49,7 @@ test = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24",
     "pytest-cov>=4.0.0",
+    "pytest-timeout>=2.3.1",
     "hypothesis>=6.0.0",
     "psutil",
     "mypy>=1.0.0",
