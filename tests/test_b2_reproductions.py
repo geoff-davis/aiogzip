@@ -73,11 +73,6 @@ async def test_native_cleanup_follows_final_worker_access(monkeypatch):
     assert events == ["last native access", "cleanup"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="F2: consumed member A can disappear on cancel",
-)
 async def test_consumed_member_cannot_be_replaced_by_successful_suffix():
     consumed = asyncio.Event()
     release = asyncio.Event()

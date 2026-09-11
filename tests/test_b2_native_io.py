@@ -85,11 +85,6 @@ async def test_real_codec_worker_settles_before_caller_cancellation(
         await stream.aclose()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="F2: aiofiles read loses consumed member A",
-)
 async def test_native_source_consumption_cannot_accept_suffix(monkeypatch, tmp_path):
     loop = asyncio.get_running_loop()
     entered = asyncio.Event()

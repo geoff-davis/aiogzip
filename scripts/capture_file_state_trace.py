@@ -32,6 +32,9 @@ class Source:
         self.reads.append({"requested": size, "returned": len(data)})
         return data
 
+    def tell(self) -> int:
+        return self.buffer.tell()
+
     async def seek(self, offset: int, whence: int = 0) -> int:
         return self.buffer.seek(offset, whence)
 
