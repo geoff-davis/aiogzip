@@ -444,6 +444,13 @@ class AsyncGzipBinaryFile:
             try:
                 await self._cleanup_failed_enter(resource, owns_file, encoder, decoder)
             except BaseException as cleanup:
+                # Outside cancellation/interrupts outrank an ordinary failure.
+                if isinstance(failure, Exception) and not isinstance(
+                    cleanup, Exception
+                ):
+                    if cleanup.__context__ is None:
+                        cleanup.__context__ = failure
+                    raise
                 failure.add_note(f"Opening cleanup also failed: {cleanup!r}")
             raise
         finally:

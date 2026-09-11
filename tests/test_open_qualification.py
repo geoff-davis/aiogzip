@@ -198,11 +198,11 @@ async def test_native_cleanup_stays_reserved_through_repeated_cancel(
         with pytest.raises(ConcurrentOperationError):
             await f.close()
         release.set()
-        with pytest.raises(OSError) as caught:
+        with pytest.raises(asyncio.CancelledError, match="cleanup-0") as caught:
             await opener
-        assert caught.value is primary
+        assert caught.value.__context__ is primary
         assert primary.__cause__ is original_cause
-        assert any("CancelledError" in note for note in primary.__notes__)
+        assert opener.cancelled()
         assert events == ["close"] and raw.closed
         assert (f._binary_file if text else f._file) is None
         await f.close()
@@ -496,11 +496,11 @@ async def test_cooperative_cleanup_finishes_before_releasing_open_reservation(
         with pytest.raises(ConcurrentOperationError):
             await f.open()
         opener.cancel("during cleanup")
-        with pytest.raises(OSError) as caught:
+        with pytest.raises(asyncio.CancelledError, match="during cleanup") as caught:
             await opener
-        assert caught.value is primary
+        assert caught.value.__context__ is primary
         assert events == ["closed"]
-        assert any("during cleanup" in note for note in primary.__notes__)
+        assert opener.cancelled()
         assert (f._binary_file if text else f._file) is None
         await f.close()
     finally:

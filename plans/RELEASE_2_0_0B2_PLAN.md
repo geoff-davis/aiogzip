@@ -291,7 +291,7 @@ create competing copies of the same checkboxes in every section.
 * [x] G01 — [Oracle and local qualification](reviews/v2.0.0b2-qualification.md#wp0-local-completion)
 * [x] G02 — [Native settlement repair and paired evidence](reviews/v2.0.0b2-wp1-completion.md)
 * [x] G03 — [Source settlement, BC2 policy and verification](reviews/v2.0.0b2-wp2-completion.md#maintainer-review-correction)
-* [x] G04 — [Opening ownership and exact BC3 qualification](reviews/v2.0.0b2-wp3-completion.md)
+* [ ] G04 — [Opening ownership and exact BC3 qualification](reviews/v2.0.0b2-wp3-completion.md)
 * [ ] G05
 * [ ] G06
 * [ ] G07

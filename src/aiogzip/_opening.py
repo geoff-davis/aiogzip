@@ -55,6 +55,11 @@ async def _acquire_path(filename: Any, mode: str, opener: Any) -> Any:
         try:
             await _settle_before_cancel(loop.run_in_executor(None, raw.close))
         except BaseException as cleanup:
+            # Outside cancellation/interrupts outrank an ordinary failure.
+            if isinstance(failure, Exception) and not isinstance(cleanup, Exception):
+                if cleanup.__context__ is None:
+                    cleanup.__context__ = failure
+                raise
             failure.add_note(f"Opening cleanup also failed: {cleanup!r}")
         raise
 

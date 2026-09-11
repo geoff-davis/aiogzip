@@ -400,6 +400,13 @@ class AsyncGzipTextFile:
                 try:
                     await binary_file.close()
                 except BaseException as cleanup:
+                    # Outside cancellation/interrupts outrank an ordinary failure.
+                    if isinstance(failure, Exception) and not isinstance(
+                        cleanup, Exception
+                    ):
+                        if cleanup.__context__ is None:
+                            cleanup.__context__ = failure
+                        raise
                     failure.add_note(f"Opening cleanup also failed: {cleanup!r}")
                 raise
             binary_file._closed_observer = self._mark_binary_closed
