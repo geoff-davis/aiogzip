@@ -237,6 +237,11 @@ was consumed. That cursor must account for consumption even when the method rais
 a success-only byte counter does not establish safe retry. Async `tell()` methods
 do not provide this checkpoint.
 
+The custom-source checkpoint calls synchronous `tell()` once before each physical
+read (and seek), plus once after a failure when a valid initial checkpoint exists.
+These are new calls into source code: `tell()` must be observational and inexpensive.
+A successful read does not require a second checkpoint.
+
 A broken source-read path does not expose buffered data as validation salvage.
 Recover with a successfully completed physical `seek(0)`, or reopen the source
 from the beginning. A non-seekable replay cache cannot recover input that the

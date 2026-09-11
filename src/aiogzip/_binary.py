@@ -1687,10 +1687,17 @@ class AsyncGzipBinaryFile:
             if method == "read" or hasattr(result, "__await__"):
                 result = await result
             return result
-        except BaseException:
+        except BaseException as error:
             if before is None or _source_position(source) != before:
                 self._poison_source()
             if self._source_abort_requested:
+                if isinstance(error, asyncio.CancelledError):
+                    # Context exit owns one cancellation, converted below to
+                    # "read aborted". Consume only that request; any outside
+                    # cancellation counts must remain with the caller.
+                    owner = self._source_owner
+                    if owner is not None:
+                        owner.uncancel()
                 self._check_read_call_not_aborted()
             raise
         finally:

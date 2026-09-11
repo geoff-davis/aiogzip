@@ -812,3 +812,110 @@ async def test_cancel_can_prevent_native_entry_after_executor_start(
         await f.close()
         if not raw.closed:
             raw.close()
+
+
+@pytest.mark.parametrize("text", [False, True])
+@pytest.mark.parametrize("exit_kind", ["body-error", "cancelled-clean-exit"])
+@pytest.mark.parametrize(
+    "followup",
+    [
+        "count",
+        pytest.param(
+            "taskgroup",
+            marks=pytest.mark.skipif(
+                sys.version_info < (3, 13),
+                reason="TaskGroup cancellation-count preservation requires Python 3.13+",
+            ),
+        ),
+    ],
+)
+async def test_custom_context_abort_does_not_leave_reader_cancelled(
+    text, exit_kind, followup
+):
+    entered = asyncio.Event()
+    leaving = asyncio.Event()
+    reader = None
+
+    class Source:
+        async def read(self, size=-1):
+            entered.set()
+            await asyncio.Future()
+
+    f = wrapper(Source(), text)
+
+    async def fail():
+        raise ValueError("child failure")
+
+    async def read_and_continue():
+        with pytest.raises(OSError, match="read aborted"):
+            await f.read()
+        if followup == "count":
+            assert asyncio.current_task().cancelling() == 0
+        else:
+            # Python 3.13+ reissues an apparent external cancellation after
+            # handling the child failure when a stale count survives the abort.
+            with pytest.raises(ExceptionGroup):
+                async with asyncio.TaskGroup() as group:
+                    group.create_task(fail())
+        return "continued"
+
+    async def context_owner():
+        nonlocal reader
+        async with f:
+            reader = asyncio.create_task(read_and_continue())
+            await entered.wait()
+            leaving.set()
+            if exit_kind == "body-error":
+                raise ValueError("body failure")
+
+    owner = asyncio.create_task(context_owner())
+    try:
+        await asyncio.wait_for(leaving.wait(), 5)
+        if exit_kind == "cancelled-clean-exit":
+            owner.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await owner
+        else:
+            with pytest.raises(ValueError, match="body failure"):
+                await owner
+        assert await reader == "continued"
+        assert not reader.cancelled()
+        assert reader.cancelling() == 0
+        assert f.closed
+    finally:
+        owner.cancel()
+        if reader is not None:
+            reader.cancel()
+        await asyncio.gather(
+            owner, *([reader] if reader is not None else []), return_exceptions=True
+        )
+        await f.close()
+
+
+@pytest.mark.parametrize("text", [False, True])
+async def test_custom_context_abort_preserves_outside_cancellation_count(text):
+    entered = asyncio.Event()
+
+    class Source:
+        async def read(self, size=-1):
+            entered.set()
+            await asyncio.Future()
+
+    f = wrapper(Source(), text)
+    reader = None
+    try:
+        with pytest.raises(ValueError, match="body failure"):
+            async with f:
+                reader = asyncio.create_task(f.read())
+                await asyncio.wait_for(entered.wait(), 5)
+                # Queue an independent request immediately before context exit
+                # adds its own, without allowing the reader to resume between.
+                reader.cancel("outside")
+                raise ValueError("body failure")
+        with pytest.raises(OSError, match="read aborted"):
+            await reader
+        assert reader.cancelling() == 1
+    finally:
+        if reader is not None:
+            await asyncio.gather(reader, return_exceptions=True)
+        await f.close()
