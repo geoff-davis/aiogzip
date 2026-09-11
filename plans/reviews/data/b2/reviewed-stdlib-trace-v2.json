@@ -1,5 +1,40 @@
 {
   "schema": 2,
+  "source": {
+    "sha": "3709027c985eb9a9476211b8ee60e153c986a28d",
+    "tree": "ce1c34331f6b3ccba917d63b7f16622b5e092515",
+    "status": "",
+    "import": "/tmp/aiogzip-b2-reviewed-harness-3709027/src/aiogzip/__init__.py"
+  },
+  "harness": {
+    "sha": "3709027c985eb9a9476211b8ee60e153c986a28d",
+    "tree": "ce1c34331f6b3ccba917d63b7f16622b5e092515",
+    "status": "",
+    "path": "/tmp/aiogzip-b2-reviewed-harness-3709027/scripts/capture_file_state_trace.py"
+  },
+  "harness_sha256": "007257058eabcc907ee1c96475ae4e8b2cd602c38b5cd97fc09544226a4aa243",
+  "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "engines": {
+    "compression": "stdlib-zlib",
+    "decompression": "stdlib-zlib",
+    "crc32": "stdlib-zlib"
+  },
+  "dependencies": {
+    "aiofiles": "25.1.0",
+    "zlib-ng": "1.0.0"
+  },
+  "fixture_sha256": "852ff69881b1e313e0dd7a7c57fb947baf36f65f2531aa76fd0663a64519ec36",
+  "command": [
+    "/tmp/aiogzip-b2-reviewed-harness-3709027/scripts/capture_file_state_trace.py",
+    "--source-root",
+    "/tmp/aiogzip-b2-reviewed-harness-3709027",
+    "--engine",
+    "stdlib",
+    "--require-clean",
+    "--output",
+    "/tmp/aiogzip-b2-review-evidence-3709027/reviewed-stdlib-trace-v2.json"
+  ],
   "semantic": {
     "text-cookie-newline=None": [
       [
@@ -314,18 +349,161 @@
       ]
     ]
   },
-  "fixture_sha256": "852ff69881b1e313e0dd7a7c57fb947baf36f65f2531aa76fd0663a64519ec36",
-  "harness_sha256": "007257058eabcc907ee1c96475ae4e8b2cd602c38b5cd97fc09544226a4aa243",
-  "source": {
-    "sha": "048700fe9f6030f8a2b6da92b685bcd108a17dd1",
-    "tree": "356a83360d4d570fea91c603c29f61f51ac6f7a1",
-    "status": "",
-    "import": "/tmp/aiogzip-b2-b1-reference/src/aiogzip/__init__.py"
-  },
-  "harness": {
-    "sha": "3709027c985eb9a9476211b8ee60e153c986a28d",
-    "tree": "ce1c34331f6b3ccba917d63b7f16622b5e092515",
-    "status": "",
-    "path": "/tmp/aiogzip-b2-reviewed-harness-3709027/scripts/capture_file_state_trace.py"
+  "diagnostic": {
+    "text-cookie-newline=None": {
+      "H1": [
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        }
+      ],
+      "H2": []
+    },
+    "text-cookie-newline=''": {
+      "H1": [
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        }
+      ],
+      "H2": []
+    },
+    "text-cookie-newline='\\n'": {
+      "H1": [
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        }
+      ],
+      "H2": []
+    },
+    "text-cookie-newline='\\r'": {
+      "H1": [
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        }
+      ],
+      "H2": []
+    },
+    "text-cookie-newline='\\r\\n'": {
+      "H1": [
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        },
+        {
+          "requested": 262144,
+          "returned": 39
+        },
+        {
+          "requested": 262144,
+          "returned": 0
+        }
+      ],
+      "H2": []
+    },
+    "binary-position": [
+      {
+        "requested": 262144,
+        "returned": 39
+      },
+      {
+        "requested": 262144,
+        "returned": 0
+      }
+    ]
   }
 }
