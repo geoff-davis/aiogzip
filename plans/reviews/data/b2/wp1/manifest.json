@@ -42,7 +42,7 @@
       "zlib-ng"
     ],
     "initial_helper_evidence": "initial-helper/; superseded implementation, retained without overwriting",
-    "disposition": "Final executor-step latency decreased in all four pairs. Shared-host throughput variation remains; no general speed claim or G17 closure."
+    "disposition": "Observed step medians decreased, but identical-baseline drift prevents a general latency claim. Minimum-time zlib-ng step deltas provide the most consistent signal; decode results are inconclusive. Removing the helper eliminates one task per offloaded step. G17 requires quiet-machine qualification."
   },
   "traces": {
     "scenarios_per_engine": 25,
