@@ -103,3 +103,29 @@ async def test_pending_hints_interleave_with_cookie_replay(tmp_path, newline, en
         await reader.seek(cookie)
         assert await reader.readlines(1) == lines[2:3]
         assert await reader.readlines() == lines[3:]
+
+
+@pytest.mark.parametrize("hint", [1, 8192, 1 << 20])
+@pytest.mark.parametrize("newline", [None, "\n", "\r"])
+async def test_pending_hints_salvage_complete_lines_before_partial_tail(
+    tmp_path, hint, newline
+):
+    term = newline or "\n"
+    lines = ["αβ" + term] * 1000
+    tail = "unterminated α"
+    corrupt = bytearray(gzip.compress(("".join(lines) + tail).encode(), mtime=0))
+    corrupt[-8] ^= 1
+    path = tmp_path / "corrupt.gz"
+    path.write_bytes(corrupt)
+    async with AsyncGzipTextFile(path, "rt", newline=newline) as reader:
+        with pytest.raises(gzip.BadGzipFile, match="CRC check failed"):
+            await reader.read()
+        recovered = []
+        while len(recovered) < len(lines):
+            batch = await reader.readlines(hint)
+            assert batch
+            recovered.extend(batch)
+        assert recovered == lines
+        with pytest.raises(OSError, match="broken"):
+            await reader.readlines(hint)
+        assert await reader.read() == tail
