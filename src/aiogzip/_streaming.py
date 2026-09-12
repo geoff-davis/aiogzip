@@ -8,6 +8,7 @@ from ._codec_async import (
     _DECODE_OFFLOAD_THRESHOLD,
     _cooperative_checkpoint,
     _drive_operation,
+    _StreamBudget,
 )
 from ._common import (
     _validate_bool,
@@ -21,9 +22,10 @@ from .codec import (
     _snapshot_bytes_input,
 )
 
-# This stream-level backstop bounds compressed source input, not decompression
-# work or output volume; per-operation output counters reset for every feed.
+# Source budgets complement shared codec work/output budgets. Count empty
+# items too, and checkpoint before asking the source for another item.
 _INLINE_SOURCE_BYTES_CHECKPOINT = 16 * 1024 * 1024
+_SOURCE_ITEMS_CHECKPOINT = 256
 
 
 def _decompress_chunks(
@@ -61,9 +63,15 @@ async def _decompress_chunks_impl(
         decoder.discard()
         raise TypeError("source.__aiter__() must return an asynchronous iterator")
     failed = False
-    inline_source_bytes = 0
+    budget = _StreamBudget()
     try:
         while True:
+            if (
+                budget.source_items >= _SOURCE_ITEMS_CHECKPOINT
+                or budget.source_bytes >= _INLINE_SOURCE_BYTES_CHECKPOINT
+            ):
+                await _cooperative_checkpoint()
+                budget.reset()
             try:
                 compressed = await iterator.__anext__()
             except StopAsyncIteration:
@@ -71,25 +79,20 @@ async def _decompress_chunks_impl(
             if not isinstance(compressed, bytes):
                 raise TypeError("decompress_chunks() source items must be bytes")
             snapshot = _snapshot_bytes_input(compressed)
+            budget.source_items += 1
+            budget.source_bytes += len(snapshot)
             if not snapshot:
                 continue
-            offloaded = len(snapshot) >= _DECODE_OFFLOAD_THRESHOLD
-            if offloaded:
-                inline_source_bytes = 0
-            elif inline_source_bytes >= _INLINE_SOURCE_BYTES_CHECKPOINT:
-                await _cooperative_checkpoint()
-                inline_source_bytes = 0
             async for output in _drive_operation(
                 cast(_AsyncDrivableOperation, decoder.feed(snapshot)),
                 workload=snapshot,
                 offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
+                budget=budget,
             ):
                 yield output
-            if not offloaded:
-                inline_source_bytes += len(snapshot)
 
         async for output in _drive_operation(
-            cast(_AsyncDrivableOperation, decoder.finish())
+            cast(_AsyncDrivableOperation, decoder.finish()), budget=budget
         ):
             yield output
     except BaseException:
@@ -143,13 +146,20 @@ async def _compress_chunks_impl(
         encoder.discard()
         raise TypeError("source.__aiter__() must return an asynchronous iterator")
     failed = False
+    budget = _StreamBudget()
     try:
         async for output in _drive_operation(
-            cast(_AsyncDrivableOperation, encoder.start())
+            cast(_AsyncDrivableOperation, encoder.start()), budget=budget
         ):
             yield output
 
         while True:
+            if (
+                budget.source_items >= _SOURCE_ITEMS_CHECKPOINT
+                or budget.source_bytes >= _INLINE_SOURCE_BYTES_CHECKPOINT
+            ):
+                await _cooperative_checkpoint()
+                budget.reset()
             try:
                 uncompressed = await iterator.__anext__()
             except StopAsyncIteration:
@@ -157,16 +167,19 @@ async def _compress_chunks_impl(
             if not isinstance(uncompressed, bytes):
                 raise TypeError("compress_chunks() source items must be bytes")
             snapshot = _snapshot_bytes_input(uncompressed)
+            budget.source_items += 1
+            budget.source_bytes += len(snapshot)
             if not snapshot:
                 continue
             async for output in _drive_operation(
                 encoder._feed_snapshot(snapshot),
                 workload=snapshot,
+                budget=budget,
             ):
                 yield output
 
         async for output in _drive_operation(
-            cast(_AsyncDrivableOperation, encoder.finish())
+            cast(_AsyncDrivableOperation, encoder.finish()), budget=budget
         ):
             yield output
     except BaseException:
