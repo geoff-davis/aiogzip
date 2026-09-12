@@ -1583,13 +1583,18 @@ class AsyncGzipTextFile:
             idx = self._pending_idx
             pending = self._pending_lines
             if idx < len(pending):
-                remaining = pending[idx:]
-                remaining_size = sum(map(len, remaining))
-
-                # Consume a complete pending batch when it cannot cross the
-                # hint. An exact hit may also be transferred in bulk and then
-                # returned immediately.
-                if hint <= 0 or total_size + remaining_size <= hint:
+                # Pending lines are a prefix of the unread buffer and fit
+                # within the refill window. The over-long-line fallback makes
+                # one line, consumed immediately, so it leaves none pending.
+                # Both bounds survive compaction; cap at the window so a large
+                # decoded chunk cannot disable bulk transfer. Every line we
+                # measure is guaranteed to fit and be consumed in this call.
+                if hint <= 0 or hint - total_size >= min(
+                    len(self._text_buffer) - self._text_buffer_offset,
+                    self._LINE_BATCH_CHARS,
+                ):
+                    remaining = pending[idx:]
+                    remaining_size = sum(map(len, remaining))
                     lines.extend(remaining)
                     self._pending_idx = len(pending)
                     self._text_buffer_offset += remaining_size
@@ -1598,8 +1603,8 @@ class AsyncGzipTextFile:
                         return lines
                     continue
 
-                # The hint lands within this batch. Walk only as far as the
-                # first whole line that reaches it, leaving the rest pending.
+                # Walk through the first whole line that reaches the hint,
+                # leaving the rest pending.
                 text_offset = self._text_buffer_offset
                 while idx < len(pending):
                     line = pending[idx]
@@ -1613,9 +1618,8 @@ class AsyncGzipTextFile:
                         self._text_buffer_offset = text_offset
                         return lines
 
-                # Runtime callers can still pass non-integer values despite
-                # the annotation. Keep the stream state coherent even for an
-                # unusual comparison value such as float("nan").
+                # The batch ended before the hint was reached. Publish its
+                # consumption before refilling (also handles float("nan")).
                 self._pending_idx = idx
                 self._text_buffer_offset = text_offset
 

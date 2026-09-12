@@ -14,6 +14,10 @@ from pathlib import Path
 
 import pytest
 
+# A broken drain loop can block the event loop, so an asyncio timeout is
+# insufficient. The thread watchdog also bounds executor-shutdown hangs.
+pytestmark = pytest.mark.timeout(60, method="thread")
+
 REPO_ROOT = Path(__file__).parents[2]
 EXAMPLE_PATH = REPO_ROOT / "examples" / "concurrent_jsonl_ingest.py"
 

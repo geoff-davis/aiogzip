@@ -155,11 +155,6 @@ async def test_overlapping_open_has_one_resource_owner(monkeypatch):
     assert len(acquired) == 1 and counts == [1], counts
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="F4: every tiny hint copies the pending suffix",
-)
 async def test_pending_batch_drain_has_linear_copy_work(tmp_path):
     class CountedBatch(list):
         copied = 0
