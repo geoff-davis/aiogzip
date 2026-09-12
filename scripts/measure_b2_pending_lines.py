@@ -61,7 +61,13 @@ async def measure(args):
                 ["x\n"] * count
                 if args.category == "scaling"
                 else [
-                    json.dumps({"id": i, "message": "αβ" * 32}) + "\n"
+                    json.dumps(
+                        {
+                            "id": i if args.payload == "varied" else 0,
+                            "message": "αβ" * 32,
+                        }
+                    )
+                    + "\n"
                     for i in range(count)
                 ]
             )
@@ -70,7 +76,9 @@ async def measure(args):
             durations = []
             for _ in range(args.repeat):
                 output = []
-                async with AsyncGzipTextFile(path, "rt", newline="\n") as reader:
+                async with AsyncGzipTextFile(
+                    path, "rt", newline="\n", chunk_size=args.chunk_size
+                ) as reader:
                     started = time.perf_counter()
                     if batching:
                         async for batch in reader.iter_batches():
@@ -84,6 +92,8 @@ async def measure(args):
             rows.append(
                 dict(
                     lines=count,
+                    chunk_size=args.chunk_size,
+                    payload=args.payload,
                     hint=hint,
                     iter_batches=batching,
                     seconds=durations,
@@ -100,6 +110,9 @@ async def measure(args):
         engine=engines,
         harness_commit=git(harness, "rev-parse", "HEAD"),
         load=os.getloadavg(),
+        affinity=sorted(os.sched_getaffinity(0))
+        if hasattr(os, "sched_getaffinity")
+        else None,
         rows=rows,
     )
 
@@ -110,6 +123,8 @@ if __name__ == "__main__":
     parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
     parser.add_argument("--category", choices=("scaling", "bulk"), required=True)
     parser.add_argument("--repeat", type=int, default=3)
+    parser.add_argument("--chunk-size", type=int, default=256 * 1024)
+    parser.add_argument("--payload", choices=("varied", "repetitive"), default="varied")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     result = asyncio.run(measure(args))

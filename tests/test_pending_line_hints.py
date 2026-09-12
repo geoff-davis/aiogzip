@@ -64,7 +64,9 @@ async def test_pending_work_is_linear_even_with_long_lines(tmp_path, hint):
             work += len(result) if isinstance(key, slice) else 1
             return result
 
-    expected = ["x" * 1023 + "\n", "\n"] * 1024
+    pair = ["x" * 1023 + "\n", "\n"]
+    expected = pair * (AsyncGzipTextFile._LINE_BATCH_CHARS // sum(map(len, pair)))
+    assert sum(map(len, expected)) <= AsyncGzipTextFile._LINE_BATCH_CHARS
     path = tmp_path / "work.gz"
     path.write_bytes(gzip.compress(b"", mtime=0))
     async with AsyncGzipTextFile(path, "rt", newline="\n") as reader:
@@ -129,3 +131,74 @@ async def test_pending_hints_salvage_complete_lines_before_partial_tail(
         with pytest.raises(OSError, match="broken"):
             await reader.readlines(hint)
         assert await reader.read() == tail
+
+
+@pytest.mark.parametrize("newline", [None, "\n", "\r"])
+async def test_large_chunk_retains_bulk_transfer(tmp_path, newline):
+    class Batch(list):
+        copied = 0
+
+        def __getitem__(self, key):
+            result = super().__getitem__(key)
+            if isinstance(key, slice):
+                self.copied += len(result)
+            return result
+
+    term = newline or "\n"
+    line = "αβ" * 16 + term
+    path = tmp_path / "large-chunk.gz"
+    path.write_bytes(gzip.compress((line * 200000).encode(), mtime=0))
+    async with AsyncGzipTextFile(
+        path, "rt", newline=newline, chunk_size=4 << 20
+    ) as reader:
+        assert await reader.readline() == line
+        assert await reader.readline() == line
+        pending = Batch(reader._pending_lines)
+        reader._pending_lines = pending
+        assert len(reader._text_buffer) - reader._text_buffer_offset > 1 << 20
+        remaining = len(pending) - reader._pending_idx
+        assert remaining > 1
+        batch = await reader.readlines(1 << 20)
+        assert batch == [line] * (((1 << 20) + len(line) - 1) // len(line))
+        # The first pending batch must use bulk transfer even though the
+        # decoded buffer exceeds the hint. Timing is not part of this test.
+        assert pending.copied == remaining
+
+
+@pytest.mark.parametrize("newline", [None, "\n", "\r"])
+@pytest.mark.parametrize("long_first_line", [False, True])
+async def test_refill_window_bounds_live_pending_lines(
+    tmp_path, monkeypatch, newline, long_first_line
+):
+    term = newline or "\n"
+    line = "αβ" + term
+    first = "x" * (AsyncGzipTextFile._LINE_BATCH_CHARS + 1) + term
+    text = line + (first if long_first_line else "") + line * 100000
+    path = tmp_path / "window.gz"
+    path.write_bytes(gzip.compress(text.encode(), mtime=0))
+    take = AsyncGzipTextFile._take_first_refilled_line
+    checked = 0
+    overlong = 0
+
+    def checked_take(reader):
+        nonlocal checked, overlong
+        result = take(reader)
+        if len(result) > reader._LINE_BATCH_CHARS:
+            overlong += 1
+            assert len(reader._pending_lines) == reader._pending_idx == 1
+        pending = "".join(reader._pending_lines[reader._pending_idx :])
+        assert len(pending) <= reader._LINE_BATCH_CHARS
+        assert reader._text_buffer[reader._text_buffer_offset :].startswith(pending)
+        checked += 1
+        return result
+
+    monkeypatch.setattr(AsyncGzipTextFile, "_take_first_refilled_line", checked_take)
+    async with AsyncGzipTextFile(
+        path, "rt", newline=newline, chunk_size=4 << 20
+    ) as reader:
+        output = []
+        async for batch in reader.iter_batches():
+            output.extend(batch)
+        assert "".join(output) == text
+    assert checked > 0
+    assert overlong == int(long_first_line)

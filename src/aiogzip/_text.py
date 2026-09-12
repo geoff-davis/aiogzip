@@ -1583,12 +1583,15 @@ class AsyncGzipTextFile:
             idx = self._pending_idx
             pending = self._pending_lines
             if idx < len(pending):
-                # Pending lines are a prefix of the unread text buffer. Its
-                # length is a conservative O(1) upper bound, even after buffer
-                # compaction. Only measure a suffix when it is guaranteed to
-                # fit: every inspected line is then consumed in this call.
-                if hint <= 0 or hint - total_size >= (
-                    len(self._text_buffer) - self._text_buffer_offset
+                # Pending lines are a prefix of the unread buffer and fit
+                # within the refill window. The over-long-line fallback makes
+                # one line, consumed immediately, so it leaves none pending.
+                # Both bounds survive compaction; cap at the window so a large
+                # decoded chunk cannot disable bulk transfer. Every line we
+                # measure is guaranteed to fit and be consumed in this call.
+                if hint <= 0 or hint - total_size >= min(
+                    len(self._text_buffer) - self._text_buffer_offset,
+                    self._LINE_BATCH_CHARS,
                 ):
                     remaining = pending[idx:]
                     remaining_size = sum(map(len, remaining))
