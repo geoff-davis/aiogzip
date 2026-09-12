@@ -3,6 +3,7 @@
 import asyncio
 import gzip
 import os
+import random
 import subprocess
 import sys
 from pathlib import Path
@@ -179,7 +180,7 @@ asyncio.run(main())
     )
 
 
-async def test_ready_executor_result_does_not_reset_stream_budget(monkeypatch):
+async def test_executor_wait_is_not_a_stream_budget_checkpoint(monkeypatch):
     class Operation:
         def __init__(self):
             self.events = iter([_CodecProgress(1)])
@@ -192,14 +193,12 @@ async def test_ready_executor_result_does_not_reset_stream_budget(monkeypatch):
 
     checkpoints = 0
 
-    async def already_ready(method, data):
-        return method(data)
-
     async def checkpoint():
         nonlocal checkpoints
         checkpoints += 1
 
-    monkeypatch.setattr(_codec_async, "_run_in_thread", already_ready)
+    # Exercise real executor hops. They yield, but policy deliberately retains
+    # the stream counters until the explicit checkpoint below.
     monkeypatch.setattr(_codec_async, "_cooperative_checkpoint", checkpoint)
     monkeypatch.setattr(_codec_async, "_NO_OUTPUT_STEPS_CHECKPOINT", 2)
     budget = _codec_async._StreamBudget(source_items=17, source_bytes=100)
@@ -210,3 +209,157 @@ async def test_ready_executor_result_does_not_reset_stream_budget(monkeypatch):
             pass
     assert checkpoints == 1
     assert budget == _codec_async._StreamBudget()
+
+
+@pytest.mark.parametrize("wrapper", [compress_chunks, decompress_chunks])
+@pytest.mark.parametrize("action", ["early-exit", "source-failure", "slow-destination"])
+async def test_checkpoint_lifecycle_retains_pull_ownership(
+    monkeypatch, wrapper, action
+):
+    # The empty prefix crosses a real source checkpoint before data arrives.
+    payload = random.Random(101).randbytes(2 * 1024 * 1024)
+    source_data = (
+        payload if wrapper is compress_chunks else gzip.compress(payload, mtime=0)
+    )
+    events = []
+    fetched = 0
+    checkpoints = 0
+    failure = OSError("source failed after checkpoint")
+    codec_name = "GzipEncoder" if wrapper is compress_chunks else "GzipDecoder"
+    codec_type = getattr(_streaming, codec_name)
+
+    class ObservedCodec(codec_type):
+        def discard(self):
+            events.append("discard")
+            return super().discard()
+
+    original_checkpoint = _streaming._cooperative_checkpoint
+    advance = _codec_async._raw_next_or_done
+    advances = 0
+
+    def observed_advance(operation, workload):
+        nonlocal advances
+        advances += 1
+        return advance(operation, workload)
+
+    monkeypatch.setattr(_codec_async, "_raw_next_or_done", observed_advance)
+
+    async def checkpoint():
+        nonlocal checkpoints
+        checkpoints += 1
+        await original_checkpoint()
+
+    async def source():
+        nonlocal fetched
+        try:
+            for _ in range(_streaming._SOURCE_ITEMS_CHECKPOINT):
+                fetched += 1
+                yield b""
+            if action == "source-failure":
+                raise failure
+            fetched += 1
+            yield source_data
+            raise AssertionError("source was prefetched while consumer stopped")
+        finally:
+            events.append("source-close")
+
+    monkeypatch.setattr(_streaming, codec_name, ObservedCodec)
+    monkeypatch.setattr(_streaming, "_cooperative_checkpoint", checkpoint)
+    stream = wrapper(source(), output_chunk_size=1024)
+    try:
+        if action == "source-failure":
+            with pytest.raises(OSError) as caught:
+                async for _ in stream:
+                    pass
+            assert caught.value is failure
+        else:
+            # Compression emits its header before pulling the source.
+            while fetched <= _streaming._SOURCE_ITEMS_CHECKPOINT:
+                assert await anext(stream)
+            assert checkpoints >= 1
+            if action == "slow-destination":
+                entered = asyncio.Event()
+                release = asyncio.Event()
+
+                async def destination():
+                    entered.set()
+                    await release.wait()
+
+                writer = asyncio.create_task(destination())
+                try:
+                    await asyncio.wait_for(entered.wait(), 5)
+                    before = fetched, checkpoints, advances, list(events)
+                    for _ in range(8):
+                        await asyncio.sleep(0)
+                    assert (fetched, checkpoints, advances, events) == before
+                    assert events == []
+                finally:
+                    release.set()
+                    await writer
+    finally:
+        await stream.aclose()
+    assert checkpoints >= 1
+    assert fetched == _streaming._SOURCE_ITEMS_CHECKPOINT + (action != "source-failure")
+    expected = (
+        ["source-close", "discard"]
+        if action == "source-failure"
+        else ["discard", "source-close"]
+    )
+    assert events == expected
+
+
+@pytest.mark.parametrize(
+    "mode", ["compress-output", "decode-output", "decode-no-output"]
+)
+async def test_single_large_item_keeps_codec_checkpoints(monkeypatch, mode):
+    # Generate the fixture before observing cooperative work. The no-output
+    # case cannot reach the source-item ceiling or rely on an executor hop.
+    payload = bytes(range(256)) * (4 * 1024 * 1024 // 256)
+    if mode == "compress-output":
+        payload = random.Random(101).randbytes(4 * 1024 * 1024)
+    wrapper = compress_chunks if mode.startswith("compress") else decompress_chunks
+    if mode == "decode-no-output":
+        payload = b""
+        item = gzip.compress(b"", mtime=0) * 20000
+        assert len(item) < _codec_async._DECODE_OFFLOAD_THRESHOLD
+    else:
+        item = (
+            payload if wrapper is compress_chunks else gzip.compress(payload, mtime=0)
+        )
+    delivered = 0
+    fetched = 0
+    output_at_checkpoints = []
+    original_checkpoint = _codec_async._cooperative_checkpoint
+
+    async def source():
+        nonlocal fetched
+        fetched += 1
+        yield item
+
+    async def checkpoint():
+        assert fetched == 1
+        output_at_checkpoints.append(delivered)
+        await original_checkpoint()
+
+    monkeypatch.setattr(_codec_async, "_cooperative_checkpoint", checkpoint)
+    chunks = []
+    async for chunk in wrapper(source(), output_chunk_size=65536):
+        assert chunk
+        chunks.append(chunk)
+        delivered += len(chunk)
+    output = b"".join(chunks)
+    assert (
+        gzip.decompress(output) if wrapper is compress_chunks else output
+    ) == payload
+    assert output_at_checkpoints
+    if mode == "decode-no-output":
+        assert set(output_at_checkpoints) == {0}
+    else:
+        assert len(output_at_checkpoints) >= 3
+        # Checkpoint is before publishing the chunk that reaches the ceiling;
+        # include a one-chunk margin when comparing observable delivery gaps.
+        positions = [0, *output_at_checkpoints, delivered]
+        assert (
+            max(b - a for a, b in zip(positions, positions[1:], strict=False))
+            <= _codec_async._INLINE_OUTPUT_BYTES_CHECKPOINT + 65536
+        )

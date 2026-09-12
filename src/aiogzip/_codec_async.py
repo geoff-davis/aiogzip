@@ -126,8 +126,9 @@ async def _drive_operation(
             should_offload = advancing_first and len(workload) >= offload_threshold
             if should_offload:
                 result = await _offloaded_next(operation, workload)
-                # An executor await can already be ready. Iterable streams
-                # reset only at a deliberate cooperative checkpoint.
+                # Iterable streams deliberately do not count executor waits
+                # as budget checkpoints, even though those waits yield. Their
+                # counters reset only at an explicit cooperative checkpoint.
                 if budget is None:
                     inline_output_bytes = 0
                     inline_output_chunks = 0
