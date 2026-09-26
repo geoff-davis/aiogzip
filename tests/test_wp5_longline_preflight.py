@@ -1,0 +1,92 @@
+"""G06 compatibility guard and strict reproductions, pending the localized repair."""
+
+import asyncio
+import gzip
+
+import pytest
+from conftest import FramedAsyncReader
+
+from aiogzip import AsyncGzipTextFile
+
+
+@pytest.mark.parametrize("newline", ["", "\r\n"])
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="G06 generic long lines repeatedly append the growing prefix",
+)
+async def test_generic_longline_building_work_is_linear(monkeypatch, newline):
+    payload = "x" * (1024 * 1024)
+    source = FramedAsyncReader(gzip.compress(payload.encode(), mtime=0))
+    work = 0
+    original = AsyncGzipTextFile._append_buffer
+
+    def append(handle, text):
+        nonlocal work
+        if text:
+            work += len(handle._text_buffer) + len(text)
+        return original(handle, text)
+
+    monkeypatch.setattr(AsyncGzipTextFile, "_append_buffer", append)
+    async with AsyncGzipTextFile(
+        None, "rt", fileobj=source, closefd=False, newline=newline, chunk_size=65536
+    ) as stream:
+        assert await stream.readline() == payload
+    # Charge characters presented to concatenation, not allocator-dependent copies.
+    # A prefix plus one final join fits comfortably; growing suffix appends do not.
+    assert work <= 2 * len(payload) + 65536
+
+
+@pytest.mark.parametrize(
+    "newline",
+    [
+        "",
+        "\r\n",
+        *[
+            pytest.param(
+                mode,
+                marks=pytest.mark.xfail(
+                    strict=True,
+                    raises=AssertionError,
+                    reason="pre-existing fast-line local pieces are invisible to mid-call tell",
+                ),
+            )
+            for mode in (None, "\n", "\r")
+        ],
+    ],
+)
+async def test_cookie_during_unpublished_longline_replays_whole_line(
+    monkeypatch, newline
+):
+    terminator = "\r" if newline == "\r" else "\r\n"
+    payload = "x" * 1000 + terminator
+    expected = payload.replace("\r\n", "\n") if newline is None else payload
+    source = FramedAsyncReader(gzip.compress(payload.encode(), mtime=0))
+    async with AsyncGzipTextFile(
+        None, "rt", fileobj=source, closefd=False, newline=newline, chunk_size=100
+    ) as stream:
+        binary = stream._binary_file
+        assert binary is not None
+        original = type(binary).read
+        reached, release = asyncio.Event(), asyncio.Event()
+        calls = 0
+
+        async def read(handle, size=-1):
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                reached.set()
+                await release.wait()
+            return await original(handle, size)
+
+        monkeypatch.setattr(type(binary), "read", read)
+        task = asyncio.create_task(stream.readline())
+        try:
+            await asyncio.wait_for(reached.wait(), timeout=5)
+            cookie = await stream.tell()
+        finally:
+            release.set()
+            result = await asyncio.wait_for(task, timeout=5)
+        assert result == expected
+        await stream.seek(cookie)
+        assert await stream.readline() == expected

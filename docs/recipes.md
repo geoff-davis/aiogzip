@@ -111,6 +111,19 @@ resources. Crossing it raises `OSError`; the inflater is bounded to the
 remaining allowance plus one byte for overflow detection instead of first
 allocating the complete expanded payload.
 
+A small file read, such as `read(1)` or `peek(1)`, can inflate and retain much
+more plaintext than it returns. The file wrapper drains the compressed input
+it has already accepted; a highly compressible file can fit in a single source
+read. Trailer validation and member metadata can therefore advance beyond the
+logical read position. The streaming codec's `output_chunk_size` limits each
+emitted chunk, not the total plaintext retained by a file handle.
+
+For concurrent untrusted inputs, set `max_decompressed_size` and bound the
+number of active handles according to available memory. Treat requested read
+sizes as delivery sizes, not memory budgets. The async-iterable
+`decompress_chunks()` API offers consumer-driven output when file seeking and
+file-layer validation timing are not required.
+
 When the payload is not needed, use `verify()` to perform the same complete
 validation scan while discarding decompressed bytes:
 
