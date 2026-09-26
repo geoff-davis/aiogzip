@@ -192,9 +192,9 @@ def main():
     encoder = aiogzip.GzipEncoder(fast_compress=args.engine == "zlib-ng")
     compression_module = type(encoder._engine).__module__
     encoder.discard()
-    assert compression_module == (
-        "zlib" if args.engine == "stdlib" else "zlib_ng.zlib_ng"
-    ), compression_module
+    assert compression_module == ("zlib" if args.engine == "stdlib" else "zlib_ng"), (
+        compression_module
+    )
     record = {
         **provenance,
         "import": str(origin),
