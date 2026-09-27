@@ -1,0 +1,10 @@
+[Unit]
+Description=WP5 G08 stdlib throughput qualification attempt (2026-09-28)
+
+[Service]
+Type=exec
+WorkingDirectory=/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore
+ExecStart=/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/venv/bin/python /home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/harness/scripts/run_b2_timing_blocks.py /home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/scheduled/aiogzip-wp5-onecore-20260928-g08-throughput-stdlib.json
+KillMode=control-group
+RuntimeMaxSec=4h1min
+TimeoutStopSec=15s
