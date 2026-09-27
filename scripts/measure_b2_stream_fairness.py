@@ -121,10 +121,18 @@ async def run(
     size,
     fixture,
     throughput_only=False,
+    latency_only=False,
+    discard_samples=0,
     warmup_seconds=0.0,
     batch_seconds=0.0,
     batch_min_operations=1,
 ):
+    if throughput_only and latency_only:
+        raise ValueError("throughput-only and latency-only are mutually exclusive")
+    if discard_samples < 0 or discard_samples >= repeat:
+        raise ValueError("discard count must leave retained samples")
+    if discard_samples and (not throughput_only or not batch_seconds):
+        raise ValueError("discard requires batched throughput-only measurements")
     line = b'{"id":123,"message":"representative repeated JSONL text","ok":true}\n'
     payload = (
         random.Random(20260927).randbytes(size)
@@ -172,7 +180,7 @@ async def run(
     )
     rows = []
     for name, compress, items, expected, ticker in cases:
-        if throughput_only and ticker:
+        if (throughput_only and ticker) or (latency_only and not ticker):
             continue
         warmup = None
         if not ticker and warmup_seconds:
@@ -210,7 +218,7 @@ async def run(
                 )
                 for _ in range(repeat)
             ]
-        seconds = [s["seconds"] for s in samples]
+        seconds = [s["seconds"] for s in samples[discard_samples:]]
         row = {
             "case": name,
             "fixture": fixture,
@@ -235,13 +243,17 @@ async def run_all(package, **kwargs):
 
 
 def main():
+    started_at = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
     parser.add_argument("--repeat", type=int, default=7)
     parser.add_argument("--size", type=int, default=4 * 1024 * 1024)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--throughput-only", action="store_true")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--throughput-only", action="store_true")
+    selection.add_argument("--latency-only", action="store_true")
+    parser.add_argument("--discard-samples", type=int, default=0)
     parser.add_argument("--warmup-seconds", type=float, default=0.0)
     parser.add_argument("--batch-seconds", type=float, default=0.0)
     parser.add_argument("--batch-min-operations", type=int, default=1)
@@ -253,6 +265,14 @@ def main():
         for value in (args.warmup_seconds, args.batch_seconds)
     ):
         parser.error("warmup and batch durations must be finite and nonnegative")
+    if not 0 <= args.discard_samples < args.repeat:
+        parser.error("discard count must leave retained samples")
+    if args.discard_samples and (not args.throughput_only or not args.batch_seconds):
+        parser.error("discard requires batched throughput-only measurements")
+    if args.latency_only and (
+        args.warmup_seconds or args.batch_seconds or args.batch_min_operations != 1
+    ):
+        parser.error("latency-only measurements cannot use throughput sampling options")
     root, harness = args.source_root.resolve(), Path(__file__).resolve()
     provenance = {
         "source": git_metadata(root),
@@ -282,6 +302,7 @@ def main():
         **provenance,
         "import": str(origin),
         "harness_sha256": hashlib.sha256(harness.read_bytes()).hexdigest(),
+        "started_at": started_at,
         "python": sys.version,
         "platform": platform.platform(),
         "aiofiles": version("aiofiles"),
@@ -295,11 +316,13 @@ def main():
         "command": sys.argv,
         "sampling": {
             "throughput_only": args.throughput_only,
+            "latency_only": args.latency_only,
+            "discard_samples": args.discard_samples,
             "warmup_seconds": args.warmup_seconds,
             "batch_seconds": args.batch_seconds,
             "batch_min_operations": args.batch_min_operations,
         },
-        "limitations": "Fixture/open-loop construction and output join/validation excluded. Output chunks retained during timing. Ticker only in latency cases. Consecutive repeats; compare interleaved process captures including baseline drift. Optional throughput warmup is recorded but excluded from minima. Batched throughput seconds are means of complete operations over a minimum summed timed-work duration, not single-operation latency; operation timings/counts and total batch wall time are retained. The minimum operation count also applies to warmup batches. Validation between operations is outside timing but affects thermal/cache state. Batched minima are not directly comparable to single-operation minima. Observations are not scheduling guarantees or G17 qualification.",
+        "limitations": "Fixture/open-loop construction and output join/validation excluded. Output chunks retained during timing. Ticker only in latency cases. Consecutive repeats; compare interleaved process captures including baseline drift. Optional throughput warmup is recorded but excluded from minima. Batched throughput seconds are means of complete operations over a minimum summed timed-work duration, not single-operation latency; operation timings/counts and total batch wall time are retained. The minimum operation count also applies to warmup batches. Validation between operations is outside timing but affects thermal/cache state. Declared early discarded samples remain in the raw samples array but are excluded from min/median. Latency-only selects ticker cases without throughput work. Batched minima are not directly comparable to single-operation minima. Observations are not scheduling guarantees or G17 qualification.",
         "rows": asyncio.run(
             run_all(
                 aiogzip,
@@ -307,12 +330,15 @@ def main():
                 fast=args.engine == "zlib-ng",
                 size=args.size,
                 throughput_only=args.throughput_only,
+                latency_only=args.latency_only,
+                discard_samples=args.discard_samples,
                 warmup_seconds=args.warmup_seconds,
                 batch_seconds=args.batch_seconds,
                 batch_min_operations=args.batch_min_operations,
             )
         ),
     }
+    record["ended_at"] = time.time()
     with args.output.open("x", encoding="utf-8") as output:
         json.dump(record, output, indent=2)
         output.write("\n")

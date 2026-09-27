@@ -375,3 +375,103 @@ async def test_slow_throughput_batch_still_uses_minimum_operation_count(
     assert result["timed_total_seconds"] == pytest.approx(0.6)
     assert result["seconds"] == pytest.approx(0.2)
     assert result["wall_seconds"] >= 0
+
+
+async def test_latency_selection_never_runs_throughput_or_discards(
+    scripts, monkeypatch
+):
+    harness = runpy.run_path(str(scripts / "measure_b2_stream_fairness.py"))
+    calls = []
+
+    async def sample(*args, **kwargs):
+        calls.append(kwargs["ticker"])
+        return {"seconds": 1.0}
+
+    monkeypatch.setitem(harness["run"].__globals__, "sample", sample)
+    rows = await harness["run"](
+        None, repeat=2, fast=False, size=32, fixture="text", latency_only=True
+    )
+    assert len(rows) == 7 and len(calls) == 14 and all(calls)
+    assert all(row["case"].startswith("latency-") for row in rows)
+    with pytest.raises(ValueError, match="discard requires"):
+        await harness["run"](
+            None,
+            repeat=2,
+            fast=False,
+            size=32,
+            fixture="text",
+            latency_only=True,
+            discard_samples=1,
+        )
+
+
+async def test_stream_discard_keeps_raw_batches_and_excludes_fast_early_sample(
+    scripts, monkeypatch
+):
+    harness = runpy.run_path(str(scripts / "measure_b2_stream_fairness.py"))
+    durations = iter([0.001, 0.02, 0.03] * 8)
+
+    async def batch(*args, **kwargs):
+        return {"seconds": next(durations)}
+
+    monkeypatch.setitem(harness["run"].__globals__, "throughput_batch", batch)
+    rows = await harness["run"](
+        None,
+        repeat=3,
+        fast=False,
+        size=32,
+        fixture="text",
+        throughput_only=True,
+        batch_seconds=0.1,
+        discard_samples=1,
+    )
+    assert len(rows) == 8
+    assert all(row["min_seconds"] == 0.02 and len(row["samples"]) == 3 for row in rows)
+
+
+async def test_longline_batches_preserve_boundaries_and_exclude_warmup(
+    scripts, monkeypatch
+):
+    harness = runpy.run_path(str(scripts / "measure_b2_long_lines.py"))
+    calls = []
+    durations = iter([0.2] * 3 + [0.001] * 3 + [0.04] * 3)
+
+    async def sample(package, case, wire, expected, phase):
+        calls.append((wire, expected, phase))
+        return {"seconds": next(durations), "verified": True}
+
+    monkeypatch.setitem(harness["run"].__globals__, "sample", sample)
+    case = {**harness["matrix"]()[0], "size": 32}
+    rows = await harness["run"](
+        None,
+        [case],
+        "timing",
+        2,
+        warmup_seconds=0.1,
+        batch_seconds=0.001,
+        batch_min_operations=3,
+        discard_samples=1,
+    )
+    row = rows[0]
+    assert len(calls) == 9
+    assert all(
+        wire is calls[0][0] and expected is calls[0][1] and phase == "timing"
+        for wire, expected, phase in calls
+    )
+    assert row["warmup"]["seconds"] == pytest.approx(0.2)
+    assert row["min_seconds"] == pytest.approx(0.04)
+    assert len(row["samples"]) == 2
+    assert row["samples"][0]["iterations"] == 3
+    assert row["samples"][1]["operation_seconds"] == [0.04] * 3
+    with pytest.raises(ValueError, match="require timing"):
+        await harness["run"](None, [case], "resources", 2, batch_seconds=0.1)
+
+
+async def test_longline_batch_validates_output_each_operation(scripts):
+    harness = runpy.run_path(str(scripts / "measure_b2_long_lines.py"))
+    case = {**harness["matrix"]()[0], "size": 32}
+    wire, expected, _ = harness["fixture"](case)
+    with pytest.raises(AssertionError):
+        await harness["timing_batch"](
+            aiogzip, case, wire, ["wrong"], seconds=0.01, min_operations=3
+        )

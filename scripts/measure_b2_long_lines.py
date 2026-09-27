@@ -8,9 +8,11 @@ import gzip
 import hashlib
 import io
 import json
+import math
 import os
 import platform
 import random
+import statistics
 import sys
 import time
 import tracemalloc
@@ -209,28 +211,127 @@ async def sample(package, case, wire, expected, phase):
     }
 
 
-async def run(package, cases, phase, repeat):
+async def timing_batch(package, case, wire, expected, *, seconds, min_operations):
+    observations = []
+    total = 0.0
+    host_before = None
+    host_after = None
+    started = time.perf_counter()
+    while len(observations) < min_operations or total < seconds:
+        observation = await sample(package, case, wire, expected, "timing")
+        duration = observation["seconds"]
+        if not math.isfinite(duration) or duration <= 0:
+            raise ValueError("operation timer must advance")
+        if not observations:
+            host_before = observation.get("host_before")
+        host_after = observation.get("host_after")
+        observations.append(duration)
+        total += duration
+    return {
+        "seconds": total / len(observations),
+        "timed_total_seconds": total,
+        "iterations": len(observations),
+        "wall_seconds": time.perf_counter() - started,
+        "operation_seconds": observations,
+        "host_before": host_before,
+        "host_after": host_after,
+    }
+
+
+async def run(
+    package,
+    cases,
+    phase,
+    repeat,
+    *,
+    warmup_seconds=0.0,
+    batch_seconds=0.0,
+    batch_min_operations=1,
+    discard_samples=0,
+):
+    if not 0 <= discard_samples < repeat:
+        raise ValueError("discard count must leave retained samples")
+    if phase != "timing" and (
+        warmup_seconds or batch_seconds or batch_min_operations != 1 or discard_samples
+    ):
+        raise ValueError("sampling options require timing phase")
+    if discard_samples and not batch_seconds:
+        raise ValueError("discard requires batched timing")
     rows = []
     for case in cases:
         wire, expected, metadata = fixture(case)
-        samples = [
-            await sample(package, case, wire, expected, phase) for _ in range(repeat)
-        ]
-        rows.append({"case": case, "fixture": metadata, "samples": samples})
+        warmup = None
+        if warmup_seconds:
+            warmup = await timing_batch(
+                package,
+                case,
+                wire,
+                expected,
+                seconds=warmup_seconds,
+                min_operations=batch_min_operations,
+            )
+        if batch_seconds:
+            samples = [
+                await timing_batch(
+                    package,
+                    case,
+                    wire,
+                    expected,
+                    seconds=batch_seconds,
+                    min_operations=batch_min_operations,
+                )
+                for _ in range(repeat)
+            ]
+        else:
+            samples = [
+                await sample(package, case, wire, expected, phase)
+                for _ in range(repeat)
+            ]
+        row = {"case": case, "fixture": metadata, "samples": samples}
+        if phase == "timing":
+            retained = [s["seconds"] for s in samples[discard_samples:]]
+            row.update(
+                warmup=warmup,
+                min_seconds=min(retained),
+                median_seconds=statistics.median(retained),
+            )
+        rows.append(row)
         print(f"{phase}: {len(rows)} rows complete", flush=True)
     return rows
 
 
 def main():
+    started_at = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
     parser.add_argument("--phase", choices=("resources", "timing"), required=True)
     parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--warmup-seconds", type=float, default=0.0)
+    parser.add_argument("--batch-seconds", type=float, default=0.0)
+    parser.add_argument("--batch-min-operations", type=int, default=1)
+    parser.add_argument("--discard-samples", type=int, default=0)
     args = parser.parse_args()
     if args.repeat < 1:
         parser.error("repeat must be positive")
+    if args.batch_min_operations < 1 or any(
+        not math.isfinite(v) or v < 0 for v in (args.warmup_seconds, args.batch_seconds)
+    ):
+        parser.error(
+            "sampling requires positive operation count and finite nonnegative durations"
+        )
+    if not 0 <= args.discard_samples < args.repeat:
+        parser.error("discard count must leave retained samples")
+    if args.discard_samples and not args.batch_seconds:
+        parser.error("discard requires batched timing")
+    if args.phase != "timing" and (
+        args.warmup_seconds
+        or args.batch_seconds
+        or args.batch_min_operations != 1
+        or args.discard_samples
+    ):
+        parser.error("sampling options require timing phase")
     if args.output.exists():
         raise FileExistsError(args.output)
     root, harness = args.source_root.resolve(), Path(__file__).resolve()
@@ -256,19 +357,41 @@ def main():
         **provenance,
         "import": str(origin),
         "harness_sha256": hashlib.sha256(harness.read_bytes()).hexdigest(),
+        "started_at": started_at,
         "python": sys.version,
         "platform": platform.platform(),
         "engines": engines,
         "dependencies": {"aiofiles": version("aiofiles")},
         "command": sys.argv,
         "phase": args.phase,
-        "limitations": "Fixtures, stdlib reference output, hashes and open precede measurement. Output-list collection is included. Append lengths are a structural string-building proxy, not actual allocator copies; final joins/slices are excluded from that proxy but included in Python allocation peaks. Zero append counts on fast paths mean this hook is bypassed, not zero copying. No scanning-work claim: baseline generic search_from avoids rescanning prefixes, and candidate scans new chunks plus a carried CR. Only unlimited line iteration is measured; bounded readline is separately tested. Doubling ratios must be derived in the evidence record. Tracemalloc misses native allocations. RSS is before/after, not peak; rows share a process and allocator history. Resource phase records no times. Timing phase has no instrumentation and requires quiet interleaved baseline/candidate runs. Seeded printable ASCII is higher entropy, not incompressible; repeated Japanese exercises stateful decoding. Latin-1 random-byte controls exclude CR/LF and assert compressed size is at least 99% of encoded size. Boundary-split, rollback, cookie and salvage contracts are covered separately in pytest.",
-        "rows": asyncio.run(run(aiogzip, matrix(), args.phase, args.repeat)),
+        "affinity": sorted(os.sched_getaffinity(0))
+        if hasattr(os, "sched_getaffinity")
+        else None,
+        "sampling": dict(
+            warmup_seconds=args.warmup_seconds,
+            batch_seconds=args.batch_seconds,
+            batch_min_operations=args.batch_min_operations,
+            discard_samples=args.discard_samples,
+        ),
+        "limitations": "Fixtures, stdlib reference output, hashes and open precede measurement. Output-list collection is included. Append lengths are a structural string-building proxy, not actual allocator copies; final joins/slices are excluded from that proxy but included in Python allocation peaks. Zero append counts on fast paths mean this hook is bypassed, not zero copying. No scanning-work claim: baseline generic search_from avoids rescanning prefixes, and candidate scans new chunks plus a carried CR. Only unlimited line iteration is measured; bounded readline is separately tested. Doubling ratios must be derived in the evidence record. Tracemalloc misses native allocations. RSS is before/after, not peak; rows share a process and allocator history. Resource phase records no times. Optional timing batches report mean timed duration per operation, with raw operations, warmup and discarded early batches retained; min/median exclude the declared discard count. Opening, host sampling, validation and cleanup between operations are outside the timed region but included in batch wall time. Timing phase has no instrumentation and requires quiet interleaved baseline/candidate runs. Seeded printable ASCII is higher entropy, not incompressible; repeated Japanese exercises stateful decoding. Latin-1 random-byte controls exclude CR/LF and assert compressed size is at least 99% of encoded size. Boundary-split, rollback, cookie and salvage contracts are covered separately in pytest.",
+        "rows": asyncio.run(
+            run(
+                aiogzip,
+                matrix(),
+                args.phase,
+                args.repeat,
+                warmup_seconds=args.warmup_seconds,
+                batch_seconds=args.batch_seconds,
+                batch_min_operations=args.batch_min_operations,
+                discard_samples=args.discard_samples,
+            )
+        ),
     }
     assert provenance == {
         "source": git_metadata(root),
         "harness": git_metadata(harness.parents[1]),
     }
+    record["ended_at"] = time.time()
     with args.output.open("x", encoding="utf-8") as output:
         json.dump(record, output, indent=2)
         output.write("\n")
