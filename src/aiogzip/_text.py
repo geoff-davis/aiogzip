@@ -79,6 +79,7 @@ class _TextReadReservation:
 
     def __exit__(self, *exc_info: object) -> None:
         self._file._read_call_active = False
+        self._file._pending_read_origin = None
 
 
 class _TextWriteReservation:
@@ -162,6 +163,7 @@ class AsyncGzipTextFile:
         "_close_complete",
         "_close_lock",
         "_read_call_active",
+        "_pending_read_origin",
         "_read_poisoned",
         "_write_call_active",
         "_read_call",
@@ -293,6 +295,9 @@ class AsyncGzipTextFile:
         self._close_complete: bool = False
         self._close_lock = asyncio.Lock()
         self._read_call_active: bool = False
+        self._pending_read_origin: Optional[Tuple[int, Tuple[Any, int], bool, int]] = (
+            None
+        )
         self._read_poisoned: bool = False
         self._write_call_active: bool = False
         self._read_call = _TextReadReservation(self)
@@ -478,6 +483,19 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        origin = self._pending_read_origin
+        if origin is not None:
+            # Local fragments have advanced the decoder, but have not yet
+            # published any text. With no shared prefix, use their start state.
+            if origin[1] == (b"", 0) and not origin[2]:
+                return origin[0]
+            return self._encode_cookie(
+                origin_offset=origin[0],
+                decoder_state=origin[1],
+                trailing_cr=origin[2],
+                seen_newlines=origin[3],
+                chars_to_skip=0,
+            )
         decoder_state = self._decoder.getstate()
         if self._can_use_plain_position(decoder_state):
             return self._binary_file._position
@@ -1132,6 +1150,13 @@ class AsyncGzipTextFile:
         added = 0
         fresh_origin: Optional[Tuple[int, Tuple[Any, int], bool, int]] = None
         origin_chars = 0
+        if not available:
+            self._pending_read_origin = (
+                bf._position,
+                self._decoder.getstate(),
+                self._trailing_cr,
+                self._seen_newline_types,
+            )
         try:
             while added < needed:
                 # Snapshot only the decode round that can leave fresh text
@@ -1164,6 +1189,7 @@ class AsyncGzipTextFile:
                 self._text_buffer += "".join(pieces)
             raise
 
+        self._pending_read_origin = None
         fresh = "".join(pieces)
         consumed_fresh = min(needed, len(fresh))
         result = prefix + fresh[:consumed_fresh]
@@ -1505,6 +1531,8 @@ class AsyncGzipTextFile:
             self._trailing_cr,
             self._seen_newline_types,
         )
+        if not prefix:
+            self._pending_read_origin = fresh_origin
         pieces: List[str] = []
         added = 0
         fresh_line_size: Optional[int] = None
@@ -1526,6 +1554,7 @@ class AsyncGzipTextFile:
                 self._append_buffer("".join(pieces))
             raise
 
+        self._pending_read_origin = None
         fresh = "".join(pieces)
         if fresh_line_size is not None:
             result = prefix + fresh[:fresh_line_size]
