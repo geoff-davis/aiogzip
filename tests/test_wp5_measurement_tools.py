@@ -170,3 +170,108 @@ async def test_latency_probe_has_no_allocation_or_inflation_instrumentation(scri
     assert row["cohort_seconds"] >= 0
     assert row["max_gap_seconds"] > 0
     assert row["handles"][0]["round_trip_verified"]
+
+
+@pytest.mark.parametrize("newline", [None, "", "\n", "\r", "\r\n"])
+@pytest.mark.parametrize("encoding", ["utf-8", "iso2022_jp"])
+@pytest.mark.parametrize("content", ["repeated", "seeded-ascii"])
+async def test_longline_resource_phase_validates_reference_without_timing(
+    scripts, monkeypatch, newline, encoding, content
+):
+    harness = runpy.run_path(str(scripts / "measure_b2_long_lines.py"))
+    case = dict(
+        size=8192,
+        newline=newline,
+        encoding=encoding,
+        chunk_size=31,
+        content=content,
+        ending="trailing-cr",
+        family="long",
+    )
+    wire, expected, metadata = harness["fixture"](case)
+
+    def forbidden_clock():
+        raise AssertionError("resource measurement used a timing clock")
+
+    monkeypatch.setitem(
+        harness["sample"].__globals__,
+        "time",
+        SimpleNamespace(perf_counter=forbidden_clock),
+    )
+    result = await harness["sample"](aiogzip, case, wire, expected, "resources")
+    assert result["verified"]
+    assert result["seconds"] is None
+    assert result["python_peak_bytes"] > 0
+    assert (
+        result["work"]["growing_buffer_characters"]
+        <= 2 * metadata["input_characters"] + 31
+    )
+    assert not tracemalloc.is_tracing()
+
+
+async def test_longline_wrong_reference_fails_and_restores_instrumentation(scripts):
+    harness = runpy.run_path(str(scripts / "measure_b2_long_lines.py"))
+    case = dict(
+        size=1024,
+        newline="",
+        encoding="utf-8",
+        chunk_size=31,
+        content="repeated",
+        ending="crlf",
+        family="long",
+    )
+    wire, expected, _ = harness["fixture"](case)
+    original = aiogzip.AsyncGzipTextFile._append_buffer
+    with pytest.raises(AssertionError):
+        await harness["sample"](aiogzip, case, wire, expected + ["wrong"], "resources")
+    assert aiogzip.AsyncGzipTextFile._append_buffer is original
+    assert not tracemalloc.is_tracing()
+
+
+async def test_shortline_timing_phase_omits_resource_instrumentation(scripts):
+    harness = runpy.run_path(str(scripts / "measure_b2_long_lines.py"))
+    case = dict(
+        size=100,
+        newline="\r\n",
+        encoding="iso2022_jp",
+        chunk_size=31,
+        content="repeated",
+        ending="crlf",
+        family="short",
+    )
+    wire, expected, metadata = harness["fixture"](case)
+    result = await harness["sample"](aiogzip, case, wire, expected, "timing")
+    assert metadata["returned_lines"] == 100
+    assert result["seconds"] >= 0
+    assert result["work"] is None
+    assert result["python_peak_bytes"] is None
+
+
+@pytest.mark.parametrize("newline", ["", "\r\n"])
+@pytest.mark.parametrize("encoding", ["utf-8", "iso2022_jp"])
+async def test_longline_split_fixture_crosses_real_decode_refills(
+    scripts, monkeypatch, newline, encoding
+):
+    harness = runpy.run_path(str(scripts / "measure_b2_long_lines.py"))
+    case = next(
+        case
+        for case in harness["matrix"]()
+        if case["family"] == "split"
+        and case["encoding"] == encoding
+        and case["newline"] == newline
+    )
+    wire, expected, _ = harness["fixture"](case)
+    pieces = []
+    original = aiogzip.AsyncGzipBinaryFile.read
+
+    async def read(handle, size=-1):
+        data = await original(handle, size)
+        pieces.append(data)
+        return data
+
+    monkeypatch.setattr(aiogzip.AsyncGzipBinaryFile, "read", read)
+    await harness["sample"](aiogzip, case, wire, expected, "resources")
+    assert any(
+        a.endswith(b"\r") and b.startswith(b"\n")
+        for a, b in zip(pieces, pieces[1:], strict=False)
+    )
