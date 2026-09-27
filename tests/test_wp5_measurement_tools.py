@@ -2,10 +2,13 @@
 
 import runpy
 import sys
+import tracemalloc
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
+import aiogzip
 
 
 @pytest.fixture
@@ -95,3 +98,75 @@ def test_manifest_rejects_reused_output(scripts, tmp_path, monkeypatch):
             },
             fresh=True,
         )
+
+
+@pytest.mark.parametrize(
+    "surface",
+    ["read", "read1", "readinto", "peek", "readline", "text-read", "text-readline"],
+)
+@pytest.mark.parametrize("seekable", [False, True])
+async def test_resource_counter_matches_accounted_inflation(scripts, surface, seekable):
+    harness = runpy.run_path(str(scripts / "measure_b2_read_resources.py"))
+    row = await harness["measure"](
+        aiogzip,
+        {
+            "size": 32768,
+            "fixture": "repeated-x",
+            "surface": surface,
+            "seekable": seekable,
+            "handles": 3,
+        },
+        "resources",
+    )
+    assert row["inflation"]["total_inflated_bytes"] == sum(
+        handle["inflated_accounted_bytes"] for handle in row["handles"]
+    )
+    assert row["inflation"]["total_inflated_bytes"] > 0
+    assert all(handle["round_trip_verified"] for handle in row["handles"])
+    assert row["cohort_seconds"] is None
+    assert row["max_gap_seconds"] is None
+    assert not tracemalloc.is_tracing()
+
+
+@pytest.mark.parametrize("fault", ["crc", "limit"])
+async def test_resource_probe_observes_errors_without_losing_counter(scripts, fault):
+    harness = runpy.run_path(str(scripts / "measure_b2_read_resources.py"))
+    row = await harness["measure"](
+        aiogzip,
+        {
+            "size": 32768,
+            "fixture": "repeated-x",
+            "surface": "readinto",
+            "seekable": False,
+            "handles": 2,
+            "fault": fault,
+            "limit": 1024 if fault == "limit" else None,
+        },
+        "resources",
+    )
+    assert all(handle["error"] for handle in row["handles"])
+    if fault == "limit":
+        assert 0 < row["inflation"]["total_inflated_bytes"] <= 2 * 1025
+        assert all(handle["terminal_limit_verified"] for handle in row["handles"])
+    else:
+        assert all(handle["validation_salvage_verified"] for handle in row["handles"])
+
+
+async def test_latency_probe_has_no_allocation_or_inflation_instrumentation(scripts):
+    harness = runpy.run_path(str(scripts / "measure_b2_read_resources.py"))
+    row = await harness["measure"](
+        aiogzip,
+        {
+            "size": 32768,
+            "fixture": "repeated-x",
+            "surface": "text-read",
+            "seekable": True,
+            "handles": 1,
+        },
+        "latency",
+    )
+    assert row["inflation"] is None
+    assert row["tracemalloc_peak_bytes"] is None
+    assert row["cohort_seconds"] >= 0
+    assert row["max_gap_seconds"] > 0
+    assert row["handles"][0]["round_trip_verified"]
