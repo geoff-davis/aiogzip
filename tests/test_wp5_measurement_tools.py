@@ -275,3 +275,19 @@ async def test_longline_split_fixture_crosses_real_decode_refills(
         a.endswith(b"\r") and b.startswith(b"\n")
         for a, b in zip(pieces, pieces[1:], strict=False)
     )
+
+
+@pytest.mark.parametrize("newline", [None, "", "\n", "\r", "\r\n"])
+async def test_longline_incompressible_control_preserves_full_line(scripts, newline):
+    harness = runpy.run_path(str(scripts / "measure_b2_long_lines.py"))
+    case = next(
+        case
+        for case in harness["matrix"]()
+        if case["content"] == "seeded-bytes" and case["newline"] == newline
+    )
+    wire, expected, metadata = harness["fixture"](case)
+    assert metadata["compressed_to_encoded_ratio"] >= 0.99
+    assert len(expected) == 1
+    assert len(expected[0]) == case["size"]
+    result = await harness["sample"](aiogzip, case, wire, expected, "resources")
+    assert result["verified"] and result["seconds"] is None

@@ -78,7 +78,20 @@ def matrix():
         for newline in (None, "", "\n", "\r", "\r\n")
         for encoding in ("utf-8", "iso2022_jp")
     ]
-    return core + controls + split + short
+    incompressible = [
+        dict(
+            size=mib * 1024 * 1024,
+            newline=newline,
+            encoding="latin-1",
+            chunk_size=65536,
+            content="seeded-bytes",
+            ending="absent",
+            family="long",
+        )
+        for mib in (1, 2, 4, 8, 16)
+        for newline in (None, "", "\n", "\r", "\r\n")
+    ]
+    return core + controls + split + short + incompressible
 
 
 def fixture(case):
@@ -87,7 +100,16 @@ def fixture(case):
     if case["family"] == "short":
         text = (unit * 30 + "\r\n") * size
     else:
-        if case["content"] == "seeded-ascii":
+        if case["content"] == "seeded-bytes":
+            # Latin-1 preserves random byte entropy while excluding only CR/LF.
+            data = (
+                random.Random(0)
+                .randbytes(size)
+                .replace(b"\r", b"\xff")
+                .replace(b"\n", b"\xfe")
+            )
+            text = data.decode("latin-1")
+        elif case["content"] == "seeded-ascii":
             # Newline-free higher-entropy control; printable ASCII is not a
             # claim of incompressibility or a stateful-encoding stress fixture.
             data = random.Random(0).randbytes(size)
@@ -99,6 +121,10 @@ def fixture(case):
         text += {"absent": "", "crlf": "\r\n", "trailing-cr": "\r"}[case["ending"]]
     raw = text.encode(case["encoding"])
     wire = gzip.compress(raw, mtime=0)
+    if case["content"] == "seeded-bytes":
+        assert len(wire) >= 0.99 * len(raw), (
+            "incompressible control compressed too well"
+        )
     with io.TextIOWrapper(
         io.BytesIO(raw), encoding=case["encoding"], newline=case["newline"]
     ) as reference:
@@ -110,6 +136,7 @@ def fixture(case):
             "wire_sha256": hashlib.sha256(wire).hexdigest(),
             "raw_sha256": hashlib.sha256(raw).hexdigest(),
             "compressed_bytes": len(wire),
+            "compressed_to_encoded_ratio": len(wire) / len(raw),
             "encoded_bytes": len(raw),
             "size_units": "lines"
             if case["family"] == "short"
@@ -235,7 +262,7 @@ def main():
         "dependencies": {"aiofiles": version("aiofiles")},
         "command": sys.argv,
         "phase": args.phase,
-        "limitations": "Fixtures, stdlib reference output, hashes and open precede measurement. Output-list collection is included. Append lengths are a structural string-building proxy, not actual allocator copies; final joins/slices are excluded from that proxy but included in Python allocation peaks. Zero append counts on fast paths mean this hook is bypassed, not zero copying. No scanning-work claim: baseline generic search_from avoids rescanning prefixes, and candidate scans new chunks plus a carried CR. Only unlimited line iteration is measured; bounded readline is separately tested. Doubling ratios must be derived in the evidence record. Tracemalloc misses native allocations. RSS is before/after, not peak; rows share a process and allocator history. Resource phase records no times. Timing phase has no instrumentation and requires quiet interleaved baseline/candidate runs. Seeded printable ASCII is higher entropy, not incompressible; repeated Japanese exercises stateful decoding. Boundary-split, rollback, cookie and salvage contracts are covered separately in pytest.",
+        "limitations": "Fixtures, stdlib reference output, hashes and open precede measurement. Output-list collection is included. Append lengths are a structural string-building proxy, not actual allocator copies; final joins/slices are excluded from that proxy but included in Python allocation peaks. Zero append counts on fast paths mean this hook is bypassed, not zero copying. No scanning-work claim: baseline generic search_from avoids rescanning prefixes, and candidate scans new chunks plus a carried CR. Only unlimited line iteration is measured; bounded readline is separately tested. Doubling ratios must be derived in the evidence record. Tracemalloc misses native allocations. RSS is before/after, not peak; rows share a process and allocator history. Resource phase records no times. Timing phase has no instrumentation and requires quiet interleaved baseline/candidate runs. Seeded printable ASCII is higher entropy, not incompressible; repeated Japanese exercises stateful decoding. Latin-1 random-byte controls exclude CR/LF and assert compressed size is at least 99% of encoded size. Boundary-split, rollback, cookie and salvage contracts are covered separately in pytest.",
         "rows": asyncio.run(run(aiogzip, matrix(), args.phase, args.repeat)),
     }
     assert provenance == {
