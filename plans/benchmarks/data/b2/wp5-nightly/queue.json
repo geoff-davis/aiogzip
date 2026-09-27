@@ -1,0 +1,28 @@
+{
+  "deadline": "2026-09-27T06:00:00-07:00",
+  "output": "/tmp/aiogzip-wp5-nightly-20260927/queue-results",
+  "python": "/tmp/aiogzip-wp5-nightly-20260927/venv/bin/python",
+  "phases": [
+    {
+      "gate": "G08",
+      "manifest": "/tmp/aiogzip-wp5-nightly-20260927/manifest.json",
+      "manifest_sha256": "f353697602c3e279b7b75b51139ef6a2da077e7ecfd823612842add963e109b9",
+      "runner": "/tmp/aiogzip-wp5-nightly-20260927/harness/scripts/run_quiet_benchmarks.py",
+      "runner_sha256": "423d96ab088cff91f56e64dfb37ca10c6f1028bf904a79af88fd912379614623"
+    },
+    {
+      "gate": "G06",
+      "manifest": "/tmp/aiogzip-wp5-nightly-20260927/g06-manifest.json",
+      "manifest_sha256": "2d3fd76778feffc58c20df1a9a66b39baab17655b644341784863557c86dfe38",
+      "runner": "/tmp/aiogzip-wp5-nightly-20260927/harness/scripts/run_quiet_benchmarks.py",
+      "runner_sha256": "423d96ab088cff91f56e64dfb37ca10c6f1028bf904a79af88fd912379614623"
+    },
+    {
+      "gate": "G07",
+      "manifest": "/tmp/aiogzip-wp5-nightly-20260927/g07-manifest.json",
+      "manifest_sha256": "d0ef5e74981202a12121fd052801c777438664c8d0264ede6990fdd55ad6a0b0",
+      "runner": "/tmp/aiogzip-wp5-nightly-20260927/harness/scripts/run_quiet_benchmarks.py",
+      "runner_sha256": "423d96ab088cff91f56e64dfb37ca10c6f1028bf904a79af88fd912379614623"
+    }
+  ]
+}
