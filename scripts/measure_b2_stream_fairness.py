@@ -12,6 +12,7 @@ import dataclasses
 import gzip
 import hashlib
 import json
+import math
 import os
 import platform
 import random
@@ -83,7 +84,47 @@ async def sample(package, items, payload, *, compress, fast, ticker):
     }
 
 
-async def run(package, *, repeat, fast, size, fixture):
+async def throughput_batch(
+    package, items, payload, *, compress, fast, target_seconds, min_operations=1
+):
+    """Average complete validated operations over a minimum timed-work budget.
+
+    Sum only each operation's original timed interval. Validation between
+    operations remains outside the timing but affects the workload/thermal state.
+    """
+    observations = []
+    total = 0.0
+    started = time.perf_counter()
+    while len(observations) < min_operations or total < target_seconds:
+        result = await sample(
+            package, items, payload, compress=compress, fast=fast, ticker=False
+        )
+        duration = result["seconds"]
+        if not math.isfinite(duration) or duration <= 0:
+            raise ValueError("operation timer must advance")
+        observations.append(duration)
+        total += duration
+    return {
+        "seconds": total / len(observations),
+        "timed_total_seconds": total,
+        "wall_seconds": time.perf_counter() - started,
+        "iterations": len(observations),
+        "operation_seconds": observations,
+    }
+
+
+async def run(
+    package,
+    *,
+    repeat,
+    fast,
+    size,
+    fixture,
+    throughput_only=False,
+    warmup_seconds=0.0,
+    batch_seconds=0.0,
+    batch_min_operations=1,
+):
     line = b'{"id":123,"message":"representative repeated JSONL text","ok":true}\n'
     payload = (
         random.Random(20260927).randbytes(size)
@@ -131,12 +172,44 @@ async def run(package, *, repeat, fast, size, fixture):
     )
     rows = []
     for name, compress, items, expected, ticker in cases:
-        samples = [
-            await sample(
-                package, items, expected, compress=compress, fast=fast, ticker=ticker
+        if throughput_only and ticker:
+            continue
+        warmup = None
+        if not ticker and warmup_seconds:
+            warmup = await throughput_batch(
+                package,
+                items,
+                expected,
+                compress=compress,
+                fast=fast,
+                target_seconds=warmup_seconds,
+                min_operations=batch_min_operations,
             )
-            for _ in range(repeat)
-        ]
+        if not ticker and batch_seconds:
+            samples = [
+                await throughput_batch(
+                    package,
+                    items,
+                    expected,
+                    compress=compress,
+                    fast=fast,
+                    target_seconds=batch_seconds,
+                    min_operations=batch_min_operations,
+                )
+                for _ in range(repeat)
+            ]
+        else:
+            samples = [
+                await sample(
+                    package,
+                    items,
+                    expected,
+                    compress=compress,
+                    fast=fast,
+                    ticker=ticker,
+                )
+                for _ in range(repeat)
+            ]
         seconds = [s["seconds"] for s in samples]
         row = {
             "case": name,
@@ -145,6 +218,7 @@ async def run(package, *, repeat, fast, size, fixture):
             "payload_sha256": hashlib.sha256(expected).hexdigest(),
             "input_sha256": hashlib.sha256(b"".join(items)).hexdigest(),
             "samples": samples,
+            "warmup": warmup,
             "min_seconds": min(seconds),
             "median_seconds": statistics.median(seconds),
         }
@@ -167,9 +241,18 @@ def main():
     parser.add_argument("--repeat", type=int, default=7)
     parser.add_argument("--size", type=int, default=4 * 1024 * 1024)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--throughput-only", action="store_true")
+    parser.add_argument("--warmup-seconds", type=float, default=0.0)
+    parser.add_argument("--batch-seconds", type=float, default=0.0)
+    parser.add_argument("--batch-min-operations", type=int, default=1)
     args = parser.parse_args()
-    if args.repeat < 1 or args.size < 1:
-        parser.error("repeat and size must be positive")
+    if args.repeat < 1 or args.size < 1 or args.batch_min_operations < 1:
+        parser.error("repeat, size and minimum operation count must be positive")
+    if any(
+        not math.isfinite(value) or value < 0
+        for value in (args.warmup_seconds, args.batch_seconds)
+    ):
+        parser.error("warmup and batch durations must be finite and nonnegative")
     root, harness = args.source_root.resolve(), Path(__file__).resolve()
     provenance = {
         "source": git_metadata(root),
@@ -210,13 +293,23 @@ def main():
         else None,
         "load_start": os.getloadavg() if hasattr(os, "getloadavg") else None,
         "command": sys.argv,
-        "limitations": "Fixture/open-loop construction and output join/validation excluded. Output chunks retained during timing. Ticker only in latency cases. Consecutive repeats; compare interleaved process captures including baseline drift. Observations are not scheduling guarantees or G17 qualification.",
+        "sampling": {
+            "throughput_only": args.throughput_only,
+            "warmup_seconds": args.warmup_seconds,
+            "batch_seconds": args.batch_seconds,
+            "batch_min_operations": args.batch_min_operations,
+        },
+        "limitations": "Fixture/open-loop construction and output join/validation excluded. Output chunks retained during timing. Ticker only in latency cases. Consecutive repeats; compare interleaved process captures including baseline drift. Optional throughput warmup is recorded but excluded from minima. Batched throughput seconds are means of complete operations over a minimum summed timed-work duration, not single-operation latency; operation timings/counts and total batch wall time are retained. The minimum operation count also applies to warmup batches. Validation between operations is outside timing but affects thermal/cache state. Batched minima are not directly comparable to single-operation minima. Observations are not scheduling guarantees or G17 qualification.",
         "rows": asyncio.run(
             run_all(
                 aiogzip,
                 repeat=args.repeat,
                 fast=args.engine == "zlib-ng",
                 size=args.size,
+                throughput_only=args.throughput_only,
+                warmup_seconds=args.warmup_seconds,
+                batch_seconds=args.batch_seconds,
+                batch_min_operations=args.batch_min_operations,
             )
         ),
     }

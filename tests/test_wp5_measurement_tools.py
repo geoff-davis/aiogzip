@@ -291,3 +291,87 @@ async def test_longline_incompressible_control_preserves_full_line(scripts, newl
     assert len(expected[0]) == case["size"]
     result = await harness["sample"](aiogzip, case, wire, expected, "resources")
     assert result["verified"] and result["seconds"] is None
+
+
+async def test_throughput_batch_reaches_timed_budget_and_records_raw_samples(
+    scripts, monkeypatch
+):
+    harness = runpy.run_path(str(scripts / "measure_b2_stream_fairness.py"))
+    durations = iter([0.02, 0.03, 0.05])
+
+    async def sample(*args, **kwargs):
+        assert kwargs["ticker"] is False
+        return {"seconds": next(durations)}
+
+    monkeypatch.setitem(harness["throughput_batch"].__globals__, "sample", sample)
+    result = await harness["throughput_batch"](
+        None, [], b"", compress=False, fast=False, target_seconds=0.075
+    )
+    assert result["iterations"] == 3
+    assert result["timed_total_seconds"] == pytest.approx(0.1)
+    assert result["seconds"] == pytest.approx(0.1 / 3)
+    assert result["operation_seconds"] == [0.02, 0.03, 0.05]
+
+
+async def test_throughput_warmup_is_excluded_from_batch_minima(scripts, monkeypatch):
+    harness = runpy.run_path(str(scripts / "measure_b2_stream_fairness.py"))
+    count = 0
+
+    async def sample(*args, **kwargs):
+        nonlocal count
+        duration = 0.2 if count % 7 == 0 else 0.01
+        count += 1
+        return {"seconds": duration}
+
+    monkeypatch.setitem(harness["run"].__globals__, "sample", sample)
+    rows = await harness["run"](
+        None,
+        repeat=2,
+        fast=False,
+        size=1024,
+        fixture="random",
+        throughput_only=True,
+        warmup_seconds=0.1,
+        batch_seconds=0.025,
+    )
+    assert len(rows) == 8
+    for row in rows:
+        assert row["warmup"]["seconds"] == 0.2
+        assert row["min_seconds"] == pytest.approx(0.01)
+        assert [sample["iterations"] for sample in row["samples"]] == [3, 3]
+
+
+async def test_throughput_batch_still_checks_complete_output(scripts):
+    harness = runpy.run_path(str(scripts / "measure_b2_stream_fairness.py"))
+
+    async def broken_wrapper(source):
+        async for _item in source:
+            yield b"wrong"
+
+    with pytest.raises(AssertionError):
+        await harness["throughput_batch"](
+            SimpleNamespace(decompress_chunks=broken_wrapper),
+            [b"input"],
+            b"expected",
+            compress=False,
+            fast=False,
+            target_seconds=0.1,
+        )
+
+
+async def test_slow_throughput_batch_still_uses_minimum_operation_count(
+    scripts, monkeypatch
+):
+    harness = runpy.run_path(str(scripts / "measure_b2_stream_fairness.py"))
+
+    async def sample(*args, **kwargs):
+        return {"seconds": 0.2}
+
+    monkeypatch.setitem(harness["throughput_batch"].__globals__, "sample", sample)
+    result = await harness["throughput_batch"](
+        None, [], b"", compress=False, fast=False, target_seconds=0.1, min_operations=3
+    )
+    assert result["iterations"] == 3
+    assert result["timed_total_seconds"] == pytest.approx(0.6)
+    assert result["seconds"] == pytest.approx(0.2)
+    assert result["wall_seconds"] >= 0
