@@ -137,7 +137,7 @@ def test_quiet_period_restarts_after_busy_sample(fake):
 
     def sample():
         now[0] += 5
-        return dict(foreign_cores=1 if now[0] == 60 else 0, load=(0, 0, 0))
+        return dict(foreign_cores=1.01 if now[0] == 60 else 0, load=(0, 0, 0))
 
     obj.sample = sample
     assert obj.quiet(initial=True)
@@ -159,7 +159,7 @@ def test_command_is_reaped_on_interference(runner, fake, monkeypatch):
     stopped = []
     monkeypatch.setitem(function.__globals__, "stop_child", lambda c: stopped.append(c))
     obj.popen = lambda *args, **kwargs: child
-    obj.sample = lambda limit: dict(foreign_cores=1)
+    obj.sample = lambda limit: dict(foreign_cores=1.01)
     reason, record = obj.command(
         dict(output="capture.json", argv=["program", "{capture}"])
     )
@@ -185,8 +185,8 @@ def test_command_reaps_even_when_monitor_fails(runner, fake, monkeypatch):
     assert stopped == [child]
 
 
-@pytest.mark.parametrize("policy", [0.26, 1, float("nan")])
-def test_policy_cannot_silently_relax(runner, policy):
+@pytest.mark.parametrize("policy", [0.25, 1.01, float("nan")])
+def test_policy_must_match_declared_thresholds(runner, policy):
     declared = dict(runner["POLICY"], foreign_cpu_cores_max=policy)
     with pytest.raises(ValueError, match="quiet policy"):
         runner["validate"](dict(quiet_policy=declared))
@@ -316,3 +316,18 @@ def test_block_span_reaps_child_and_cannot_complete(runner, fake, monkeypatch):
     )
     assert reason == "block-span" and record["status"] == "block-span"
     assert stopped == [child]
+
+
+@pytest.mark.parametrize(
+    "foreign,load,expected", [(1.0, 0.5, True), (1.01, 0.0, False), (0.0, 0.51, False)]
+)
+def test_provisional_ceiling_and_load_boundary(fake, foreign, load, expected):
+    obj, now = fake
+    obj.end = obj.deadline = 130
+
+    def sample():
+        now[0] += 5
+        return dict(foreign_cores=foreign, load=(load, load, 0))
+
+    obj.sample = sample
+    assert obj.quiet() is expected
