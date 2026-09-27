@@ -1,4 +1,4 @@
-"""G06 compatibility guard and strict reproductions, pending the localized repair."""
+"""G06 structural and replay regressions for locally accumulated text."""
 
 import asyncio
 import gzip
@@ -10,13 +10,12 @@ from aiogzip import AsyncGzipTextFile
 
 
 @pytest.mark.parametrize("newline", ["", "\r\n"])
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="G06 generic long lines repeatedly append the growing prefix",
-)
-async def test_generic_longline_building_work_is_linear(monkeypatch, newline):
-    payload = "x" * (1024 * 1024)
+@pytest.mark.parametrize("surface", ["readline", "anext", "bounded"])
+@pytest.mark.parametrize("mib", [1, 2])
+async def test_generic_longline_building_work_is_linear(
+    monkeypatch, newline, surface, mib
+):
+    payload = "x" * (mib * 1024 * 1024)
     source = FramedAsyncReader(gzip.compress(payload.encode(), mtime=0))
     work = 0
     original = AsyncGzipTextFile._append_buffer
@@ -31,7 +30,13 @@ async def test_generic_longline_building_work_is_linear(monkeypatch, newline):
     async with AsyncGzipTextFile(
         None, "rt", fileobj=source, closefd=False, newline=newline, chunk_size=65536
     ) as stream:
-        assert await stream.readline() == payload
+        if surface == "anext":
+            result = await anext(stream)
+        elif surface == "bounded":
+            result = await stream.readline(len(payload))
+        else:
+            result = await stream.readline()
+        assert result == payload
     # Charge characters presented to concatenation, not allocator-dependent copies.
     # A prefix plus one final join fits comfortably; growing suffix appends do not.
     assert work <= 2 * len(payload) + 65536
@@ -41,14 +46,19 @@ async def test_generic_longline_building_work_is_linear(monkeypatch, newline):
 @pytest.mark.parametrize(
     "surface", ["readline", "anext", "read", "readlines", "iter_batches"]
 )
-@pytest.mark.parametrize("midstream", [False, True])
+@pytest.mark.parametrize("start", ["initial", "empty-buffer", "buffered-prefix"])
 @pytest.mark.parametrize("encoding", ["utf-8", "utf-16", "iso2022_jp"])
 async def test_cookie_during_unpublished_longline_replays_whole_line(
-    monkeypatch, newline, surface, encoding, midstream
+    monkeypatch, newline, surface, encoding, start
 ):
     terminator = "\r" if newline == "\r" else "\r\n"
     payload = "日" * 1000 + terminator
-    prime = {"utf-8": 33, "utf-16": 49, "iso2022_jp": 48}[encoding] if midstream else 0
+    if start == "buffered-prefix":
+        prime = 1
+    elif start == "empty-buffer":
+        prime = {"utf-8": 33, "utf-16": 49, "iso2022_jp": 48}[encoding]
+    else:
+        prime = 0
     expected = payload.replace("\r\n", "\n") if newline is None else payload
     source = FramedAsyncReader(
         gzip.compress(("日" * prime + payload).encode(encoding), mtime=0)
@@ -62,7 +72,7 @@ async def test_cookie_during_unpublished_longline_replays_whole_line(
         chunk_size=100,
         encoding=encoding,
     ) as stream:
-        if midstream:
+        if prime:
             assert await stream.read(prime) == "日" * prime
         binary = stream._binary_file
         assert binary is not None
@@ -112,14 +122,15 @@ async def test_cookie_during_unpublished_longline_replays_whole_line(
 
 @pytest.mark.parametrize("surface", ["readline", "read"])
 @pytest.mark.parametrize("failure", ["cancel", "no-effect-error"])
+@pytest.mark.parametrize("newline", [None, "", "\r\n"])
 async def test_unpublished_cookie_origin_clears_after_failed_read(
-    monkeypatch, surface, failure
+    monkeypatch, surface, failure, newline
 ):
-    line = "日" * 1000 + "\n"
+    line = "日" * 1000 + ("\r\n" if newline == "\r\n" else "\n")
     payload = line + "tail"
     source = FramedAsyncReader(gzip.compress(payload.encode(), mtime=0))
     async with AsyncGzipTextFile(
-        None, "rt", fileobj=source, closefd=False, chunk_size=100
+        None, "rt", fileobj=source, closefd=False, chunk_size=100, newline=newline
     ) as stream:
         binary = stream._binary_file
         assert binary is not None
