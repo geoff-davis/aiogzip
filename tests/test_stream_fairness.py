@@ -82,8 +82,9 @@ async def test_ready_source_progress_precedes_exhaustion(mode):
         ([b"x"], "_INLINE_OUTPUT_CHUNKS_CHECKPOINT"),
     ],
 )
+@pytest.mark.parametrize("empty_between", [False, True])
 async def test_codec_budget_survives_operation_boundaries(
-    monkeypatch, events, threshold
+    monkeypatch, events, threshold, empty_between
 ):
     class Operation:
         def __init__(self):
@@ -107,6 +108,13 @@ async def test_codec_budget_survives_operation_boundaries(
     for _ in range(3):
         async for _ in _codec_async._drive_operation(Operation(), budget=budget):
             pass
+        if empty_between:
+            # An empty feed must preserve the accumulated work for the next
+            # operation even when the driver skips loading its budget.
+            empty = Operation()
+            empty.events = iter(())
+            async for _ in _codec_async._drive_operation(empty, budget=budget):
+                pass
     assert checkpoints == 1
 
 

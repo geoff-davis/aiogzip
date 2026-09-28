@@ -107,10 +107,11 @@ async def _drive_operation(
     workload: bytes = b"",
     offload_threshold: int = _ZLIB_OFFLOAD_THRESHOLD,
     budget: _StreamBudget | None = None,
+    first_result: object = None,
 ) -> AsyncIterator[bytes]:
-    """Pull one bounded codec chunk at a time, inline or in an executor."""
+    """Pull bounded chunks; ``None`` means no inline result was supplied."""
     completed = False
-    advancing_first = True
+    advancing_first = first_result is None
     failed = False
     inline_output_bytes = 0
     inline_output_chunks = 0
@@ -134,6 +135,11 @@ async def _drive_operation(
                     inline_output_chunks = 0
                     no_output_bytes = 0
                     no_output_steps = 0
+            elif first_result is not None:
+                # A small compression feed may already have advanced inline.
+                # Account for that result exactly once before advancing again.
+                result = first_result
+                first_result = None
             else:
                 result = _raw_next_or_done(operation, b"")
             advancing_first = False

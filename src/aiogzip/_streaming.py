@@ -6,8 +6,11 @@ from typing import Any, AsyncIterable, AsyncIterator, Optional, Union, cast
 from . import _engine
 from ._codec_async import (
     _DECODE_OFFLOAD_THRESHOLD,
+    _DONE,
+    _ZLIB_OFFLOAD_THRESHOLD,
     _cooperative_checkpoint,
     _drive_operation,
+    _raw_next_or_done,
     _StreamBudget,
 )
 from ._common import (
@@ -171,10 +174,26 @@ async def _compress_chunks_impl(
             budget.source_bytes += len(snapshot)
             if not snapshot:
                 continue
+            operation = encoder._feed_snapshot(snapshot)
+            first_result = None
+            if len(snapshot) < _ZLIB_OFFLOAD_THRESHOLD:
+                # Most small compression feeds complete without output. Avoid
+                # constructing an async driver for that already-finished work.
+                try:
+                    first_result = _raw_next_or_done(operation, b"")
+                except BaseException:
+                    try:
+                        operation.close()
+                    except BaseException:
+                        pass
+                    raise
+                if first_result is _DONE:
+                    continue
             async for output in _drive_operation(
-                encoder._feed_snapshot(snapshot),
+                operation,
                 workload=snapshot,
                 budget=budget,
+                first_result=first_result,
             ):
                 yield output
 
