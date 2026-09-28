@@ -1,0 +1,10 @@
+[Unit]
+Description=WP5 G08 committed first-step stdlib comparison against wp5 (2026-09-29)
+
+[Service]
+Type=exec
+WorkingDirectory=/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore
+ExecStart=/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/venv/bin/python /home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/harness/scripts/run_b2_timing_blocks.py /home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/scheduled/aiogzip-wp5-onecore-20260929-g08-stdlib-wp5.json
+KillMode=control-group
+RuntimeMaxSec=2h1min
+TimeoutStopSec=15s
