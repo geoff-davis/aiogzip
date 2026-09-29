@@ -1,0 +1,19 @@
+{
+  "sanoid-prune.service": [
+    "2026-09-29T02:15:01-07:00 Framework systemd[1]: Starting sanoid-prune.service - Prune ZFS snapshots...",
+    "2026-09-29T02:15:07-07:00 Framework systemd[1]: sanoid-prune.service: Deactivated successfully.",
+    "2026-09-29T02:15:07-07:00 Framework systemd[1]: Finished sanoid-prune.service - Prune ZFS snapshots.",
+    "2026-09-29T02:15:07-07:00 Framework systemd[1]: sanoid-prune.service: Consumed 5.009s CPU time, 20.8M memory peak."
+  ],
+  "syncoid-backup.service": [
+    "2026-09-29T04:02:28-07:00 Framework systemd[1]: Starting syncoid-backup.service - Syncoid backup to local backup pool...",
+    "2026-09-29T04:02:32-07:00 Framework systemd[1]: syncoid-backup.service: Deactivated successfully.",
+    "2026-09-29T04:02:32-07:00 Framework systemd[1]: Finished syncoid-backup.service - Syncoid backup to local backup pool.",
+    "2026-09-29T04:02:32-07:00 Framework systemd[1]: syncoid-backup.service: Consumed 3.906s CPU time, 36.3M memory peak."
+  ],
+  "timer_units": {
+    "sanoid.timer": "# /etc/systemd/system/sanoid.timer\n[Unit]\nDescription=Run Sanoid Every 5 Minutes\n\n[Timer]\nOnCalendar=*:0/5\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n",
+    "syncoid-backup.timer": "# /etc/systemd/system/syncoid-backup.timer\n[Unit]\nDescription=Run Syncoid backup hourly\n\n[Timer]\nOnCalendar=hourly\nRandomizedDelaySec=5m\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n"
+  },
+  "interpretation": "Journal overlap suggests background snapshot/backup work contributed; aggregate foreign CPU cannot prove per-process attribution. No unrelated service was altered."
+}
