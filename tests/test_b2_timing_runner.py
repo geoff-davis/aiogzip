@@ -319,9 +319,9 @@ def test_block_span_reaps_child_and_cannot_complete(runner, fake, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "foreign,load,expected", [(1.0, 0.5, True), (1.01, 0.0, False), (0.0, 0.51, False)]
+    "foreign,load,expected", [(1.0, 0.5, True), (1.01, 0.0, False), (0.0, 5.0, True)]
 )
-def test_provisional_ceiling_and_load_boundary(fake, foreign, load, expected):
+def test_foreign_ceiling_gates_and_load_is_only_recorded(fake, foreign, load, expected):
     obj, now = fake
     obj.end = obj.deadline = 130
 

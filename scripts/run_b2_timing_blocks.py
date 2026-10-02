@@ -20,9 +20,11 @@ from pathlib import Path
 from capture_file_state_trace import git_metadata
 from run_quiet_benchmarks import cpu_snapshot, foreign_cores, stop_child
 
+# Foreign CPU is the admission and interference metric. Load averages are
+# recorded with every sample as context but do not gate: they can outlast the
+# CPU activity that raised them.
 POLICY = dict(
     foreign_cpu_cores_max=1.0,
-    load_1_and_5_max=0.5,
     quiet_seconds=120,
     sample_seconds=5,
 )
@@ -264,10 +266,7 @@ class WindowRunner:
             row = self.sample()
             if row is None:
                 return False
-            if (
-                row["foreign_cores"] > POLICY["foreign_cpu_cores_max"]
-                or max(row["load"][:2]) > POLICY["load_1_and_5_max"]
-            ):
+            if row["foreign_cores"] > POLICY["foreign_cpu_cores_max"]:
                 since = self.clock.monotonic()
             elif self.clock.monotonic() - since >= POLICY["quiet_seconds"]:
                 return (
