@@ -1,0 +1,13 @@
+{
+  "g06-stdlib.tar.xz": "6d98c6fe5ef37cfa87b3108b8dc04b5a0c54c4d4d8cd20cb026d58b4fa8b84eb",
+  "g06-zlib-ng-derived.tar.xz": "cf1c449cd455ef419cf8a7f270b0da7a7bb1265721420880068dd5b09c979971",
+  "g07-both.tar.xz": "a78b3a957108f9769aca68cc1d4366528c9811ff0aae63566d7b1da4d92f680c",
+  "g08-scheduling-stdlib-wp4.tar.xz": "ccdeca02567c59481f3fac8fc616557905986a3b69575df952bb00d358a09002",
+  "g08-scheduling-zlib-ng-wp4.tar.xz": "28aba4d2b42c96095d54bdc84ed07bdc1c7ca1a79a7e22de1c6f91d63be7aca3",
+  "g08-throughput-zlib-ng-wp4-derived.tar.xz": "c508a861af7307fa9f52195ef966e045e7b51a46e642df7987f4a9b0c6fab2fa",
+  "g08-throughput-zlib-ng-wp4-raw1.tar.xz": "e381e530734dfa17e6bb86e49d15084eeb2c49c19f3f0ab5a104cfd14562d579",
+  "g08-throughput-zlib-ng-wp4-raw2.tar.xz": "0da51353c88cbb2ee6f5df080d40031bfc2889915353e0bc00cc547c2e1ee532",
+  "g08-throughput-zlib-ng-wp5-derived.tar.xz": "a0046585078a1762010c859610baba498d49bb219b35482241583aab6c848c6d",
+  "g08-throughput-zlib-ng-wp5-raw1.tar.xz": "fc1f57b040a1aef42149d22e20ac04ce156395c5d49050abbd3544f50cbc483d",
+  "g08-throughput-zlib-ng-wp5-raw2.tar.xz": "60ea215c7fa0c61b29050e620bba3f275275b59939dcf1151b3bd1c8699d4054"
+}
