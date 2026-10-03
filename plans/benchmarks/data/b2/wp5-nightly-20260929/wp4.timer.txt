@@ -1,0 +1,12 @@
+[Unit]
+Description=WP5 September 29 only; review before scheduling more
+
+[Timer]
+OnCalendar=2026-09-29 02:00:00 America/Los_Angeles
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=false
+Unit=aiogzip-wp5-onecore-20260929-g08-stdlib-wp4.service
+
+[Install]
+WantedBy=timers.target

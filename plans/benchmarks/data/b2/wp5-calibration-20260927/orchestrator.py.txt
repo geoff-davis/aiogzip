@@ -1,0 +1,46 @@
+import hashlib,json,os,subprocess,sys,time
+from pathlib import Path
+root=Path('/tmp/aiogzip-quiet-calibration-20260927')
+frozen=Path('/tmp/aiogzip-wp5-nightly-20260927/followup-candidate')
+sys.path.insert(0,str(frozen/'scripts'))
+from run_quiet_benchmarks import cpu_snapshot,foreign_cores,stop_child
+relative=next(s[3:] for s in Path('/proc/self/cgroup').read_text().splitlines() if s.startswith('0::'))
+assert relative.endswith('/aiogzip-quiet-calibration-20260927.service'),relative
+cgroup=Path('/sys/fs/cgroup')/relative.lstrip('/')
+record={'policy':{'foreign_cores_max':1.0,'load1_load5_start_max':0.5,'quiet_seconds':120,'max_minimum_drift_percent':3.0},'script_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'host':[],'captures':[],'status':'waiting','limitations':'Policy calibration only, not release qualification. Same committed source and harness in every capture. All 16 throughput rows per engine must meet 3% across-capture minimum drift; latency rows are retained but not used for throughput criterion.'}
+def save():
+ (root/'status.json').write_text(json.dumps(record,indent=2)+'\n')
+def sample():
+ before=cpu_snapshot(cgroup);time.sleep(5);after=cpu_snapshot(cgroup)
+ row={'time':time.time(),'foreign_cores':foreign_cores(before,after),'load':os.getloadavg()}
+ record['host'].append(row);save();return row
+save();limit=time.monotonic()+900;quiet=time.monotonic()
+while time.monotonic()-quiet<120:
+ h=sample()
+ if h['foreign_cores']>1.0 or max(h['load'][:2])>.5:quiet=time.monotonic()
+ if time.monotonic()>limit:
+  record['status']='deferred';save();sys.exit(0)
+record['status']='running';save()
+order=('stdlib','zlib-ng','stdlib','zlib-ng','zlib-ng','stdlib','zlib-ng','stdlib')
+for i,engine in enumerate(order):
+ argv=['/usr/bin/taskset','-c','0','/tmp/aiogzip-wp5-nightly-20260927/venv/bin/python',str(frozen/'scripts/measure_b2_stream_fairness.py'),'--source-root',str(frozen),'--engine',engine,'--repeat','7','--output',str(root/f'{i}-{engine}.json')]
+ with (root/f'{i}-{engine}.log').open('x') as log:
+  child=subprocess.Popen(argv,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+  try:
+   while child.poll() is None:
+    h=sample()
+    if h['foreign_cores']>1.0 or time.monotonic()>limit:
+     record['status']='contaminated';save();sys.exit(0)
+  finally:stop_child(child)
+  if child.returncode:raise RuntimeError((argv,child.returncode))
+ record['captures'].append({'engine':engine,'file':str(root/f'{i}-{engine}.json')});save()
+comparisons=[]
+for engine in ('stdlib','zlib-ng'):
+ caps=[json.loads(Path(c['file']).read_text()) for c in record['captures'] if c['engine']==engine]
+ for rows in zip(*(c['rows'] for c in caps),strict=True):
+  if not rows[0]['case'].startswith('throughput-'):continue
+  key=tuple(rows[0][k] for k in ('case','fixture','direction','payload_sha256','input_sha256'))
+  assert all(tuple(r[k] for k in ('case','fixture','direction','payload_sha256','input_sha256'))==key for r in rows)
+  minima=[r['min_seconds'] for r in rows];drift=(max(minima)/min(minima)-1)*100
+  comparisons.append({'engine':engine,'case':key[0],'fixture':key[1],'direction':key[2],'minima':minima,'drift_percent':drift,'passes':drift<=3.0})
+record['comparisons']=comparisons;record['status']='stable' if all(x['passes'] for x in comparisons) else 'unstable';save()

@@ -1,0 +1,69 @@
+import dataclasses, asyncio, gzip, hashlib, json, os, random, subprocess, sys, threading, time
+from pathlib import Path
+ROOT=Path(__file__).parent
+SOURCE=Path('/tmp/aiogzip-wp5-nightly-20260927/followup-candidate')
+HARNESS=Path('/tmp/aiogzip-quiet-calibration-batched-20260927/harness')
+
+def telemetry():
+    cpus={}
+    for line in Path('/proc/stat').read_text().splitlines():
+        key,*values=line.split()
+        if key in ('cpu','cpu0','cpu16','cpu13','cpu29'):
+            cpus[key]=list(map(int,values))
+    freqs={}
+    for cpu in (0,13):
+        p=Path(f'/sys/devices/system/cpu/cpu{cpu}/cpufreq/scaling_cur_freq')
+        freqs[str(cpu)]=int(p.read_text()) if p.exists() else None
+    temps={}
+    for d in Path('/sys/class/hwmon').glob('hwmon*'):
+        if (d/'name').read_text().strip()=='k10temp':
+            for p in d.glob('temp*_input'):
+                label=p.with_name(p.name.replace('_input','_label'))
+                temps[label.read_text().strip() if label.exists() else p.name]=int(p.read_text())
+    return dict(time=time.time(),monotonic=time.monotonic(),cpus=cpus,frequency_khz=freqs,temperature_millic=temps,load=os.getloadavg())
+
+async def worker(cpu):
+    os.sched_setaffinity(0,{cpu})
+    os.environ['AIOGZIP_ENGINE']='stdlib'
+    # Use the same documented override as the committed harness.
+    sys.path.insert(0,str(HARNESS/'scripts'))
+    import measure_b2_stream_fairness as harness
+    sys.path.insert(0,str(SOURCE/'src'))
+    import aiogzip
+    assert str(SOURCE/'src') in aiogzip.__file__
+    rows=[]
+    payload=random.Random(20260927).randbytes(4*1024*1024)
+    wire=gzip.compress(payload,mtime=0)
+    for size in (1048576,4096,64):
+        items=[wire[i:i+size] for i in range(0,len(wire),size)]
+        samples=[]
+        for index in range(8):
+            start=telemetry(); process_started=time.process_time()
+            batch=await harness.throughput_batch(aiogzip,items,payload,compress=False,fast=False,target_seconds=.1,min_operations=3)
+            samples.append(dict(index=index,before=start,after=telemetry(),batch=batch,process_cpu_seconds=time.process_time()-process_started))
+        rows.append(dict(chunk_size=size,samples=samples))
+    return dict(cpu=cpu,package=aiogzip.__file__,engine=dataclasses.asdict(aiogzip.engine_info()),rows=rows)
+
+if len(sys.argv)>1:
+    print(json.dumps(asyncio.run(worker(int(sys.argv[1])))))
+else:
+    for path in (SOURCE,HARNESS):
+        assert not subprocess.check_output(['git','-C',str(path),'status','--porcelain'],text=True).strip()
+    record=dict(status='running',diagnostic_only=True,script_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),source=subprocess.check_output(['git','-C',str(SOURCE),'rev-parse','HEAD'],text=True).strip(),harness=subprocess.check_output(['git','-C',str(HARNESS),'rev-parse','HEAD'],text=True).strip(),captures=[],telemetry=[],clock_ticks=os.sysconf('SC_CLK_TCK'),limitations='Exploratory placement comparison; no qualification or causal inference. Raw CPU counters include benchmark CPU; aggregate busy minus child CPU is approximate foreign work. Frequency is an instantaneous proxy, not effective clock. First batches retained separately; same case order each process.')
+    stop=threading.Event()
+    def monitor():
+        while not stop.is_set():
+            record['telemetry'].append(telemetry());stop.wait(.25)
+    thread=threading.Thread(target=monitor);thread.start()
+    try:
+        for index,cpu in enumerate([0,13,13,0]*3):
+            result=subprocess.run([sys.executable,str(Path(__file__)),str(cpu)],capture_output=True,text=True,timeout=120,check=True)
+            capture=json.loads(result.stdout)
+            file=ROOT/f'{index:02d}-cpu{cpu}.json';file.write_text(json.dumps(capture,indent=2)+'\n')
+            record['captures'].append(dict(cpu=cpu,file=str(file)))
+            (ROOT/'status.json').write_text(json.dumps(record,indent=2)+'\n')
+        record['status']='complete'
+    except BaseException as exc:
+        record['status']='failed';record['error']=repr(exc);raise
+    finally:
+        stop.set();thread.join();(ROOT/'status.json').write_text(json.dumps(record,indent=2)+'\n')

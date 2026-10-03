@@ -1,0 +1,56 @@
+import hashlib,json,os,subprocess,sys,time
+from pathlib import Path
+root=Path('/tmp/aiogzip-quiet-calibration-batched-20260927')
+frozen=Path('/tmp/aiogzip-quiet-calibration-batched-20260927/harness')
+source=Path('/tmp/aiogzip-wp5-nightly-20260927/followup-candidate')
+sys.path.insert(0,str(frozen/'scripts'))
+from run_quiet_benchmarks import cpu_snapshot,foreign_cores,stop_child
+relative=next(s[3:] for s in Path('/proc/self/cgroup').read_text().splitlines() if s.startswith('0::'))
+assert relative.endswith('/aiogzip-quiet-calibration-batched-20260927.service'),relative
+cgroup=Path('/sys/fs/cgroup')/relative.lstrip('/')
+record={'policy':{'foreign_cores_max':1.0,'load1_load5_start_max':0.5,'quiet_seconds':120,'max_minimum_drift_percent':3.0,'warmup_seconds':0.25,'batch_seconds':0.1,'batch_min_operations':3,'wait_budget_seconds':900,'measurement_budget_seconds':1200},'script_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'host':[],'captures':[],'warmup_captures':[],'status':'waiting','limitations':'Policy calibration only, not release qualification. Same committed source and harness in every capture. All 16 throughput rows per engine must meet 3% across-capture minimum drift; Only throughput rows run. Each sample is mean per operation over at least100ms of timed work, with250ms per-case warmup and one discarded full capture perengine. Not comparable with unbatched minima.'}
+record['source_commit']=subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()
+record['harness_commit']=subprocess.check_output(['git','-C',str(frozen),'rev-parse','HEAD'],text=True).strip()
+def save():
+ (root/'status.json').write_text(json.dumps(record,indent=2)+'\n')
+def sample():
+ before=cpu_snapshot(cgroup);time.sleep(5);after=cpu_snapshot(cgroup)
+ row={'time':time.time(),'foreign_cores':foreign_cores(before,after),'load':os.getloadavg()}
+ record['host'].append(row);save();return row
+save();limit=time.monotonic()+900;quiet=time.monotonic()
+while time.monotonic()-quiet<120:
+ h=sample()
+ if h['foreign_cores']>1.0 or max(h['load'][:2])>.5:quiet=time.monotonic()
+ if time.monotonic()>limit:
+  record['status']='deferred';save();sys.exit(0)
+record['status']='running';limit=time.monotonic()+1200;save()
+order=('stdlib','zlib-ng','stdlib','zlib-ng','stdlib','zlib-ng','zlib-ng','stdlib','zlib-ng','stdlib')
+for i,engine in enumerate(order):
+ argv=['/usr/bin/taskset','-c','0','/tmp/aiogzip-wp5-nightly-20260927/venv/bin/python',str(frozen/'scripts/measure_b2_stream_fairness.py'),'--source-root',str(source),'--engine',engine,'--repeat','7','--throughput-only','--warmup-seconds','0.25','--batch-seconds','0.1','--batch-min-operations','3','--output',str(root/f'{i}-{engine}.json')]
+ with (root/f'{i}-{engine}.log').open('x') as log:
+  child=subprocess.Popen(argv,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+  try:
+   while child.poll() is None:
+    h=sample()
+    if h['foreign_cores']>1.0:
+     record['status']='contaminated';save();sys.exit(0)
+    if time.monotonic()>limit:
+     record['status']='measurement-timeout';save();sys.exit(0)
+  finally:stop_child(child)
+  if child.returncode:raise RuntimeError((argv,child.returncode))
+ capture=json.loads((root/f'{i}-{engine}.json').read_text())
+ assert capture['sampling']==dict(throughput_only=True,warmup_seconds=.25,batch_seconds=.1,batch_min_operations=3)
+ assert capture['source']['sha']==record['source_commit'] and capture['harness']['sha']==record['harness_commit']
+ assert len(capture['rows'])==16
+ assert all(s['iterations']>=3 and s['timed_total_seconds']>=.1 for row in capture['rows'] for s in row['samples'])
+ record['warmup_captures' if i<2 else 'captures'].append({'engine':engine,'file':str(root/f'{i}-{engine}.json')});save()
+comparisons=[]
+for engine in ('stdlib','zlib-ng'):
+ caps=[json.loads(Path(c['file']).read_text()) for c in record['captures'] if c['engine']==engine]
+ for rows in zip(*(c['rows'] for c in caps),strict=True):
+  if not rows[0]['case'].startswith('throughput-'):continue
+  key=tuple(rows[0][k] for k in ('case','fixture','direction','payload_sha256','input_sha256'))
+  assert all(tuple(r[k] for k in ('case','fixture','direction','payload_sha256','input_sha256'))==key for r in rows)
+  minima=[r['min_seconds'] for r in rows];drift=(max(minima)/min(minima)-1)*100
+  comparisons.append({'engine':engine,'case':key[0],'fixture':key[1],'direction':key[2],'minima':minima,'drift_percent':drift,'passes':drift<=3.0})
+record['comparisons']=comparisons;record['status']='stable' if all(x['passes'] for x in comparisons) else 'unstable';save()

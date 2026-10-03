@@ -186,11 +186,6 @@ async def test_pending_batch_drain_has_linear_copy_work(tmp_path):
 
 
 @pytest.mark.parametrize("wrapper", [compress_chunks, decompress_chunks])
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="F7: empty ready items bypass checkpoints",
-)
 async def test_empty_source_allows_sibling_progress_before_exhaustion(wrapper):
     ticks = 0
     ticks_before_last = None

@@ -79,6 +79,7 @@ class _TextReadReservation:
 
     def __exit__(self, *exc_info: object) -> None:
         self._file._read_call_active = False
+        self._file._pending_read_origin = None
 
 
 class _TextWriteReservation:
@@ -162,6 +163,7 @@ class AsyncGzipTextFile:
         "_close_complete",
         "_close_lock",
         "_read_call_active",
+        "_pending_read_origin",
         "_read_poisoned",
         "_write_call_active",
         "_read_call",
@@ -293,6 +295,9 @@ class AsyncGzipTextFile:
         self._close_complete: bool = False
         self._close_lock = asyncio.Lock()
         self._read_call_active: bool = False
+        self._pending_read_origin: Optional[
+            Tuple[int, Tuple[Any, int], bool, int, int]
+        ] = None
         self._read_poisoned: bool = False
         self._write_call_active: bool = False
         self._read_call = _TextReadReservation(self)
@@ -478,6 +483,19 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        origin = self._pending_read_origin
+        if origin is not None:
+            # Local fragments have advanced the decoder, but have not yet
+            # published text. Replay their origin plus any consumed prefix.
+            if origin[1] == (b"", 0) and not origin[2] and not origin[4]:
+                return origin[0]
+            return self._encode_cookie(
+                origin_offset=origin[0],
+                decoder_state=origin[1],
+                trailing_cr=origin[2],
+                seen_newlines=origin[3],
+                chars_to_skip=origin[4],
+            )
         decoder_state = self._decoder.getstate()
         if self._can_use_plain_position(decoder_state):
             return self._binary_file._position
@@ -1132,6 +1150,14 @@ class AsyncGzipTextFile:
         added = 0
         fresh_origin: Optional[Tuple[int, Tuple[Any, int], bool, int]] = None
         origin_chars = 0
+        if not available:
+            self._pending_read_origin = (
+                bf._position,
+                self._decoder.getstate(),
+                self._trailing_cr,
+                self._seen_newline_types,
+                0,
+            )
         try:
             while added < needed:
                 # Snapshot only the decode round that can leave fresh text
@@ -1164,6 +1190,7 @@ class AsyncGzipTextFile:
                 self._text_buffer += "".join(pieces)
             raise
 
+        self._pending_read_origin = None
         fresh = "".join(pieces)
         consumed_fresh = min(needed, len(fresh))
         result = prefix + fresh[:consumed_fresh]
@@ -1505,6 +1532,8 @@ class AsyncGzipTextFile:
             self._trailing_cr,
             self._seen_newline_types,
         )
+        if not prefix:
+            self._pending_read_origin = (*fresh_origin, 0)
         pieces: List[str] = []
         added = 0
         fresh_line_size: Optional[int] = None
@@ -1526,6 +1555,7 @@ class AsyncGzipTextFile:
                 self._append_buffer("".join(pieces))
             raise
 
+        self._pending_read_origin = None
         fresh = "".join(pieces)
         if fresh_line_size is not None:
             result = prefix + fresh[:fresh_line_size]
@@ -1679,19 +1709,10 @@ class AsyncGzipTextFile:
 
     async def _anext_buffered_reserved(self, buf_len: int) -> str:
         """Finish generic-newline iteration under the text reservation."""
-        search_from = max(0, buf_len - 1)
-        while True:
-            has_more = await self._read_chunk_and_decode()
-            if not has_more:
-                remaining = len(self._text_buffer) - self._text_buffer_offset
-                if remaining > 0:
-                    return self._consume_buffer(remaining)
-                raise StopAsyncIteration
-            pos, length = self._find_line_terminator(search_from)
-            if pos != -1:
-                return self._consume_buffer(pos + length)
-            buf_len = len(self._text_buffer) - self._text_buffer_offset
-            search_from = max(0, buf_len - 1)
+        line = await self._readline_buffered_reserved(-1, buf_len)
+        if not line:
+            raise StopAsyncIteration
+        return line
 
     async def readline(self, limit: int = -1) -> str:
         """
@@ -1779,23 +1800,82 @@ class AsyncGzipTextFile:
         return None
 
     async def _readline_buffered_reserved(self, limit: int, buf_len: int) -> str:
-        """Finish a generic-newline text line under the read reservation."""
-        search_from = max(0, buf_len - 1)
-        while True:
-            has_more = await self._read_chunk_and_decode()
-            pos, length = self._find_line_terminator(search_from)
-            if pos != -1:
-                end = pos + length
-                if limit != -1 and end > limit:
-                    return self._consume_buffer(limit)
-                return self._consume_buffer(end)
+        """Accumulate a line without repeatedly copying the decoded prefix.
 
-            current = self._buffered_text_len()
-            if limit != -1 and current >= limit:
-                return self._consume_buffer(limit)
-            if not has_more:
-                return self._consume_buffer(current) if current else ""
-            search_from = max(0, current - 1)
+        Decode into an empty buffer each round, keeping its replay origin for
+        any remainder. The pending origin protects concurrent tell(); exceptions
+        restore every recoverable piece before the reservation is released.
+        """
+        bf = self._binary_file
+        assert bf is not None
+        if not buf_len:
+            self._capture_buffer_origin()
+        state = self._readlines_rollback_state()
+        prefix = self._text_buffer[self._text_buffer_offset :]
+        pieces = [prefix] if prefix else []
+        fresh_start = len(pieces)
+        total = buf_len
+        carry_cr = self._newline in ("", "\r\n")
+        carry = "\r" if carry_cr and prefix.endswith("\r") else ""
+        self._pending_read_origin = (
+            state[2],
+            state[3],
+            state[4],
+            state[5],
+            state[6] + state[1],
+        )
+        try:
+            while True:
+                self._text_buffer = ""
+                self._text_buffer_offset = 0
+                has_more = await self._read_chunk_and_decode()
+                chunk = self._text_buffer
+                before = total
+                total += len(chunk)
+                if chunk:
+                    pieces.append(chunk)
+
+                # Only one old character can participate in a new terminator.
+                # Keep it across empty decoder outputs as well as chunk splits.
+                self._text_buffer = carry + chunk if carry else chunk
+                try:
+                    pos, length = self._find_line_terminator()
+                finally:
+                    self._text_buffer = chunk
+                end = before + pos + length - len(carry) if pos != -1 else total
+                if limit != -1 and end > limit:
+                    end = limit
+                if pos != -1 or (limit != -1 and total >= limit) or not has_more:
+                    take = end - before
+                    if chunk:
+                        pieces[-1] = chunk[:take]
+                    result = "".join(pieces)
+                    if take == len(chunk):
+                        self._buffer_origin_chars_to_skip += len(chunk)
+                        self._text_buffer = ""
+                        self._text_buffer_offset = 0
+                    else:
+                        self._text_buffer_offset = take
+                    self._pending_read_origin = None
+                    return result
+                if chunk:
+                    carry = "\r" if carry_cr and chunk.endswith("\r") else ""
+        except BaseException:
+            # Terminal poison deliberately discards text through the binary
+            # observer. Do not resurrect it; only retryable/validation-salvage
+            # failures retain the old prefix and successfully decoded pieces.
+            if bf._can_restore_failed_read():
+                (
+                    self._text_buffer,
+                    self._text_buffer_offset,
+                    self._buffer_origin_offset,
+                    self._buffer_origin_decoder_state,
+                    self._buffer_origin_trailing_cr,
+                    self._buffer_origin_seen_newline_types,
+                    self._buffer_origin_chars_to_skip,
+                ) = state
+                self._text_buffer += "".join(pieces[fresh_start:])
+            raise
 
     async def _readline_generic_reserved(self, limit: int) -> str:
         """Read one generic-newline line while already reserved."""

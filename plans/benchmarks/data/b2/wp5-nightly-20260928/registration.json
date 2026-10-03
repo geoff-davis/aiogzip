@@ -1,0 +1,31 @@
+{
+  "name": "aiogzip-wp5-onecore-20260928-g08-throughput-stdlib",
+  "start": "2026-09-28T02:00:00-07:00",
+  "deadline": "2026-09-28T06:00:00-07:00",
+  "manifest": "/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/scheduled/aiogzip-wp5-onecore-20260928-g08-throughput-stdlib.json",
+  "manifest_sha256": "d1c750bbf4e84738f4b333bb1e375d8b98a32d6b90926504002659229cd11e31",
+  "service_sha256": "a58f1e11d86da43e7fe06f44cd9a306296792b59aa3e9beedae8e73fff56cf17",
+  "timer_sha256": "953c26bd4a903a8abb55dd1500904b0a97efa99cd9436880106152c27d8b23e4",
+  "status": "registered-waiting",
+  "runner_commit": "e6d8422a27b5210495149b3c9dcd27cad04914ec",
+  "scope": "Only G08 stdlib throughput; review before scheduling any other window",
+  "timer": {
+    "NextElapseUSecRealtime": "Mon 2026-09-28 02:00:00 PDT",
+    "ActiveState": "active",
+    "SubState": "waiting",
+    "FragmentPath": "/home/geoff/.config/systemd/user/aiogzip-wp5-onecore-20260928-g08-throughput-stdlib.timer",
+    "UnitFileState": "enabled"
+  },
+  "service": {
+    "TimeoutStopUSec": "15s",
+    "RuntimeMaxUSec": "4h 1min",
+    "ExecStart": "{ path=/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/venv/bin/python ; argv[]=/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/venv/bin/python /home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/harness/scripts/run_b2_timing_blocks.py /home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/scheduled/aiogzip-wp5-onecore-20260928-g08-throughput-stdlib.json ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+    "KillMode": "control-group",
+    "ActiveState": "inactive",
+    "SubState": "dead",
+    "FragmentPath": "/home/geoff/.config/systemd/user/aiogzip-wp5-onecore-20260928-g08-throughput-stdlib.service"
+  },
+  "verified_at": "2026-09-27T16:53:05.867547+00:00",
+  "results_parent_exists": true,
+  "results_directory_exists": false
+}

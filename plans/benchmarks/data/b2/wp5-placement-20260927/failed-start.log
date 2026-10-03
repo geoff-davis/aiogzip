@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/tmp/aiogzip-placement-diagnostic-20260927/run.py", line 60, in <module>
+    result=subprocess.run([sys.executable,str(Path(__file__)),str(cpu)],capture_output=True,text=True,timeout=120,check=True)
+  File "/home/geoff/.local/share/uv/python/cpython-3.14.2-linux-x86_64-gnu/lib/python3.14/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/tmp/aiogzip-wp5-nightly-20260927/venv/bin/python', '/tmp/aiogzip-placement-diagnostic-20260927/run.py', '0']' returned non-zero exit status 1.
