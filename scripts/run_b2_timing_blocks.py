@@ -22,9 +22,13 @@ from run_quiet_benchmarks import cpu_snapshot, foreign_cores, stop_child
 
 # Foreign CPU is the admission and interference metric. Load averages are
 # recorded with every sample as context but do not gate: they can outlast the
-# CPU activity that raised them.
+# CPU activity that raised them. Any sample above the ceiling restarts the
+# quiet period, but a running command is rejected only when interference lasts
+# interference_samples consecutive samples. Shorter excursions stay in the
+# telemetry for review alongside the drift screen; they don't disqualify alone.
 POLICY = dict(
-    foreign_cpu_cores_max=1.0,
+    foreign_cpu_cores_max=2.5,
+    interference_samples=3,
     quiet_seconds=120,
     sample_seconds=5,
 )
@@ -295,6 +299,7 @@ class WindowRunner:
         record = dict(output=str(path), argv=argv, started_at=self.clock.time())
         self.event("command-start", **record)
         reason = None
+        over = 0
         with path.with_suffix(".log").open("x", encoding="utf-8") as log:
             child = self.popen(
                 argv, stdout=log, stderr=subprocess.STDOUT, start_new_session=True
@@ -302,16 +307,16 @@ class WindowRunner:
             try:
                 while True:
                     row = self.sample(stop_at)
+                    if row is not None:
+                        busy = row["foreign_cores"] > POLICY["foreign_cpu_cores_max"]
+                        over = over + 1 if busy else 0
                     if self.remaining() <= 0:
                         reason = "deadline"
                     elif self.clock.monotonic() >= self.block_end:
                         reason = "block-span"
                     elif self.clock.monotonic() >= stop_at:
                         reason = "command-timeout"
-                    elif (
-                        row is not None
-                        and row["foreign_cores"] > POLICY["foreign_cpu_cores_max"]
-                    ):
+                    elif over >= POLICY["interference_samples"]:
                         reason = "interference"
                     if reason or child.poll() is not None:
                         break

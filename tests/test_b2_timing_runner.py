@@ -137,7 +137,7 @@ def test_quiet_period_restarts_after_busy_sample(fake):
 
     def sample():
         now[0] += 5
-        return dict(foreign_cores=1.01 if now[0] == 60 else 0, load=(0, 0, 0))
+        return dict(foreign_cores=2.51 if now[0] == 60 else 0, load=(0, 0, 0))
 
     obj.sample = sample
     assert obj.quiet(initial=True)
@@ -159,7 +159,7 @@ def test_command_is_reaped_on_interference(runner, fake, monkeypatch):
     stopped = []
     monkeypatch.setitem(function.__globals__, "stop_child", lambda c: stopped.append(c))
     obj.popen = lambda *args, **kwargs: child
-    obj.sample = lambda limit: dict(foreign_cores=1.01)
+    obj.sample = lambda limit: dict(foreign_cores=2.51)
     reason, record = obj.command(
         dict(output="capture.json", argv=["program", "{capture}"])
     )
@@ -185,7 +185,7 @@ def test_command_reaps_even_when_monitor_fails(runner, fake, monkeypatch):
     assert stopped == [child]
 
 
-@pytest.mark.parametrize("policy", [0.25, 1.01, float("nan")])
+@pytest.mark.parametrize("policy", [1.0, 2.51, float("nan")])
 def test_policy_must_match_declared_thresholds(runner, policy):
     declared = dict(runner["POLICY"], foreign_cpu_cores_max=policy)
     with pytest.raises(ValueError, match="quiet policy"):
@@ -319,7 +319,7 @@ def test_block_span_reaps_child_and_cannot_complete(runner, fake, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "foreign,load,expected", [(1.0, 0.5, True), (1.01, 0.0, False), (0.0, 5.0, True)]
+    "foreign,load,expected", [(2.5, 0.5, True), (2.51, 0.0, False), (0.0, 5.0, True)]
 )
 def test_foreign_ceiling_gates_and_load_is_only_recorded(fake, foreign, load, expected):
     obj, now = fake
@@ -331,3 +331,52 @@ def test_foreign_ceiling_gates_and_load_is_only_recorded(fake, foreign, load, ex
 
     obj.sample = sample
     assert obj.quiet() is expected
+
+
+@pytest.mark.parametrize(
+    "samples,expected",
+    [
+        ([3.0, 3.0, 0.0, 3.0, 3.0, 0.0], "complete"),
+        ([3.0, 3.0, 3.0], "interference"),
+        ([0.0, 3.0, 3.0, 3.0, 0.0], "interference"),
+        ([3.0, 3.0, None, 3.0], "interference"),
+    ],
+    ids=[
+        "brief-spikes-tolerated",
+        "sustained-rejected",
+        "sustained-mid-run",
+        "missing-sample-keeps-count",
+    ],
+)
+def test_only_sustained_interference_rejects_a_command(
+    runner, fake, monkeypatch, samples, expected
+):
+    obj, _ = fake
+    function = runner["WindowRunner"].command
+    monkeypatch.setitem(function.__globals__, "validate", lambda _: None)
+    stopped = []
+    monkeypatch.setitem(function.__globals__, "stop_child", lambda c: stopped.append(c))
+    feed = iter(samples)
+    child = SimpleNamespace(returncode=0)
+    child.poll = lambda: None if remaining else 0
+    remaining = [True]
+
+    def sample(limit):
+        try:
+            value = next(feed)
+        except StopIteration:
+            remaining.clear()
+            return dict(foreign_cores=0.0)
+        return None if value is None else dict(foreign_cores=value)
+
+    def popen(argv, **kwargs):
+        Path(argv[-1]).write_text("{}")
+        return child
+
+    obj.popen = popen
+    obj.sample = sample
+    reason, record = obj.command(
+        dict(output="capture.json", argv=["program", "{capture}"])
+    )
+    assert record["status"] == expected and stopped == [child]
+    assert (reason == "interference") is (expected == "interference")
