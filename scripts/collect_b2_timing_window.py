@@ -8,6 +8,7 @@ with analysis errors, never converted into a passing report. A live run is refus
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -87,10 +88,12 @@ def reconcile(manifest, state, raw):
                     or capture["source"]["status"]
                 ):
                     raise ValueError("capture source mismatch")
+                # Keep the manifest's own separators: Path would rewrite a POSIX
+                # checkout key with backslashes on Windows.
+                harness = os.path.dirname(os.path.dirname(argv[4]))
                 if (
                     capture["harness"]["status"]
-                    or capture["harness"]["sha"]
-                    != manifest["checkouts"][str(Path(argv[4]).parent.parent)]
+                    or capture["harness"]["sha"] != manifest["checkouts"][harness]
                 ):
                     raise ValueError("capture harness mismatch")
                 engine = "stdlib-zlib" if command["engine"] == "stdlib" else "zlib-ng"
