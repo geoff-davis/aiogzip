@@ -923,7 +923,10 @@ async def test_taskgroup_sibling_failure_during_close_closes_the_file(
     assert [type(e) for e in raised.value.exceptions] == [OSError]
     assert writer.cancelled()
     assert writers[0].closed
-    assert parent.cancelling() == cancelling_before
+    if sys.version_info >= (3, 13):
+        # Before 3.13 TaskGroup can leave the parent's cancellation request
+        # count raised on this path; that is asyncio bookkeeping, not ours.
+        assert parent.cancelling() == cancelling_before
 
 
 async def test_staged_file_closes_after_a_failing_body(tmp_path, monkeypatch):
