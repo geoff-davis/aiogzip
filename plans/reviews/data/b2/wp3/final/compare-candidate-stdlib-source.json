@@ -1,0 +1,522 @@
+{
+  "passed": true,
+  "differences": [
+    {
+      "scenario": "binary-custom-cancel-consumed-False-checkpoint-False",
+      "before": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          {
+            "bytes": "6d656d62657220410a6d656d62657220420a"
+          }
+        ],
+        [
+          "next",
+          {
+            "bytes": ""
+          }
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "binary-custom-cancel-consumed-True-checkpoint-False",
+      "before": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          {
+            "bytes": "6d656d62657220420a"
+          }
+        ],
+        [
+          "next",
+          {
+            "bytes": ""
+          }
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "binary-custom-cancel-consumed-True-checkpoint-True",
+      "before": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          {
+            "bytes": "6d656d62657220420a"
+          }
+        ],
+        [
+          "next",
+          {
+            "bytes": ""
+          }
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "binary-custom-error-consumed-False-checkpoint-False",
+      "before": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          {
+            "bytes": "6d656d62657220410a6d656d62657220420a"
+          }
+        ],
+        [
+          "next",
+          {
+            "bytes": ""
+          }
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "binary-custom-error-consumed-True-checkpoint-False",
+      "before": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          {
+            "bytes": "6d656d62657220420a"
+          }
+        ],
+        [
+          "next",
+          {
+            "bytes": ""
+          }
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "binary-custom-error-consumed-True-checkpoint-True",
+      "before": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          {
+            "bytes": "6d656d62657220420a"
+          }
+        ],
+        [
+          "next",
+          {
+            "bytes": ""
+          }
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "binary-native-consumed-cancel",
+      "before": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          {
+            "bytes": "6d656d62657220420a"
+          }
+        ],
+        [
+          "next",
+          {
+            "bytes": ""
+          }
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          {
+            "bytes": "6d656d62657220410a6d656d62657220420a"
+          }
+        ],
+        [
+          "next",
+          {
+            "bytes": ""
+          }
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "text-custom-cancel-consumed-False-checkpoint-False",
+      "before": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "member A\nmember B\n"
+        ],
+        [
+          "next",
+          ""
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "text-custom-cancel-consumed-True-checkpoint-False",
+      "before": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "member B\n"
+        ],
+        [
+          "next",
+          ""
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "text-custom-cancel-consumed-True-checkpoint-True",
+      "before": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "member B\n"
+        ],
+        [
+          "next",
+          ""
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "text-custom-error-consumed-False-checkpoint-False",
+      "before": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          "member A\nmember B\n"
+        ],
+        [
+          "next",
+          ""
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "text-custom-error-consumed-True-checkpoint-False",
+      "before": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          "member B\n"
+        ],
+        [
+          "next",
+          ""
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "text-custom-error-consumed-True-checkpoint-True",
+      "before": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          "member B\n"
+        ],
+        [
+          "next",
+          ""
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "OSError",
+          "injected source failure"
+        ],
+        [
+          "retry",
+          "OSError",
+          "read stream is broken"
+        ],
+        [
+          "next",
+          "OSError",
+          "read stream is broken"
+        ]
+      ],
+      "exception_id": "BC2"
+    },
+    {
+      "scenario": "text-native-consumed-cancel",
+      "before": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "member B\n"
+        ],
+        [
+          "next",
+          ""
+        ]
+      ],
+      "after": [
+        [
+          "initial",
+          "CancelledError"
+        ],
+        [
+          "retry",
+          "member A\nmember B\n"
+        ],
+        [
+          "next",
+          ""
+        ]
+      ],
+      "exception_id": "BC2"
+    }
+  ],
+  "diagnostics_equal": false
+}

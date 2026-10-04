@@ -1,0 +1,33 @@
+{
+  "source": "68dc67c",
+  "baseline": "140e661",
+  "harness": "c9c9ec8",
+  "pinned_affinity": [
+    0
+  ],
+  "files": {
+    "baseline-tests.log.gz": "bbacc94c60a5fd15762431d390ecc5f6ce1d7527e737436517019948a4d857d5",
+    "final-default.log.gz": "43c18195ecb896a105b0dac3dd5ba80a0edcc0fbd299b938e5d9bc587d7b5375",
+    "final-stdlib.log.gz": "c456e87450f21bebc4a9be6aeda4ff29ea55b2998c3c776681380b14bb267d04",
+    "stdlib-bulk-0-baseline.json": "c2fe2a494a4efb618f102b565836e5072ecec34b9ae3d9454a5f2bc1862bfe45",
+    "stdlib-bulk-1-candidate.json": "172f039d9c15d2b01ba863f98ef85757fcdf3e8ffd6506005bf50222954aba3a",
+    "stdlib-bulk-2-candidate.json": "39fee6ca5d734b52d055ae41682ac9ffb14d735bb38e78d47ee9f870ef28079d",
+    "stdlib-bulk-3-baseline.json": "82de1d2b57a2c5e2f36f753480bf75295e8ccf7782581a727c84f4fad1a11984",
+    "stdlib-pinned-0-baseline.json": "d3d531437a1bf09c64fbadd925caa8c77f673c438601d740898f0289a7e99336",
+    "stdlib-pinned-1-candidate.json": "e62ea15e41d1b8a5e76e82ec04ed51cb7bc0d891da8f641e3d60f8530d7c155a",
+    "stdlib-pinned-2-candidate.json": "6eab031e73d4e14beb14356055f67806c4d8dce233cf6ed10b9fa8d8de8d25d1",
+    "stdlib-pinned-3-baseline.json": "b4f4d3016c2acff22e19304c121f3ca02481ef1201273d548aa0df1ec76b977c",
+    "stdlib-scaling-baseline.json": "250765bada9f9d6be9bb3c1008a5724339d146c59ffe70f82211cf1fa32daed9",
+    "stdlib-scaling-candidate.json": "5aded3b7842281174fb03f213b252fafbd4fb518da318ee145f4b6caddba3206",
+    "zlib-ng-bulk-0-baseline.json": "269ed5db07ce9d3581a4af0c3625568fa233e0d644db4d6f45812e6f27a834d2",
+    "zlib-ng-bulk-1-candidate.json": "359dbfd602e98641a4f480fc6f7507c4af923b788020e910ac87cb9bdf358da6",
+    "zlib-ng-bulk-2-candidate.json": "b8c5d3677094416dae6944d10730f9727c93ab9efbd42ece11f00b6bf443ddf0",
+    "zlib-ng-bulk-3-baseline.json": "f77f30ceb1252d987851ff0952ce1ca912472bcb1cd8a3d6494a9c6cab098fc5",
+    "zlib-ng-pinned-0-baseline.json": "5079f495f3b571259286ecb57616dd5861bfbcdd0737ba3eff3c807d4f69a887",
+    "zlib-ng-pinned-1-candidate.json": "8bb41561528f57a016609f8e5441f3ce81fcf7e38db4bdca5db359737c6f727a",
+    "zlib-ng-pinned-2-candidate.json": "012a62dc418bbf34957b2f5e4024ba437a8a87b91d4d2eedfb22bd9dc1aa35f7",
+    "zlib-ng-pinned-3-baseline.json": "eacb37705099397ff40889a040a49c3c8534ce1d529a837c235fb2755dcbc82a",
+    "zlib-ng-scaling-baseline.json": "9e89dca62179ba51b57829240da04f626daf0e48e61ac29a3f5d380d75b8a1d7",
+    "zlib-ng-scaling-candidate.json": "3fd34531b7d760e44d5ad706cb951958ce46026af05f4f37c77a04c36f15db70"
+  }
+}

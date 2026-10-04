@@ -1,0 +1,131 @@
+{
+  "source": {
+    "sha": "b074bdc77e45e9033769fb96a999e98e8931c24b",
+    "tree": "38b0e6de668c14fbb35850a5c58138e6a1ecc803",
+    "status": ""
+  },
+  "harness": {
+    "sha": "b074bdc77e45e9033769fb96a999e98e8931c24b",
+    "tree": "38b0e6de668c14fbb35850a5c58138e6a1ecc803",
+    "status": ""
+  },
+  "script_sha256": "8d2b65d9d905a8b0d9ac361c5aa0198b8b5aa896a32a12d182049a078bb9be69",
+  "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+  "engines": {
+    "compression": "stdlib-zlib",
+    "decompression": "stdlib-zlib",
+    "crc32": "stdlib-zlib"
+  },
+  "fixture_sha256": "9e66fda15d8e47c5a53e37f2688fa8b17f694d21817d770b06173d68f92435eb",
+  "semantic": {
+    "binary-custom-cancel": {
+      "outcome": {
+        "type": "CancelledError",
+        "message": "cleanup cancellation",
+        "cause": null,
+        "notes": []
+      },
+      "cancelled": true,
+      "cancelling": 1,
+      "closes": 1
+    },
+    "binary-custom-timeout": {
+      "outcome": {
+        "type": "TimeoutError",
+        "message": "",
+        "cause": {
+          "type": "CancelledError",
+          "message": "",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "cancelled": false,
+      "cancelling": 0,
+      "closes": 1
+    },
+    "binary-native-cancel": {
+      "outcome": {
+        "type": "CancelledError",
+        "message": "cleanup cancellation",
+        "cause": null,
+        "notes": []
+      },
+      "cancelled": true,
+      "cancelling": 1,
+      "closes": 1
+    },
+    "binary-native-timeout": {
+      "outcome": {
+        "type": "TimeoutError",
+        "message": "",
+        "cause": {
+          "type": "CancelledError",
+          "message": "",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "cancelled": false,
+      "cancelling": 0,
+      "closes": 1
+    },
+    "text-custom-cancel": {
+      "outcome": {
+        "type": "CancelledError",
+        "message": "cleanup cancellation",
+        "cause": null,
+        "notes": []
+      },
+      "cancelled": true,
+      "cancelling": 1,
+      "closes": 1
+    },
+    "text-custom-timeout": {
+      "outcome": {
+        "type": "TimeoutError",
+        "message": "",
+        "cause": {
+          "type": "CancelledError",
+          "message": "",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "cancelled": false,
+      "cancelling": 0,
+      "closes": 1
+    },
+    "text-native-cancel": {
+      "outcome": {
+        "type": "CancelledError",
+        "message": "cleanup cancellation",
+        "cause": null,
+        "notes": []
+      },
+      "cancelled": true,
+      "cancelling": 1,
+      "closes": 1
+    },
+    "text-native-timeout": {
+      "outcome": {
+        "type": "TimeoutError",
+        "message": "",
+        "cause": {
+          "type": "CancelledError",
+          "message": "",
+          "cause": null,
+          "notes": []
+        },
+        "notes": []
+      },
+      "cancelled": false,
+      "cancelling": 0,
+      "closes": 1
+    }
+  },
+  "diagnostic": {}
+}

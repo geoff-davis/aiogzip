@@ -517,12 +517,18 @@ async def test_text_inline_write_matches_reserved_helper(
 
 
 @pytest.mark.parametrize("newline", [None, ""])
-async def test_text_readlines_restores_lines_after_transient_source_error(newline):
+@pytest.mark.parametrize("hint", [-1, 1 << 20])
+async def test_text_readlines_restores_lines_after_transient_source_error(
+    newline, hint
+):
     class FailOnceReader:
         def __init__(self, data):
             self._buffer = io.BytesIO(data)
             self._reads = 0
             self.failed = False
+
+        def tell(self):
+            return self._buffer.tell()
 
         async def read(self, size=-1):
             self._reads += 1
@@ -551,9 +557,9 @@ async def test_text_readlines_restores_lines_after_transient_source_error(newlin
     await stream.open()
     try:
         with pytest.raises(OSError, match="transient source failure"):
-            await stream.readlines()
+            await stream.readlines(hint)
         assert source.failed is True
-        assert await stream.readlines() == lines
+        assert await stream.readlines(hint) == lines
     finally:
         await stream.close()
 

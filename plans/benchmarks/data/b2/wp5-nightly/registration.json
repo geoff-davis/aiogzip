@@ -1,0 +1,15 @@
+{
+  "registered_at": "2026-09-27T01:42:29.118275+00:00",
+  "queue_commit": "850ff0c24dafe3284613b8eae0d4320f539d3757",
+  "sha256": {
+    "manifest.json": "f353697602c3e279b7b75b51139ef6a2da077e7ecfd823612842add963e109b9",
+    "g06-manifest.json": "2d3fd76778feffc58c20df1a9a66b39baab17655b644341784863557c86dfe38",
+    "g07-manifest.json": "d0ef5e74981202a12121fd052801c777438664c8d0264ede6990fdd55ad6a0b0",
+    "queue.json": "367aa52e87d6df41dad63d5ff7c02643ae0be6c1bdef5a0bbc0cf3f3b147ee4b",
+    "queue-service-override.conf": "7c6f692685a2c1209accc1d8c061c928b96f1209d802060391ca4448e6d3545c",
+    "queue-harness/scripts/run_quiet_benchmark_queue.py": "386b315504ccad5438f87176b5d536c333f8d0dd8941410a3df754c009e79d6e"
+  },
+  "timer": "NextElapseUSecRealtime=Sun 2026-09-27 02:00:00 PDT\nActiveState=active\n",
+  "effective_units": "# /run/user/1000/systemd/transient/aiogzip-wp5-nightly-20260927.service\n# This is a transient unit file, created programmatically via the systemd API. Do not edit.\n[Unit]\nDescription=WP5 quiet-machine benchmark evidence\n\n[Service]\nWorkingDirectory=/tmp/aiogzip-wp5-nightly-20260927\nRuntimeMaxSec=4h 10min\nKillMode=control-group\nTimeoutStopSec=15s\nExecStart=\nExecStart=\"/tmp/aiogzip-wp5-nightly-20260927/venv/bin/python\" \"/tmp/aiogzip-wp5-nightly-20260927/harness/scripts/run_quiet_benchmarks.py\" \"/tmp/aiogzip-wp5-nightly-20260927/manifest.json\"\n\n# /run/user/1000/systemd/user/aiogzip-wp5-nightly-20260927.service.d/10-queue.conf\n[Service]\nExecStart=\nExecStart=/tmp/aiogzip-wp5-nightly-20260927/venv/bin/python /tmp/aiogzip-wp5-nightly-20260927/queue-harness/scripts/run_quiet_benchmark_queue.py /tmp/aiogzip-wp5-nightly-20260927/queue.json\n\n# /run/user/1000/systemd/transient/aiogzip-wp5-nightly-20260927.timer\n# This is a transient unit file, created programmatically via the systemd API. Do not edit.\n[Unit]\nDescription=WP5 quiet-machine benchmark evidence\n\n[Timer]\nOnCalendar=2026-09-27 02:00:00 America/Los_Angeles\nAccuracySec=1s\nRemainAfterElapse=no\n",
+  "benchmarks_started": false
+}

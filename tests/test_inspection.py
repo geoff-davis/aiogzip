@@ -232,7 +232,7 @@ class TestIncrementalGzipDecoder:
         with pytest.raises(OSError):
             await _decode(raw, input_chunk_size=2)
 
-    async def test_cancelled_offload_discards_decoder(self, monkeypatch):
+    async def test_cancelled_offload_discards_decoder(self, mock_codec_executor):
         raw = _gzip_member(os.urandom(async_module._ZLIB_OFFLOAD_THRESHOLD + 1024))
         decoder = GzipDecoder(
             max_decompressed_size=None,
@@ -248,7 +248,7 @@ class TestIncrementalGzipDecoder:
             await release.wait()
             return method(data)
 
-        monkeypatch.setattr(async_module, "_run_in_thread", controlled_offload)
+        mock_codec_executor(controlled_offload)
         stream = _drive_operation(decoder.feed(raw), workload=raw)
         task = asyncio.create_task(stream.__anext__())
         await started.wait()

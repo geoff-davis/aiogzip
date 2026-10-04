@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `tell()` on a text file during an in-progress long-line or sized read no
+  longer returns a cookie that skips characters the read had decoded but not
+  yet returned. Seeking back to such a cookie now replays every character.
+
 ## [2.0.0b1] - 2026-09-01
 
 ### Added

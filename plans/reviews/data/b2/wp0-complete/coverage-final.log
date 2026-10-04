@@ -1,0 +1,124 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.2, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/geoff/Projects/personal/aiogzip
+configfile: pyproject.toml
+testpaths: tests
+plugins: hypothesis-6.165.10, cov-7.1.0, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 2505 items
+
+tests/integration/test_example_concurrent_jsonl_ingest.py .............. [  0%]
+.........................                                                [  1%]
+tests/integration/test_example_fragmented_transport.py ................  [  2%]
+tests/test_aiocsv.py ..                                                  [  2%]
+tests/test_append_mode.py .......                                        [  2%]
+tests/test_b2_native_io.py ..xx                                          [  2%]
+tests/test_b2_open_ownership.py xxxxxxxx........                         [  3%]
+tests/test_b2_reproductions.py xxxxxx..                                  [  3%]
+tests/test_batched_readline.py ......................................... [  5%]
+........................................................................ [  8%]
+.....                                                                    [  8%]
+tests/test_benchmark_runner.py ......................................... [ 10%]
+........................................................................ [ 12%]
+.............                                                            [ 13%]
+tests/test_binary_io.py .....................................            [ 14%]
+tests/test_boolean_validation.py ....................................... [ 16%]
+........................................................................ [ 19%]
+........................................................................ [ 22%]
+........................................................................ [ 25%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+...........                                                              [ 31%]
+tests/test_cli.py .............                                          [ 31%]
+tests/test_codec_async.py ....................                           [ 32%]
+tests/test_codec_buffer.py ....................                          [ 33%]
+tests/test_codec_decoder.py ............................................ [ 35%]
+................................                                         [ 36%]
+tests/test_codec_decoder_characterization.py ........................... [ 37%]
+.........                                                                [ 37%]
+tests/test_codec_decoder_regressions.py .........................        [ 38%]
+tests/test_codec_encoder.py ..........................................   [ 40%]
+tests/test_codec_engine_accounting.py ......................             [ 41%]
+tests/test_codec_lifecycle.py .............................              [ 42%]
+tests/test_codec_member_metadata_failures.py ........................... [ 43%]
+.                                                                        [ 43%]
+tests/test_codec_operation_typing.py ....                                [ 43%]
+tests/test_codec_purity.py ....                                          [ 43%]
+tests/test_compress_chunks.py .......................................... [ 45%]
+........                                                                 [ 45%]
+tests/test_convenience.py ........                                       [ 46%]
+tests/test_coverage_gaps.py .......                                      [ 46%]
+tests/test_doc_examples.py ............................................. [ 48%]
+........................................................................ [ 51%]
+...................................................................      [ 53%]
+tests/test_edge_cases_and_errors.py .................................... [ 55%]
+.........................................                                [ 57%]
+tests/test_engine.py .................................                   [ 58%]
+tests/test_factory_api.py ..................................             [ 59%]
+tests/test_factory_typing.py .                                           [ 59%]
+tests/test_fast_compress.py ..........                                   [ 60%]
+tests/test_file_lifecycle.py ........................................... [ 61%]
+...............................                                          [ 63%]
+tests/test_file_mtime.py ...........................                     [ 64%]
+tests/test_file_state_comparison.py .                                    [ 64%]
+tests/test_file_state_matrix.py ........................................ [ 65%]
+.......                                                                  [ 66%]
+tests/test_file_state_trace.py ..                                        [ 66%]
+tests/test_fileobj.py .........................                          [ 67%]
+tests/test_gzip_header_parser.py ....................................... [ 68%]
+...s                                                                     [ 68%]
+tests/test_hypothesis_parity.py ........                                 [ 69%]
+tests/test_inspection.py ............................................... [ 71%]
+................                                                         [ 71%]
+tests/test_installed_artifact.py .....                                   [ 71%]
+tests/test_interop.py .......                                            [ 72%]
+tests/test_modes_and_api.py ............................................ [ 73%]
+..........                                                               [ 74%]
+tests/test_newline_detection.py ........................................ [ 75%]
+.....................................................................    [ 78%]
+tests/test_performance.py .....                                          [ 78%]
+tests/test_protocols_and_paths.py ................                       [ 79%]
+tests/test_public_api_contract.py ........                               [ 79%]
+tests/test_public_api_typing.py ....                                     [ 80%]
+tests/test_public_exports.py ....                                        [ 80%]
+tests/test_readinto.py ................................................. [ 82%]
+........................................................................ [ 84%]
+.............................                                            [ 86%]
+tests/test_readline_longline.py ...................................      [ 87%]
+tests/test_regressions.py .............................................. [ 89%]
+........................................                                 [ 90%]
+tests/test_review_gaps.py ............                                   [ 91%]
+tests/test_seek_plain_fast.py .........                                  [ 91%]
+tests/test_streaming.py ................................................ [ 93%]
+.........................                                                [ 94%]
+tests/test_streaming_encoder.py ........................................ [ 96%]
+.........                                                                [ 96%]
+tests/test_text_coverage.py ........................                     [ 97%]
+tests/test_text_io.py .................................................. [ 99%]
+.                                                                        [ 99%]
+tests/test_text_position_properties.py ...                               [ 99%]
+tests/test_version_sync.py .....                                         [100%]
+
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.14.2-final-0 ________________
+
+Name                           Stmts   Miss Branch BrPart   Cover   Missing
+---------------------------------------------------------------------------
+src/aiogzip/__init__.py           59      0     22     12  85.19%   128->148, 128->exit, 149->166, 149->exit, 167->174, 167->exit, 212->232, 212->exit, 233->250, 233->exit, 251->258, 251->exit
+src/aiogzip/__main__.py           43      1     14      1  96.49%   22
+src/aiogzip/_binary.py          1056     64    462     59  91.77%   107, 121, 447, 454-455, 525, 531, 533->545, 585, 641, 650->652, 660, 663, 667->669, 670, 769, 797, 803, 806, 851, 883, 897, 931, 935, 940-944, 960, 1004, 1006, 1008, 1010, 1020-1023, 1028->1030, 1035-1036, 1089, 1158, 1309, 1314, 1324, 1329-1330, 1448, 1450->1453, 1460, 1462->exit, 1544, 1548, 1560, 1573->1575, 1590, 1598, 1611, 1663, 1668->exit, 1670->exit, 1694, 1702->exit, 1715->1723, 1739-1746, 1775, 1781->1783, 1798->exit, 1805, 1818->1823, 1829->exit, 1831->exit
+src/aiogzip/_codec_async.py       93      5     18      0  95.50%   66-67, 71-72, 141
+src/aiogzip/_codec_buffer.py     202      5     82      7  95.77%   28, 57->exit, 98, 100, 115, 119, 240->exit
+src/aiogzip/_common.py           171      1    104      8  96.73%   197, 294->exit, 301->exit, 308->309, 308->exit, 309->310, 309->exit, 310->exit
+src/aiogzip/_engine.py           107     12     58      8  85.45%   81, 85, 92, 99-101, 104, 107-109, 156, 177
+src/aiogzip/_gzip_header.py      208      1     88      1  99.32%   57
+src/aiogzip/_inspection.py        61      7     10      3  85.92%   74-75, 77, 81->67, 90, 109-111
+src/aiogzip/_metadata.py          10      0      0      0 100.00%
+src/aiogzip/_streaming.py        102      5     42      5  91.67%   88->66, 127-131, 147->152, 162->152, 187->exit
+src/aiogzip/_text.py            1081     78    436     47  90.57%   399-400, 420-421, 495, 506, 541-543, 548, 560-562, 579-581, 592->exit, 615->exit, 622, 666, 673, 769, 773-774, 794, 831, 863-868, 890, 915, 921->924, 927, 967, 1008-1012, 1014, 1028, 1047-1048, 1076, 1111-1113, 1147, 1167-1168, 1238->1241, 1243, 1254-1255, 1259-1260, 1322-1323, 1335, 1509, 1550, 1552, 1743, 1753, 1757, 1958, 1970->1972, 1975-1978, 1983-1985, 2016->exit, 2021-2023, 2062->exit, 2081-2085, 2088->exit
+src/aiogzip/codec.py             458      4    130      5  98.47%   62, 68->exit, 166, 185, 215->exit, 219->exit, 583
+---------------------------------------------------------------------------
+TOTAL                           3651    183   1466    156  92.87%
+Coverage JSON written to file /tmp/aiogzip-wp0-completion/quality/coverage-final.json
+Required test coverage of 85% reached. Total coverage: 92.87%
+================= 2488 passed, 1 skipped, 16 xfailed in 25.31s =================

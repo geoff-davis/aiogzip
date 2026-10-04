@@ -1,0 +1,55 @@
+{
+  "base_commit": "7d83609",
+  "scope": "Initial WP3 repair; G04 remains open. No WP3 push or clean BC3 capture claimed.",
+  "validation": "Python 3.14.2, aiofiles 25.1.0, zlib-ng 1.0.0: 2694 passed, 1 skipped, 3 xfailed under both engines. Python 3.11.14/3.12.12, aiofiles 23.2.1: 126 focused passes under both engines.",
+  "source_selection": "Checkout source. Floor environments use PYTHONPATH=/home/geoff/Projects/personal/aiogzip/src and AIOGZIP_ENGINE=stdlib or zlib-ng.",
+  "floor_files": [
+    "test_open_settlement.py",
+    "test_b2_open_ownership.py",
+    "test_file_lifecycle.py",
+    "test_file_state_trace.py",
+    "test_source_failure_trace.py"
+  ],
+  "file_hashes": {
+    "src/aiogzip/_binary.py": "10d19f2668f18f5d74e717b2f45a13821ffd9cb4bfaa7f43b98d90440b14fed3",
+    "src/aiogzip/_text.py": "5e91448ef2b4151634e37674f8d23a745091cfb3e4dad95a862851aafe10f732",
+    "src/aiogzip/_opening.py": "fd8d5e56a6a7dad66b519b9e97f07d6c9c36ad32983f52740658742eb115898a",
+    "tests/test_open_settlement.py": "508c80f2306d27f604c56afd020386711529740239d52e3edb6ee4211eca28d5",
+    "tests/test_b2_open_ownership.py": "90debe3d17c6f41a4e61bf300ca163bb0c7195d6c5ff2377238d84ef3c2690ea",
+    "tests/test_b2_reproductions.py": "c188875e4b4afbd96dac123ecaed4982e7e186a891658813d94ccb67b16b95b4"
+  },
+  "files": {
+    "311-stdlib.log": {
+      "sha256": "d848d6bdb99b64d6c0771c67caa981cbb66d439311c07377a8b466b24c7c320f",
+      "bytes": 180
+    },
+    "311-zlib-ng.log": {
+      "sha256": "3b5b8913afd61c60c8f3605f630b896d26f9ec824bb2289189956d1f78765fa3",
+      "bytes": 180
+    },
+    "312-stdlib.log": {
+      "sha256": "3b5b8913afd61c60c8f3605f630b896d26f9ec824bb2289189956d1f78765fa3",
+      "bytes": 180
+    },
+    "312-zlib-ng.log": {
+      "sha256": "d3c0c39effc7188c73c4301fd93027f95d47c8173583061ff89b064f8abbaa08",
+      "bytes": 180
+    },
+    "default.log": {
+      "sha256": "8e2027e70aca332ceae85f39a4a3eb39d0084720c7dbb8c1a206369471d23776",
+      "bytes": 8271
+    },
+    "docs.log": {
+      "sha256": "fd4df28b3495a6af30e6cb042913c8bc1e583b798d39fdf628a626897c8c4210",
+      "bytes": 993
+    },
+    "prek.log": {
+      "sha256": "91d1970f9de59a1317b4234a061d225c680c84f2e80e65de048202f9c3c03ce6",
+      "bytes": 1040
+    },
+    "stdlib.log": {
+      "sha256": "b94d54c4fd500f39ccafa06cfa1a82a3fdfa7f498afbf9ee941e73dce2b4840f",
+      "bytes": 8271
+    }
+  }
+}

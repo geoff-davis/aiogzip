@@ -1,0 +1,35 @@
+{
+  "main": {
+    "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+    "packages": {
+      "aiofiles": "25.1.0",
+      "zlib-ng": "1.0.0",
+      "pytest": "9.1.1",
+      "pytest-asyncio": "1.4.0",
+      "pytest-cov": "7.1.0",
+      "hypothesis": "6.165.10"
+    }
+  },
+  "py311-floor": {
+    "python": "3.11.14 (main, Dec 17 2025, 21:07:37) [Clang 21.1.4 ]",
+    "packages": {
+      "aiofiles": "23.2.1",
+      "zlib-ng": "1.0.0",
+      "pytest": "9.1.1",
+      "pytest-asyncio": "1.4.0",
+      "pytest-cov": "7.1.0",
+      "hypothesis": "6.165.10"
+    }
+  },
+  "py312-floor": {
+    "python": "3.12.12 (main, Dec 17 2025, 21:10:06) [Clang 21.1.4 ]",
+    "packages": {
+      "aiofiles": "23.2.1",
+      "zlib-ng": "1.0.0",
+      "pytest": "9.1.1",
+      "pytest-asyncio": "1.4.0",
+      "pytest-cov": "7.1.0",
+      "hypothesis": "6.165.10"
+    }
+  }
+}

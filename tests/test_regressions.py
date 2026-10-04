@@ -1534,7 +1534,7 @@ class TestWriteCancellationDuringOffload:
     """
 
     async def test_cancelled_offloaded_write_marks_stream_broken(
-        self, temp_file, monkeypatch
+        self, temp_file, mock_codec_executor
     ):
         import asyncio
 
@@ -1546,7 +1546,7 @@ class TestWriteCancellationDuringOffload:
             await release.wait()
             return method(data)
 
-        monkeypatch.setattr(_codec_async, "_run_in_thread", blocking_offload)
+        mock_codec_executor(blocking_offload)
 
         payload = os.urandom(512 * 1024)  # above the offload threshold
         f = AsyncGzipBinaryFile(temp_file, "wb")
@@ -1574,7 +1574,7 @@ class TestReadCancellationDuringOffload:
 
     @pytest.mark.parametrize("use_cap", [False, True])
     async def test_cancelled_offloaded_read_marks_stream_broken(
-        self, temp_file, monkeypatch, use_cap
+        self, temp_file, mock_codec_executor, use_cap
     ):
         import asyncio
         import gzip
@@ -1591,7 +1591,7 @@ class TestReadCancellationDuringOffload:
             await release.wait()
             return method(data)
 
-        monkeypatch.setattr(_codec_async, "_run_in_thread", blocking_offload)
+        mock_codec_executor(blocking_offload)
         cap = len(payload) * 2 if use_cap else None
         f = AsyncGzipBinaryFile(
             temp_file,

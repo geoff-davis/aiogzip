@@ -1,0 +1,28 @@
+{
+  "registered_at": "2026-09-28T17:02:48.328424+00:00",
+  "retired": "September 28 links removed and timer absent. Combined disable --now returned 5 after removing links; subsequent inspection confirmed old service inactive/not-found with MainPID=0 and no timers. No benchmark was running.",
+  "windows": {
+    "wp4": {
+      "timer": "TimersCalendar={ OnCalendar=2026-09-29 02:00:00 America/Los_Angeles ; next_elapse=Tue 2026-09-29 02:00:00 PDT }\nNextElapseUSecRealtime=Tue 2026-09-29 02:00:00 PDT\nPersistent=no\nActiveState=active\nSubState=waiting\nUnitFileState=enabled\n",
+      "service": "TimeoutStopUSec=15s\nRuntimeMaxUSec=1h 59min 30s\nMainPID=0\nExecStart={ path=/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/venv/bin/python ; argv[]=/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/venv/bin/python /home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/harness/scripts/run_b2_timing_blocks.py /home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/scheduled/aiogzip-wp5-onecore-20260929-g08-stdlib-wp4.json ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }\nKillMode=control-group\nActiveState=inactive\nSubState=dead\n",
+      "results_absent": true,
+      "sha256": {
+        "/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/scheduled/aiogzip-wp5-onecore-20260929-g08-stdlib-wp4.json": "5a4063cf8dac860bb7bb959c2e37474d9528efba26b2899239022771096a5f91",
+        "/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/units/aiogzip-wp5-onecore-20260929-g08-stdlib-wp4.service": "1fa7663f79cf1a953d722ca95e9677ee65de18f9349a045a0dc0541536cef762",
+        "/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/units/aiogzip-wp5-onecore-20260929-g08-stdlib-wp4.timer": "8fe3d5ab4428e0fb62195fd4a70ad3909e3cb0b87aa6a0f8aade3715a547c4eb"
+      }
+    },
+    "wp5": {
+      "timer": "TimersCalendar={ OnCalendar=2026-09-29 04:00:00 America/Los_Angeles ; next_elapse=Tue 2026-09-29 04:00:00 PDT }\nNextElapseUSecRealtime=Tue 2026-09-29 04:00:00 PDT\nPersistent=no\nActiveState=active\nSubState=waiting\nUnitFileState=enabled\n",
+      "service": "TimeoutStopUSec=15s\nRuntimeMaxUSec=2h 1min\nMainPID=0\nExecStart={ path=/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/venv/bin/python ; argv[]=/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/venv/bin/python /home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/harness/scripts/run_b2_timing_blocks.py /home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/scheduled/aiogzip-wp5-onecore-20260929-g08-stdlib-wp5.json ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }\nKillMode=control-group\nActiveState=inactive\nSubState=dead\n",
+      "results_absent": true,
+      "sha256": {
+        "/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/scheduled/aiogzip-wp5-onecore-20260929-g08-stdlib-wp5.json": "368a6f79b71fbc6a40cfe965ace69fd797ba8feaa012ae75222451b1c1669669",
+        "/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/units/aiogzip-wp5-onecore-20260929-g08-stdlib-wp5.service": "86f280368d58a8661e37916b822a8c61f8e4994c5e174308eb207e19866db9db",
+        "/home/geoff/Projects/personal/aiogzip/.cache/wp5-qualification-onecore/units/aiogzip-wp5-onecore-20260929-g08-stdlib-wp5.timer": "779f7175174a7ac831412c9dae037173891cae2ac1b7ec59aab4978d1b9fb14f"
+      }
+    }
+  },
+  "linger": "Linger=yes\n",
+  "timer_list": "NEXT                        LEFT LAST PASSED UNIT                                              ACTIVATES\nTue 2026-09-29 02:00:00 PDT  15h -         - aiogzip-wp5-onecore-20260929-g08-stdlib-wp4.timer aiogzip-wp5-onecore-20260929-g08-stdlib-wp4.service\nTue 2026-09-29 04:00:00 PDT  17h -         - aiogzip-wp5-onecore-20260929-g08-stdlib-wp5.timer aiogzip-wp5-onecore-20260929-g08-stdlib-wp5.service\n\n2 timers listed.\n"
+}

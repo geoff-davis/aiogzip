@@ -445,7 +445,7 @@ class TestDecompressChunks:
             await task
         assert closed.is_set()
 
-    async def test_cancellation_during_offloaded_codec_work(self, monkeypatch):
+    async def test_cancellation_during_offloaded_codec_work(self, mock_codec_executor):
         compressed = gzip.compress(
             os.urandom(async_module._DECODE_OFFLOAD_THRESHOLD + 1024), mtime=0
         )
@@ -461,7 +461,7 @@ class TestDecompressChunks:
             finally:
                 completed.set()
 
-        monkeypatch.setattr(async_module, "_run_in_thread", blocked_offload)
+        mock_codec_executor(blocked_offload)
         stream = aiogzip.decompress_chunks(_items([compressed]))
         task = asyncio.create_task(stream.__anext__())
         await started.wait()

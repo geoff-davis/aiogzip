@@ -1,0 +1,77 @@
+{
+  "source": {
+    "sha": "dc8950cb334e1cf4082f2bf50074464e06c72287",
+    "tree": "820a775b067cf5bf17a179c20f81c7c7b1f9f37b",
+    "status": ""
+  },
+  "harness": {
+    "sha": "3709027c985eb9a9476211b8ee60e153c986a28d",
+    "tree": "ce1c34331f6b3ccba917d63b7f16622b5e092515",
+    "status": ""
+  },
+  "import": "/tmp/aiogzip-b2-reviewed-baseline-dc8950c/src/aiogzip/__init__.py",
+  "harness_path": "/tmp/aiogzip-b2-reviewed-harness-3709027/scripts/measure_b2_partial_read.py",
+  "harness_sha256": "5b36dd660109a56320dded4e1706294982effa5d71687d83d518b32b98540dd2",
+  "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "aiofiles": "25.1.0",
+  "engines": {
+    "compression": "stdlib-zlib",
+    "decompression": "stdlib-zlib",
+    "crc32": "stdlib-zlib"
+  },
+  "command": [
+    "/tmp/aiogzip-b2-reviewed-harness-3709027/scripts/measure_b2_partial_read.py",
+    "--source-root",
+    "/tmp/aiogzip-b2-reviewed-baseline-dc8950c",
+    "--output",
+    "/tmp/aiogzip-b2-review-evidence-3709027/partial-read-stdlib-v2.json"
+  ],
+  "limitations": "One sample per fixture; tracemalloc misses native allocations; excludes fixture generation and open; no RSS or scheduler measurement; correctness hashing follows measured call. This is not a performance comparison.",
+  "rows": [
+    {
+      "fixture": "repeated-x",
+      "payload_bytes": 16777216,
+      "compressed_bytes": 16328,
+      "payload_sha256": "a06c26cbac8b80704f420222dae5658b88ff2da96702d12ef7a4223e9361f7c1",
+      "fixture_sha256": "ea3ea222f41ff2d086cdb581d4c1d0c9312ed8b6ceb2d052a9d78306e50e7b0c",
+      "source_chunk_size": 262144,
+      "requested": 1,
+      "returned": 1,
+      "source_reads_during_call": [
+        {
+          "requested": 262144,
+          "returned": 16328
+        }
+      ],
+      "compressed_bytes_fetched": 16328,
+      "retained_plaintext": 16777215,
+      "tracemalloc_current": 16827168,
+      "tracemalloc_peak": 33607726,
+      "first_result_seconds": 0.03183478908613324,
+      "round_trip_sha256_verified": true
+    },
+    {
+      "fixture": "random-seed-0",
+      "payload_bytes": 16777216,
+      "compressed_bytes": 16782354,
+      "payload_sha256": "9a602909aa028342fcc1d1626d70b8bca9482a48e0bef62cae0786d7286a31bf",
+      "fixture_sha256": "d1ccacf290359340ec7d435c6b1290917fc8c719f8e2826b49abc97a931ef5b5",
+      "source_chunk_size": 262144,
+      "requested": 1,
+      "returned": 1,
+      "source_reads_during_call": [
+        {
+          "requested": 262144,
+          "returned": 262144
+        }
+      ],
+      "compressed_bytes_fetched": 262144,
+      "retained_plaintext": 262053,
+      "tracemalloc_current": 564738,
+      "tracemalloc_peak": 1353339,
+      "first_result_seconds": 0.00030025793239474297,
+      "round_trip_sha256_verified": true
+    }
+  ]
+}
