@@ -1,0 +1,374 @@
+{
+  "source": {
+    "sha": "b074bdc77e45e9033769fb96a999e98e8931c24b",
+    "tree": "38b0e6de668c14fbb35850a5c58138e6a1ecc803",
+    "status": ""
+  },
+  "harness": {
+    "sha": "b074bdc77e45e9033769fb96a999e98e8931c24b",
+    "tree": "38b0e6de668c14fbb35850a5c58138e6a1ecc803",
+    "status": ""
+  },
+  "harness_sha256": "9203464e3ac3c36dd1142f494e7e64f941674d0976030f268f8ac9810ce5e74b",
+  "python": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+  "engines": {
+    "compression": "stdlib-zlib",
+    "decompression": "zlib-ng",
+    "crc32": "zlib-ng"
+  },
+  "fixture_sha256": "f5c0961e49a01f993ea5de7f6c361108aa27af3e4f32d9d1dcc6ecda0f4ebb8e",
+  "semantic": {
+    "binary-custom-cancel-consumed-False-checkpoint-False": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "binary-custom-error-consumed-False-checkpoint-False": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "binary-custom-cancel-consumed-False-checkpoint-True": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220410a6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "binary-custom-error-consumed-False-checkpoint-True": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220410a6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "binary-custom-cancel-consumed-True-checkpoint-False": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "binary-custom-error-consumed-True-checkpoint-False": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "binary-custom-cancel-consumed-True-checkpoint-True": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "binary-custom-error-consumed-True-checkpoint-True": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "binary-native-consumed-cancel": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        {
+          "bytes": "6d656d62657220410a6d656d62657220420a"
+        }
+      ],
+      [
+        "next",
+        {
+          "bytes": ""
+        }
+      ]
+    ],
+    "text-custom-cancel-consumed-False-checkpoint-False": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "text-custom-error-consumed-False-checkpoint-False": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "text-custom-cancel-consumed-False-checkpoint-True": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "member A\nmember B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ],
+    "text-custom-error-consumed-False-checkpoint-True": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "member A\nmember B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ],
+    "text-custom-cancel-consumed-True-checkpoint-False": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "text-custom-error-consumed-True-checkpoint-False": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "text-custom-cancel-consumed-True-checkpoint-True": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "text-custom-error-consumed-True-checkpoint-True": [
+      [
+        "initial",
+        "OSError",
+        "injected source failure"
+      ],
+      [
+        "retry",
+        "OSError",
+        "read stream is broken"
+      ],
+      [
+        "next",
+        "OSError",
+        "read stream is broken"
+      ]
+    ],
+    "text-native-consumed-cancel": [
+      [
+        "initial",
+        "CancelledError"
+      ],
+      [
+        "retry",
+        "member A\nmember B\n"
+      ],
+      [
+        "next",
+        ""
+      ]
+    ]
+  },
+  "diagnostic": {
+    "binary-custom-cancel-consumed-False-checkpoint-False": {
+      "physical_position": 0
+    },
+    "binary-custom-error-consumed-False-checkpoint-False": {
+      "physical_position": 0
+    },
+    "binary-custom-cancel-consumed-False-checkpoint-True": {
+      "physical_position": 58
+    },
+    "binary-custom-error-consumed-False-checkpoint-True": {
+      "physical_position": 58
+    },
+    "binary-custom-cancel-consumed-True-checkpoint-False": {
+      "physical_position": 29
+    },
+    "binary-custom-error-consumed-True-checkpoint-False": {
+      "physical_position": 29
+    },
+    "binary-custom-cancel-consumed-True-checkpoint-True": {
+      "physical_position": 29
+    },
+    "binary-custom-error-consumed-True-checkpoint-True": {
+      "physical_position": 29
+    },
+    "binary-native-consumed-cancel": {
+      "physical_position": 58
+    },
+    "text-custom-cancel-consumed-False-checkpoint-False": {
+      "physical_position": 0
+    },
+    "text-custom-error-consumed-False-checkpoint-False": {
+      "physical_position": 0
+    },
+    "text-custom-cancel-consumed-False-checkpoint-True": {
+      "physical_position": 58
+    },
+    "text-custom-error-consumed-False-checkpoint-True": {
+      "physical_position": 58
+    },
+    "text-custom-cancel-consumed-True-checkpoint-False": {
+      "physical_position": 29
+    },
+    "text-custom-error-consumed-True-checkpoint-False": {
+      "physical_position": 29
+    },
+    "text-custom-cancel-consumed-True-checkpoint-True": {
+      "physical_position": 29
+    },
+    "text-custom-error-consumed-True-checkpoint-True": {
+      "physical_position": 29
+    },
+    "text-native-consumed-cancel": {
+      "physical_position": 58
+    }
+  }
+}

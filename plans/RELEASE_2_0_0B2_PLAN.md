@@ -1,7 +1,7 @@
 # aiogzip 2.0.0b2: Correctness, Performance, and File-State Plan
 
 > **Revision 2 — 2026-09-07. Supersedes the September 1 b2 plan.**
-> **Status:** WP0–WP4 completed locally; WP5 G06–G08 closed, G09/C0 pending; later packages and release qualification remain pending.
+> **Status:** WP0–WP5 completed locally (C0 pinned as `refs/c0/v2.0.0b2`); WP6 onward and release qualification remain pending.
 > **Target:** `2.0.0b2`.
 > **Commit this file as:** `plans/RELEASE_2_0_0B2_PLAN.md`.
 > **Historical reviewed starting point:** `dc8950cb334e1cf4082f2bf50074464e06c72287`.
@@ -296,7 +296,7 @@ create competing copies of the same checkboxes in every section.
 * [x] G06 — [Generic long-line repair, scaling and dispositions](reviews/v2.0.0b2-wp5-completion.md#g06-generic-long-line-scaling)
 * [x] G07 — [Partial-read measurement, limits and eager-drain disposition](reviews/v2.0.0b2-wp5-completion.md#g07-partial-read-amplification)
 * [x] G08 — [Cross-item fairness, scheduling and throughput dispositions](reviews/v2.0.0b2-wp5-completion.md#g08-cross-item-fairness)
-* [ ] G09
+* [x] G09 — [Corrected reference C0 pinned with traces and ledger](reviews/v2.0.0b2-c0-record.md)
 * [ ] G10
 * [ ] G11
 * [ ] G12
