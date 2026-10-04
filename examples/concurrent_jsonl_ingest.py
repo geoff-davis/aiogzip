@@ -326,9 +326,10 @@ async def _write_manifest(staging: Path, manifest: DatasetManifest) -> None:
         await file.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-# Windows refuses to delete a file that is still open. A shard cancelled by its
-# TaskGroup can still be closing its staged file in the aiofiles executor when
-# cleanup starts, so retry briefly on that sharing violation.
+# A shard cancelled by its TaskGroup can still be closing its staged file in the
+# aiofiles executor when cleanup starts. Windows then refuses the delete
+# (PermissionError) or leaves the file delete-pending so removing its directory
+# fails as not empty (a plain OSError). Retry briefly on either.
 _CLEANUP_ATTEMPTS = 10
 _CLEANUP_RETRY_SECONDS = 0.05
 
@@ -340,7 +341,7 @@ async def _cleanup_staging(staging: Path) -> None:
         try:
             await asyncio.to_thread(shutil.rmtree, staging)
             return
-        except PermissionError:
+        except OSError:
             if attempt == _CLEANUP_ATTEMPTS:
                 raise
             await asyncio.sleep(_CLEANUP_RETRY_SECONDS * attempt)

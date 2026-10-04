@@ -301,7 +301,9 @@ async def test_per_shard_limit_aborts_without_publishing(tmp_path):
     destination = tmp_path / "published"
     limit = min(shard.byte_count for shard in expected.shards) - 1
 
-    with pytest.raises(example.ShardIngestError, match="max_decompressed_size"):
+    with pytest.raises(
+        example.ShardIngestError, match="max_decompressed_size"
+    ) as exc_info:
         await _ingest(
             _inputs(fixtures),
             destination,
@@ -309,7 +311,12 @@ async def test_per_shard_limit_aborts_without_publishing(tmp_path):
         )
 
     assert not destination.exists()
-    assert _partial_directories(destination) == []
+    leftovers = _partial_directories(destination)
+    # On failure, report the cleanup error (carried as a note) and what remains.
+    assert leftovers == [], (
+        f"notes={getattr(exc_info.value, '__notes__', [])!r} "
+        f"contents={[str(p) for d in leftovers for p in d.rglob('*')]!r}"
+    )
 
 
 async def test_dataset_limit_has_one_primary_budget_failure(tmp_path, monkeypatch):
@@ -678,7 +685,15 @@ async def test_valid_gzip_with_invalid_json_is_application_failure(tmp_path):
     assert _partial_directories(destination) == []
 
 
-async def test_cleanup_retries_a_transient_sharing_violation(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "error",
+    [
+        PermissionError("file in use by another process"),
+        OSError(145, "The directory is not empty"),
+    ],
+    ids=["sharing-violation", "delete-pending"],
+)
+async def test_cleanup_retries_a_transient_windows_error(tmp_path, monkeypatch, error):
     staging = tmp_path / "staging"
     (staging / "partitions").mkdir(parents=True)
     calls = []
@@ -687,7 +702,7 @@ async def test_cleanup_retries_a_transient_sharing_violation(tmp_path, monkeypat
     def busy_then_free(path):
         calls.append(path)
         if len(calls) < 3:
-            raise PermissionError("file in use by another process")
+            raise error
         original(path)
 
     monkeypatch.setattr(example.shutil, "rmtree", busy_then_free)
