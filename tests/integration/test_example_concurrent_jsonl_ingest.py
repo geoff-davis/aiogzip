@@ -6,10 +6,12 @@ import asyncio
 import gzip
 import hashlib
 import importlib.util
+import io
 import json
 import shutil
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -732,6 +734,215 @@ async def test_cleanup_gives_up_after_persistent_sharing_violations(
         await example._cleanup_staging(staging)
     assert len(calls) == example._CLEANUP_ATTEMPTS
     assert staging.exists()
+
+
+class _GatedWriter(io.BufferedWriter):
+    """A real buffered file whose close can block and then fail."""
+
+    def __init__(self, path, *, gate_close=False, close_error=None):
+        super().__init__(io.FileIO(path, "wb"))
+        self.close_entered = threading.Event()
+        self.close_release = threading.Event()
+        if not gate_close:
+            self.close_release.set()
+        self.close_error = close_error
+
+    def close(self):
+        if self.closed:
+            return
+        self.close_entered.set()
+        if not self.close_release.wait(5):
+            raise RuntimeError("close watchdog expired")
+        super().close()
+        if self.close_error is not None:
+            raise self.close_error
+
+
+def _install_writer(monkeypatch, tmp_path, **options):
+    path = tmp_path / "staged.jsonl"
+    writers = []
+
+    def gated_open(target, mode):
+        writer = _GatedWriter(target, **options)
+        writers.append(writer)
+        return writer
+
+    monkeypatch.setattr(example, "_sync_open", gated_open)
+    return path, writers
+
+
+async def test_staged_file_cancelled_during_open_closes_the_late_handle(
+    tmp_path, monkeypatch
+):
+    entered, release = threading.Event(), threading.Event()
+    writers = []
+
+    def slow_open(path, mode):
+        entered.set()
+        if not release.wait(5):
+            raise RuntimeError("open watchdog expired")
+        writer = _GatedWriter(path, close_error=OSError("late close failed"))
+        writers.append(writer)
+        return writer
+
+    monkeypatch.setattr(example, "_sync_open", slow_open)
+
+    async def use():
+        async with example._staged_file(tmp_path / "staged.jsonl"):
+            raise AssertionError("body must not run after cancellation")
+
+    task = asyncio.create_task(use())
+    await asyncio.to_thread(entered.wait, 5)
+    task.cancel()
+    await asyncio.sleep(0)
+    assert not task.done()  # still waiting for the open to settle
+    release.set()
+    with pytest.raises(asyncio.CancelledError) as raised:
+        await task
+    assert writers[0].closed
+    # The late close failure is kept as context, but cancellation wins.
+    assert any("late close failed" in note for note in raised.value.__notes__)
+    (tmp_path / "staged.jsonl").unlink()  # deletable: nothing holds it open
+
+
+async def test_settle_records_cancellation_racing_completion():
+    loop = asyncio.get_running_loop()
+    work = loop.create_future()
+    settling = asyncio.create_task(example._settle(work))
+    await asyncio.sleep(0)  # now waiting on the work
+    work.set_result("done")
+    settling.cancel()  # delivered in the same step as completion
+    future, cancellation = await settling
+    assert future.result() == "done"
+    assert isinstance(cancellation, asyncio.CancelledError)
+
+
+@pytest.mark.parametrize("close_fails", [False, True], ids=["close-ok", "close-fails"])
+async def test_cancellation_during_close_wins_on_normal_exit(
+    tmp_path, monkeypatch, close_fails
+):
+    error = OSError("close failed") if close_fails else None
+    path, writers = _install_writer(
+        monkeypatch, tmp_path, gate_close=True, close_error=error
+    )
+
+    async def use():
+        async with example._staged_file(path) as staged:
+            await staged.write(b"data")
+
+    task = asyncio.create_task(use())
+    while not writers:
+        await asyncio.sleep(0)
+    await asyncio.to_thread(writers[0].close_entered.wait, 5)
+    task.cancel()
+    await asyncio.sleep(0)
+    assert not task.done()  # the close settles before cancellation propagates
+    writers[0].close_release.set()
+    with pytest.raises(asyncio.CancelledError) as raised:
+        await task
+    assert writers[0].closed
+    notes = getattr(raised.value, "__notes__", [])
+    assert any("close failed" in note for note in notes) is close_fails
+
+
+async def test_cancellation_during_close_wins_over_a_body_error(tmp_path, monkeypatch):
+    path, writers = _install_writer(monkeypatch, tmp_path, gate_close=True)
+    body_error = OSError("body failed")
+
+    async def use():
+        async with example._staged_file(path):
+            raise body_error
+
+    task = asyncio.create_task(use())
+    while not writers:
+        await asyncio.sleep(0)
+    await asyncio.to_thread(writers[0].close_entered.wait, 5)
+    task.cancel()
+    writers[0].close_release.set()
+    with pytest.raises(asyncio.CancelledError) as raised:
+        await task
+    assert raised.value.__cause__ is body_error
+    assert writers[0].closed
+
+
+async def test_body_cancellation_keeps_precedence_over_close_failure(
+    tmp_path, monkeypatch
+):
+    path, writers = _install_writer(
+        monkeypatch, tmp_path, close_error=OSError("close failed")
+    )
+    with pytest.raises(asyncio.CancelledError) as raised:
+        async with example._staged_file(path):
+            raise asyncio.CancelledError
+    assert any("close failed" in note for note in raised.value.__notes__)
+    assert writers[0].closed
+
+
+async def test_timeout_during_close_still_closes_and_times_out(tmp_path, monkeypatch):
+    path, writers = _install_writer(monkeypatch, tmp_path, gate_close=True)
+    loop = asyncio.get_running_loop()
+    timeout_holder = []
+
+    async def expire_during_close():
+        while not writers:
+            await asyncio.sleep(0)
+        await asyncio.to_thread(writers[0].close_entered.wait, 5)
+        # Expire only once the close is blocked, then let it finish.
+        timeout_holder[0].reschedule(loop.time())
+        await asyncio.sleep(0.05)
+        writers[0].close_release.set()
+
+    expirer = loop.create_task(expire_during_close())
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(None) as timeout:
+            timeout_holder.append(timeout)
+            async with example._staged_file(path) as staged:
+                await staged.write(b"data")
+    await expirer
+    assert writers[0].closed
+
+
+async def test_taskgroup_sibling_failure_during_close_closes_the_file(
+    tmp_path, monkeypatch
+):
+    path, writers = _install_writer(monkeypatch, tmp_path, gate_close=True)
+    loop = asyncio.get_running_loop()
+
+    async def writer_task():
+        async with example._staged_file(path) as staged:
+            await staged.write(b"data")
+
+    async def failing_sibling():
+        while not writers:
+            await asyncio.sleep(0)
+        await asyncio.to_thread(writers[0].close_entered.wait, 5)
+        # Release the blocked close only after the TaskGroup has cancelled the
+        # writer, so the writer is cancelled while its close is in flight.
+        loop.call_later(0.05, writers[0].close_release.set)
+        raise OSError("sibling failed")
+
+    parent = asyncio.current_task()
+    cancelling_before = parent.cancelling()
+    with pytest.raises(ExceptionGroup) as raised:
+        async with asyncio.TaskGroup() as group:
+            writer = group.create_task(writer_task())
+            group.create_task(failing_sibling())
+    assert [type(e) for e in raised.value.exceptions] == [OSError]
+    assert writer.cancelled()
+    assert writers[0].closed
+    if sys.version_info >= (3, 13):
+        # Before 3.13 TaskGroup can leave the parent's cancellation request
+        # count raised on this path; that is asyncio bookkeeping, not ours.
+        assert parent.cancelling() == cancelling_before
+
+
+async def test_staged_file_closes_after_a_failing_body(tmp_path, monkeypatch):
+    path, writers = _install_writer(monkeypatch, tmp_path)
+    with pytest.raises(OSError, match="body failed"):
+        async with example._staged_file(path) as staged:
+            await staged.write(b"partial")
+            raise OSError("body failed")
+    assert writers[0].closed
 
 
 async def test_cleanup_is_idempotent(tmp_path):
