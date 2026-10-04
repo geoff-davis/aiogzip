@@ -5,6 +5,7 @@ import gzip
 import io
 import os
 import warnings
+from enum import Enum, auto
 from pathlib import Path
 from typing import (
     Any,
@@ -64,6 +65,25 @@ def _decompression_error_message(error: gzip.BadGzipFile) -> str:
     elif "ended before" in detail and "truncated" not in detail:
         detail = f"truncated or incomplete stream ({detail})"
     return f"Error decompressing gzip data: {detail}"
+
+
+class _ReadHealth(Enum):
+    """Binary reader health, orthogonal to EOF, closure and active calls.
+
+    VALIDATION_SALVAGE follows a reported integrity failure: decoded bytes
+    remain readable as recovery data, then reads fail terminally. BROKEN is
+    terminal until a successful rewind or reopen.
+    """
+
+    HEALTHY = auto()
+    VALIDATION_SALVAGE = auto()
+    BROKEN = auto()
+
+
+# Module aliases keep hot read guards to one identity check on a global.
+_HEALTHY = _ReadHealth.HEALTHY
+_VALIDATION_SALVAGE = _ReadHealth.VALIDATION_SALVAGE
+_BROKEN = _ReadHealth.BROKEN
 
 
 class ConcurrentOperationError(OSError):
@@ -213,8 +233,7 @@ class AsyncGzipBinaryFile:
         "_close_lock",
         "_closed_observer",
         "_read_poison_observer",
-        "_read_broken",
-        "_read_validation_failed",
+        "_read_health",
         "_max_decompressed_size",
         "_strict_size",
         "_fast_compress",
@@ -340,8 +359,8 @@ class AsyncGzipBinaryFile:
         self._close_lock = asyncio.Lock()
         self._closed_observer: Optional[Callable[[], None]] = None
         self._read_poison_observer: Optional[Callable[[bool], None]] = None
-        self._read_broken: bool = False
-        self._read_validation_failed: bool = False
+        self._read_health: _ReadHealth
+        self._reset_read_health()
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._strict_size = validated_strict_size
 
@@ -422,8 +441,7 @@ class AsyncGzipBinaryFile:
                 )
                 self._eof = False
                 self._read_call_active = False
-                self._read_broken = False
-                self._read_validation_failed = False
+                self._reset_read_health()
                 self._position = 0
                 self._mtime = None
                 self._decoder_header_generation = 0
@@ -595,7 +613,11 @@ class AsyncGzipBinaryFile:
                 # recovery path for a poisoned reader. Other seeks cannot safely
                 # use state from the failed decoder, including relative seeks that
                 # happen to target 0.
-                if self._read_broken and whence == os.SEEK_SET and offset == 0:
+                if (
+                    self._read_health is not _HEALTHY
+                    and whence == os.SEEK_SET
+                    and offset == 0
+                ):
                     await self._rewind_reader()
                     rewound = True
                     self._check_read_call_not_aborted()
@@ -728,7 +750,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
         if size is not None and size > _MAX_CHUNK_SIZE:
             raise ValueError(
@@ -808,7 +830,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
         view = memoryview(b)
         if view.readonly:
@@ -842,7 +864,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
 
         if size is None:
@@ -890,7 +912,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
         view = memoryview(b)
         if view.readonly:
@@ -915,7 +937,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
         if limit is None or limit < 0:
             # Any negative limit means "no limit", matching io.IOBase. Values
@@ -939,7 +961,7 @@ class AsyncGzipBinaryFile:
         elif limit != -1 and buf_len - start >= limit:
             end = start + limit
         elif self._eof:
-            if self._read_broken:
+            if self._read_health is not _HEALTHY:
                 self._check_read_usable()
             end = buf_len
         else:
@@ -974,7 +996,7 @@ class AsyncGzipBinaryFile:
                 end = start + limit
             elif self._eof:
                 # A poisoned, unterminated remainder is not a clean final line.
-                if self._read_broken:
+                if self._read_health is not _HEALTHY:
                     self._check_read_usable()
                 end = buf_len
             else:
@@ -1005,7 +1027,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
 
         lines: List[bytes] = []
@@ -1021,7 +1043,10 @@ class AsyncGzipBinaryFile:
                     total += len(line)
                     if hint > 0 and total >= hint:
                         break
-                    if self._read_broken and self._validation_line_salvage_complete():
+                    if (
+                        self._read_health is not _HEALTHY
+                        and self._validation_line_salvage_complete()
+                    ):
                         # Publish every complete recovery line exactly once.
                         # A trailing unterminated span stays buffered so the
                         # next line call reports the terminal validation error.
@@ -1240,7 +1265,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
 
         if size is None:
@@ -1448,11 +1473,11 @@ class AsyncGzipBinaryFile:
 
     def _has_validation_failure(self) -> bool:
         """Return whether integrity validation poisoned the current reader."""
-        return self._read_broken and self._read_validation_failed
+        return self._read_health is _VALIDATION_SALVAGE
 
     def _can_restore_failed_read(self) -> bool:
         """Return whether failed-call bytes remain reachable by retry or salvage."""
-        return not self._read_broken or self._has_validation_failure()
+        return self._read_health is not _BROKEN
 
     def _read_buffer_exhausted(self) -> bool:
         """Return whether no decoded binary bytes remain buffered."""
@@ -1507,7 +1532,7 @@ class AsyncGzipBinaryFile:
 
     def _check_read_usable(self, *, allow_buffered: bool = False) -> None:
         """Reject unsafe access, optionally allowing pre-failure decoded bytes."""
-        if not self._read_broken:
+        if self._read_health is _HEALTHY:
             return
         if self._has_validation_failure() and allow_buffered:
             if len(self._buffer) - self._buffer_offset > 0:
@@ -1526,14 +1551,39 @@ class AsyncGzipBinaryFile:
         *,
         validation_failed: bool = False,
     ) -> None:
-        """Make a failed decoder terminal while retaining pre-failure output."""
-        self._read_broken = True
-        self._read_validation_failed = validation_failed
+        """Make a failed decoder terminal while retaining pre-failure output.
+
+        Health and EOF are committed before the text observer runs; an observer
+        error still propagates but can no longer skip the decoder discard.
+        """
+        self._read_health = _VALIDATION_SALVAGE if validation_failed else _BROKEN
         self._eof = True
-        observer = self._read_poison_observer
-        if observer is not None:
-            observer(validation_failed)
-        decoder.discard()
+        try:
+            observer = self._read_poison_observer
+            if observer is not None:
+                observer(validation_failed)
+        finally:
+            decoder.discard()
+
+    def _reset_read_health(self) -> None:
+        """Mark the reader healthy: at construction, open and successful rewind."""
+        self._read_health = _HEALTHY
+
+    def _break_read_on_abort(self) -> None:
+        """Make the reader terminal when an exceptional context exit aborts it."""
+        self._read_health = _BROKEN
+        self._eof = True
+
+    # Temporary derived, read-only views of the former Boolean pair for the text
+    # layer. No setters or storage; binary code reads _read_health. WP8 removes
+    # them when text migrates to the authoritative health.
+    @property
+    def _read_broken(self) -> bool:
+        return self._read_health is not _HEALTHY
+
+    @property
+    def _read_validation_failed(self) -> bool:
+        return self._read_health is _VALIDATION_SALVAGE
 
     def _check_write_call_available(self) -> None:
         """Reject overlapping writer calls before they mutate codec state."""
@@ -1623,8 +1673,7 @@ class AsyncGzipBinaryFile:
             max_decompressed_size=self._max_decompressed_size,
         )
         self._decoder_header_generation = 0
-        self._read_broken = False
-        self._read_validation_failed = False
+        self._reset_read_health()
         del self._buffer[:]
         self._buffer_offset = 0
         self._eof = False
@@ -1748,7 +1797,7 @@ class AsyncGzipBinaryFile:
                 raise cancellation from failure
             else:
                 if method == "read":
-                    if not self._is_closed and not self._read_broken:
+                    if not self._is_closed and self._read_health is _HEALTHY:
                         self._pending_compressed_chunk = result
                 else:
                     # A cancelled rewind cannot leave old codec state aligned
@@ -1921,9 +1970,7 @@ class AsyncGzipBinaryFile:
             if self._writing_mode:
                 self._write_broken = True
             else:
-                self._read_broken = True
-                self._read_validation_failed = False
-                self._eof = True
+                self._break_read_on_abort()
 
             work = self._source_work
             owner = self._source_owner
