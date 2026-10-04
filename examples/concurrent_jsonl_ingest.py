@@ -230,18 +230,30 @@ def _validated_inputs(inputs: Sequence[Path]) -> tuple[Path, ...]:
     return tuple(sorted(paths, key=lambda path: (path.name, path.as_posix())))
 
 
-async def _settle(work: Awaitable[object]) -> tuple[asyncio.Future[object], bool]:
-    """Wait for work to finish even if cancelled; report whether it was."""
+async def _settle(
+    work: Awaitable[object],
+) -> tuple[asyncio.Future[object], asyncio.CancelledError | None]:
+    """Wait for work to finish even if cancelled.
+
+    Returns the finished future and the first cancellation delivered to the
+    caller, which the caller must re-raise after its cleanup. A cancellation
+    that arrives just as the work completes is still recorded. If the work
+    never finishes, neither does this: abandoning it would leak what it owns.
+    """
     future = asyncio.ensure_future(work)
-    cancelled = False
+    cancellation: asyncio.CancelledError | None = None
     while not future.done():
         try:
-            await asyncio.shield(future)
-        except asyncio.CancelledError:
-            if future.done():
-                break
-            cancelled = True
-    return future, cancelled
+            # wait() neither cancels the work nor raises its failure.
+            await asyncio.wait({future})
+        except asyncio.CancelledError as error:
+            if cancellation is None:
+                cancellation = error
+    return future, cancellation
+
+
+def _failure(future: asyncio.Future[object]) -> BaseException | None:
+    return None if future.cancelled() else future.exception()
 
 
 # Indirection so tests can observe the executor open.
@@ -253,34 +265,50 @@ async def _staged_file(path: Path) -> AsyncIterator[_AsyncByteWriter]:
     """Open a staged output file so cancellation can never leak its handle.
 
     aiofiles.open() awaits the executor; if that await is cancelled, the
-    worker still opens the file and nothing closes it. Here the open and the
-    close always settle, a file opened under cancellation is closed, and the
-    cancellation wins. Windows cannot delete a file that is left open.
+    worker still opens the file and nothing closes it. Windows cannot delete a
+    file left open. Here the open and the close always settle, and a file
+    opened under cancellation is closed. Cancellation wins over ordinary open,
+    body and close errors, which are attached as notes or as the cause; a body
+    that is itself cancelled or interrupted keeps precedence.
     """
     loop = asyncio.get_running_loop()
-    opening, cancelled = await _settle(
+    opening, cancellation = await _settle(
         loop.run_in_executor(None, partial(_sync_open, path, "wb"))
     )
-    if opening.exception() is None:
-        staged = aiofiles.threadpool.wrap(opening.result(), loop=loop)
-    if cancelled:
-        if opening.exception() is None:
-            await _settle(staged.close())
-        raise asyncio.CancelledError
-    open_error = opening.exception()
+    open_error = _failure(opening)
+    if cancellation is not None:
+        if open_error is None:
+            late = aiofiles.threadpool.wrap(opening.result(), loop=loop)
+            closing, _ = await _settle(late.close())
+            close_error = _failure(closing)
+            if close_error is not None:
+                cancellation.add_note(f"late staged file close failed: {close_error!r}")
+        else:
+            cancellation.add_note(f"staged file open also failed: {open_error!r}")
+        raise cancellation
     if open_error is not None:
         raise open_error
+    staged = aiofiles.threadpool.wrap(opening.result(), loop=loop)
     try:
         yield cast(_AsyncByteWriter, staged)
     except BaseException as error:
-        closing, _ = await _settle(staged.close())
-        if closing.exception() is not None:
-            error.add_note(f"staged file close also failed: {closing.exception()!r}")
+        closing, close_cancellation = await _settle(staged.close())
+        close_error = _failure(closing)
+        if close_error is not None:
+            error.add_note(f"staged file close also failed: {close_error!r}")
+        if close_cancellation is not None and isinstance(error, Exception):
+            raise close_cancellation from error
         raise
-    closing, close_cancelled = await _settle(staged.close())
-    closing.result()
-    if close_cancelled:
-        raise asyncio.CancelledError
+    closing, close_cancellation = await _settle(staged.close())
+    close_error = _failure(closing)
+    if close_cancellation is not None:
+        if close_error is not None:
+            close_cancellation.add_note(
+                f"staged file close also failed: {close_error!r}"
+            )
+        raise close_cancellation
+    if close_error is not None:
+        raise close_error
 
 
 async def _write_staged_bytes(writer: _AsyncByteWriter, data: bytes) -> int:
