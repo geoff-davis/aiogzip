@@ -880,18 +880,25 @@ async def test_body_cancellation_keeps_precedence_over_close_failure(
 
 async def test_timeout_during_close_still_closes_and_times_out(tmp_path, monkeypatch):
     path, writers = _install_writer(monkeypatch, tmp_path, gate_close=True)
+    loop = asyncio.get_running_loop()
+    timeout_holder = []
 
-    async def release_later():
+    async def expire_during_close():
+        while not writers:
+            await asyncio.sleep(0)
         await asyncio.to_thread(writers[0].close_entered.wait, 5)
+        # Expire only once the close is blocked, then let it finish.
+        timeout_holder[0].reschedule(loop.time())
         await asyncio.sleep(0.05)
         writers[0].close_release.set()
 
+    expirer = loop.create_task(expire_during_close())
     with pytest.raises(TimeoutError):
-        async with asyncio.timeout(0.01):
+        async with asyncio.timeout(None) as timeout:
+            timeout_holder.append(timeout)
             async with example._staged_file(path) as staged:
-                releaser = asyncio.get_running_loop().create_task(release_later())
                 await staged.write(b"data")
-    await releaser
+    await expirer
     assert writers[0].closed
 
 
