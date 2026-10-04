@@ -2004,7 +2004,18 @@ class AsyncGzipBinaryFile:
                 # A failure or cancellation leaves the broken handle reportably
                 # open so an explicit close() can retry the underlying close.
                 await self._close_underlying(close_file)
-            self._mark_closed()
+            try:
+                self._mark_closed()
+            finally:
+                # A reservation released before closure saw an open handle and
+                # kept the decoder; one still active discards it on release.
+                # Either way a closed reader never keeps its codec state.
+                if (
+                    not self._writing_mode
+                    and not self._read_call_active
+                    and self._decoder is not None
+                ):
+                    self._decoder.discard()
 
     @staticmethod
     async def _close_underlying(file: Any) -> None:
