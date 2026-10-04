@@ -15,12 +15,15 @@ import shutil
 import sys
 import tempfile
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Awaitable, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 from typing import Protocol, cast
 
 import aiofiles
+import aiofiles.threadpool
 
 import aiogzip
 
@@ -227,6 +230,59 @@ def _validated_inputs(inputs: Sequence[Path]) -> tuple[Path, ...]:
     return tuple(sorted(paths, key=lambda path: (path.name, path.as_posix())))
 
 
+async def _settle(work: Awaitable[object]) -> tuple[asyncio.Future[object], bool]:
+    """Wait for work to finish even if cancelled; report whether it was."""
+    future = asyncio.ensure_future(work)
+    cancelled = False
+    while not future.done():
+        try:
+            await asyncio.shield(future)
+        except asyncio.CancelledError:
+            if future.done():
+                break
+            cancelled = True
+    return future, cancelled
+
+
+# Indirection so tests can observe the executor open.
+_sync_open = open
+
+
+@asynccontextmanager
+async def _staged_file(path: Path) -> AsyncIterator[_AsyncByteWriter]:
+    """Open a staged output file so cancellation can never leak its handle.
+
+    aiofiles.open() awaits the executor; if that await is cancelled, the
+    worker still opens the file and nothing closes it. Here the open and the
+    close always settle, a file opened under cancellation is closed, and the
+    cancellation wins. Windows cannot delete a file that is left open.
+    """
+    loop = asyncio.get_running_loop()
+    opening, cancelled = await _settle(
+        loop.run_in_executor(None, partial(_sync_open, path, "wb"))
+    )
+    if opening.exception() is None:
+        staged = aiofiles.threadpool.wrap(opening.result(), loop=loop)
+    if cancelled:
+        if opening.exception() is None:
+            await _settle(staged.close())
+        raise asyncio.CancelledError
+    open_error = opening.exception()
+    if open_error is not None:
+        raise open_error
+    try:
+        yield cast(_AsyncByteWriter, staged)
+    except BaseException as error:
+        closing, _ = await _settle(staged.close())
+        if closing.exception() is not None:
+            error.add_note(f"staged file close also failed: {closing.exception()!r}")
+        raise
+    closing, close_cancelled = await _settle(staged.close())
+    closing.result()
+    if close_cancelled:
+        raise asyncio.CancelledError
+
+
 async def _write_staged_bytes(writer: _AsyncByteWriter, data: bytes) -> int:
     written = await writer.write(data)
     if written != len(data):
@@ -260,7 +316,7 @@ async def _ingest_shard(
                     newline="\n",
                     max_decompressed_size=per_shard_limit,
                 ) as stream:
-                    async with aiofiles.open(output, "wb") as staged:
+                    async with _staged_file(output) as staged:
                         async for batch in stream.iter_batches(hint=batch_hint):
                             batch_chars = sum(len(line) for line in batch)
                             max_batch_chars = max(max_batch_chars, batch_chars)

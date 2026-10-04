@@ -10,6 +10,7 @@ import json
 import shutil
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -732,6 +733,55 @@ async def test_cleanup_gives_up_after_persistent_sharing_violations(
         await example._cleanup_staging(staging)
     assert len(calls) == example._CLEANUP_ATTEMPTS
     assert staging.exists()
+
+
+async def test_staged_file_cancelled_during_open_closes_the_late_handle(
+    tmp_path, monkeypatch
+):
+    entered, release = threading.Event(), threading.Event()
+    opened = []
+
+    def slow_open(path, mode):
+        entered.set()
+        if not release.wait(5):
+            raise RuntimeError("open watchdog expired")
+        handle = open(path, mode)  # noqa: SIM115 - closed by the example
+        opened.append(handle)
+        return handle
+
+    monkeypatch.setattr(example, "_sync_open", slow_open)
+
+    async def use():
+        async with example._staged_file(tmp_path / "staged.jsonl"):
+            raise AssertionError("body must not run after cancellation")
+
+    task = asyncio.create_task(use())
+    await asyncio.to_thread(entered.wait, 5)
+    task.cancel()
+    await asyncio.sleep(0)
+    assert not task.done()  # still waiting for the open to settle
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert len(opened) == 1
+    assert opened[0].closed
+    (tmp_path / "staged.jsonl").unlink()  # deletable: nothing holds it open
+
+
+async def test_staged_file_closes_after_a_failing_body(tmp_path, monkeypatch):
+    opened = []
+
+    def tracking_open(path, mode):
+        handle = open(path, mode)  # noqa: SIM115 - closed by the example
+        opened.append(handle)
+        return handle
+
+    monkeypatch.setattr(example, "_sync_open", tracking_open)
+    with pytest.raises(OSError, match="body failed"):
+        async with example._staged_file(tmp_path / "staged.jsonl") as staged:
+            await staged.write(b"partial")
+            raise OSError("body failed")
+    assert opened[0].closed
 
 
 async def test_cleanup_is_idempotent(tmp_path):
