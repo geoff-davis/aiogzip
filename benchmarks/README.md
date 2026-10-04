@@ -86,6 +86,16 @@ Fine-grained performance measurements:
 - Small write operations (1000 x 120 bytes)
 - Binary readline stress case (200KB line, 17-byte chunks)
 
+#### Read health (`bench_read_health.py`, category `read_health`)
+
+Binary paths that `io` and `micro` do not reach, added for the 2.0.0b2 WP6
+read-health change:
+
+- seek(0) rewind of a healthy reader (50 rewinds, 4 MiB incompressible member)
+- size-limit break followed by seek(0) recovery (10 recoveries)
+- CRC failure followed by draining validation-salvage data with read() (4 MiB)
+  and readline() (50K lines)
+
 ### 8. 🔄 Streaming and sans-I/O codec (`bench_streaming.py`)
 
 - Direct synchronous `GzipEncoder` and `GzipDecoder` encode/decode
@@ -463,6 +473,7 @@ benchmarks/
 ├── bench_scenarios.py     # Real-world scenarios
 ├── bench_errors.py        # Error handling
 ├── bench_micro.py         # Micro-benchmarks
+├── bench_read_health.py   # Seek, recovery and salvage paths
 ├── bench_codec_regressions.py # 2.0.0a2 regression matrices
 ├── bench_compare.py       # Result comparison tool
 └── README.md              # This file
