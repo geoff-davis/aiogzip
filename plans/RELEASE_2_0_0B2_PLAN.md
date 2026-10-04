@@ -1,7 +1,7 @@
 # aiogzip 2.0.0b2: Correctness, Performance, and File-State Plan
 
 > **Revision 2 — 2026-09-07. Supersedes the September 1 b2 plan.**
-> **Status:** WP0–WP4 completed locally; WP5 onward and release qualification remain pending.
+> **Status:** WP0–WP4 completed locally; WP5 G06–G08 closed, G09/C0 pending; later packages and release qualification remain pending.
 > **Target:** `2.0.0b2`.
 > **Commit this file as:** `plans/RELEASE_2_0_0B2_PLAN.md`.
 > **Historical reviewed starting point:** `dc8950cb334e1cf4082f2bf50074464e06c72287`.
@@ -293,9 +293,9 @@ create competing copies of the same checkboxes in every section.
 * [x] G03 — [Source settlement, BC2 policy and verification](reviews/v2.0.0b2-wp2-completion.md#maintainer-review-correction)
 * [x] G04 — [Opening ownership and exact BC3 qualification](reviews/v2.0.0b2-wp3-completion.md#cleanup-cancellation-review-correction)
 * [x] G05 — [Linear pending-line draining and maintainer qualification](reviews/v2.0.0b2-wp4-progress.md#maintainer-qualification)
-* [ ] G06
-* [ ] G07
-* [ ] G08
+* [x] G06 — [Generic long-line repair, scaling and dispositions](reviews/v2.0.0b2-wp5-completion.md#g06-generic-long-line-scaling)
+* [x] G07 — [Partial-read measurement, limits and eager-drain disposition](reviews/v2.0.0b2-wp5-completion.md#g07-partial-read-amplification)
+* [x] G08 — [Cross-item fairness, scheduling and throughput dispositions](reviews/v2.0.0b2-wp5-completion.md#g08-cross-item-fairness)
 * [ ] G09
 * [ ] G10
 * [ ] G11

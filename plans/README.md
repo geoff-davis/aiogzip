@@ -11,6 +11,7 @@ The `.txt` suffix preserves the original Markdown without formatter changes.
 - [Completed WP2 source settlement](reviews/v2.0.0b2-wp2-completion.md)
 - [Completed WP3 opening ownership](reviews/v2.0.0b2-wp3-completion.md)
 - [Completed WP4 pending-line batching](reviews/v2.0.0b2-wp4-progress.md#maintainer-qualification)
+- [WP5 G06–G08 completion](reviews/v2.0.0b2-wp5-completion.md)
 - [WP5 fairness and resource progress](reviews/v2.0.0b2-wp5-progress.md)
 - [WP5 small-item overhead investigation](reviews/v2.0.0b2-wp5-small-item-investigation.md)
 - [WP5 September 29 qualification windows](reviews/v2.0.0b2-wp5-nightly-20260929.md)
