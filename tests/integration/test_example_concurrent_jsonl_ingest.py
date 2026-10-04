@@ -295,13 +295,18 @@ async def test_truncated_stream_never_publishes_or_leaks(tmp_path, cut):
     assert _partial_directories(destination) == []
 
 
-async def test_per_shard_limit_aborts_without_publishing(tmp_path):
+# TEMPORARY DIAGNOSTIC: repeat to reproduce the intermittent Windows failure and
+# report the cleanup error carried in the exception notes. Not for merge.
+@pytest.mark.parametrize("repetition", range(20))
+async def test_per_shard_limit_aborts_without_publishing(tmp_path, repetition):
     fixtures = tmp_path / "fixtures"
     expected = example.generate_fixtures(fixtures)
     destination = tmp_path / "published"
     limit = min(shard.byte_count for shard in expected.shards) - 1
 
-    with pytest.raises(example.ShardIngestError, match="max_decompressed_size"):
+    with pytest.raises(
+        example.ShardIngestError, match="max_decompressed_size"
+    ) as exc_info:
         await _ingest(
             _inputs(fixtures),
             destination,
@@ -309,7 +314,12 @@ async def test_per_shard_limit_aborts_without_publishing(tmp_path):
         )
 
     assert not destination.exists()
-    assert _partial_directories(destination) == []
+    leftovers = _partial_directories(destination)
+    contents = [
+        str(path.relative_to(tmp_path)) for d in leftovers for path in d.rglob("*")
+    ]
+    notes = getattr(exc_info.value, "__notes__", [])
+    assert leftovers == [], f"notes={notes!r} contents={contents!r}"
 
 
 async def test_dataset_limit_has_one_primary_budget_failure(tmp_path, monkeypatch):
