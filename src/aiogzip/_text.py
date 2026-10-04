@@ -1832,7 +1832,8 @@ class AsyncGzipTextFile:
                 chunk = self._text_buffer
                 before = total
                 total += len(chunk)
-                if chunk:
+                # The awaited refill replaces the buffer; ty keeps its "" narrowing.
+                if chunk:  # ty: ignore[redundant-condition]
                     pieces.append(chunk)
 
                 # Only one old character can participate in a new terminator.
@@ -1847,7 +1848,7 @@ class AsyncGzipTextFile:
                     end = limit
                 if pos != -1 or (limit != -1 and total >= limit) or not has_more:
                     take = end - before
-                    if chunk:
+                    if chunk:  # ty: ignore[redundant-condition]
                         pieces[-1] = chunk[:take]
                     result = "".join(pieces)
                     if take == len(chunk):
@@ -1858,7 +1859,7 @@ class AsyncGzipTextFile:
                         self._text_buffer_offset = take
                     self._pending_read_origin = None
                     return result
-                if chunk:
+                if chunk:  # ty: ignore[redundant-condition]
                     carry = "\r" if carry_cr and chunk.endswith("\r") else ""
         except BaseException:
             # Terminal poison deliberately discards text through the binary

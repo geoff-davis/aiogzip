@@ -1,13 +1,15 @@
 """Nightly batch selection without preparing checkouts or running a benchmark."""
 
 import datetime as dt
-import fcntl
 import hashlib
 import json
 import runpy
 from pathlib import Path
 
 import pytest
+
+# The driver runs under systemd on Linux and locks with fcntl.
+fcntl = pytest.importorskip("fcntl")
 
 UTC = dt.UTC
 
