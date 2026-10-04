@@ -678,6 +678,47 @@ async def test_valid_gzip_with_invalid_json_is_application_failure(tmp_path):
     assert _partial_directories(destination) == []
 
 
+async def test_cleanup_retries_a_transient_sharing_violation(tmp_path, monkeypatch):
+    staging = tmp_path / "staging"
+    (staging / "partitions").mkdir(parents=True)
+    calls = []
+    original = shutil.rmtree
+
+    def busy_then_free(path):
+        calls.append(path)
+        if len(calls) < 3:
+            raise PermissionError("file in use by another process")
+        original(path)
+
+    monkeypatch.setattr(example.shutil, "rmtree", busy_then_free)
+    monkeypatch.setattr(example, "_CLEANUP_RETRY_SECONDS", 0)
+
+    await example._cleanup_staging(staging)
+
+    assert len(calls) == 3
+    assert not staging.exists()
+
+
+async def test_cleanup_gives_up_after_persistent_sharing_violations(
+    tmp_path, monkeypatch
+):
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    calls = []
+
+    def always_busy(path):
+        calls.append(path)
+        raise PermissionError("file in use by another process")
+
+    monkeypatch.setattr(example.shutil, "rmtree", always_busy)
+    monkeypatch.setattr(example, "_CLEANUP_RETRY_SECONDS", 0)
+
+    with pytest.raises(PermissionError):
+        await example._cleanup_staging(staging)
+    assert len(calls) == example._CLEANUP_ATTEMPTS
+    assert staging.exists()
+
+
 async def test_cleanup_is_idempotent(tmp_path):
     missing = tmp_path / "missing-staging"
 
