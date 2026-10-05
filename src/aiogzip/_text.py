@@ -7,6 +7,7 @@ import os
 import re
 import secrets
 import struct
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Any,
@@ -54,6 +55,38 @@ _LINE_RE_CR = re.compile(r"[^\r]*\r")
 # test is a C-speed scan, so the guard costs far less than the regex pass.
 _SPLITLINES_UNSAFE_LF = "\r\v\f\x1c\x1d\x1e\x85\u2028\u2029"
 _SPLITLINES_UNSAFE_CR = "\n\v\f\x1c\x1d\x1e\x85\u2028\u2029"
+
+
+@dataclass(slots=True)
+class _TextBufferOrigin:
+    """Replay checkpoint for the buffered text: where it began and what to skip.
+
+    The handle's live origin is updated in place; rollback and unpublished-read
+    origins are independent snapshots. decoder_state follows the codecs
+    getstate() contract, an immutable (bytes, int), so snapshots may share it.
+    """
+
+    byte_offset: int
+    decoder_state: Tuple[Any, int]
+    trailing_cr: bool
+    seen_newline_types: int
+    chars_to_skip: int
+
+    def snapshot(self) -> "_TextBufferOrigin":
+        return _TextBufferOrigin(
+            self.byte_offset,
+            self.decoder_state,
+            self.trailing_cr,
+            self.seen_newline_types,
+            self.chars_to_skip,
+        )
+
+    def restore(self, saved: "_TextBufferOrigin") -> None:
+        self.byte_offset = saved.byte_offset
+        self.decoder_state = saved.decoder_state
+        self.trailing_cr = saved.trailing_cr
+        self.seen_newline_types = saved.seen_newline_types
+        self.chars_to_skip = saved.chars_to_skip
 
 
 class _TextReadReservation:
@@ -177,11 +210,7 @@ class AsyncGzipTextFile:
         "_seen_newline_types",
         "_decoder_byte_position",
         "_cookie_nonce",
-        "_buffer_origin_offset",
-        "_buffer_origin_decoder_state",
-        "_buffer_origin_trailing_cr",
-        "_buffer_origin_seen_newline_types",
-        "_buffer_origin_chars_to_skip",
+        "_buffer_origin",
         "_universal_newlines",
         "_max_decompressed_size",
         "_max_rewind_cache_size",
@@ -295,9 +324,7 @@ class AsyncGzipTextFile:
         self._close_complete: bool = False
         self._close_lock = asyncio.Lock()
         self._read_call_active: bool = False
-        self._pending_read_origin: Optional[
-            Tuple[int, Tuple[Any, int], bool, int, int]
-        ] = None
+        self._pending_read_origin: Optional[_TextBufferOrigin] = None
         self._read_poisoned: bool = False
         self._write_call_active: bool = False
         self._read_call = _TextReadReservation(self)
@@ -325,12 +352,9 @@ class AsyncGzipTextFile:
         # is what plain-position bookkeeping must compare against.
         self._decoder_byte_position: int = 0
         self._cookie_nonce: int = secrets.randbits(64)
-        initial_decoder_state = self._decoder.getstate()
-        self._buffer_origin_offset: int = 0
-        self._buffer_origin_decoder_state: Tuple[Any, int] = initial_decoder_state
-        self._buffer_origin_trailing_cr: bool = False
-        self._buffer_origin_seen_newline_types: int = 0
-        self._buffer_origin_chars_to_skip: int = 0
+        self._buffer_origin = _TextBufferOrigin(
+            0, self._decoder.getstate(), False, 0, 0
+        )
         self._universal_newlines: bool = newline in {None, ""}
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
@@ -487,25 +511,30 @@ class AsyncGzipTextFile:
         if origin is not None:
             # Local fragments have advanced the decoder, but have not yet
             # published text. Replay their origin plus any consumed prefix.
-            if origin[1] == (b"", 0) and not origin[2] and not origin[4]:
-                return origin[0]
+            if (
+                origin.decoder_state == (b"", 0)
+                and not origin.trailing_cr
+                and not origin.chars_to_skip
+            ):
+                return origin.byte_offset
             return self._encode_cookie(
-                origin_offset=origin[0],
-                decoder_state=origin[1],
-                trailing_cr=origin[2],
-                seen_newlines=origin[3],
-                chars_to_skip=origin[4],
+                origin_offset=origin.byte_offset,
+                decoder_state=origin.decoder_state,
+                trailing_cr=origin.trailing_cr,
+                seen_newlines=origin.seen_newline_types,
+                chars_to_skip=origin.chars_to_skip,
             )
         decoder_state = self._decoder.getstate()
         if self._can_use_plain_position(decoder_state):
             return self._binary_file._position
 
         if self._buffered_text_len() > 0:
-            origin_offset = self._buffer_origin_offset
-            decoder_state = self._buffer_origin_decoder_state
-            trailing_cr = self._buffer_origin_trailing_cr
-            seen_newlines = self._buffer_origin_seen_newline_types
-            chars_to_skip = self._buffer_origin_chars_to_skip + self._text_buffer_offset
+            live = self._buffer_origin
+            origin_offset = live.byte_offset
+            decoder_state = live.decoder_state
+            trailing_cr = live.trailing_cr
+            seen_newlines = live.seen_newline_types
+            chars_to_skip = live.chars_to_skip + self._text_buffer_offset
         else:
             origin_offset = self._binary_file._position
             decoder_state = self._decoder.getstate()
@@ -831,7 +860,7 @@ class AsyncGzipTextFile:
         if self._text_buffer_offset > self._TEXT_COMPACTION_THRESHOLD:
             # Keep the original decoder state and accumulate the characters a
             # cookie must replay before reaching the compacted unread suffix.
-            self._buffer_origin_chars_to_skip += self._text_buffer_offset
+            self._buffer_origin.chars_to_skip += self._text_buffer_offset
             self._text_buffer = self._text_buffer[self._text_buffer_offset :]
             self._text_buffer_offset = 0
 
@@ -842,7 +871,7 @@ class AsyncGzipTextFile:
         end = start + size
         if end >= len(buf):
             # Consuming everything — return without slice when possible
-            self._buffer_origin_chars_to_skip += len(buf)
+            self._buffer_origin.chars_to_skip += len(buf)
             self._text_buffer = ""
             self._text_buffer_offset = 0
             return buf if start == 0 else buf[start:]
@@ -887,11 +916,12 @@ class AsyncGzipTextFile:
         seen_newlines: int,
     ) -> None:
         """Record the decoder state from which the current buffered text can be replayed."""
-        self._buffer_origin_offset = origin_offset
-        self._buffer_origin_decoder_state = decoder_state
-        self._buffer_origin_trailing_cr = trailing_cr
-        self._buffer_origin_seen_newline_types = seen_newlines
-        self._buffer_origin_chars_to_skip = 0
+        origin = self._buffer_origin
+        origin.byte_offset = origin_offset
+        origin.decoder_state = decoder_state
+        origin.trailing_cr = trailing_cr
+        origin.seen_newline_types = seen_newlines
+        origin.chars_to_skip = 0
 
     def _capture_buffer_origin(self) -> None:
         """Snapshot the current decoder state before decoding fresh unread text."""
@@ -1066,11 +1096,12 @@ class AsyncGzipTextFile:
         if len(self._text_buffer) == self._text_buffer_offset:
             self._text_buffer = ""
             self._text_buffer_offset = 0
-            self._buffer_origin_offset = bf._position
-            self._buffer_origin_decoder_state = self._decoder.getstate()
-            self._buffer_origin_trailing_cr = self._trailing_cr
-            self._buffer_origin_seen_newline_types = self._seen_newline_types
-            self._buffer_origin_chars_to_skip = 0
+            origin = self._buffer_origin
+            origin.byte_offset = bf._position
+            origin.decoder_state = self._decoder.getstate()
+            origin.trailing_cr = self._trailing_cr
+            origin.seen_newline_types = self._seen_newline_types
+            origin.chars_to_skip = 0
 
         raw_chunk = await bf.read(self._chunk_size)
         self._decoder_byte_position = bf._position
@@ -1143,7 +1174,7 @@ class AsyncGzipTextFile:
             # The binary salvage buffer is exhausted, but decoded text from it
             # remains publishable. Return that short final span exactly once;
             # the next call reaches the binary broken-stream error.
-            self._buffer_origin_chars_to_skip += len(buffer)
+            self._buffer_origin.chars_to_skip += len(buffer)
             self._set_buffer("")
             return prefix
         pieces: List[str] = []
@@ -1151,7 +1182,7 @@ class AsyncGzipTextFile:
         fresh_origin: Optional[Tuple[int, Tuple[Any, int], bool, int]] = None
         origin_chars = 0
         if not available:
-            self._pending_read_origin = (
+            self._pending_read_origin = _TextBufferOrigin(
                 bf._position,
                 self._decoder.getstate(),
                 self._trailing_cr,
@@ -1220,9 +1251,9 @@ class AsyncGzipTextFile:
                     trailing_cr=fresh_origin[2],
                     seen_newlines=fresh_origin[3],
                 )
-                self._buffer_origin_chars_to_skip = len(fresh) - origin_chars
+                self._buffer_origin.chars_to_skip = len(fresh) - origin_chars
             else:
-                self._buffer_origin_chars_to_skip += len(buffer) + len(fresh)
+                self._buffer_origin.chars_to_skip += len(buffer) + len(fresh)
             self._set_buffer("")
         return result
 
@@ -1533,7 +1564,7 @@ class AsyncGzipTextFile:
             self._seen_newline_types,
         )
         if not prefix:
-            self._pending_read_origin = (*fresh_origin, 0)
+            self._pending_read_origin = _TextBufferOrigin(*fresh_origin, 0)
         pieces: List[str] = []
         added = 0
         fresh_line_size: Optional[int] = None
@@ -1576,7 +1607,7 @@ class AsyncGzipTextFile:
                     trailing_cr=fresh_origin[2],
                     seen_newlines=fresh_origin[3],
                 )
-                self._buffer_origin_chars_to_skip = len(fresh)
+                self._buffer_origin.chars_to_skip = len(fresh)
             return result
 
         result = prefix + fresh
@@ -1587,7 +1618,7 @@ class AsyncGzipTextFile:
             trailing_cr=fresh_origin[2],
             seen_newlines=fresh_origin[3],
         )
-        self._buffer_origin_chars_to_skip = len(fresh)
+        self._buffer_origin.chars_to_skip = len(fresh)
         return result if result else None
 
     def _validation_line_salvage_complete(self) -> bool:
@@ -1817,13 +1848,10 @@ class AsyncGzipTextFile:
         total = buf_len
         carry_cr = self._newline in ("", "\r\n")
         carry = "\r" if carry_cr and prefix.endswith("\r") else ""
-        self._pending_read_origin = (
-            state[2],
-            state[3],
-            state[4],
-            state[5],
-            state[6] + state[1],
-        )
+        saved_buffer, saved_offset, saved_origin = state
+        pending = saved_origin.snapshot()
+        pending.chars_to_skip += saved_offset
+        self._pending_read_origin = pending
         try:
             while True:
                 self._text_buffer = ""
@@ -1852,7 +1880,7 @@ class AsyncGzipTextFile:
                         pieces[-1] = chunk[:take]
                     result = "".join(pieces)
                     if take == len(chunk):
-                        self._buffer_origin_chars_to_skip += len(chunk)
+                        self._buffer_origin.chars_to_skip += len(chunk)
                         self._text_buffer = ""
                         self._text_buffer_offset = 0
                     else:
@@ -1866,15 +1894,9 @@ class AsyncGzipTextFile:
             # observer. Do not resurrect it; only retryable/validation-salvage
             # failures retain the old prefix and successfully decoded pieces.
             if bf._can_restore_failed_read():
-                (
-                    self._text_buffer,
-                    self._text_buffer_offset,
-                    self._buffer_origin_offset,
-                    self._buffer_origin_decoder_state,
-                    self._buffer_origin_trailing_cr,
-                    self._buffer_origin_seen_newline_types,
-                    self._buffer_origin_chars_to_skip,
-                ) = state
+                self._text_buffer = saved_buffer
+                self._text_buffer_offset = saved_offset
+                self._buffer_origin.restore(saved_origin)
                 self._text_buffer += "".join(pieces[fresh_start:])
             raise
 
@@ -1888,44 +1910,28 @@ class AsyncGzipTextFile:
 
     def _readlines_rollback_state(
         self,
-    ) -> Tuple[str, int, int, Tuple[Any, int], bool, int, int]:
+    ) -> Tuple[str, int, _TextBufferOrigin]:
         """Capture the replay metadata needed to undo a composite publication."""
         return (
             self._text_buffer,
             self._text_buffer_offset,
-            self._buffer_origin_offset,
-            self._buffer_origin_decoder_state,
-            self._buffer_origin_trailing_cr,
-            self._buffer_origin_seen_newline_types,
-            self._buffer_origin_chars_to_skip,
+            self._buffer_origin.snapshot(),
         )
 
     def _rollback_readlines(
         self,
-        state: Tuple[str, int, int, Tuple[Any, int], bool, int, int],
+        state: Tuple[str, int, _TextBufferOrigin],
         lines: List[str],
     ) -> None:
         """Restore text consumed by a failed composite read when recoverable."""
         binary_file = self._binary_file
         if binary_file is None or not binary_file._can_restore_failed_read():
             return
-        (
-            original_buffer,
-            original_offset,
-            origin_offset,
-            origin_decoder_state,
-            origin_trailing_cr,
-            origin_seen_newlines,
-            origin_chars_to_skip,
-        ) = state
+        original_buffer, original_offset, saved_origin = state
         unread = self._text_buffer[self._text_buffer_offset :]
         self._text_buffer = original_buffer[:original_offset] + "".join(lines) + unread
         self._text_buffer_offset = original_offset
-        self._buffer_origin_offset = origin_offset
-        self._buffer_origin_decoder_state = origin_decoder_state
-        self._buffer_origin_trailing_cr = origin_trailing_cr
-        self._buffer_origin_seen_newline_types = origin_seen_newlines
-        self._buffer_origin_chars_to_skip = origin_chars_to_skip
+        self._buffer_origin.restore(saved_origin)
         self._pending_lines = []
         self._pending_idx = 0
 
