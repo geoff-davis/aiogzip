@@ -151,3 +151,42 @@ async def test_no_origin_object_is_created_per_line(monkeypatch, newline, ending
     refills = len(text) // stream._chunk_size + 1
     assert len(created) <= 2 * refills + 2
     assert len(created) * 1000 < lines
+
+
+async def test_tell_and_seek_round_trip_across_compaction():
+    # No public read path currently refills a buffer that still holds unread
+    # text past the threshold, so drive the compaction branch through the
+    # refill it guards; the stream state stays consistent.
+    lines = [f"行 {i:06d} line\n" for i in range(30_000)]
+    data = gzip.compress("".join(lines).encode())
+    stream = AsyncGzipTextFile(
+        None, "rt", fileobj=_Source(data), newline="", chunk_size=65536
+    )
+    await stream.open()
+    try:
+        consumed = 0
+        while stream._text_buffer_offset <= stream._TEXT_COMPACTION_THRESHOLD:
+            assert await stream.readline() == lines[consumed]
+            consumed += 1
+        assert stream._buffered_text_len() > 0
+        before = await stream.tell()
+        offset = stream._text_buffer_offset
+        skip = stream._buffer_origin.chars_to_skip
+        live = stream._buffer_origin
+
+        assert await stream._read_chunk_and_decode()
+
+        # Compacted: the consumed prefix moved into the origin's skip count.
+        assert stream._text_buffer_offset == 0
+        assert stream._buffer_origin.chars_to_skip == skip + offset
+        assert stream._buffer_origin is live
+        after = await stream.tell()
+        assert after == before  # same logical position, same cookie
+
+        rest = await stream.read()
+        assert rest == "".join(lines[consumed:])
+        for cookie in (before, after):
+            assert await stream.seek(cookie) == cookie
+            assert await stream.read() == rest
+    finally:
+        await stream.close()

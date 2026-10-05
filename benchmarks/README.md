@@ -91,7 +91,7 @@ Fine-grained performance measurements:
 Text paths that use the replay origin, added for the 2.0.0b2 WP7 change:
 
 - tell()/seek(cookie) round trips (200, multibyte text)
-- readline() with a tell() every 50 lines over a compacting buffer
+- readline() with a tell() every 50 lines
 - readlines(64) in a loop, which snapshots the origin on every call
 
 #### Read health (`bench_read_health.py`, category `read_health`)

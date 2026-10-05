@@ -28,14 +28,42 @@ CATEGORY = {
     "_readline_buffered_reserved": "pending-origin",
 }
 LINES = 20_000
+CHUNK = 4096  # small chunks: many refills per scenario
 
 
 class _Source:
     def __init__(self, data):
         self._data = io.BytesIO(data)
+        self.reads = 0
 
     async def read(self, size=-1):
+        self.reads += 1
         return self._data.read(size)
+
+
+def _count_refills(counter):
+    """Count the text layer's decode refills; return a restore callback."""
+    cls = AsyncGzipTextFile
+    originals = {
+        name: getattr(cls, name)
+        for name in ("_read_chunk_and_decode", "_decode_next_chunk")
+    }
+
+    def wrap(method):
+        async def counted(self, *args, **kwargs):
+            counter["refills"] += 1
+            return await method(self, *args, **kwargs)
+
+        return counted
+
+    for name, method in originals.items():
+        setattr(cls, name, wrap(method))
+
+    def restore():
+        for name, method in originals.items():
+            setattr(cls, name, method)
+
+    return restore
 
 
 def _install(counts):
@@ -59,17 +87,25 @@ async def _scenario(name, newline, ending, action):
     counts = collections.Counter()
     data = gzip.compress("".join(f"row {i}{ending}" for i in range(LINES)).encode())
     original = _install(counts)
+    refills = collections.Counter()
+    restore_refills = _count_refills(refills)
     try:
-        stream = AsyncGzipTextFile(None, "rt", fileobj=_Source(data), newline=newline)
+        source = _Source(data)
+        stream = AsyncGzipTextFile(
+            None, "rt", fileobj=source, newline=newline, chunk_size=CHUNK
+        )
         await stream.open()
         operations = await action(stream)
         await stream.close()
     finally:
         text_module._TextBufferOrigin = original
+        restore_refills()
     return dict(
         scenario=name,
         lines=LINES,
         operations=operations,
+        source_reads=source.reads,
+        text_refills=refills["refills"],
         counts=dict(sorted(counts.items())),
     )
 

@@ -3,8 +3,9 @@ Text replay-origin benchmarks for aiogzip.
 
 Targets the text paths that read or replace the replay origin, which the io
 and micro categories do not isolate: tell()/seek(cookie) round trips,
-tell() after buffer compaction, and small-hint readlines() calls, each of
-which snapshots the origin for rollback. Public API only, so one runner can
+line reading with periodic tell(), and small-hint readlines() calls, each
+of which snapshots the origin for rollback. Buffer compaction is not
+reached by these public paths; tests drive it directly. Public API only, so one runner can
 time any source root.
 """
 
@@ -61,9 +62,9 @@ class TextOriginBenchmarks(BenchmarkBase):
         avg = await self._timed(iterations, operation)
         self._record("tell/seek cookie round trip x200", avg, iterations)
 
-    async def benchmark_tell_after_compaction(self):
-        """Read most of a buffer line by line, then tell(), repeatedly."""
-        path = await self._write("origin_compaction.gz")
+    async def benchmark_readline_with_periodic_tell(self):
+        """Read line by line with a tell() every 50 lines (fast line path)."""
+        path = await self._write("origin_periodic_tell.gz")
         iterations = 10
 
         async def operation():
@@ -95,5 +96,5 @@ class TextOriginBenchmarks(BenchmarkBase):
     async def run_all(self):
         """Run all text-origin benchmarks."""
         await self.benchmark_cookie_round_trips()
-        await self.benchmark_tell_after_compaction()
+        await self.benchmark_readline_with_periodic_tell()
         await self.benchmark_small_hint_readlines()
