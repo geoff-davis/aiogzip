@@ -745,7 +745,12 @@ def test_bc2_fails_a_lossy_violation_with_no_differences():
     rows = parse(run["trace"])
     pair = make_pair(2060, rows, reference="b1")
     assert not pair.diffs and bc2_request(pair) is not None
-    lossy = {"trace": run["trace"], "violations": [], "rebased_at": None}
+    lossy = {
+        "trace": run["trace"],
+        "violations": [],
+        "rebased_at": None,
+        "normalized": [],
+    }
     assert compare(pair, lossy).ok
     lossy["violations"] = [[0, "injected"]]
     fails(pair, "lossy model: op 0: injected", lossy=lossy)
@@ -995,7 +1000,26 @@ def test_bc2_o1_normalization_needs_bc3_to_own_the_acquisition():
     request = bc2_request(pair)
     assert request is not None and request.acquire is None
     lossy["trace"] = unparse(ref)
-    fails(pair, "normalized an acquisition BC3 does not own", lossy=lossy)
+    fails(pair, "lossy model normalized [-1], expected []", lossy=lossy)
+
+
+@pytest.mark.parametrize("normalized", [None, [], [-1, -1], [0], ["-1"]])
+def test_bc2_o1_requires_exactly_one_normalized_acquisition(normalized):
+    pair, lossy = b1_recorded(20)
+    assert bc2_request(pair).acquire == "O1"
+    if normalized is None:
+        del lossy["normalized"]
+    else:
+        lossy["normalized"] = normalized
+    fails(pair, f"lossy model normalized {normalized!r}, expected [-1]", lossy=lossy)
+
+
+def test_bc2_without_a_clause_rejects_any_normalized_event():
+    pair, lossy = b1_recorded(168)
+    assert bc2_request(pair).acquire is None
+    assert compare(pair, lossy).ok
+    lossy["normalized"] = [-1]
+    fails(pair, "lossy model normalized [-1], expected []", lossy=lossy)
 
 
 @pytest.mark.parametrize(

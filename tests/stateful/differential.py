@@ -280,9 +280,13 @@ def compare(pair: Pair, lossy: dict[str, Any] | None = None) -> Result:
             # The lossy model must accept b1's whole run, matching events
             # included; any violation fails the seed.
             failures += [f"lossy model: op {i}: {m}" for i, m in lossy["violations"]]
-            if lossy.get("normalized") and request.acquire is None:
+            # The normalization evidence must match the request exactly:
+            # O1 normalizes the acquisition once, nothing else normalizes.
+            expected = [-1] if request.acquire == "O1" else []
+            if lossy.get("normalized") != expected:
                 failures.append(
-                    "lossy model normalized an acquisition BC3 does not own"
+                    f"lossy model normalized {lossy.get('normalized')!r}, "
+                    f"expected {expected!r}"
                 )
             claim = bc2_claim(pair, request, lossy, set(owner))
             for item in claim.items():
