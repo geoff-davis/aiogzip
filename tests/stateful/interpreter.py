@@ -67,11 +67,16 @@ class Gate:
         # Absolute source seeks that completed, custom or native, taken by
         # the next landed event (BC2's physical-rewind witness; raw only).
         self.seeks: list[int] = []
+        # Parked native seeks as [file offset before, target] (G native's
+        # replayed-prefix witness; raw only).
+        self.origins: list[list[int]] = []
 
-    def seeked(self, target: int | None) -> None:
+    def seeked(self, target: int | None, origin: int | None = None) -> None:
         if target is not None:
             with self.busy_lock:
                 self.seeks.append(target)
+                if origin is not None:
+                    self.origins.append([origin, target])
 
     def arm(self) -> None:
         self.armed = True
@@ -157,11 +162,12 @@ class GatedExecutor(concurrent.futures.ThreadPoolExecutor):
                 if not release.wait(SCENARIO_TIMEOUT):
                     raise TimeoutError("gated executor was never released")
                 start = _native_offset(fn) if record["method"] == "read" else None
+                origin = _seek_origin(fn) if seek is not None else None
                 result = fn(*args, **kwargs)
                 if start is not None and isinstance(result, (bytes, bytearray)):
                     # The lost-input witness: the wire range this read took.
                     record["taken"] = [start, start + len(result)]
-                gate.seeked(seek)
+                gate.seeked(seek, origin)
                 return result
             finally:
                 ran.set()
@@ -281,6 +287,16 @@ def _native_offset(fn) -> int | None:
         target = getattr(getattr(fn, "func", None), "__self__", None)
     tell = getattr(target, "tell", None)
     return tell() if callable(tell) else None
+
+
+def _seek_origin(fn) -> int | None:
+    """The offset a parked native seek starts from, or None when the probe
+    would fail: evidence must never change the call's own outcome (an abort
+    may already have closed the file, and the seek reports that itself)."""
+    try:
+        return _native_offset(fn)
+    except (OSError, ValueError):
+        return None
 
 
 def _native_parked(fn) -> dict[str, Any]:
@@ -441,6 +457,9 @@ class Event:
     # Absolute source seeks completed during the event (BC2 witness; raw
     # only, never in the trace).
     seeks: list[int] | None = None
+    # Parked native seeks as [offset before, target] (G native witness; raw
+    # only, never in the trace).
+    origins: list[list[int]] | None = None
 
 
 Hook = Callable[[Any, Event, "Context"], None]
@@ -639,6 +658,8 @@ async def run(
         with gate.busy_lock:
             if gate.seeks:
                 event.seeks, gate.seeks = gate.seeks, []
+            if gate.origins:
+                event.origins, gate.origins = gate.origins, []
         events.append(event)
         for hook in hooks:
             hook(context.handle, event, context)
@@ -1041,6 +1062,7 @@ def recorded_run(
     run_record["trace"] = trace
     # Evidence only, never compared: the source seeks each event made.
     run_record["seeks"] = [[e.index, e.seeks] for e in events if e.seeks]
+    run_record["origins"] = [[e.index, e.origins] for e in events if e.origins]
     if hooks:
         run_record["violations"] = hook.violations
         run_record["health"] = hook.health

@@ -45,7 +45,7 @@ sys.path.insert(0, str(HERE))
 from generator import generate, unb64  # noqa: E402
 from interpreter import Event, Outcome, final_output, symbolic  # noqa: E402
 from model import Checker, text_model  # noqa: E402
-from oracle import engine_modules, raw_reference  # noqa: E402
+from oracle import engine_modules, raw_reference, wire_reference  # noqa: E402
 
 READ_ABORTED = "read aborted because the gzip file was closed while the call was active"
 READ_BROKEN = "read stream is broken"
@@ -190,6 +190,8 @@ class Pair:
     ref: list[Row]
     cand_info: dict[str, Any]
     engine: str
+    # The reference run record's evidence (``seeks``, ``origins``), if any.
+    ref_info: dict[str, Any] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.cand_by_key = {row.key: row for row in self.cand}
@@ -869,7 +871,10 @@ def bc2_request(pair: Pair) -> Bc2Request | None:
         if trigger is None:
             continue
         clause, taken = trigger
-        lossy = lossy_scenario(scenario, *taken, pair.engine)
+        if clause == "G":
+            lossy = replay_scenario(scenario, taken[0], pair.engine)
+        else:
+            lossy = lossy_scenario(scenario, *taken, pair.engine)
         if lossy is None:
             return None
         rebase = source["kind"] == "native" or source["seekable"]
@@ -911,7 +916,44 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
         and wire_range(pair, r.taken) is not None
     ):
         return "L2", r.taken
+    origin = _seek_origin(pair, key)
+    if (
+        key[1] == "cancel"
+        and pair.op(key)["call"]["op"] == "seek0"
+        and c == r
+        and c.outcome == {"cancelled": True}
+        and (r.parked or {}).get("method") == "seek"
+        and origin is not None
+    ):
+        # G native: the parked seek moved the file to 0 under the cancel and
+        # b1 kept its decoder, which has consumed wire[:origin].
+        return "G", [origin, origin]
     return None
+
+
+def _seek_origin(pair: Pair, key) -> int | None:
+    """The file offset b1's parked native seek left, or None unless the
+    reference recorded exactly one seek, to 0, at the event, with exactly one
+    origin ``[p, 0]`` where ``[0, p]`` is a valid wire range short of the
+    wire's end (a regular file then cannot have reported its end to b1)."""
+    index = key[0]
+    seeks = [s for i, s in pair.ref_info.get("seeks") or [] if i == index]
+    origins = [o for i, o in pair.ref_info.get("origins") or [] if i == index]
+    if seeks != [[0]] or len(origins) != 1 or len(origins[0]) != 1:
+        return None
+    witness = origins[0][0]
+    if not isinstance(witness, list) or len(witness) != 2:
+        return None
+    origin, target = witness
+    if type(target) is not int or target != 0:
+        return None
+    if wire_range(pair, [0, origin]) is None:
+        return None
+    if origin == len(unb64(pair.scenario["wire"])):
+        # b1 may already have seen the source's end, and then never reads
+        # again; whether it did is not witnessed, so no trigger.
+        return None
+    return origin
 
 
 def wire_range(pair: Pair, taken: Any) -> list[int] | None:
@@ -1068,7 +1110,8 @@ def lossy_scenario(
     if a == b:
         return scenario
     if any(s < a < e or s < b < e for s, e in spans):
-        return None
+        wire = unb64(scenario["wire"])
+        return _wire_scenario(scenario, wire[:a] + wire[b:], engine, lossy_range=[a, b])
     lost = b - a
     payloads = scenario["payloads"]
     drop = {i for i, (s, e) in enumerate(spans) if a <= s and e <= b}
@@ -1113,6 +1156,57 @@ def lossy_scenario(
             Checker(lossy, engine)
         except (ValueError, AssertionError):
             return None
+    return lossy
+
+
+def replay_scenario(
+    scenario: dict[str, Any], origin: int, engine: str
+) -> dict[str, Any] | None:
+    """G native's view: b1's decoder replays ``wire[:origin]``, then reads
+    the true wire again from offset 0 into that same state."""
+    wire = unb64(scenario["wire"])
+    return _wire_scenario(
+        scenario, wire[:origin] + wire, engine, replayed_prefix=origin
+    )
+
+
+def _wire_scenario(
+    scenario: dict[str, Any], spliced: bytes, engine: str, **witness: Any
+) -> dict[str, Any] | None:
+    """A view no payload model describes, judged by the engine-matched wire
+    oracle: a splice inside a member, or a replayed prefix.
+
+    The view carries only its decoder input and the ``wire`` corruption kind:
+    its expected bytes, guarantee and failure come from ``wire_reference``
+    over that input. A decompression limit the oracle cannot order, or a
+    view the model refuses, stays ineligible (fail closed).
+    """
+    corruption: dict[str, Any] = {"kind": "wire"}
+    if scenario["corruption"]["kind"] == "limit":
+        limit = scenario["corruption"]["limit"]
+        module = engine_modules()[engine]
+        reference = wire_reference(module, spliced)
+        if reference["failure"] == "body invalid" and reference[
+            "validated"
+        ] <= limit < len(reference["output"]):
+            # A batched inflate may raise before it emits the bytes that pass
+            # the limit, so which failure comes first is not determined.
+            return None
+        corruption["limit"] = limit
+    lossy = dict(scenario)
+    lossy.update(
+        wire=base64.b64encode(spliced).decode("ascii"),
+        payloads=[],
+        payload_size=0,
+        member_offsets=None,
+        member_spans=None,
+        corruption=corruption,
+        **witness,
+    )
+    try:
+        Checker(lossy, engine)
+    except (UnicodeDecodeError, ValueError, AssertionError):
+        return None
     return lossy
 
 
@@ -1255,6 +1349,7 @@ def run(
             parse(ref_runs[str(seed)]["trace"]),
             cand_runs[str(seed)],
             inflater,
+            ref_runs[str(seed)],
         )
         for seed in seeds
     }

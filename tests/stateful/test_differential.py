@@ -31,17 +31,21 @@ from differential import (
     Pair,
     Row,
     _converged,
+    _wire_scenario,
     bc2_request,
+    bc2_trigger_only,
     compare,
     encoded,
     lossy_scenario,
     parse,
     raw_bytes,
+    replay_scenario,
     shadow_scenario,
 )
 from generator import generate, member_spans, unb64
 from interpreter import Event, Outcome, final_output, recorded_run
 from model import Checker, LossyChecker
+from oracle import engine_modules, wire_reference
 
 import aiogzip
 
@@ -75,13 +79,16 @@ def make_pair(
     scenario: dict[str, Any] | None = None,
     cand: list[Row] | None = None,
     run_scenario: dict[str, Any] | None = None,
+    ref_info: dict[str, Any] | None = None,
 ) -> Pair:
     """A pair over the live candidate; ``scenario`` overrides only what the
     predicates see, ``run_scenario`` what the candidate also runs."""
     live_scenario, run = live(seed, run_scenario)
     rows = parse(run["trace"]) if cand is None else cand
     refs = parse(C0[str(seed)]) if ref is None else ref
-    return Pair(scenario or live_scenario, reference, rows, refs, run, ENGINE)
+    return Pair(
+        scenario or live_scenario, reference, rows, refs, run, ENGINE, ref_info or {}
+    )
 
 
 def c0_rows(seed: int) -> list[Row]:
@@ -709,18 +716,30 @@ def test_bc2_rejects_a_scenario_without_member_spans():
     )
 
 
-def test_bc2_rejects_a_range_with_an_endpoint_inside_a_member():
+def test_bc2_judges_a_range_with_an_endpoint_inside_a_member_by_the_oracle():
     request = bc2_request_for(2486)
     a, b = request.lossy["lossy_range"]
-    pair, lossy = b1_emulated(2486)
+    pair, _lossy = b1_emulated(2486)
     scenario = copy.deepcopy(pair.scenario)
-    # Move the last member's end past the range's end.
+    # Move the last member's end past the range's end: the same wire, now
+    # with an endpoint inside a member, so the wire oracle judges the view.
     assert scenario["member_spans"][-1][1] == b
     scenario["member_spans"][-1][1] = b + 1
-    fails(
-        make_pair(2486, pair.ref, reference="b1", scenario=scenario),
-        "unclaimed",
-        lossy=lossy,
+    moved = bc2_request(make_pair(2486, pair.ref, reference="b1", scenario=scenario))
+    assert moved is not None
+    assert moved.lossy["corruption"] == {"kind": "wire"}
+    assert moved.lossy["lossy_range"] == [a, b]
+    wire = unb64(scenario["wire"])
+    assert unb64(moved.lossy["wire"]) == wire[:a] + wire[b:]
+    # Over the same spliced wire, the oracle's view and the structural
+    # view expect exactly the same bytes, guarantee and failure.
+    oracle = Checker(moved.lossy, ENGINE).expect
+    structural = Checker(request.lossy, ENGINE).expect
+    assert (oracle.upper, oracle.lower, oracle.clean, oracle.failure) == (
+        structural.upper,
+        structural.lower,
+        structural.clean,
+        structural.failure,
     )
 
 
@@ -875,7 +894,9 @@ def test_lossy_checker_physical_rewind_needs_a_seek_over_the_range(
 
 def test_lossy_checker_stays_lossy_without_a_recorded_seek(monkeypatch):
     assert _lossy_run(2969)["rebased_at"] is not None
-    monkeypatch.setattr(interpreter.Gate, "seeked", lambda self, target: None)
+    monkeypatch.setattr(
+        interpreter.Gate, "seeked", lambda self, target, origin=None: None
+    )
     run = _lossy_run(2969)
     assert run["seeks"] == [] and run["rebased_at"] is None
 
@@ -908,9 +929,17 @@ def test_native_source_seeks_are_recorded():
 # Recorded b1 references (tests/data/wp10_b1_runs.json).
 
 
+def b1_evidence(seed: int) -> dict[str, Any]:
+    run = copy.deepcopy(B1[str(seed)])
+    return {"seeks": run["seeks"], "origins": run["origins"]}
+
+
 def b1_recorded(seed: int) -> tuple[Pair, dict[str, Any]]:
     run = copy.deepcopy(B1[str(seed)])
-    return make_pair(seed, parse(run["trace"]), reference="b1"), run["lossy"]
+    pair = make_pair(
+        seed, parse(run["trace"]), reference="b1", ref_info=b1_evidence(seed)
+    )
+    return pair, run["lossy"]
 
 
 def test_bc2_l2_584_stays_lossy_to_the_end():
@@ -957,13 +986,15 @@ def test_bc2_l2_rejects_a_trigger_that_differs_beyond_the_witness():
     fails(pair, "(4, 'cancel', 0)", "(6, 'buffer_read', 0)", lossy=lossy)
 
 
-def test_bc2_l2_rejects_a_range_with_an_endpoint_inside_a_member():
-    pair, lossy = b1_recorded(584)
+def test_bc2_l2_judges_a_range_with_an_endpoint_inside_a_member_by_the_oracle():
+    pair, _lossy = b1_recorded(584)
     ref = edit(pair.ref, row(pair.ref, 4, "cancel").key, taken=[0, 100])
-    lossy["trace"] = unparse(ref)
-    pair = make_pair(584, ref, reference="b1")
-    assert bc2_request(pair) is None
-    fails(pair, "unclaimed", lossy=lossy)
+    request = bc2_request(make_pair(584, ref, reference="b1"))
+    assert request is not None and request.clause == "L2"
+    assert request.lossy["corruption"] == {"kind": "wire"}
+    assert request.lossy["lossy_range"] == request.taken == [0, 100]
+    wire = unb64(pair.scenario["wire"])
+    assert unb64(request.lossy["wire"]) == wire[100:]
 
 
 def test_bc2_168_span_runs_past_the_rebase_until_convergence():
@@ -1046,11 +1077,32 @@ def test_lossy_checker_normalizes_only_o1():
 
 
 @pytest.mark.parametrize("seed", [169, 232])
-def test_bc2_e_trigger_only_is_claimed(seed):
+def test_bc2_e_mid_member_trigger_goes_to_the_oracle_lossy_run(seed):
+    # The oracle makes the mid-member range eligible: b1's recorded lossy
+    # run over the spliced wire accepts it, and BC2 claims the trigger.
     pair, lossy = b1_recorded(seed)
-    assert lossy is None and bc2_request(pair) is None
+    request = bc2_request(pair)
+    assert request is not None and request.clause == "L2"
+    assert request.lossy["corruption"] == {"kind": "wire"}
+    assert lossy is not None and lossy["violations"] == []
     (key,) = pair.diffs
     assert key[1] == "cancel" and pair.ref_by_key[key].taken is not None
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT") == [repr(("event", key))]
+    assert bc2_trigger_only(pair).events == set()
+
+
+@pytest.mark.parametrize("seed", [169, 232])
+def test_bc2_e_trigger_only_is_claimed_without_a_lossy_view(seed):
+    # With no view at all (no member spans), the trigger-only clause still
+    # claims the one-sided witness without a lossy run.
+    pair, _lossy = b1_recorded(seed)
+    scenario = copy.deepcopy(pair.scenario)
+    del scenario["member_spans"]
+    pair = make_pair(seed, pair.ref, reference="b1", scenario=scenario)
+    assert bc2_request(pair) is None
+    (key,) = pair.diffs
     result = compare(pair)
     assert result.ok, result.failures
     assert claims(result, "BC2-LOST-INPUT") == [repr(("event", key))]
@@ -1072,9 +1124,11 @@ def _e_pair(**edits) -> Pair:
         ref = edit(ref, row(ref, 4, "cancel").key, taken=[0, 0])
     if "one_sided" in edits:
         ref = ref[:-1] + [Row((14, "cleanup_close", 0), {"ok": None}), ref[-1]]
-    scenario = None
+    # Without member spans no lossy view exists, so E is the clause judging.
+    scenario = copy.deepcopy(generate(169))
+    if "eligible" not in edits:
+        del scenario["member_spans"]
     if "custom" in edits:
-        scenario = copy.deepcopy(generate(169))
         scenario["source"] = {
             "kind": "custom",
             "seekable": True,
@@ -1385,6 +1439,110 @@ def test_bc2_g_rejects_a_lossy_violation_after_the_rewind_cancel():
     fails(pair, "lossy model: op 2: injected", lossy=lossy)
 
 
+# G native: a cancelled native seek0 moved the file without resetting b1's
+# decoder, which replays the consumed prefix and then reads from offset 0.
+
+
+@pytest.mark.parametrize("seed, origin", [(1620, 49), (242, 15015)])
+def test_bc2_g_native_cancelled_rewind_is_claimed(seed, origin):
+    pair, lossy = b1_recorded(seed)
+    request = bc2_request(pair)
+    assert request is not None and request.clause == "G"
+    assert pair.op(request.trigger)["call"]["op"] == "seek0"
+    assert request.taken == [origin, origin]
+    wire = unb64(pair.scenario["wire"])
+    assert request.lossy == replay_scenario(pair.scenario, origin, ENGINE)
+    assert unb64(request.lossy["wire"]) == wire[:origin] + wire
+    assert request.lossy["replayed_prefix"] == origin
+    assert request.lossy["corruption"] == {"kind": "wire"}
+    assert lossy["violations"] == []
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert set(pair.diffs) <= {eval(i)[1] for i in claims(result, "BC2-LOST-INPUT")}
+
+
+def test_bc2_g_native_1620_replays_the_prefix_into_mid_member_state():
+    # A fresh decode of the true wire inflates the whole member and fails
+    # only its CRC; the replayed state fails inside the body, as b1 does
+    # with "invalid distance too far back".
+    pair, _lossy = b1_recorded(1620)
+    wire = unb64(pair.scenario["wire"])
+    module = engine_modules()[ENGINE]
+    fresh = wire_reference(module, wire)
+    assert (fresh["failure"], len(fresh["output"])) == ("trailer crc", 283)
+    replayed = wire_reference(module, wire[:49] + wire)
+    assert replayed["failure"] == "body invalid"
+    assert replayed["validated"] == 0 and len(replayed["output"]) < 283
+    (key,) = [k for k in pair.diffs if k[1] == "next"]
+    assert "invalid distance too far back" in pair.ref_by_key[key].outcome["message"]
+
+
+def _g_native(seeks=None, origins=None, scenario=None) -> Pair:
+    pair, _lossy = b1_recorded(1620)
+    info = b1_evidence(1620)
+    assert info == {"seeks": [[2, [0]]], "origins": [[2, [[49, 0]]]]}
+    if seeks is not None:
+        info["seeks"] = seeks
+    if origins is not None:
+        info["origins"] = origins
+    return make_pair(1620, pair.ref, reference="b1", scenario=scenario, ref_info=info)
+
+
+@pytest.mark.parametrize(
+    "seeks, origins",
+    [
+        (None, []),  # no origin witnessed (the probe found the file closed)
+        (None, [[2, [[49, 0]]], [2, [[49, 0]]]]),  # two records at the event
+        (None, [[2, [[49, 0], [49, 0]]]]),  # two origins in one record
+        (None, [[3, [[49, 0]]]]),  # at another event
+        (None, [[2, [[49, 1]]]]),  # a seek not to 0
+        (None, [[2, [[49, True]]]]),
+        (None, [[2, [[True, 0]]]]),
+        (None, [[2, [["49", 0]]]]),
+        (None, [[2, [[49]]]]),
+        (None, [[2, [[49, 0, 0]]]]),
+        (None, [[2, [-1, 0]]]),
+        (None, [[2, [[-1, 0]]]]),
+        (None, [[2, [[172, 0]]]]),  # the whole wire: b1 may have seen EOF
+        (None, [[2, [[173, 0]]]]),  # past the wire
+        ([], None),  # no completed seek
+        ([[2, [0, 0]]], None),
+        ([[2, [5]]], None),
+    ],
+)
+def test_bc2_g_native_rejects_malformed_or_missing_evidence(seeks, origins):
+    pair = _g_native(seeks, origins)
+    request = bc2_request(pair)
+    assert request is None or request.clause != "G"
+    fails(pair, "unclaimed")
+
+
+def test_bc2_g_native_rejects_a_cancel_whose_rows_differ():
+    pair, lossy = b1_recorded(1620)
+    key = row(pair.ref, 2, "cancel").key
+    ref = edit(pair.ref, key, second={"ok": {"str": "x"}})
+    pair = make_pair(1620, ref, reference="b1", ref_info=b1_evidence(1620))
+    assert bc2_request(pair) is None
+
+
+def test_bc2_g_native_rejects_a_lossy_violation():
+    pair, lossy = b1_recorded(1620)
+    lossy["violations"] = [[3, "injected"]]
+    fails(pair, "lossy model: op 3: injected", lossy=lossy)
+
+
+def test_bc2_g_native_view_differs_from_the_true_view():
+    # The true view guarantees the whole member before its CRC failure; the
+    # replayed view guarantees nothing.
+    pair, _lossy = b1_recorded(1620)
+    assert len(unb64(pair.scenario["wire"])) == 172
+    request = bc2_request(pair)
+    true_view = Checker(pair.scenario, ENGINE).expect
+    replayed = Checker(request.lossy, ENGINE).expect
+    assert true_view.lower == 283 and replayed.lower == 0
+    assert len(replayed.upper) < len(true_view.upper)
+
+
 # lossy_scenario over synthetic text scenarios: whole members removed from
 # the middle, joins across a character, and failure-boundary prefixes.
 
@@ -1457,12 +1615,105 @@ def test_lossy_scenario_rejects_a_join_across_a_character():
     assert lossy_scenario(scenario, *middle(scenario), ENGINE) is None
 
 
-def test_lossy_scenario_rejects_an_endpoint_inside_a_member():
+@pytest.mark.parametrize(
+    "shift, upper, clean",
+    [
+        # m1, then 0x1f, then m3: the next header's magic is wrong.
+        ((1, 0), "ab", False),
+        # m1, then the trailer's last ISIZE byte (zero padding), then m3.
+        ((0, -1), "abef", True),
+    ],
+)
+def test_lossy_scenario_judges_an_endpoint_inside_a_member_by_the_oracle(
+    shift, upper, clean
+):
     scenario = synthetic([b"ab", b"cd", b"ef"])
     a, b = middle(scenario)
-    assert lossy_scenario(scenario, a + 1, b, ENGINE) is None
-    assert lossy_scenario(scenario, a, b - 1, ENGINE) is None
-    assert lossy_scenario(scenario, a, b, ENGINE) is not None
+    a, b = a + shift[0], b + shift[1]
+    wire = unb64(scenario["wire"])
+    lossy = lossy_scenario(scenario, a, b, ENGINE)
+    assert lossy is not None
+    assert lossy["corruption"] == {"kind": "wire"}
+    assert lossy["lossy_range"] == [a, b]
+    assert unb64(lossy["wire"]) == wire[:a] + wire[b:]
+    assert lossy["payloads"] == [] and lossy["member_spans"] is None
+    checker = Checker(lossy, ENGINE)
+    reference = wire_reference(engine_modules()[ENGINE], wire[:a] + wire[b:])
+    assert checker.expect.reference == reference
+    assert checker.upper == upper and checker.expect.clean is clean
+    assert lossy_scenario(scenario, *middle(scenario), ENGINE)["corruption"] == {
+        "kind": "none"
+    }
+
+
+def test_wire_view_matches_the_structural_view_over_the_same_splice():
+    for payloads in ([b"ab", b"cd", b"ef"], [b"ab\n" * 40, b"cd", b"ef\r\n" * 9]):
+        scenario = synthetic(payloads)
+        a, b = middle(scenario)
+        wire = unb64(scenario["wire"])
+        structural = Checker(lossy_scenario(scenario, a, b, ENGINE), ENGINE)
+        view = _wire_scenario(scenario, wire[:a] + wire[b:], ENGINE, lossy_range=[a, b])
+        oracle = Checker(view, ENGINE)
+        assert (oracle.upper, oracle.lower, oracle.expect.clean) == (
+            structural.upper,
+            structural.lower,
+            structural.expect.clean,
+        )
+
+
+def _limited(scenario, limit):
+    scenario = copy.deepcopy(scenario)
+    scenario["corruption"] = {"kind": "limit", "limit": limit}
+    return scenario
+
+
+def test_wire_view_composes_the_decompression_limit():
+    scenario = synthetic([b"ab" * 10, b"cd" * 10, b"ef" * 10])
+    a, b = middle(scenario)
+    lossy = lossy_scenario(_limited(scenario, 25), a, b - 1, ENGINE)
+    assert lossy["corruption"] == {"kind": "wire", "limit": 25}
+    expect = Checker(lossy, ENGINE).expect
+    assert (expect.upper, expect.lower, expect.failure) == (
+        (b"ab" * 10 + b"ef" * 10)[:25],
+        0,
+        "limit",
+    )
+    lossy = lossy_scenario(_limited(scenario, 40), a, b - 1, ENGINE)
+    expect = Checker(lossy, ENGINE).expect
+    assert expect.clean and expect.upper == b"ab" * 10 + b"ef" * 10
+
+
+@pytest.mark.parametrize(
+    "limit, outcome",
+    [
+        (3, "limit"),  # the validated member alone passes the limit
+        (4, None),  # between validated and inflated: not determined
+        (6, None),
+        (7, "validation"),  # the damaged member never reaches the limit
+    ],
+)
+def test_wire_view_refuses_a_limit_inside_an_invalid_body(limit, outcome):
+    # "abcd" validates; the damaged member inflates "xyz" then fails.
+    scenario = synthetic([b"abcd", b"xyz"], damaged=b"xyz")
+    wire = unb64(scenario["wire"])
+    view = _wire_scenario(_limited(scenario, limit), wire, ENGINE, lossy_range=[0, 0])
+    if outcome is None:
+        assert view is None
+    else:
+        assert Checker(view, ENGINE).expect.failure == outcome
+
+
+def test_wire_view_holds_text_before_the_first_undecodable_byte():
+    scenario = synthetic([b"abcd", b"\xff"], damaged=b"\xffz")
+    wire = unb64(scenario["wire"])
+    view = _wire_scenario(scenario, wire, ENGINE, lossy_range=[0, 0])
+    checker = Checker(view, ENGINE)
+    assert checker.expect.upper == b"abcd" and checker.upper == "abcd"
+    assert checker.expect.failure == "validation" and not checker.expect.clean
+    # A clean wire view whose bytes are not text is refused outright.
+    clean = synthetic([b"abcd", b"\xff"])
+    wire = unb64(clean["wire"])
+    assert _wire_scenario(clean, wire, ENGINE, lossy_range=[0, 0]) is None
 
 
 def test_lossy_scenario_keeps_a_truncation_as_validation():

@@ -22,7 +22,7 @@ import types
 from enum import Enum
 from typing import Any
 
-from oracle import engine_modules, raw_reference
+from oracle import engine_modules, raw_reference, wire_reference
 
 
 class Lifecycle(Enum):
@@ -241,6 +241,34 @@ def expectation(scenario: dict[str, Any], engine: str) -> Expectation:
     whole = b"".join(payloads)
     corruption = scenario["corruption"]
     kind = corruption["kind"]
+    if kind == "wire":
+        # A lossy view whose splice lies inside a member: the bytes come from
+        # the engine-matched member-loop oracle over the spliced wire itself.
+        module = engine_modules()[engine]
+        reference = wire_reference(module, base64.b64decode(scenario["wire"]))
+        output = reference["output"]
+        limit = corruption.get("limit")
+        if limit is not None and len(output) > limit:
+            # Every byte past the limit precedes the wire's own failure, so
+            # the limit fails first, exactly as for a clean limit scenario.
+            return Expectation(output[:limit], 0, False, "limit", reference)
+        clean = reference["failure"] is None
+        failure = None if clean else "validation"
+        lower = reference["validated"]
+        if scenario["mode"] == "rt":
+            decoder = codecs.getincrementaldecoder(scenario["text"]["encoding"])()
+            try:
+                decoder.decode(output, final=clean)
+            except UnicodeDecodeError as error:
+                if clean:
+                    raise AssertionError(
+                        "a clean wire view does not decode as text"
+                    ) from error
+                # Text holds only the bytes before the first undecodable
+                # sequence; the reader may raise the gzip failure first, but a
+                # decode error is not modeled and stays a violation.
+                output, lower = output[: error.start], min(lower, error.start)
+        return Expectation(output, lower, clean, failure, reference)
     if kind == "none" or (kind == "limit" and corruption["limit"] >= len(whole)):
         return Expectation(whole, len(whole), True, None)
     if kind == "limit":

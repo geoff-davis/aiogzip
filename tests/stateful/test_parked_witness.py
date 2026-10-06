@@ -10,7 +10,7 @@ import concurrent.futures
 import functools
 
 import aiofiles
-from interpreter import Gate, GatedExecutor, _native_parked
+from interpreter import Gate, GatedExecutor, _native_parked, _seek_origin
 
 from aiogzip._source_io import _NativeSourceCall
 
@@ -94,3 +94,33 @@ async def test_candidate_native_open_parks_as_open(tmp_path):
     await handle.close()
     methods = [_native_parked(fn)["method"] for fn in executor.submitted]
     assert methods[0] == "open"
+
+
+async def test_gated_executor_records_the_parked_native_seek_origin(tmp_path):
+    # G native's witness: the offset a parked native seek starts from.
+    (tmp_path / "in").write_bytes(b"0123456789")
+    loop = asyncio.get_running_loop()
+    gate = Gate()
+    executor = GatedExecutor(gate, loop)
+    async with aiofiles.open(tmp_path / "in", "rb", executor=executor) as f:
+        assert await f.read(7) == b"0123456"
+        gate.arm()
+        seek = asyncio.create_task(f.seek(0))
+        await asyncio.wait_for(gate.entered.wait(), 5)
+        gate.release()
+        assert await seek == 0
+    executor.shutdown()
+    assert gate.seeks == [0]
+    assert gate.origins == [[7, 0]]
+
+
+def test_seek_origin_probe_never_raises_on_a_closed_file(tmp_path):
+    # An abort may close the file before the parked seek runs; the seek
+    # reports that itself, so the probe records nothing instead of raising.
+    (tmp_path / "in").write_bytes(b"data")
+    handle = open(tmp_path / "in", "rb")  # noqa: SIM115
+    handle.read(3)
+    call = functools.partial(handle.seek, 0)
+    assert _seek_origin(call) == 3
+    handle.close()
+    assert _seek_origin(call) is None
