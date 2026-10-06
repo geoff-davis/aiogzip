@@ -15,7 +15,7 @@ import struct
 import warnings
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import Protocol
 
 from . import _engine
 from ._codec_buffer import _InputQueue, _OutputCursor
@@ -207,7 +207,7 @@ class _CodecBase:
     def _reserve(
         self,
         iterator: _CodecIterator,
-    ) -> CodecOperation:
+    ) -> _Operation:
         operation = _Operation(self, iterator)
         self._active_token = operation
         return operation
@@ -373,7 +373,7 @@ class GzipEncoder(_CodecBase):
         size = len(snapshot)
         if self._strict_size and self._input_size + size > 0xFFFFFFFF:
             raise self._feed_size_error(size)
-        return cast(_AsyncDrivableOperation, self._reserve(self._feed(snapshot)))
+        return self._reserve(self._feed(snapshot))
 
     def _feed(self, data: bytes) -> _CodecIterator:
         try:

@@ -1356,6 +1356,10 @@ class AsyncGzipBinaryFile:
             # that all accepted members and trailers were complete.
             self._eof = True
             pieces: List[bytes] = []
+            # finish() is driven synchronously: nothing between try and the
+            # loop's end can suspend, so task cancellation cannot land here.
+            # The live cancellation boundaries are the source read above
+            # (_read_compressed_chunk) and the feed path's driver below.
             try:
                 try:
                     for piece in decoder.finish():
@@ -1363,9 +1367,6 @@ class AsyncGzipBinaryFile:
                 finally:
                     self._sync_decoder_mtime(decoder)
                 return pieces
-            except asyncio.CancelledError:
-                self._poison_read(decoder)
-                raise
             except gzip.BadGzipFile as error:
                 self._retain_validation_pieces(pieces)
                 self._poison_read(decoder, validation_failed=True)
