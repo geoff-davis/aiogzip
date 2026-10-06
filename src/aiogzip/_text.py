@@ -790,6 +790,7 @@ class AsyncGzipTextFile:
         # Keep the primitive encoder/sink body inline: both the reservation
         # context manager and a direct helper call exceeded the 5% small-write
         # threshold in pinned release measurements.
+        # Parity: tests/test_parity_text_inline.py (T1)
         self._check_text_write_call_available()
         self._write_call_active = True
         try:
@@ -1099,7 +1100,8 @@ class AsyncGzipTextFile:
         if bf is None:
             return False
 
-        # Inline _capture_buffer_origin when buffer is empty
+        # Inline _capture_buffer_origin when buffer is empty.
+        # Parity: tests/test_parity_text_inline.py (T2)
         if len(self._text_buffer) == self._text_buffer_offset:
             self._text_buffer = ""
             self._text_buffer_offset = 0
@@ -1137,6 +1139,7 @@ class AsyncGzipTextFile:
         Mirrors :meth:`_read_chunk_and_decode` but returns the translated text
         instead of appending it to the buffer, so callers can accumulate it in
         a local list (avoiding the quadratic ``str +=`` for large reads).
+        Parity: tests/test_parity_text_inline.py (T3).
 
         Returns:
             (text, more): ``text`` is the translated text decoded this round
@@ -1720,6 +1723,7 @@ class AsyncGzipTextFile:
         if self._line_term is not None:
             # Keep pending-line consumption inline: a helper call in this
             # per-line hot path measurably lowers iteration throughput.
+            # Parity: tests/test_parity_text_inline.py (T4)
             idx = self._pending_idx
             pending = self._pending_lines
             if idx < len(pending):
@@ -1812,6 +1816,7 @@ class AsyncGzipTextFile:
 
         # Keep the bounded hot path inline: this avoids a helper frame and
         # computes the buffered length only once before a refill.
+        # Parity: tests/test_parity_text_inline.py (T5)
         pos, length = self._find_line_terminator(0)
         if pos != -1:
             end = pos + length

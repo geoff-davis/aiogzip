@@ -107,6 +107,7 @@ class _Operation(Iterator[bytes]):
             # yielding bytes, so that frame was pure per-call overhead. The
             # ownership block intentionally mirrors _advance_raw(); lifecycle
             # tests cover both drivers so changes must keep them equivalent.
+            # Parity: tests/test_parity_operation.py
             if self._invalidated or self._owner._discarded:
                 raise RuntimeError("gzip codec operation was invalidated by discard()")
             if self._closed:
@@ -360,6 +361,7 @@ class GzipEncoder(_CodecBase):
         # This internal path is the file writer's per-call hot path. Preserve
         # every public feed() precondition inline, avoiding three helper frames
         # whose checks are otherwise repeated for every tiny write.
+        # Parity: tests/test_parity_encoder_feed.py
         if self._active_token is not None:
             raise RuntimeError("gzip encoder has an active operation")
         if self._unusable:

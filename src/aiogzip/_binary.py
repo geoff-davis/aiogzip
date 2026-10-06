@@ -1127,6 +1127,7 @@ class AsyncGzipBinaryFile:
 
         # Reserve inline so the primitive path avoids the measured context-
         # manager cost; the codec/sink work itself is shared with composites.
+        # Parity: tests/test_parity_binary_write.py
         self._check_write_call_available()
         self._write_call_active = True
         try:
