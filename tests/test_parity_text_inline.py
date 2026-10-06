@@ -207,12 +207,27 @@ async def test_t1_closed_and_invalid_input_match(writer):
 # T2: inline origin capture
 
 
+UNIVERSAL_NEWLINES = [None, ""]  # modes that track a pending CR and the mask
+
+
 @pytest.mark.parametrize("encoding", ["utf-8", "utf-16-le"])
 @pytest.mark.parametrize("newline", NEWLINES)
 async def test_t2_inline_origin_matches_the_helper(newline, encoding, monkeypatch):
-    stream = _reader(_wire(TEXT * 5, encoding), newline=newline, encoding=encoding)
+    # 6-byte chunks split multibyte characters and end some refills on a CR.
+    stream = _reader(
+        _wire(TEXT * 5, encoding), chunk_size=6, newline=newline, encoding=encoding
+    )
     original_read = AsyncGzipBinaryFile.read
-    checked = []
+    captured = []
+
+    def fields(origin):
+        return (
+            origin.byte_offset,
+            origin.decoder_state,
+            origin.trailing_cr,
+            origin.seen_newline_types,
+            origin.chars_to_skip,
+        )
 
     async def read(self, size=-1):
         # Called right after the refill captured its origin inline (or not,
@@ -223,23 +238,9 @@ async def test_t2_inline_origin_matches_the_helper(newline, encoding, monkeypatc
             and caller == "_read_chunk_and_decode"
             and stream._buffered_text_len() == 0
         ):
-            origin = stream._buffer_origin
-            inline = (
-                origin.byte_offset,
-                origin.decoder_state,
-                origin.trailing_cr,
-                origin.seen_newline_types,
-                origin.chars_to_skip,
-            )
+            inline = fields(stream._buffer_origin)
             stream._capture_buffer_origin()
-            helper = (
-                origin.byte_offset,
-                origin.decoder_state,
-                origin.trailing_cr,
-                origin.seen_newline_types,
-                origin.chars_to_skip,
-            )
-            checked.append(inline == helper)
+            captured.append((inline, fields(stream._buffer_origin)))
         return await original_read(self, size)
 
     monkeypatch.setattr(AsyncGzipBinaryFile, "read", read)
@@ -248,9 +249,19 @@ async def test_t2_inline_origin_matches_the_helper(newline, encoding, monkeypatc
         await stream.seek(0)
         while await stream.readline():
             pass
-    assert all(checked)
-    if newline not in FAST_NEWLINES:
-        assert checked  # generic modes refill through the inline capture
+        # Bounded readline refills through _read_chunk_and_decode in every
+        # mode, including the fast modes whose unbounded readline does not.
+        await stream.seek(0)
+        while await stream.readline(3):
+            pass
+    assert captured
+    assert all(inline == helper for inline, helper in captured)
+    inline_rows = [inline for inline, _ in captured]
+    # Witnesses: the comparison covered non-default captured state.
+    assert any(row[1][0] for row in inline_rows)  # pending decoder bytes
+    if newline in UNIVERSAL_NEWLINES:
+        assert any(row[2] for row in inline_rows)  # pending CR
+        assert any(row[3] for row in inline_rows)  # newline mask
 
 
 # T3: _decode_next_chunk vs _read_chunk_and_decode
@@ -332,6 +343,77 @@ async def test_t3_validation_salvage_matches(how):
         except OSError:
             pass
     assert "".join(collected) == _decoded(text, None)
+
+
+class _FlakySource:
+    """Seekable-free source whose one read fails before consuming input.
+
+    ``tell`` gives the reader a no-effect checkpoint, so the failure is
+    recoverable and a retry continues from the restored state.
+    """
+
+    def __init__(self, data, fail_at):
+        self.buffer = io.BytesIO(data)
+        self.tell = self.buffer.tell
+        self.reads = 0
+        self.fail_at = fail_at
+
+    async def read(self, size=-1):
+        self.reads += 1
+        if self.reads == self.fail_at:
+            raise OSError("transient source error")
+        return self.buffer.read(size)
+
+    def close(self):
+        pass
+
+
+async def _t3_source_error(how, newline, fail_at):
+    text = NOISY.replace("7\n", "7\r\n")
+    stream = AsyncGzipTextFile(
+        None,
+        "rt",
+        fileobj=_FlakySource(_wire(text), fail_at),
+        closefd=False,
+        chunk_size=4096,
+        newline=newline,
+    )
+    collected, restored = [], None
+    async with stream:
+        while True:
+            try:
+                # A sized read spanning several chunks, so the failing call
+                # has already decoded text that it must restore.
+                part = await (
+                    stream.read(10_000) if how == "sized" else stream.readline()
+                )
+            except OSError as error:
+                assert restored is None and "transient" in str(error)
+                bf = stream._binary_file
+                consumed = sum(map(len, collected))
+                restored = (
+                    consumed + stream._buffered_text_len(),  # decoded frontier
+                    bf._position,
+                    bf._read_health.name,
+                )
+                continue  # retry on the same handle
+            if not part:
+                break
+            collected.append(part)
+    assert "".join(collected) == _decoded(text, newline)
+    return restored, "".join(collected)
+
+
+@pytest.mark.parametrize("fail_at", [2, 3])
+@pytest.mark.parametrize("newline", NEWLINES)
+async def test_t3_source_error_restores_and_retries_identically(newline, fail_at):
+    # read(-1) is not a T3 path: it restores at the binary layer instead.
+    sized = await _t3_source_error("sized", newline, fail_at)
+    readline = await _t3_source_error("readline", newline, fail_at)
+    assert sized == readline
+    frontier, position, health = sized[0]
+    assert health == "HEALTHY"
+    assert frontier > 0 and position > 0  # the failure came after decoded text
 
 
 # T4: iteration vs readline

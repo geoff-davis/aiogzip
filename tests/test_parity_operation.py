@@ -200,6 +200,9 @@ def _guard_case(case):
     elif case == "invalidated":
         encoder.discard()
         expected = RuntimeError
+    elif case == "close-before-start":
+        operation.close()
+        expected = StopIteration
     elif case == "non-active":
         encoder._active_token = object()
         expected = RuntimeError
@@ -210,7 +213,9 @@ def _guard_case(case):
     return encoder, operation, expected
 
 
-@pytest.mark.parametrize("case", ["closed", "invalidated", "non-active", "early-close"])
+@pytest.mark.parametrize(
+    "case", ["closed", "invalidated", "non-active", "close-before-start", "early-close"]
+)
 def test_ownership_guards_match_between_drivers(case):
     results = []
     for driver in ("public", "raw"):
@@ -225,6 +230,14 @@ def test_ownership_guards_match_between_drivers(case):
     assert results[0] == results[1]
     # A guard rejection never changes codec state.
     assert results[0][2] == results[0][3]
+    if case in ("close-before-start", "early-close"):
+        # Closing before exhaustion abandons the codec under either driver.
+        after = results[0][3]
+        assert (after["active"], after["unusable"], after["finished"]) == (
+            False,
+            True,
+            False,
+        )
 
 
 @pytest.mark.parametrize("driver", ["public", "raw"])
