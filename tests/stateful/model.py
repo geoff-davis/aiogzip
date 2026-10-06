@@ -18,6 +18,7 @@ import dataclasses
 import gzip
 import io
 import os
+import types
 from enum import Enum
 from typing import Any
 
@@ -921,7 +922,12 @@ class LossyChecker(Checker):
     """b1's reader over the input it actually saw after losing some (BC2).
 
     Built on the lossy scenario: the true wire with the lost range removed.
-    At the trigger event an injected failure or a cancellation has no effect,
+    Before the trigger b1 reads the true wire, so the model checks against
+    the true scenario until the trigger event, then switches to the lossy
+    one, keeping the position, health and marks it has accumulated (the lost
+    range starts where the reader's source stood, so the data before the
+    position is the same in both). At the trigger event an injected failure
+    or a cancellation has no effect,
     because b1 retries. After the trigger, b1's first physical rewind returns
     it to the true wire when ``rebase`` is set (a seekable source); on a
     non-seekable custom source b1 replays its cache, which lacks the lost
@@ -954,9 +960,21 @@ class LossyChecker(Checker):
         self.rebase = rebase
         self.rebased_at: int | None = None
         self.index: int | None = None
+        self.lossy = types.SimpleNamespace(**{n: getattr(self, n) for n in self.VIEW})
+        self._use(self.true)
+        self.lost = False  # whether the lossy view is in force
+
+    VIEW = ("expect", "upper", "lower")
+
+    def _use(self, view: Any) -> None:
+        for name in self.VIEW:
+            setattr(self, name, getattr(view, name))
 
     def observe(self, event) -> None:
         self.index = event.index
+        if not self.lost and event.index >= self.trigger:
+            self._use(self.lossy)
+            self.lost = True
         super().observe(event)
 
     def transition(self, event: str) -> None:
@@ -973,8 +991,7 @@ class LossyChecker(Checker):
             # The position is then set in the shared decompressed
             # coordinates, which the rewind makes valid on the true wire.
             self.rebased_at = self.index
-            for name in ("expect", "upper", "lower", "wire_size"):
-                setattr(self, name, getattr(self.true, name))
+            self._use(self.true)
 
 
 class WriteChecker(_HandleChecker):

@@ -17,6 +17,7 @@ import asyncio
 import base64
 import concurrent.futures
 import dataclasses
+import gc
 import hashlib
 import json
 import os
@@ -269,10 +270,15 @@ def _native_offset(fn) -> int | None:
 
 def _native_parked(fn) -> dict[str, Any]:
     """Describe a parked executor call: aiofiles passes a ``partial``, the
-    candidate a ``_NativeSourceCall``; both expose ``args``."""
+    candidate a ``_NativeSourceCall``; both expose ``args``. The candidate
+    opens by submitting ``sync_open`` itself, so a named function stands for
+    its own method (a lambda's name is not one)."""
     method = getattr(fn, "method", None) or getattr(
         getattr(fn, "func", None), "__name__", None
     )
+    if method is None:
+        name = getattr(fn, "__name__", None)
+        method = name if isinstance(name, str) and name.isidentifier() else None
     args = getattr(fn, "args", ())
     data = args[0] if args and isinstance(args[0], (bytes, bytearray)) else None
     return {
@@ -339,6 +345,13 @@ async def _park(gate: Gate) -> None:
         release = gate.release_async
         gate.entered.set()
         await release.wait()
+
+
+# The differential's subprocesses collect garbage before each fd count, so a
+# file an earlier seed leaked cannot move a later seed's fd_delta. In-process
+# test runs skip it: a full collection of pytest's heap per scenario triples
+# the suite's time, and nothing there compares fd_delta across processes.
+COLLECT_FOR_FD_COUNTS = False
 
 
 def _open_fds() -> int | None:
@@ -518,6 +531,10 @@ async def run(
 ) -> list[Event]:
     """Replay ``scenario``; return raw events (hooks see each as it lands)."""
     loop = asyncio.get_running_loop()
+    # Collect first: a file an earlier scenario leaked closes when its
+    # garbage is collected, which must not count against this scenario.
+    if COLLECT_FOR_FD_COUNTS:
+        gc.collect()
     fds_before = _open_fds()
     gate = Gate()
     loop.set_default_executor(GatedExecutor(gate, loop))
@@ -822,6 +839,10 @@ async def run(
         else:
             output = b""
         final.update(final_output(output, retain))
+    # The handle and source stay referenced here, so a real leak of theirs
+    # still shows; only this scenario's unreachable garbage is collected.
+    if COLLECT_FOR_FD_COUNTS:
+        gc.collect()
     fds_after = _open_fds()
     if fds_before is not None and fds_after is not None:
         final["fd_delta"] = fds_after - fds_before
@@ -993,6 +1014,8 @@ def main() -> None:
         help="each scenario line is a BC2 request; run the lossy model",
     )
     args = parser.parse_args()
+    global COLLECT_FOR_FD_COUNTS
+    COLLECT_FOR_FD_COUNTS = True
     root = args.source_root.resolve()
     os.environ["AIOGZIP_ENGINE"] = args.engine
     sys.path.insert(0, str(root / "src"))

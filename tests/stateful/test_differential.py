@@ -218,6 +218,21 @@ def test_consumed_source_failure_records_the_taken_wire_range():
     assert failed.taken == [0, 64]
 
 
+def test_fd_counts_follow_a_collection(monkeypatch):
+    # A file an earlier scenario leaked closes when its garbage is collected;
+    # collecting right before each count keeps that out of fd_delta. The
+    # interpreter's CLI (every differential side) turns this on.
+    calls = []
+    real_count = interpreter._open_fds
+    monkeypatch.setattr(interpreter, "COLLECT_FOR_FD_COUNTS", True)
+    monkeypatch.setattr(interpreter.gc, "collect", lambda: calls.append("collect"))
+    monkeypatch.setattr(
+        interpreter, "_open_fds", lambda: calls.append("count") or real_count()
+    )
+    recorded_run(aiogzip, generate(558), ENGINE)
+    assert calls == ["collect", "count", "collect", "count"]
+
+
 # The model's EOF narrowing (seed 4946): an empty result that could only
 # come from the end narrows an uncertain position to it.
 
@@ -983,6 +998,32 @@ def test_lossy_checker_rejects_a_misplaced_trigger():
 
 def test_lossy_checker_rejects_the_true_scenario_after_lost_input():
     assert _lossy_run(2060, lossy=generate(2060))["violations"]
+
+
+def _584_lossy_run(**override) -> dict[str, Any]:
+    # Seed 584 reads the whole wire (op 0), rewinds (op 3), and then its
+    # cancelled native read (op 4) is where b1 lost [0, 242).
+    scenario = generate(584)
+    lossy = lossy_scenario(scenario, 0, 242, ENGINE)
+    assert lossy is not None and lossy["wire"] == ""
+    request = {"lossy": lossy, "trigger": 4, "rebase": False} | override
+    return recorded_run(aiogzip, scenario, ENGINE, "lossy", request)
+
+
+def test_lossy_checker_reads_the_true_wire_before_the_trigger():
+    violations = _584_lossy_run()["violations"]
+    # Before the trigger the true wire is in force, so op 0's whole-wire
+    # readlines is accepted. From the trigger on the lossy (empty) view is:
+    # the first data the model checks again, op 12's readlines after the
+    # seek0 at op 11 (text buffer reads at 6 and 8 suspend data checks), is
+    # true-wire data the lossy wire does not hold.
+    assert violations and min(i for i, _ in violations) == 12
+
+
+def test_lossy_checker_keeps_its_state_across_the_switch():
+    # A trigger after every event leaves the true view in force throughout:
+    # the run is the candidate's own, so nothing is rejected.
+    assert _584_lossy_run(trigger=1000)["violations"] == []
 
 
 def test_lossy_checker_rebases_only_when_asked():

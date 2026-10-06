@@ -71,3 +71,26 @@ async def test_gated_executor_records_the_parked_native_write(tmp_path):
         await write
     executor.shutdown()
     assert (tmp_path / "out").read_bytes() == b"parked"
+
+
+def test_a_named_function_stands_for_its_own_method():
+    # The candidate opens by submitting sync_open itself; aiofiles (b1, C0)
+    # submits a partial of it. Both must record the same parked method.
+    sync_open = aiofiles.threadpool.sync_open
+    direct = _native_parked(sync_open)
+    wrapped = _native_parked(functools.partial(sync_open, "path", "rb"))
+    assert direct == wrapped == {"via": "native", "method": "open", "bytes": None}
+
+
+async def test_candidate_native_open_parks_as_open(tmp_path):
+    import aiogzip
+
+    (tmp_path / "f.gz").write_bytes(b"")
+    loop = asyncio.get_running_loop()
+    executor = _Recording()
+    loop.set_default_executor(executor)
+    handle = aiogzip.AsyncGzipBinaryFile(tmp_path / "f.gz", "rb")
+    await handle.open()
+    await handle.close()
+    methods = [_native_parked(fn)["method"] for fn in executor.submitted]
+    assert methods[0] == "open"
