@@ -196,7 +196,7 @@ class AsyncGzipTextFile:
         "_close_lock",
         "_read_call_active",
         "_pending_read_origin",
-        "_read_poisoned",
+        "_read_poison_seen",
         "_write_call_active",
         "_read_call",
         "_write_call",
@@ -324,7 +324,10 @@ class AsyncGzipTextFile:
         self._close_lock = asyncio.Lock()
         self._read_call_active: bool = False
         self._pending_read_origin: Optional[_TextBufferOrigin] = None
-        self._read_poisoned: bool = False
+        # One-way hint, not a health copy: set when binary reports poison and
+        # cleared only when text rewinds. It lets a healthy hot-path call skip
+        # the binary query; every decision it gates asks binary's authority.
+        self._read_poison_seen: bool = False
         self._write_call_active: bool = False
         self._read_call = _TextReadReservation(self)
         self._write_call = _TextWriteReservation(self)
@@ -437,8 +440,10 @@ class AsyncGzipTextFile:
                         raise
                     failure.add_note(f"Opening cleanup also failed: {cleanup!r}")
                 raise
-            binary_file._closed_observer = self._mark_binary_closed
-            binary_file._read_poison_observer = self._mark_binary_read_poisoned
+            binary_file._attach_text_observers(
+                closed=self._mark_binary_closed,
+                poisoned=self._mark_binary_read_poisoned,
+            )
             self._binary_file = binary_file
             return self
         finally:
@@ -582,7 +587,7 @@ class AsyncGzipTextFile:
                     chars_to_skip,
                 ) = self._decode_cookie(offset)
                 await self._binary_file.seek(origin_offset)
-                self._read_poisoned = False
+                self._read_poison_seen = False
                 self._decoder.setstate(decoder_state)
                 self._decoder_byte_position = origin_offset
                 self._trailing_cr = trailing_cr
@@ -660,8 +665,11 @@ class AsyncGzipTextFile:
         self._is_closed = True
 
     def _mark_binary_read_poisoned(self, validation_failed: bool) -> None:
-        """Mirror binary poison and discard text unreachable after terminal errors."""
-        self._read_poisoned = True
+        """Latch that poison reached this handle; drop text a terminal error strands.
+
+        Idempotent: binary may deliver one poisoning more than once.
+        """
+        self._read_poison_seen = True
         if not validation_failed:
             self._set_buffer("")
 
@@ -675,13 +683,13 @@ class AsyncGzipTextFile:
     def _check_text_read_call_usable(self) -> None:
         """Reject overlapping text reads or terminal binary poison."""
         self._check_text_read_call_available()
-        if self._read_poisoned:
+        if self._read_poison_seen:
             self._check_text_read_usable()
 
     def _check_text_read_usable(self) -> None:
         """Reject terminal poison while allowing explicit validation salvage."""
         binary_file = self._binary_file
-        if binary_file is None or not binary_file._read_broken:
+        if binary_file is None or binary_file._read_is_healthy():
             return
         if binary_file._has_validation_failure() and self._buffered_text_len() > 0:
             return
@@ -893,7 +901,7 @@ class AsyncGzipTextFile:
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
         await self._binary_file.seek(0)
-        self._read_poisoned = False
+        self._read_poison_seen = False
         self._decoder.reset()
         self._decoder_byte_position = 0
         self._set_buffer("")
@@ -1277,7 +1285,7 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_poisoned:
+        if self._read_call_active or self._read_poison_seen:
             self._check_text_read_call_usable()
 
         if size is None:
@@ -1375,7 +1383,7 @@ class AsyncGzipTextFile:
                 self._newline == ""
                 and cr_length == 1
                 and cr_is_trailing
-                and (not bf._eof or bf._read_broken)
+                and (not bf._eof or not bf._read_is_healthy())
             )
             rel_pos = pos_r - base
             if should_wait_for_lf:
@@ -1481,7 +1489,7 @@ class AsyncGzipTextFile:
         if (
             self._universal_newlines
             and self._trailing_cr
-            and (bf is None or not bf._read_broken)
+            and (bf is None or bf._read_is_healthy())
         ):
             self._seen_newline_types |= self._SEEN_CR
             self._trailing_cr = False
@@ -1685,7 +1693,7 @@ class AsyncGzipTextFile:
 
             if (
                 lines
-                and self._read_poisoned
+                and self._read_poison_seen
                 and self._validation_line_salvage_complete()
             ):
                 return lines
@@ -1706,7 +1714,7 @@ class AsyncGzipTextFile:
         """Return the next line from the file."""
         if self._is_closed:
             raise StopAsyncIteration
-        if self._read_call_active or self._read_poisoned:
+        if self._read_call_active or self._read_poison_seen:
             self._check_text_read_call_usable()
 
         if self._line_term is not None:
@@ -1770,7 +1778,7 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
-        if self._read_call_active or self._read_poisoned:
+        if self._read_call_active or self._read_poison_seen:
             self._check_text_read_call_usable()
 
         if limit is None or limit < 0:
@@ -1970,7 +1978,7 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
-        if self._read_call_active or self._read_poisoned:
+        if self._read_call_active or self._read_poison_seen:
             self._check_text_read_call_usable()
 
         state = self._readlines_rollback_state()
@@ -1989,7 +1997,10 @@ class AsyncGzipTextFile:
                     total_size += len(line)
                     if hint > 0 and total_size >= hint:
                         break
-                    if self._read_poisoned and self._validation_line_salvage_complete():
+                    if (
+                        self._read_poison_seen
+                        and self._validation_line_salvage_complete()
+                    ):
                         break
                 return lines
         except BaseException:

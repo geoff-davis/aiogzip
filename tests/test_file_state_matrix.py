@@ -367,7 +367,7 @@ async def test_cancelled_text_sized_read_does_not_publish_restored_pieces(monkey
     try:
         with pytest.raises(asyncio.CancelledError):
             await stream.read(100)
-        assert stream._read_poisoned is True
+        assert stream._read_poison_seen is True
         assert stream._buffered_text_len() == 0
         with pytest.raises(OSError, match="broken.*close and reopen"):
             await stream.read(1)
@@ -439,12 +439,12 @@ async def test_cookie_recovery_clears_the_text_poison_mirror(tmp_path):
         decoder = binary_file._decoder
         assert decoder is not None
         binary_file._poison_read(decoder, validation_failed=True)
-        assert binary_file._read_broken is True
-        assert stream._read_poisoned is True
+        assert binary_file._read_is_healthy() is False
+        assert stream._read_poison_seen is True
 
         assert await stream.seek(cookie) == cookie
-        assert binary_file._read_broken is False
-        assert stream._read_poisoned is False
+        assert binary_file._read_is_healthy() is True
+        assert stream._read_poison_seen is False
         assert await stream.read() == payload[1:]
     finally:
         await stream.close()

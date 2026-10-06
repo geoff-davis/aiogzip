@@ -68,23 +68,20 @@ def _assert_failed(stream: AsyncGzipBinaryFile, health: _ReadHealth) -> None:
 # Structure
 
 
-def test_production_code_never_assigns_the_legacy_names():
-    # Every store or delete of an attribute, including tuple/list targets.
+def test_production_code_never_uses_the_legacy_names():
+    # WP8 removed the temporary views: no load, store or delete remains.
     for path in SRC.glob("*.py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, ast.Attribute) and isinstance(
-                node.ctx, (ast.Store, ast.Del)
-            ):
+            if isinstance(node, ast.Attribute):
                 assert node.attr not in LEGACY, f"{path.name}:{node.lineno}"
 
 
-def test_health_is_one_slot_and_the_legacy_names_are_properties():
+def test_health_is_one_slot_and_the_legacy_names_are_gone():
     slots = AsyncGzipBinaryFile.__slots__
     assert "_read_health" in slots
     assert not set(LEGACY) & set(slots)
     for name in LEGACY:
-        assert isinstance(getattr(AsyncGzipBinaryFile, name), property)
-        assert getattr(AsyncGzipBinaryFile, name).fset is None
+        assert not hasattr(AsyncGzipBinaryFile, name)
     assert [h.name for h in _ReadHealth] == [
         "HEALTHY",
         "VALIDATION_SALVAGE",
@@ -93,23 +90,21 @@ def test_health_is_one_slot_and_the_legacy_names_are_properties():
 
 
 @pytest.mark.parametrize(
-    "health,broken,validation_failed",
+    "health,healthy,validation_failed,restorable",
     [
-        (_ReadHealth.HEALTHY, False, False),
-        (_ReadHealth.VALIDATION_SALVAGE, True, True),
-        (_ReadHealth.BROKEN, True, False),
+        (_ReadHealth.HEALTHY, True, False, True),
+        (_ReadHealth.VALIDATION_SALVAGE, False, True, True),
+        (_ReadHealth.BROKEN, False, False, False),
     ],
 )
-def test_legacy_views_are_derived_and_read_only(health, broken, validation_failed):
+def test_wrapper_predicates_derive_from_health(
+    health, healthy, validation_failed, restorable
+):
     stream = AsyncGzipBinaryFile(None, "rb", fileobj=_Source(b""), closefd=False)
     stream._read_health = health
-    assert stream._read_broken is broken
-    assert stream._read_validation_failed is validation_failed
-    # The invalid (False, True) pair has no representation.
-    assert not (validation_failed and not broken)
-    for name in LEGACY:
-        with pytest.raises(AttributeError):
-            setattr(stream, name, False)
+    assert stream._read_is_healthy() is healthy
+    assert stream._has_validation_failure() is validation_failed
+    assert stream._can_restore_failed_read() is restorable
 
 
 # Invariants across transitions
@@ -119,7 +114,7 @@ def test_legacy_views_are_derived_and_read_only(health, broken, validation_faile
 def test_construction_is_healthy_before_open(mode):
     stream = AsyncGzipBinaryFile(None, mode, fileobj=io.BytesIO(), closefd=False)
     assert stream._read_health is _ReadHealth.HEALTHY
-    assert stream._read_broken is False
+    assert stream._read_is_healthy() is True
 
 
 async def test_open_and_validated_eof_stay_healthy():
@@ -214,7 +209,7 @@ async def test_raising_poison_observer_cannot_skip_decoder_discard(
         assert stream._eof is True
         raise observer_error
 
-    stream._read_poison_observer = observer
+    stream._attach_text_observers(closed=lambda: None, poisoned=observer)
     with pytest.raises(RuntimeError) as raised:
         await stream.read()
     assert raised.value is observer_error

@@ -101,7 +101,7 @@ FRESH = state(HEALTHY, eof=False, decoder_live=True)
 
 def observe(stream):
     events = []
-    stream._read_poison_observer = events.append
+    stream._attach_text_observers(closed=lambda: None, poisoned=events.append)
     return events
 
 
