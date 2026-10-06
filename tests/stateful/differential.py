@@ -1223,6 +1223,10 @@ def bc2_claim(
     claim = Claim()
     if parse(lossy["trace"]) != pair.ref:
         return claim  # b1's replay was not reproduced; claim nothing
+    if not (
+        _states_ok(pair.cand_info.get("states")) and _states_ok(lossy.get("states"))
+    ):
+        return claim  # convergence evidence is malformed; claim nothing
     losses = _losses(pair, request, lossy)
     if losses is None:
         return claim  # malformed loss evidence; claim nothing
@@ -1312,10 +1316,23 @@ def _losses(pair: Pair, request: Bc2Request, lossy: dict[str, Any]) -> list[int]
     return indices
 
 
+def _states_ok(states: Any) -> bool:
+    """Whether a run's per-event states have the shape convergence reads:
+    [position, eof, view, pending injected failure]."""
+    return type(states) is list and all(
+        type(state) is list
+        and len(state) == 4
+        and state[3] in (None, "no_effect", "consumed")
+        for state in states
+    )
+
+
 def _converged(pair: Pair, lossy: dict[str, Any], start: int) -> int | None:
     """The candidate-order position of the first event after the trigger
     after which both models agree: the lossy model is back on the true view,
-    and both are certain of the same position, with the same health and eof.
+    and both are certain of the same position, with the same health and eof,
+    and the same pending injected source failure (which decides the next
+    read: seed 5712).
     A physical rewind alone is not enough (a relative seek keeps b1 ahead by
     the lost length)."""
     ref_order = {row.key: n for n, row in enumerate(pair.ref)}
@@ -1327,9 +1344,11 @@ def _converged(pair: Pair, lossy: dict[str, Any], start: int) -> int | None:
         m = ref_order.get(pair.cand[n].key)
         if m is None or n >= len(cand_states) or m >= len(ref_states):
             continue
-        (c_pos, c_eof, _), (r_pos, r_eof, view) = cand_states[n], ref_states[m]
+        (c_pos, c_eof, _, c_pending) = cand_states[n]
+        (r_pos, r_eof, view, r_pending) = ref_states[m]
         if (
             view == "true"
+            and c_pending == r_pending
             and c_pos is not None
             and c_pos[0] == c_pos[1]
             and c_pos == r_pos

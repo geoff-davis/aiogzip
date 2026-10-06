@@ -989,7 +989,9 @@ class _Indexed:
         self.health: list[list[str | None]] = []
         self.positions: list[list[int] | None] = []
         # After each event: the position range (None when unmodeled), eof,
-        # and a lossy model's view ("true" or "lossy"; None otherwise).
+        # a lossy model's view ("true" or "lossy"; None otherwise), and the
+        # custom source's pending injected failure ("no_effect", "consumed"
+        # or None), which decides the next source read.
         self.states: list[list[Any]] = []
 
     def __call__(self, handle, event, context) -> None:
@@ -1014,6 +1016,7 @@ class _Indexed:
                 [position[0], position[-1]] if position and first.modeled else None,
                 getattr(first, "eof", None),
                 getattr(first, "view", None),
+                getattr(getattr(context, "source", None), "fail", None),
             ]
         )
         self.health.append(

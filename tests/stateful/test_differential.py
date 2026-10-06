@@ -650,11 +650,11 @@ BC2_SEEDS = {
     1065: "rt seekable: a rewind with no source call keeps the lossy view",
     277: "rb seekable: a rewind with no source call keeps the lossy view",
     430: "rt seekable: a physical rewind, but the models never converge",
-    2969: "rb seekable: the span ends where the models converge",
+    2969: "rb seekable: b1 spends an armed failure the candidate keeps",
     2361: "rt seekable: the span ends where the models converge",
     3210: "rb seekable: convergence at a seek_back",
 }
-CONVERGING = (2969, 2361, 3210)
+CONVERGING = (2361, 3210)
 
 
 def span_end(pair: Pair, lossy: dict[str, Any]) -> int | None:
@@ -846,18 +846,21 @@ def unparse(rows: list[Row]) -> list[list[Any]]:
     return trace
 
 
-@pytest.mark.parametrize("field", ["view", "position", "eof", "health"])
+@pytest.mark.parametrize("field", ["view", "position", "eof", "pending", "health"])
 def test_bc2_span_ends_only_when_every_converged_field_agrees(field):
-    pair, lossy = b1_emulated(2969)
+    pair, lossy = b1_emulated(3210)
     end = span_end(pair, lossy)
     m = next(n for n, r in enumerate(pair.ref) if r.key == pair.cand[end].key)
-    position, eof, view = lossy["states"][m]
+    position, eof, view, pending = lossy["states"][m]
     if field == "view":
-        lossy["states"][m] = [position, eof, "lossy"]
+        lossy["states"][m] = [position, eof, "lossy", pending]
     elif field == "position":
-        lossy["states"][m] = [[position[0] + 1] * 2, eof, view]
+        lossy["states"][m] = [[position[0] + 1] * 2, eof, view, pending]
     elif field == "eof":
-        lossy["states"][m] = [position, not eof, view]
+        lossy["states"][m] = [position, not eof, view, pending]
+    elif field == "pending":
+        other = "consumed" if pending is None else None
+        lossy["states"][m] = [position, eof, view, other]
     else:
         lossy["health"][m] = [lossy["health"][m][0], "BROKEN"]
     later = span_end(pair, lossy)
@@ -865,11 +868,11 @@ def test_bc2_span_ends_only_when_every_converged_field_agrees(field):
 
 
 def test_bc2_span_ends_only_at_a_certain_position():
-    pair, lossy = b1_emulated(2969)
+    pair, lossy = b1_emulated(3210)
     end = span_end(pair, lossy)
     m = next(n for n, r in enumerate(pair.ref) if r.key == pair.cand[end].key)
-    position, eof, view = lossy["states"][m]
-    lossy["states"][m] = [[position[0], position[0] + 1], eof, view]
+    position, eof, view, pending = lossy["states"][m]
+    lossy["states"][m] = [[position[0], position[0] + 1], eof, view, pending]
     pair.cand_info["states"][end][0] = [position[0], position[0] + 1]
     later = span_end(pair, lossy)
     assert later is None or later > end
@@ -976,8 +979,8 @@ def test_bc2_l2_584_fails_if_b1_had_rewound():
     pair, lossy = b1_recorded(584)
     for m, r in enumerate(pair.ref):
         if r.index >= 9:
-            position, eof, _ = lossy["states"][m]
-            lossy["states"][m] = [position, eof, "true"]
+            position, eof, _, pending = lossy["states"][m]
+            lossy["states"][m] = [position, eof, "true", pending]
     cand_states = pair.cand_info["states"]
     m = next(n for n, r in enumerate(pair.ref) if r.index == 9)
     n = next(n for n, r in enumerate(pair.cand) if r.index == 9)
@@ -2631,3 +2634,64 @@ def test_h_losses_are_bound_to_rows_that_can_lose(seed, mutate, bound):
     request = bc2_request(pair)
     mutate(pair)
     assert _losses(pair, request, lossy) == bound
+
+
+# Convergence compares the pending injected source failure, which decides
+# the next source read.
+
+
+def test_runs_record_the_pending_injected_failure():
+    scenario, run = live(2969)
+    ops = [op["op"] for op in scenario["ops"]]
+    armed = ops.index("fail_no_effect")
+    m = next(n for n, r in enumerate(parse(run["trace"])) if r.index == armed)
+    assert run["states"][m][3] == "no_effect"
+    assert all(state[3] is None for state in run["states"][:m])
+
+
+def test_bc2_2969_never_converges_while_the_candidate_keeps_b1s_spent_failure():
+    pair, lossy = b1_emulated(2969)
+    assert span_end(pair, lossy) is None
+    # Had the candidate spent it too, the models would converge at op 9.
+    for state in pair.cand_info["states"]:
+        state[3] = None
+    end = span_end(pair, lossy)
+    assert end is not None and pair.cand[end].index == 9
+
+
+def test_bc2_5712_claims_the_read_after_the_pending_failure():
+    pair, lossy = b1_recorded(5712)
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert any("(9, 'next', 0)" in item for item in claims(result, "BC2-LOST-INPUT"))
+    # Without the pending field's difference, the span ends at op 8.
+    m = {r.key: n for n, r in enumerate(pair.ref)}
+    for n, r in enumerate(pair.cand):
+        if r.key in m:
+            lossy["states"][m[r.key]][3] = pair.cand_info["states"][n][3]
+    fails(pair, "(9, 'next', 0)", lossy=lossy)
+
+
+@pytest.mark.parametrize(
+    ("side", "mutate"),
+    [
+        ("lossy", lambda states: states.__setitem__(0, states[0][:3])),
+        ("lossy", lambda states: states[0].__setitem__(3, "armed")),
+        ("lossy", lambda states: states.__setitem__(0, tuple(states[0]))),
+        ("cand", lambda states: states.__setitem__(-1, states[-1][:3])),
+        ("cand", lambda states: states[0].append(None)),
+    ],
+)
+def test_bc2_malformed_states_claim_nothing(side, mutate):
+    pair, lossy = b1_recorded(5712)
+    request = bc2_request(pair)
+    assert bc2_claim(pair, request, lossy, set()).events
+    mutate(lossy["states"] if side == "lossy" else pair.cand_info["states"])
+    assert bc2_claim(pair, request, lossy, set()).events == set()
+
+
+def test_bc2_missing_states_claim_nothing():
+    pair, lossy = b1_recorded(5712)
+    request = bc2_request(pair)
+    del lossy["states"]
+    assert bc2_claim(pair, request, lossy, set()).events == set()
