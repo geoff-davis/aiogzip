@@ -3,7 +3,9 @@
 import asyncio
 import gzip
 import io
+import sys
 import threading
+from pathlib import Path
 
 import aiofiles.threadpool
 import pytest
@@ -14,6 +16,10 @@ from aiogzip import (
     ConcurrentOperationError,
     _binary,
 )
+
+sys.path.insert(0, str(Path(__file__).parent / "stateful"))
+from model import CLOSED, OPENING, U  # noqa: E402
+from observer import assert_lifecycle  # noqa: E402
 
 
 @pytest.mark.parametrize("text", [False, True])
@@ -74,11 +80,12 @@ async def test_native_initialization_remains_owned_until_settled(
     opener = asyncio.create_task(f.open())
     try:
         await asyncio.wait_for(entered.wait(), 5)
-        assert (f._binary_file if text else f._file) is None
+        assert_lifecycle(f, U, "open_starts")
         with pytest.raises(ConcurrentOperationError):
             await f.open()
         with pytest.raises(ConcurrentOperationError):
             await f.close()
+        assert_lifecycle(f, OPENING, "overlapping_open_or_close")
         for number in range(cancellations):
             opener.cancel(f"cancel-{number}")
             await asyncio.sleep(0)
@@ -90,9 +97,11 @@ async def test_native_initialization_remains_owned_until_settled(
         assert events == (
             ["last access", "close"] if ownership == "path" else ["last access"]
         )
-        assert (f._binary_file if text else f._file) is None
+        assert_lifecycle(f, OPENING, "initialization_fails")
         await f.close()
+        assert_lifecycle(f, U, "close")
         await f.close()
+        assert_lifecycle(f, CLOSED, "close")
         assert events.count("close") == (1 if ownership == "path" else 0)
     finally:
         release.set()
@@ -120,6 +129,7 @@ async def test_cancel_before_open_starts_does_not_acquire(monkeypatch, text, wri
         await opener
     assert not acquired
     await f.close()
+    assert_lifecycle(f, U, "close")
 
 
 @pytest.mark.parametrize("text", [False, True])
@@ -155,8 +165,9 @@ async def test_failed_header_preserves_primary_error_when_cleanup_fails(
         "Opening cleanup also failed: RuntimeError('cleanup failure')"
     ]
     assert events == ["close"]
-    assert (f._binary_file if text else f._file) is None
+    assert_lifecycle(f, OPENING, "cleanup_raises_exception")
     await f.close()
+    assert_lifecycle(f, U, "close")
     assert events == ["close"]
 
 
@@ -185,7 +196,9 @@ async def test_native_wrap_failure_closes_acquired_resource(
         with pytest.raises(RuntimeError, match="wrap failed"):
             await f.open()
         assert len(acquired) == 1 and acquired[0].closed
+        assert_lifecycle(f, OPENING, "initialization_fails")
         await f.close()
+        assert_lifecycle(f, U, "close")
     finally:
         for raw in acquired:
             raw.close()

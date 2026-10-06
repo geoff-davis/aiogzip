@@ -45,6 +45,10 @@ COVERED_ELSEWHERE = {
         "test_open_qualification.py",
         "test_context_exit_during_open_does_not_abandon_opener",
     ),
+    ("lifecycle", "OPEN->context_exit_abort_cleanup_fails"): (
+        "test_file_lifecycle.py",
+        "test_failed_abort_close_preserves_body_error_and_open_state",
+    ),
 }
 
 
@@ -74,6 +78,17 @@ def test_seed_set_covers_every_table_row():
     rows |= {("health", f"{health.value}->{event}") for health, event in READ_HEALTH}
     assert covered <= rows, sorted(covered - rows)
     assert rows - covered == set(COVERED_ELSEWHERE)
-    for path, name in COVERED_ELSEWHERE.values():
+    for (_table, row), (path, name) in COVERED_ELSEWHERE.items():
         source = (TESTS / path).read_text(encoding="utf-8")
-        assert re.search(rf"^(async )?def {name}\(", source, re.M), (path, name)
+        start = re.search(rf"^\s*(async )?def {name}\(", source, re.M)
+        assert start, (path, name)
+        end = re.compile(r"^\s*(async )?def test|^class ", re.M).search(
+            source, start.end()
+        )
+        body = source[start.end() : end.start() if end else None]
+        # The focused test asserts that row through the shared table.
+        source_state, event = row.split("->")
+        assert re.search(
+            rf"assert_lifecycle\(\s*\w+(\.\w+)*,\s*{source_state},\s*\"{event}\"",
+            body,
+        ), (path, name, row)

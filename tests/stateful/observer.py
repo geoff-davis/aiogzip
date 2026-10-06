@@ -26,7 +26,44 @@ from __future__ import annotations
 
 from typing import Any
 
-from model import CLOSED, OPEN, Checker, Health, U, WriteChecker
+from model import (
+    CLOSED,
+    OPEN,
+    OPENING,
+    Checker,
+    Health,
+    Lifecycle,
+    LifecycleRow,
+    U,
+    WriteChecker,
+    lifecycle_after,
+)
+
+
+def observed_lifecycle(handle: Any) -> Lifecycle:
+    """The lifecycle a binary or text handle's private state shows."""
+    if handle._is_closed:
+        return CLOSED
+    if handle._opening:
+        return OPENING
+    binary = handle._binary_file if hasattr(handle, "_binary_file") else handle
+    if binary is not None and binary._file is not None:
+        return OPEN
+    return U
+
+
+def assert_lifecycle(handle: Any, source: Lifecycle, event: str) -> LifecycleRow:
+    """Assert ``handle`` is where the lifecycle table sends ``source`` on ``event``.
+
+    Focused tests use this for every end state they check, so the table and
+    those tests cannot drift apart. Returns the row for further assertions.
+    """
+    row = lifecycle_after(source, event)
+    actual = observed_lifecycle(handle)
+    assert actual is row.target, (
+        f"{source.value} --{event}--> {actual.value}, table says {row.target.value}"
+    )
+    return row
 
 
 class Observer:

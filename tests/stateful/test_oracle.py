@@ -64,7 +64,14 @@ def test_one_shot_decompress_raises_where_the_schedule_captures_output(engine):
     reference = REFERENCES[engine]
     assert reference["schedule"] == SCHEDULE
     assert len(reference["output"]) > LATE
-    assert _payload().startswith(reference["output"][: reference["error_offset"]])
+    # Everything inflatable from the body before the flipped byte is the
+    # payload, and the reference reproduces all of it. What the engine
+    # inflates from the corrupt region before detecting it is unconstrained.
+    clean_body = gzip.compress(_payload(), mtime=0)[HEADER:-TRAILER]
+    before = module.decompressobj(-15).decompress(clean_body[:OFFSET])
+    assert len(before) > LATE
+    assert _payload().startswith(before)
+    assert reference["output"].startswith(before)
 
 
 def test_schedule_is_deterministic_and_reports_no_error_for_a_clean_body():

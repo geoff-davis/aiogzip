@@ -1,7 +1,9 @@
 """WP3 acquisition/initialization ownership regressions."""
 
 import asyncio
+import sys
 import threading
+from pathlib import Path
 
 import aiofiles.threadpool
 import pytest
@@ -12,6 +14,10 @@ from aiogzip import (
     ConcurrentOperationError,
     _binary,
 )
+
+sys.path.insert(0, str(Path(__file__).parent / "stateful"))
+from model import CLOSED, OPEN, OPENING, U  # noqa: E402
+from observer import assert_lifecycle  # noqa: E402
 
 
 @pytest.mark.parametrize("text", [False, True])
@@ -53,7 +59,11 @@ async def test_close_during_acquisition_has_no_late_resource_owner(
                 result, ConcurrentOperationError
             ):
                 raise result
+        # The overlapping close was rejected, so the opener published.
+        assert isinstance(results[1], ConcurrentOperationError)
+        assert_lifecycle(f, OPENING, "open_succeeds")
         await f.close()
+        assert_lifecycle(f, OPEN, "close")
         observed_closes = resource.closes
     finally:
         release.set()
@@ -103,7 +113,9 @@ async def test_native_acquisition_cancel_has_a_final_owner(
         assert await asyncio.to_thread(settled.wait, 5)
         with pytest.raises(asyncio.CancelledError):
             await opener
+        assert_lifecycle(f, OPENING, "acquisition_fails")
         await f.close()
+        assert_lifecycle(f, U, "close")
         observed_closed = acquired[0].closed
     finally:
         release.set()
@@ -155,6 +167,9 @@ async def test_codec_initialization_failure_preserves_resource_ownership(
     )
     with pytest.raises(RuntimeError, match="injected codec initialization failure"):
         await f.open()
+    assert_lifecycle(f, OPENING, "initialization_fails")
     await f.close()
+    assert_lifecycle(f, U, "close")
     await f.close()
+    assert_lifecycle(f, CLOSED, "close")
     assert resource.closes == (0 if external else 1)

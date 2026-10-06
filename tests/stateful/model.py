@@ -100,6 +100,12 @@ LIFECYCLE: tuple[LifecycleRow, ...] = (
     ),
     LifecycleRow(
         OPEN,
+        "context_exit_abort_cleanup_fails",
+        OPEN,
+        "health BROKEN; text notified; close() retries the underlying close",
+    ),
+    LifecycleRow(
+        OPEN,
         "close",
         CLOSED,
         "health and eof retained; owned resource closed once; observers detached",
@@ -107,7 +113,13 @@ LIFECYCLE: tuple[LifecycleRow, ...] = (
     # Before any successful open: calls are refused and close latches.
     LifecycleRow(U, "call_starts", U, "ValueError: file not opened"),
     LifecycleRow(U, "close", CLOSED, "nothing acquired, nothing closed"),
-    LifecycleRow(CLOSED, "close", CLOSED, "no effect"),
+    LifecycleRow(
+        CLOSED,
+        "close",
+        CLOSED,
+        "no state change; text over a directly closed binary surfaces unwritten "
+        "encoder bytes as ValueError",
+    ),
     LifecycleRow(CLOSED, "open", CLOSED, "ValueError"),
     LifecycleRow(CLOSED, "call_starts", CLOSED, "ValueError"),
 )
