@@ -2,8 +2,8 @@
 """Count text replay-origin objects by category for representative workloads.
 
 WP7 evidence: the live origin is updated in place (no object per refill or
-line), a rollback snapshot is one object per snapshotting composite read, and
-an unpublished-read pending origin is one object per such read. Counts are of
+line), rollback keeps an immutable field tuple (no object), and an
+unpublished-read pending origin is one object per such read. Counts are of
 _TextBufferOrigin constructions attributed to the method that requested them.
 
     uv run python scripts/measure_text_origin_allocations.py [--output FILE]
@@ -22,7 +22,6 @@ from aiogzip import AsyncGzipTextFile
 
 CATEGORY = {
     "__init__": "live-origin",
-    "_readlines_rollback_state": "rollback-snapshot",
     "_read_sized_reserved": "pending-origin",
     "_next_fast_line": "pending-origin",
     "_readline_buffered_reserved": "pending-origin",
@@ -74,8 +73,6 @@ def _install(counts):
 
         def __init__(self, *args, **kwargs):
             frame = sys._getframe(1)  # the code that constructed the origin
-            if frame.f_code.co_name == "snapshot":
-                frame = frame.f_back
             counts[CATEGORY.get(frame.f_code.co_name, frame.f_code.co_name)] += 1
             super().__init__(*args, **kwargs)
 

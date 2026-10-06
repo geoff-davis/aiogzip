@@ -6,6 +6,7 @@ themselves.
 """
 
 import asyncio
+import dataclasses
 import gzip
 import io
 import random
@@ -90,11 +91,11 @@ async def test_pending_origin_is_published_once_and_never_aliases(
             pending = stream._pending_read_origin
             assert pending is not None
             assert pending is not stream._buffer_origin
-            published = pending.snapshot()
+            published = dataclasses.replace(pending)
             # Mutate the live origin while the pending one is published, then
             # put it back: the pending origin must not move with it.
             live = stream._buffer_origin
-            saved_live = live.snapshot()
+            saved_live = dataclasses.astuple(live)
             live.byte_offset += 12345
             live.chars_to_skip += 678
             live.trailing_cr = not live.trailing_cr
@@ -171,7 +172,7 @@ async def test_readlines_rollback_restores_offset_origin_and_batch(
     ) as stream:
         first = await stream.readline()
         buffer, offset = stream._text_buffer, stream._text_buffer_offset
-        origin = stream._buffer_origin.snapshot()
+        origin = dataclasses.replace(stream._buffer_origin)
         live = stream._buffer_origin
         restores = _spy_restore(monkeypatch, stream)
         with pytest.raises(OSError, match="transient source failure"):
@@ -210,7 +211,7 @@ async def test_buffered_readline_restores_origin_then_appends_recovered_text(
     ) as stream:
         assert await stream.readline() == "head\n"
         buffer, offset = stream._text_buffer, stream._text_buffer_offset
-        origin = stream._buffer_origin.snapshot()
+        origin = dataclasses.replace(stream._buffer_origin)
         restores = _spy_restore(monkeypatch, stream)
         with pytest.raises(OSError, match="transient source failure"):
             await stream.readline()

@@ -70,25 +70,39 @@ def test_origin_is_a_slotted_dataclass_with_the_five_fields():
 # Copy independence
 
 
-def test_snapshot_is_independent_of_the_live_origin():
-    live = _origin()
-    saved = live.snapshot()
-    assert saved == live and saved is not live
-    live.chars_to_skip += 5
-    live.byte_offset = 99
-    live.trailing_cr = False
-    assert saved == _origin()
-    saved.seen_newline_types = 0
-    assert live.seen_newline_types == 3
+def _fields(origin):
+    return (
+        origin.byte_offset,
+        origin.decoder_state,
+        origin.trailing_cr,
+        origin.seen_newline_types,
+        origin.chars_to_skip,
+    )
 
 
-def test_restore_copies_fields_and_keeps_objects_separate():
+async def test_rollback_state_is_independent_of_the_live_origin():
+    data = gzip.compress(b"line\n" * 100)
+    async with AsyncGzipTextFile(None, "rt", fileobj=_Source(data)) as stream:
+        await stream.readline()
+        live = stream._buffer_origin
+        _buffer, _offset, saved = stream._readlines_rollback_state()
+        # An immutable field tuple, not an object sharing state with the origin.
+        assert type(saved) is tuple
+        assert saved == _fields(live)
+        before = _fields(live)
+        live.chars_to_skip += 5
+        live.byte_offset = 99
+        live.trailing_cr = not live.trailing_cr
+        assert saved == before
+
+
+def test_restore_copies_fields_into_the_live_object():
     live = _origin(byte_offset=0, chars_to_skip=0)
-    saved = _origin()
+    saved = _fields(_origin())
     live.restore(saved)
-    assert live == saved and live is not saved
+    assert live == _origin()
     live.chars_to_skip = 100
-    assert saved.chars_to_skip == 7
+    assert saved == _fields(_origin())
 
 
 def test_decoder_state_values_are_immutable():
@@ -145,11 +159,11 @@ async def test_no_origin_object_is_created_per_line(monkeypatch, newline, ending
         count += 1
     await stream.close()
     assert count == lines
-    # Refills update the live origin in place. A line crossing a chunk boundary
-    # may take a rollback snapshot and a pending origin, so the count scales with
-    # refills, never with lines.
+    # Refills update the live origin in place and rollback keeps a field tuple.
+    # A line crossing a chunk boundary may publish one pending origin, so the
+    # count scales with refills, never with lines.
     refills = len(text) // stream._chunk_size + 1
-    assert len(created) <= 2 * refills + 2
+    assert len(created) <= refills + 2
     assert len(created) * 1000 < lines
 
 

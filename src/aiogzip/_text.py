@@ -61,9 +61,9 @@ _SPLITLINES_UNSAFE_CR = "\n\v\f\x1c\x1d\x1e\x85\u2028\u2029"
 class _TextBufferOrigin:
     """Replay checkpoint for the buffered text: where it began and what to skip.
 
-    The handle's live origin is updated in place; rollback and unpublished-read
-    origins are independent snapshots. decoder_state follows the codecs
-    getstate() contract, an immutable (bytes, int), so snapshots may share it.
+    The handle's live origin is updated in place; an unpublished-read origin is
+    an independent object, and rollback keeps an immutable field tuple. decoder_state follows the codecs
+    getstate() contract, an immutable (bytes, int), so copies may share it.
     """
 
     byte_offset: int
@@ -72,21 +72,20 @@ class _TextBufferOrigin:
     seen_newline_types: int
     chars_to_skip: int
 
-    def snapshot(self) -> "_TextBufferOrigin":
-        return _TextBufferOrigin(
+    def restore(self, saved: "_OriginFields") -> None:
+        (
             self.byte_offset,
             self.decoder_state,
             self.trailing_cr,
             self.seen_newline_types,
             self.chars_to_skip,
-        )
+        ) = saved
 
-    def restore(self, saved: "_TextBufferOrigin") -> None:
-        self.byte_offset = saved.byte_offset
-        self.decoder_state = saved.decoder_state
-        self.trailing_cr = saved.trailing_cr
-        self.seen_newline_types = saved.seen_newline_types
-        self.chars_to_skip = saved.chars_to_skip
+
+# A rollback copy of the origin's fields, in declaration order. An immutable
+# tuple cannot alias the live origin, and building one inline costs less than
+# constructing an object on every readlines() call.
+_OriginFields = Tuple[int, Tuple[Any, int], bool, int, int]
 
 
 class _TextReadReservation:
@@ -1849,7 +1848,7 @@ class AsyncGzipTextFile:
         carry_cr = self._newline in ("", "\r\n")
         carry = "\r" if carry_cr and prefix.endswith("\r") else ""
         saved_buffer, saved_offset, saved_origin = state
-        pending = saved_origin.snapshot()
+        pending = _TextBufferOrigin(*saved_origin)
         pending.chars_to_skip += saved_offset
         self._pending_read_origin = pending
         try:
@@ -1910,17 +1909,24 @@ class AsyncGzipTextFile:
 
     def _readlines_rollback_state(
         self,
-    ) -> Tuple[str, int, _TextBufferOrigin]:
+    ) -> Tuple[str, int, _OriginFields]:
         """Capture the replay metadata needed to undo a composite publication."""
+        origin = self._buffer_origin
         return (
             self._text_buffer,
             self._text_buffer_offset,
-            self._buffer_origin.snapshot(),
+            (
+                origin.byte_offset,
+                origin.decoder_state,
+                origin.trailing_cr,
+                origin.seen_newline_types,
+                origin.chars_to_skip,
+            ),
         )
 
     def _rollback_readlines(
         self,
-        state: Tuple[str, int, _TextBufferOrigin],
+        state: Tuple[str, int, _OriginFields],
         lines: List[str],
     ) -> None:
         """Restore text consumed by a failed composite read when recoverable."""
