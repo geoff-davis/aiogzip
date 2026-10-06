@@ -1160,6 +1160,82 @@ def test_bc2_f1_rejects_a_near_miss(change):
     fails(_f1_pair(**{change: True}), "(1, 'abort', 0)")
 
 
+def _wire_len(seed: int) -> int:
+    return len(unb64(generate(seed)["wire"]))
+
+
+MALFORMED = [
+    [],
+    "0,21",
+    [0],
+    [0, 21, 30],
+    [-1, 5],
+    [21, 0],
+    [True, 5],
+    [0.0, 21],
+    None,
+]
+
+
+@pytest.mark.parametrize("taken", MALFORMED + ["past-end"])
+def test_bc2_f1_rejects_a_malformed_candidate_witness(taken):
+    if taken == "past-end":
+        taken = [0, _wire_len(290) + 1]
+    pair, _lossy = b1_recorded(290)
+    key = row(pair.ref, 1, "abort").key
+    cand = edit(pair.cand, key, taken=taken)
+    fails(make_pair(290, pair.ref, reference="b1", cand=cand), "(1, 'abort', 0)")
+
+
+def test_bc2_f1_accepts_an_empty_witness_at_the_end_of_input():
+    pair, _lossy = b1_recorded(290)
+    key = row(pair.ref, 1, "abort").key
+    end = _wire_len(290)
+    cand = edit(pair.cand, key, taken=[end, end])
+    passes(make_pair(290, pair.ref, reference="b1", cand=cand), "BC2-LOST-INPUT")
+
+
+@pytest.mark.parametrize(
+    "primary",
+    [
+        {"error": "ValueError", "message": "abort at 1"},
+        {"error": "InjectedAbort", "message": "abort at 2"},
+        {"error": "InjectedAbort", "message": "exit at 1"},
+        {"ok": None},
+    ],
+)
+def test_bc2_f1_requires_the_injected_abort_on_both_sides(primary):
+    pair, _lossy = b1_recorded(290)
+    key = row(pair.ref, 1, "abort").key
+    ref = edit(pair.ref, key, outcome=primary)
+    cand = edit(pair.cand, key, outcome=primary)
+    fails(make_pair(290, ref, reference="b1", cand=cand), "(1, 'abort', 0)")
+
+
+@pytest.mark.parametrize("taken", MALFORMED[:-1] + ["past-end"])
+def test_bc2_l2_rejects_a_malformed_reference_witness(taken):
+    if taken == "past-end":
+        taken = [147, _wire_len(169) + 1]
+    pair, _lossy = b1_recorded(169)
+    ref = edit(pair.ref, row(pair.ref, 4, "cancel").key, taken=taken)
+    pair = make_pair(169, ref, reference="b1")
+    assert bc2_request(pair) is None
+    fails(pair, "(4, 'cancel', 0)")
+
+
+@pytest.mark.parametrize("taken", MALFORMED[:-1] + ["past-end"])
+def test_bc2_l1_rejects_a_malformed_shared_witness(taken):
+    if taken == "past-end":
+        taken = [0, _wire_len(2060) + 1]
+    pair, lossy = b1_emulated(2060)
+    trigger = bc2_request(pair).trigger
+    ref = edit(pair.ref, trigger, taken=taken)
+    cand = edit(pair.cand, trigger, taken=taken)
+    pair = make_pair(2060, ref, reference="b1", cand=cand)
+    assert bc2_request(pair) is None
+    assert not compare(pair, lossy).claims["BC2-LOST-INPUT"]
+
+
 # G custom: a cancelled custom seek0 is an L1 trigger with an empty range.
 
 

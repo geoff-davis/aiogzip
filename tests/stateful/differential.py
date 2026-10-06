@@ -876,6 +876,8 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
         if c != r:
             return None
         if c.taken is not None:
+            if wire_range(pair, c.taken) is None:
+                return None  # malformed evidence proves nothing
             empty = c.taken[0] == c.taken[1]
             if empty and source["checkpoint"]:
                 return None  # proven no effect: unchanged, not claimed
@@ -895,10 +897,24 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
         and c.without_taken() == r.without_taken()
         and c.outcome == {"cancelled": True}
         and (r.parked or {}).get("method") == "read"
-        and r.taken is not None
+        and wire_range(pair, r.taken) is not None
     ):
         return "L2", r.taken
     return None
+
+
+def wire_range(pair: Pair, taken: Any) -> list[int] | None:
+    """A witness range, or None unless it is exactly two non-bool ints with
+    ``0 <= a <= b <= len(wire)``. An empty range (a completed read at the
+    end of input) is valid."""
+    if not isinstance(taken, list) or len(taken) != 2:
+        return None
+    if not all(type(x) is int for x in taken):
+        return None
+    a, b = taken
+    if not 0 <= a <= b <= len(unb64(pair.scenario["wire"])):
+        return None
+    return [a, b]
 
 
 def bc2_trigger_only(pair: Pair) -> Claim:
@@ -944,13 +960,14 @@ def bc2_aborted_native_read(pair: Pair) -> Claim:
         if key[1] != "abort":
             continue
         c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+        injected = {"error": "InjectedAbort", "message": f"abort at {key[0]}"}
         if (
-            c.outcome == r.outcome
+            c.outcome == r.outcome == injected
             and c.parked == r.parked
             and (c.parked or {}).get("via") == "native"
             and (c.parked or {}).get("method") == "read"
             and c.second == {"error": "OSError", "message": READ_ABORTED}
-            and c.taken is not None
+            and wire_range(pair, c.taken) is not None
             and r.second == B1_READ_CLOSED
             and r.taken is None
         ):
