@@ -114,7 +114,7 @@ async def test_abort_settles_a_blocked_custom_sink_write_from_a_large_write():
     assert sink.closes == 1
 
 
-async def test_abort_preserves_outside_cancellation_of_the_writer_task():
+async def test_abort_consumes_only_its_own_cancellation_request():
     sink = _Sink("write")
     stream = AsyncGzipBinaryFile(None, "wb", fileobj=sink, closefd=True)
 
@@ -128,6 +128,40 @@ async def test_abort_preserves_outside_cancellation_of_the_writer_task():
         await asyncio.wait_for(task, 5)
     assert task.cancelling() == 0
     assert sink.touched_after_close == 0
+
+
+@pytest.mark.parametrize("text", [False, True])
+async def test_abort_preserves_outside_cancellation_of_the_writer_task(text):
+    sink = _Sink("write")
+    if text:
+        stream = AsyncGzipTextFile(None, "wt", fileobj=sink, closefd=True)
+    else:
+        stream = AsyncGzipBinaryFile(None, "wb", fileobj=sink, closefd=True)
+    writer = None
+    try:
+        with pytest.raises(RuntimeError, match="body"):
+            async with stream:
+                writer = asyncio.create_task(
+                    _write_then_flush(stream, "x" if text else b"x")
+                )
+                await asyncio.wait_for(sink.entered.wait(), 5)
+                # Queue an independent request immediately before context exit
+                # adds its own, without allowing the writer to resume between.
+                writer.cancel("outside")
+                raise RuntimeError("body")
+        with pytest.raises(OSError, match="flush aborted"):
+            await asyncio.wait_for(writer, 5)
+        assert writer.cancelling() == 1
+        assert sink.touched_after_close == 0
+    finally:
+        sink.release.set()
+        if writer is not None:
+            await asyncio.gather(writer, return_exceptions=True)
+
+
+async def _write_then_flush(stream, payload):
+    await stream.write(payload)
+    await stream.flush()
 
 
 class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
