@@ -48,6 +48,10 @@ from oracle import engine_modules, raw_reference  # noqa: E402
 
 READ_ABORTED = "read aborted because the gzip file was closed while the call was active"
 READ_BROKEN = "read stream is broken"
+B1_READ_CLOSED = {
+    "error": "OSError",
+    "message": "Error reading from file: I/O operation on closed file",
+}
 WRITE_BROKEN = "write stream is broken"
 CLOSED = {"error": "ValueError", "message": "I/O operation on closed file."}
 REOPEN = {"error": "ValueError", "message": "Cannot reopen a closed file"}
@@ -275,6 +279,11 @@ def compare(pair: Pair, lossy: dict[str, Any] | None = None) -> Result:
                 failures.append(f"{item} claimed by {owner[item]} and {name}")
             owner.setdefault(item, name)
     if "BC2-LOST-INPUT" in applies:
+        for clause in (bc2_aborted_native_read, bc2_trigger_only):
+            for item in clause(pair).items():
+                if item in owner:
+                    failures.append(f"{item} claimed by {owner[item]} and BC2")
+                owner.setdefault(item, "BC2-LOST-INPUT")
         request = bc2_request(pair)
         if request is not None and lossy is not None:
             # The lossy model must accept b1's whole run, matching events
@@ -874,9 +883,10 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
         if (
             key[1] == "cancel"
             and not source["checkpoint"]
-            and pair.op(key)["call"]["op"] != "seek0"
             and c.outcome == {"cancelled": True}
         ):
+            # A cancelled read or (G) a cancelled seek0: the source did not
+            # move, and b1 keeps its position.
             return "L1", [0, 0]
         return None
     if (
@@ -889,6 +899,63 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
     ):
         return "L2", r.taken
     return None
+
+
+def bc2_trigger_only(pair: Pair) -> Claim:
+    """E: an L2 trigger that is the seed's only difference.
+
+    b1's cancelled native read took a range no lossy scenario models (an
+    endpoint inside a member), but b1 rewound before it observed the loss:
+    every other event and every final field matches exactly, so the trigger
+    row's one-sided ``taken`` witness is claimed without a lossy run.
+    """
+    claim = Claim()
+    if pair.reference != "b1" or pair.mode not in ("rb", "rt"):
+        return claim
+    if pair.scenario["source"]["kind"] != "native":
+        return claim
+    if len(pair.diffs) != 1 or pair.final_diffs or pair.cand_only or pair.ref_only:
+        return claim
+    (key,) = pair.diffs
+    if bc2_request(pair) is not None or pair.health_before(key) != "HEALTHY":
+        return claim
+    c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+    trigger = _trigger(pair, key, c, r, pair.scenario["source"])
+    if trigger is not None and trigger[0] == "L2" and c.taken is None:
+        claim.events.add(key)
+    return claim
+
+
+def bc2_aborted_native_read(pair: Pair) -> Claim:
+    """F1: context exit aborts a native read parked in the executor.
+
+    The candidate's read completes and settles, then reports the abort; b1
+    closes the file under the worker, whose read fails on the closed file
+    without taking input.
+    """
+    claim = Claim()
+    if pair.reference != "b1" or pair.mode not in ("rb", "rt"):
+        return claim
+    if pair.scenario["source"]["kind"] != "native":
+        return claim
+    if pair.cand_final.get("closed") != pair.ref_final.get("closed"):
+        return claim
+    for key in pair.diffs:
+        if key[1] != "abort":
+            continue
+        c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+        if (
+            c.outcome == r.outcome
+            and c.parked == r.parked
+            and (c.parked or {}).get("via") == "native"
+            and (c.parked or {}).get("method") == "read"
+            and c.second == {"error": "OSError", "message": READ_ABORTED}
+            and c.taken is not None
+            and r.second == B1_READ_CLOSED
+            and r.taken is None
+        ):
+            claim.events.add(key)
+    return claim
 
 
 def lossy_scenario(

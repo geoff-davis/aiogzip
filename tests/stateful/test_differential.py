@@ -1041,6 +1041,154 @@ def test_lossy_checker_normalizes_only_o1():
         LossyChecker(scenario, scenario, ENGINE, 0, True, 0, "O2")
 
 
+# E: an L2 trigger whose one-sided witness is the seed's only difference.
+
+
+@pytest.mark.parametrize("seed", [169, 232])
+def test_bc2_e_trigger_only_is_claimed(seed):
+    pair, lossy = b1_recorded(seed)
+    assert lossy is None and bc2_request(pair) is None
+    (key,) = pair.diffs
+    assert key[1] == "cancel" and pair.ref_by_key[key].taken is not None
+    result = compare(pair)
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT") == [repr(("event", key))]
+
+
+def _e_pair(**edits) -> Pair:
+    pair, _lossy = b1_recorded(169)
+    ref, cand = pair.ref, pair.cand
+    if "later" in edits:
+        target = row(ref, 7, "read1")
+        ref = edit(ref, target.key, outcome={"ok": {"bytes": "00"}})
+    if "final" in edits:
+        ref = edit_final(ref, fd_delta=1)
+    if "cand_taken" in edits:
+        cand = edit(cand, row(cand, 4, "cancel").key, taken=[147, 150])
+    if "second" in edits:
+        ref = edit(ref, row(ref, 4, "cancel").key, second={"ok": {"str": "x"}})
+    if "eligible" in edits:
+        ref = edit(ref, row(ref, 4, "cancel").key, taken=[0, 0])
+    if "one_sided" in edits:
+        ref = ref[:-1] + [Row((14, "cleanup_close", 0), {"ok": None}), ref[-1]]
+    scenario = None
+    if "custom" in edits:
+        scenario = copy.deepcopy(generate(169))
+        scenario["source"] = {
+            "kind": "custom",
+            "seekable": True,
+            "checkpoint": False,
+            "frames": [],
+            "closefd": False,
+        }
+    return make_pair(169, ref, reference="b1", scenario=scenario, cand=cand)
+
+
+@pytest.mark.parametrize(
+    "change", ["later", "final", "cand_taken", "second", "one_sided", "custom"]
+)
+def test_bc2_e_rejects_anything_beyond_the_trigger_witness(change):
+    fails(_e_pair(**{change: True}), "(4, 'cancel', 0)")
+
+
+def test_bc2_e_defers_an_eligible_range_to_the_lossy_run():
+    pair = _e_pair(eligible=True)
+    assert bc2_request(pair) is not None
+    fails(pair, "(4, 'cancel', 0)")
+
+
+# F1: context exit aborts a native read parked in the executor.
+
+
+@pytest.mark.parametrize("seed", [290, 1426])
+def test_bc2_f1_aborted_native_read_is_claimed(seed):
+    pair, lossy = b1_recorded(seed)
+    (key,) = [k for k in pair.diffs if k[1] == "abort"]
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert repr(("event", key)) in claims(result, "BC2-LOST-INPUT")
+
+
+def _f1_pair(**edits) -> Pair:
+    pair, _lossy = b1_recorded(290)
+    ref, cand = pair.ref, pair.cand
+    key = row(ref, 1, "abort").key
+    c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+    if "period" in edits:
+        message = r.second["message"] + "."
+        ref = edit(ref, key, second={"error": "OSError", "message": message})
+    if "cand_untaken" in edits:
+        cand = edit(cand, key, taken=None)
+    if "ref_taken" in edits:
+        ref = edit(ref, key, taken=c.taken)
+    if "method" in edits:
+        parked = dict(r.parked, method="seek")
+        ref, cand = edit(ref, key, parked=parked), edit(cand, key, parked=parked)
+    if "injected" in edits:
+        ref = edit(ref, key, outcome={"error": "ValueError", "message": "x"})
+    if "closed" in edits:
+        ref = edit_final(ref, closed=False)
+    if "cand_second" in edits:
+        cand = edit(cand, key, second={"error": "OSError", "message": "x"})
+    scenario = None
+    if "custom" in edits:
+        scenario = copy.deepcopy(generate(290))
+        scenario["source"] = {
+            "kind": "custom",
+            "seekable": True,
+            "checkpoint": False,
+            "frames": [],
+            "closefd": False,
+        }
+    return make_pair(290, ref, reference="b1", scenario=scenario, cand=cand)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "period",
+        "cand_untaken",
+        "ref_taken",
+        "method",
+        "injected",
+        "closed",
+        "cand_second",
+        "custom",
+    ],
+)
+def test_bc2_f1_rejects_a_near_miss(change):
+    fails(_f1_pair(**{change: True}), "(1, 'abort', 0)")
+
+
+# G custom: a cancelled custom seek0 is an L1 trigger with an empty range.
+
+
+@pytest.mark.parametrize("seed", [1956, 2350])
+def test_bc2_g_cancelled_custom_rewind_is_claimed(seed):
+    pair, lossy = b1_recorded(seed)
+    request = bc2_request(pair)
+    assert request is not None and request.clause == "L1"
+    assert pair.op(request.trigger)["call"]["op"] == "seek0"
+    assert request.taken == [0, 0] and request.lossy is pair.scenario
+    assert lossy["violations"] == []
+    passes(pair, "BC2-LOST-INPUT", lossy)
+
+
+def test_bc2_g_rejects_a_checkpoint_source():
+    pair, lossy = b1_recorded(1956)
+    scenario = copy.deepcopy(pair.scenario)
+    scenario["source"]["checkpoint"] = True
+    pair = make_pair(1956, pair.ref, reference="b1", scenario=scenario)
+    assert bc2_request(pair) is None
+    fails(pair, "(2, 'read', 0)", lossy=lossy)
+
+
+def test_bc2_g_rejects_a_lossy_violation_after_the_rewind_cancel():
+    pair, lossy = b1_recorded(1956)
+    lossy["violations"] = [[2, "injected"]]
+    fails(pair, "lossy model: op 2: injected", lossy=lossy)
+
+
 # lossy_scenario over synthetic text scenarios: whole members removed from
 # the middle, joins across a character, and failure-boundary prefixes.
 
