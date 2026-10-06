@@ -44,7 +44,13 @@ sys.path.insert(0, str(HERE))
 
 from generator import generate, unb64  # noqa: E402
 from interpreter import Event, Outcome, final_output, symbolic  # noqa: E402
-from model import Checker, text_model, wire_view  # noqa: E402
+from model import (  # noqa: E402
+    Checker,
+    later_loss_kind,
+    loss_witness,
+    text_model,
+    wire_view,
+)
 from oracle import engine_modules, raw_reference  # noqa: E402
 
 READ_ABORTED = "read aborted because the gzip file was closed while the call was active"
@@ -1259,9 +1265,9 @@ def bc2_claim(
 def _losses(pair: Pair, request: Bc2Request, lossy: dict[str, Any]) -> list[int] | None:
     """The event indices of the lossy run's later losses (H), or None when
     the record is missing, malformed, or not bound to b1's rows: each index
-    is a single b1 row after the trigger, a range is that row's ``taken``
-    within the true wire, and an empty (None) loss is a cancelled read on a
-    custom source without checkpoints."""
+    is a single b1 row after the trigger that can be a later loss
+    (``later_loss_kind``), and its range or empty loss is exactly what
+    that row's ``taken`` witnesses (``loss_witness``)."""
     losses = lossy.get("losses")
     if type(losses) is not list:
         return None
@@ -1276,22 +1282,28 @@ def _losses(pair: Pair, request: Bc2Request, lossy: dict[str, Any]) -> list[int]
         if index <= request.trigger[0] or len(rows) != 1:
             return None
         (row,) = rows
+        outcome = row.outcome if isinstance(row.outcome, dict) else {}
+        if outcome == {"cancelled": True}:
+            kind, message = "cancelled", None
+        elif outcome.keys() == {"error", "message"} and isinstance(
+            outcome["message"], str
+        ):
+            kind, message = "error", outcome["message"]
+        else:
+            return None
+        transition = later_loss_kind(row.name, kind, message, source)
+        if transition is None:
+            return None
+        witnessed, witness = loss_witness(transition, row.taken, wire_size)
+        if not witnessed:
+            return None
         if taken is None:
-            if not (
-                source["kind"] == "custom"
-                and not source["checkpoint"]
-                and row.name == "cancel"
-                and row.outcome == {"cancelled": True}
-                and row.taken is None
-            ):
+            if witness is not None:
                 return None
         elif not (
             type(taken) is list
-            and len(taken) == 2
             and all(type(x) is int for x in taken)
-            and 0 <= taken[0] <= taken[1] <= wire_size
-            and type(row.taken) is list
-            and row.taken == taken
+            and taken == witness
         ):
             return None
         indices.append(index)

@@ -31,6 +31,7 @@ from differential import (
     Pair,
     Row,
     _converged,
+    _losses,
     _wire_scenario,
     bc2_claim,
     bc2_request,
@@ -45,7 +46,15 @@ from differential import (
 )
 from generator import generate, member_spans, unb64
 from interpreter import Event, Outcome, final_output, recorded_run
-from model import Checker, LossyChecker, wire_view
+from model import (
+    INJECTED_AT_END,
+    INJECTED_CONSUMED,
+    INJECTED_NO_EFFECT,
+    Checker,
+    LossyChecker,
+    later_loss_kind,
+    wire_view,
+)
 from oracle import engine_modules, wire_reference
 
 import aiogzip
@@ -2049,11 +2058,19 @@ def _h_checker(trigger: int = 2, source=None, **lossy_fields) -> LossyChecker:
     return checker
 
 
-def _at(checker: LossyChecker, index: int, taken=None, seeks=None, kind="error"):
+H_EVENTS = {
+    "no_effect": ({"op": "read"}, Outcome("error", error=OSError(INJECTED_NO_EFFECT))),
+    "at_end": ({"op": "read"}, Outcome("error", error=OSError(INJECTED_AT_END))),
+    "consumed": ({"op": "read"}, Outcome("error", error=OSError(INJECTED_CONSUMED))),
+    "cancel": ({"op": "cancel", "call": {"op": "read"}}, Outcome("cancelled")),
+    "ok": ({"op": "seek0"}, Outcome("ok", 0)),
+}
+
+
+def _at(checker: LossyChecker, index: int, taken=None, seeks=None, kind="no_effect"):
+    op, outcome = H_EVENTS[kind]
     checker.index = index
-    checker.event = Event(
-        index, {"op": "read"}, Outcome(kind), taken=taken, seeks=seeks
-    )
+    checker.event = Event(index, op, outcome, taken=taken, seeks=seeks)
     return checker
 
 
@@ -2088,7 +2105,13 @@ def _expect_without(*ranges: list[int]):
     ],
 )
 def test_h_later_loss_needs_its_own_witness(transition, taken, expected):
-    assert _at(_h_checker(), 5, taken).later_loss(transition) == expected
+    kind = {
+        "uncertain_failure": "no_effect",
+        "no_effect_failure": "no_effect",
+        "consumed_failure": "consumed",
+        "cancel_uncertain": "cancel",
+    }[transition]
+    assert _at(_h_checker(), 5, taken, kind=kind).later_loss(transition) == expected
 
 
 NATIVE = {"kind": "native"}
@@ -2110,7 +2133,7 @@ CHECKPOINT = generate(129)["source"] | {"checkpoint": True}
     ],
 )
 def test_h_a_settled_cancel_is_a_loss_only_on_a_native_source(source, taken, expected):
-    checker = _at(_h_checker(source=source), 5, taken)
+    checker = _at(_h_checker(source=source), 5, taken, kind="cancel")
     assert checker.later_loss("cancel_no_effect") == expected
 
 
@@ -2127,7 +2150,10 @@ def test_h_an_empty_cancel_loss_needs_a_custom_source_without_checkpoints():
         true = scenario | {"source": source}
         checker = LossyChecker(true, true, ENGINE, 2, True, 0)
         checker.lost = True
-        assert _at(checker, 5).later_loss("cancel_uncertain") == (False, None)
+        assert _at(checker, 5, kind="cancel").later_loss("cancel_uncertain") == (
+            False,
+            None,
+        )
 
 
 def test_h_a_loss_opens_an_epoch_on_the_oracle_view():
@@ -2142,7 +2168,7 @@ def test_h_a_loss_opens_an_epoch_on_the_oracle_view():
 def test_h_losses_accumulate_in_wire_order():
     checker = _at(_h_checker(), 5, [0, 10])
     checker.transition("uncertain_failure")
-    _at(checker, 7, [38, 66]).transition("consumed_failure")
+    _at(checker, 7, [38, 66], kind="consumed").transition("consumed_failure")
     assert checker.deleted == [[0, 10], [38, 66]] and checker.epoch_start == 0
     assert checker.expect == _expect_without([0, 10], [38, 66])
     assert checker.violations == []
@@ -2350,3 +2376,130 @@ def _non_cancel_after(pair, request):
 )
 def test_h_empty_losses_must_be_custom_cancelled_reads(mutate):
     assert _h_claim(2228, mutate) == set()
+
+
+# The loss classification shared by the lossy model and the claim's check.
+
+CUSTOM = generate(129)["source"]
+
+
+@pytest.mark.parametrize(
+    ("name", "kind", "message", "source", "expected"),
+    [
+        ("cancel", "cancelled", None, NATIVE, "cancel_no_effect"),
+        ("cancel", "cancelled", None, CUSTOM, "cancel_uncertain"),
+        ("cancel", "cancelled", None, CHECKPOINT, None),
+        ("cancel", "error", INJECTED_CONSUMED, CUSTOM, None),
+        ("cancel", "ok", None, NATIVE, None),
+        ("read", "error", INJECTED_NO_EFFECT, CUSTOM, "uncertain_failure"),
+        ("next", "error", INJECTED_AT_END, CUSTOM, "uncertain_failure"),
+        ("readinto", "error", INJECTED_CONSUMED, CUSTOM, "consumed_failure"),
+        ("readinto", "error", INJECTED_CONSUMED, CHECKPOINT, "consumed_failure"),
+        # A checkpoint restores a no-effect or at-end failure.
+        ("readinto", "error", INJECTED_NO_EFFECT, CHECKPOINT, None),
+        ("readinto", "error", INJECTED_AT_END, CHECKPOINT, None),
+        # Native failures, other calls, other outcomes, other messages.
+        ("read", "error", INJECTED_CONSUMED, NATIVE, None),
+        ("seek0", "error", INJECTED_CONSUMED, CUSTOM, None),
+        ("overlap", "error", INJECTED_NO_EFFECT, CUSTOM, None),
+        ("close_during", "error", INJECTED_CONSUMED, CUSTOM, None),
+        ("read", "cancelled", None, CUSTOM, None),
+        ("read", "ok", None, CUSTOM, None),
+        ("read", "error", "boom", CUSTOM, None),
+        ("read", "error", None, CUSTOM, None),
+    ],
+)
+def test_h_later_loss_kind(name, kind, message, source, expected):
+    assert later_loss_kind(name, kind, message, source) == expected
+
+
+def test_h_a_checkpointed_no_effect_failure_is_no_loss():
+    # Seed 1598 (checkpoint source): after the trigger (op 1's consumed
+    # close_during), op 4's readinto fails without effect, with an empty
+    # taken witness. The model records no loss, and a record naming one
+    # claims nothing.
+    pair, lossy = b1_recorded(1598)
+    readinto = row(pair.ref, 4, "readinto")
+    assert readinto.taken == [4096, 4096] and lossy["losses"] == []
+    _set_losses([[4, [4096, 4096]]])(pair, None, lossy)
+    request = bc2_request(pair)
+    assert request.trigger[0] == 1
+    assert _losses(pair, request, lossy) is None
+    assert bc2_claim(pair, request, lossy, set()).events == set()
+
+
+def _with_row(pair, index: int, **changes):
+    pair.ref = [
+        dataclasses.replace(r, **changes) if r.index == index else r for r in pair.ref
+    ]
+
+
+def _with_source(pair, **changes):
+    pair.scenario = pair.scenario | {"source": pair.scenario["source"] | changes}
+
+
+@pytest.mark.parametrize(
+    ("seed", "mutate", "bound"),
+    [
+        # 58: op 4's next consumed [0, 21] on a custom source without
+        # checkpoints.
+        (58, lambda pair: None, [4]),
+        (58, lambda pair: _with_source(pair, checkpoint=True), [4]),
+        (58, lambda pair: _with_row(pair, 4, key=(4, "seek0", 0)), None),
+        (58, lambda pair: _with_row(pair, 4, key=(4, "overlap", 0)), None),
+        (58, lambda pair: _with_row(pair, 4, outcome={"cancelled": True}), None),
+        (58, lambda pair: _with_row(pair, 4, outcome={"ok": None}), None),
+        (
+            58,
+            lambda pair: _with_row(
+                pair, 4, outcome={"error": "OSError", "message": "boom"}
+            ),
+            None,
+        ),
+        (
+            58,
+            lambda pair: _with_row(
+                pair, 4, outcome={"error": "OSError", "message": INJECTED_NO_EFFECT}
+            ),
+            [4],
+        ),
+        (
+            58,
+            lambda pair: (
+                _with_row(
+                    pair,
+                    4,
+                    outcome={"error": "OSError", "message": INJECTED_NO_EFFECT},
+                ),
+                _with_source(pair, checkpoint=True),
+            ),
+            None,
+        ),
+        (58, lambda pair: _with_source(pair, kind="native"), None),
+        # 53: op 10's native cancel took [0, 64].
+        (53, lambda pair: None, [10]),
+        (53, lambda pair: _with_row(pair, 10, key=(10, "read", 0)), None),
+        (
+            53,
+            lambda pair: _with_row(
+                pair, 10, outcome={"error": "OSError", "message": INJECTED_CONSUMED}
+            ),
+            None,
+        ),
+        (
+            53,
+            lambda pair: _with_source(
+                pair, kind="custom", seekable=True, checkpoint=True, frames=[]
+            ),
+            None,
+        ),
+        # 2228: empty cancelled reads at 1 and 9, custom without checkpoints.
+        (2228, lambda pair: None, [1, 9]),
+        (2228, lambda pair: _with_row(pair, 9, outcome={"ok": None}), None),
+    ],
+)
+def test_h_losses_are_bound_to_rows_that_can_lose(seed, mutate, bound):
+    pair, lossy = b1_recorded(seed)
+    request = bc2_request(pair)
+    mutate(pair)
+    assert _losses(pair, request, lossy) == bound

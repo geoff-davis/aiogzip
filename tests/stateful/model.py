@@ -986,6 +986,58 @@ def wire_view(
     return lossy
 
 
+def later_loss_kind(
+    name: str, kind: str, message: str | None, source: dict[str, Any]
+) -> str | None:
+    """The candidate transition of an event that can be one of b1's later
+    losses (H), or None. Shared by the lossy model and the claim's check of
+    its record.
+
+    A cancelled call: on a native source the candidate settles it without
+    effect (``cancel_no_effect``); on a custom source without checkpoints it
+    is uncertain. A read call failing with an injected source failure: on a
+    custom source without checkpoints, a no-effect or at-end failure is
+    uncertain and a consuming one consumed; with checkpoints only a
+    consuming failure is. Nothing else is (native failures, checkpoint
+    cancels, other calls).
+    """
+    custom = source["kind"] == "custom"
+    checkpoint = custom and source["checkpoint"]
+    if name == "cancel":
+        if kind != "cancelled":
+            return None
+        if source["kind"] == "native":
+            return "cancel_no_effect"
+        return "cancel_uncertain" if custom and not checkpoint else None
+    if name not in READ_OPS or kind != "error" or message is None or not custom:
+        return None
+    if INJECTED_CONSUMED in message:
+        return "consumed_failure"
+    if not checkpoint and (INJECTED_NO_EFFECT in message or INJECTED_AT_END in message):
+        return "uncertain_failure"
+    return None
+
+
+def loss_witness(
+    kind: str, taken: Any, wire_size: int
+) -> tuple[bool, list[int] | None]:
+    """Whether b1's ``taken`` witnesses a later loss of ``kind``, and its
+    true-wire range (None for an empty cancelled custom read)."""
+    if taken is None:
+        return (True, None) if kind == "cancel_uncertain" else (False, None)
+    if (
+        type(taken) is list
+        and len(taken) == 2
+        and all(type(x) is int for x in taken)
+        and 0 <= taken[0] <= taken[1] <= wire_size
+        # A cancel the candidate settles without effect loses input only
+        # when b1 took some (L2).
+        and (kind != "cancel_no_effect" or taken[0] < taken[1])
+    ):
+        return True, list(taken)
+    return False, None
+
+
 class LossyChecker(Checker):
     """b1's reader over the input it actually saw after losing some (BC2).
 
@@ -1121,36 +1173,16 @@ class LossyChecker(Checker):
             or self.index is None
             or self.index <= self.trigger
             or self._lost_index == self.index
-            or transition not in (*self.NO_EFFECT, "cancel_no_effect")
         ):
             return False, None
-        source = self.true_scenario["source"]
-        if transition == "cancel_no_effect" and source["kind"] != "native":
-            # Only a native cancel loses input the candidate settles without
-            # effect (L2); a checkpoint source restores it.
+        outcome = self.event.outcome
+        message = None if outcome.error is None else str(outcome.error)
+        kind = later_loss_kind(
+            self.event.op["op"], outcome.kind, message, self.true_scenario["source"]
+        )
+        if kind is None or kind != transition:
             return False, None
-        taken = getattr(self.event, "taken", None)
-        if taken is not None:
-            if (
-                isinstance(taken, list)
-                and len(taken) == 2
-                and all(type(x) is int for x in taken)
-                and 0 <= taken[0] <= taken[1] <= self.wire_size
-                # A cancel the model already settles without effect loses
-                # input only when b1 took some (L2).
-                and (transition != "cancel_no_effect" or taken[0] < taken[1])
-            ):
-                return True, list(taken)
-            return False, None
-        if transition == "cancel_no_effect":
-            return False, None
-        if (
-            transition == "cancel_uncertain"
-            and source["kind"] == "custom"
-            and not source["checkpoint"]
-        ):
-            return True, None
-        return False, None
+        return loss_witness(kind, getattr(self.event, "taken", None), self.wire_size)
 
     def lose(self, taken: list[int] | None) -> None:
         """Apply a later loss: extend the epoch, or start a new one."""
