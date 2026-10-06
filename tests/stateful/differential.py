@@ -1291,7 +1291,7 @@ def _losses(pair: Pair, request: Bc2Request, lossy: dict[str, Any]) -> list[int]
             kind, message = "error", outcome["message"]
         else:
             return None
-        transition = later_loss_kind(row.name, kind, message, source)
+        transition = later_loss_kind(pair.op(row.key), kind, message, source)
         if transition is None:
             return None
         witnessed, witness = loss_witness(transition, row.taken, wire_size)

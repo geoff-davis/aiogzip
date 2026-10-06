@@ -2064,14 +2064,54 @@ H_EVENTS = {
     "consumed": ({"op": "read"}, Outcome("error", error=OSError(INJECTED_CONSUMED))),
     "cancel": ({"op": "cancel", "call": {"op": "read"}}, Outcome("cancelled")),
     "ok": ({"op": "seek0"}, Outcome("ok", 0)),
+    # Effective calls: the primary call of an overlap or close_during, a
+    # cancel that lost the race, and a seek's replay.
+    "overlap": (
+        {"op": "overlap", "call": {"op": "read"}, "second": {"op": "read"}},
+        Outcome("error", error=OSError(INJECTED_CONSUMED)),
+    ),
+    "close_during": (
+        {"op": "close_during", "call": {"op": "readline"}},
+        Outcome("error", error=OSError(INJECTED_CONSUMED)),
+    ),
+    "cancel_lost": (
+        {"op": "cancel", "call": {"op": "read"}},
+        Outcome("error", error=OSError(INJECTED_CONSUMED)),
+    ),
+    "seek": (
+        {"op": "seek_abs", "target": 3},
+        Outcome("error", error=OSError(INJECTED_CONSUMED)),
+    ),
+    # The concurrent second call's failure is never the loss.
+    "overlap_second": (
+        {"op": "overlap", "call": {"op": "read"}, "second": {"op": "read"}},
+        Outcome("ok", b""),
+    ),
 }
+SECOND = Outcome("error", error=OSError(INJECTED_CONSUMED))
 
 
 def _at(checker: LossyChecker, index: int, taken=None, seeks=None, kind="no_effect"):
     op, outcome = H_EVENTS[kind]
+    second = SECOND if kind == "overlap_second" else None
     checker.index = index
-    checker.event = Event(index, op, outcome, taken=taken, seeks=seeks)
+    checker.event = Event(index, op, outcome, second, taken=taken, seeks=seeks)
     return checker
+
+
+@pytest.mark.parametrize(
+    ("kind", "expected"),
+    [
+        ("overlap", (True, [38, 66])),
+        ("close_during", (True, [38, 66])),
+        ("cancel_lost", (True, [38, 66])),
+        ("seek", (True, [38, 66])),
+        ("overlap_second", (False, None)),
+    ],
+)
+def test_h_later_loss_classifies_the_effective_call(kind, expected):
+    checker = _at(_h_checker(), 5, [38, 66], kind=kind)
+    assert checker.later_loss("consumed_failure") == expected
 
 
 def _expect_without(*ranges: list[int]):
@@ -2273,6 +2313,14 @@ H_SEEDS = {
     2473: [[9, [0, 64]]],
     # Empty cancelled custom reads: no view change.
     2228: [[1, None], [9, None]],
+    # An overlap's primary read consumed.
+    1124: [[5, [0, 22]]],
+    1893: [[3, [0, 4096]]],
+    # A seek's replay consumed: relative, nonseekable forward, and a
+    # seek_mark that rebases first and opens a new epoch at the same event.
+    363: [[8, [0, 512]]],
+    4358: [[7, [10000, 10010]]],
+    4533: [[6, [0, 3]]],
 }
 
 
@@ -2300,6 +2348,11 @@ def test_h_recorded_loss_rows_need_the_loss_record(seed, row):
     assert any(row in item for item in bc2)
     lossy["losses"] = []
     fails(pair, row, lossy=lossy)
+
+
+def test_h_4533_rebases_and_reopens_at_the_seek():
+    _pair, lossy = b1_recorded(4533)
+    assert lossy["rebases"] == [6] and lossy["losses"] == [[6, [0, 3]]]
 
 
 def test_h_53_rebases_before_its_second_epoch():
@@ -2383,34 +2436,91 @@ def test_h_empty_losses_must_be_custom_cancelled_reads(mutate):
 CUSTOM = generate(129)["source"]
 
 
+READ = {"op": "read", "n": -1}
+SEEK = {"op": "seek_abs", "target": 3}
+
+
 @pytest.mark.parametrize(
-    ("name", "kind", "message", "source", "expected"),
+    ("op", "kind", "message", "source", "expected"),
     [
-        ("cancel", "cancelled", None, NATIVE, "cancel_no_effect"),
-        ("cancel", "cancelled", None, CUSTOM, "cancel_uncertain"),
-        ("cancel", "cancelled", None, CHECKPOINT, None),
-        ("cancel", "error", INJECTED_CONSUMED, CUSTOM, None),
-        ("cancel", "ok", None, NATIVE, None),
-        ("read", "error", INJECTED_NO_EFFECT, CUSTOM, "uncertain_failure"),
-        ("next", "error", INJECTED_AT_END, CUSTOM, "uncertain_failure"),
-        ("readinto", "error", INJECTED_CONSUMED, CUSTOM, "consumed_failure"),
-        ("readinto", "error", INJECTED_CONSUMED, CHECKPOINT, "consumed_failure"),
+        # A cancelled cancel: cancel semantics.
+        ({"op": "cancel", "call": READ}, "cancelled", None, NATIVE, "cancel_no_effect"),
+        ({"op": "cancel", "call": READ}, "cancelled", None, CUSTOM, "cancel_uncertain"),
+        ({"op": "cancel", "call": READ}, "cancelled", None, CHECKPOINT, None),
+        # Cancellation lost the race: the call's own outcome.
+        (
+            {"op": "cancel", "call": READ},
+            "error",
+            INJECTED_CONSUMED,
+            CUSTOM,
+            "consumed_failure",
+        ),
+        ({"op": "cancel", "call": READ}, "error", INJECTED_CONSUMED, NATIVE, None),
+        ({"op": "cancel", "call": READ}, "ok", None, NATIVE, None),
+        ({"op": "cancel"}, "error", INJECTED_CONSUMED, CUSTOM, None),
+        # Direct read calls.
+        (READ, "error", INJECTED_NO_EFFECT, CUSTOM, "uncertain_failure"),
+        ({"op": "next"}, "error", INJECTED_AT_END, CUSTOM, "uncertain_failure"),
+        ({"op": "readinto"}, "error", INJECTED_CONSUMED, CUSTOM, "consumed_failure"),
+        (
+            {"op": "readinto"},
+            "error",
+            INJECTED_CONSUMED,
+            CHECKPOINT,
+            "consumed_failure",
+        ),
         # A checkpoint restores a no-effect or at-end failure.
-        ("readinto", "error", INJECTED_NO_EFFECT, CHECKPOINT, None),
-        ("readinto", "error", INJECTED_AT_END, CHECKPOINT, None),
+        ({"op": "readinto"}, "error", INJECTED_NO_EFFECT, CHECKPOINT, None),
+        ({"op": "readinto"}, "error", INJECTED_AT_END, CHECKPOINT, None),
+        # Direct seeks (a forward replay or rewind that reads).
+        (SEEK, "error", INJECTED_CONSUMED, CUSTOM, "consumed_failure"),
+        ({"op": "seek0"}, "error", INJECTED_CONSUMED, CHECKPOINT, "consumed_failure"),
+        ({"op": "seek_mark"}, "error", INJECTED_NO_EFFECT, CUSTOM, "uncertain_failure"),
+        ({"op": "seek_back"}, "error", INJECTED_NO_EFFECT, CHECKPOINT, None),
+        (SEEK, "error", INJECTED_CONSUMED, NATIVE, None),
+        # Overlap and close_during: the primary call's outcome only.
+        (
+            {"op": "overlap", "call": READ, "second": READ},
+            "error",
+            INJECTED_CONSUMED,
+            CUSTOM,
+            "consumed_failure",
+        ),
+        (
+            {"op": "close_during", "call": {"op": "readline"}},
+            "error",
+            INJECTED_NO_EFFECT,
+            CUSTOM,
+            "uncertain_failure",
+        ),
+        ({"op": "overlap", "call": READ}, "ok", None, CUSTOM, None),
+        (
+            {"op": "overlap", "call": {"op": "tell"}},
+            "error",
+            INJECTED_CONSUMED,
+            CUSTOM,
+            None,
+        ),
+        ({"op": "overlap"}, "error", INJECTED_CONSUMED, CUSTOM, None),
+        (
+            {"op": "close_during", "call": READ},
+            "error",
+            INJECTED_CONSUMED,
+            NATIVE,
+            None,
+        ),
         # Native failures, other calls, other outcomes, other messages.
-        ("read", "error", INJECTED_CONSUMED, NATIVE, None),
-        ("seek0", "error", INJECTED_CONSUMED, CUSTOM, None),
-        ("overlap", "error", INJECTED_NO_EFFECT, CUSTOM, None),
-        ("close_during", "error", INJECTED_CONSUMED, CUSTOM, None),
-        ("read", "cancelled", None, CUSTOM, None),
-        ("read", "ok", None, CUSTOM, None),
-        ("read", "error", "boom", CUSTOM, None),
-        ("read", "error", None, CUSTOM, None),
+        (READ, "error", INJECTED_CONSUMED, NATIVE, None),
+        ({"op": "tell"}, "error", INJECTED_CONSUMED, CUSTOM, None),
+        ({"op": "close"}, "error", INJECTED_CONSUMED, CUSTOM, None),
+        (READ, "cancelled", None, CUSTOM, None),
+        (READ, "ok", None, CUSTOM, None),
+        (READ, "error", "boom", CUSTOM, None),
+        (READ, "error", None, CUSTOM, None),
     ],
 )
-def test_h_later_loss_kind(name, kind, message, source, expected):
-    assert later_loss_kind(name, kind, message, source) == expected
+def test_h_later_loss_kind(op, kind, message, source, expected):
+    assert later_loss_kind(op, kind, message, source) == expected
 
 
 def test_h_a_checkpointed_no_effect_failure_is_no_loss():
@@ -2445,7 +2555,9 @@ def _with_source(pair, **changes):
         # checkpoints.
         (58, lambda pair: None, [4]),
         (58, lambda pair: _with_source(pair, checkpoint=True), [4]),
-        (58, lambda pair: _with_row(pair, 4, key=(4, "seek0", 0)), None),
+        # A seek failing the same way is a loss too.
+        (58, lambda pair: _with_row(pair, 4, key=(4, "seek0", 0)), [4]),
+        (58, lambda pair: _with_row(pair, 4, key=(4, "tell", 0)), None),
         (58, lambda pair: _with_row(pair, 4, key=(4, "overlap", 0)), None),
         (58, lambda pair: _with_row(pair, 4, outcome={"cancelled": True}), None),
         (58, lambda pair: _with_row(pair, 4, outcome={"ok": None}), None),
@@ -2493,6 +2605,22 @@ def _with_source(pair, **changes):
             ),
             None,
         ),
+        # 1124: op 5's overlap; its primary read consumed [0, 22].
+        (1124, lambda pair: None, [5]),
+        (
+            1124,
+            lambda pair: _with_row(
+                pair,
+                5,
+                outcome={"ok": {"str": ""}},
+                second={"error": "OSError", "message": INJECTED_CONSUMED},
+            ),
+            None,
+        ),
+        (1124, lambda pair: _with_source(pair, kind="native"), None),
+        # 4358: op 7's seek_abs on a nonseekable source consumed [10000, 10010].
+        (4358, lambda pair: None, [7]),
+        (4358, lambda pair: _with_row(pair, 7, key=(7, "tell", 0)), None),
         # 2228: empty cancelled reads at 1 and 9, custom without checkpoints.
         (2228, lambda pair: None, [1, 9]),
         (2228, lambda pair: _with_row(pair, 9, outcome={"ok": None}), None),

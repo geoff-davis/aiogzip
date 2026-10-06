@@ -987,29 +987,41 @@ def wire_view(
 
 
 def later_loss_kind(
-    name: str, kind: str, message: str | None, source: dict[str, Any]
+    op: dict[str, Any], kind: str, message: str | None, source: dict[str, Any]
 ) -> str | None:
     """The candidate transition of an event that can be one of b1's later
     losses (H), or None. Shared by the lossy model and the claim's check of
-    its record.
+    its record. ``kind`` and ``message`` are the event's primary outcome;
+    a concurrent second outcome is never the loss.
 
-    A cancelled call: on a native source the candidate settles it without
-    effect (``cancel_no_effect``); on a custom source without checkpoints it
-    is uncertain. A read call failing with an injected source failure: on a
-    custom source without checkpoints, a no-effect or at-end failure is
-    uncertain and a consuming one consumed; with checkpoints only a
-    consuming failure is. Nothing else is (native failures, checkpoint
-    cancels, other calls).
+    A cancelled ``cancel``: on a native source the candidate settles it
+    without effect (``cancel_no_effect``); on a custom source without
+    checkpoints it is uncertain. Otherwise the effective call is classified:
+    the ``call`` of an overlap, a ``close_during``, or a cancel whose
+    cancellation lost the race; or the op itself. A read or seek call
+    failing with an injected source failure on a custom source: without
+    checkpoints, a no-effect or at-end failure is uncertain and a consuming
+    one consumed; with checkpoints only a consuming failure is. Nothing else
+    is (native failures, checkpoint cancels, other calls).
     """
     custom = source["kind"] == "custom"
     checkpoint = custom and source["checkpoint"]
-    if name == "cancel":
-        if kind != "cancelled":
-            return None
+    name = op.get("op")
+    if name == "cancel" and kind == "cancelled":
         if source["kind"] == "native":
             return "cancel_no_effect"
         return "cancel_uncertain" if custom and not checkpoint else None
-    if name not in READ_OPS or kind != "error" or message is None or not custom:
+    if name in ("cancel", "overlap", "close_during"):
+        call = op.get("call")
+        if not isinstance(call, dict):
+            return None
+        name = call.get("op")
+    if (
+        name not in READ_OPS | SEEK_OPS
+        or kind != "error"
+        or message is None
+        or not custom
+    ):
         return None
     if INJECTED_CONSUMED in message:
         return "consumed_failure"
@@ -1178,7 +1190,7 @@ class LossyChecker(Checker):
         outcome = self.event.outcome
         message = None if outcome.error is None else str(outcome.error)
         kind = later_loss_kind(
-            self.event.op["op"], outcome.kind, message, self.true_scenario["source"]
+            self.event.op, outcome.kind, message, self.true_scenario["source"]
         )
         if kind is None or kind != transition:
             return False, None
