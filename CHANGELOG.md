@@ -9,6 +9,11 @@ All notable changes to this project will be documented in this file.
 - `tell()` on a text file during an in-progress long-line or sized read no
   longer returns a cookie that skips characters the read had decoded but not
   yet returned. Seeking back to such a cookie now replays every character.
+- After a CRC or `ISIZE` failure, text `read()` returns the recoverable text
+  that ends inside a multibyte character instead of raising
+  `UnicodeDecodeError` and discarding it. When the remaining recovery data
+  completes no character, text `read()` raises the terminal broken-stream
+  `OSError` instead of returning `''`, which looked like a clean EOF.
 
 ## [2.0.0b1] - 2026-09-01
 

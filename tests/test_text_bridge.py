@@ -334,6 +334,56 @@ async def test_validation_salvage_latches_and_retains_text():
             await stream.readlines()
 
 
+@pytest.mark.parametrize("first_size", [-1, 1, 100])
+async def test_salvage_ending_inside_a_character_keeps_complete_text(first_size):
+    # b1 and C0 finalized the decoder on the salvage drain, so the incomplete
+    # final byte raised UnicodeDecodeError and discarded 'ab' (WP10 F1a).
+    payload = "abé".encode()[:-1]
+    async with _text(_corrupt_crc(gzip.compress(payload, mtime=0))) as stream:
+        with pytest.raises(gzip.BadGzipFile):
+            await stream.read(first_size)
+        delivered = ""
+        while True:
+            try:
+                delivered += await stream.read(first_size)
+            except OSError as error:
+                assert "broken" in str(error)
+                break
+        assert delivered == "ab"
+
+
+@pytest.mark.parametrize(("newline", "expected"), [(None, "ab\n"), ("", "ab\r")])
+async def test_salvage_ending_in_a_cr_resolves_it_as_a_line_end(newline, expected):
+    # Every continuation of a trailing CR begins with this resolution, so
+    # emitting it is safe; pins b1/C0 behaviour.
+    async with _text(
+        _corrupt_crc(gzip.compress(b"ab\r", mtime=0)), newline=newline
+    ) as (stream):
+        with pytest.raises(gzip.BadGzipFile):
+            await stream.read(100)
+        assert await stream.read() == expected
+        with pytest.raises(OSError, match="broken"):
+            await stream.read()
+
+
+@pytest.mark.parametrize(
+    ("payload", "encoding"), [(b"", "utf-8"), ("".encode("utf-16"), "utf-16")]
+)
+@pytest.mark.parametrize("size", [-1, 1])
+async def test_salvage_completing_no_character_is_never_clean_eof(
+    payload, encoding, size
+):
+    # b1 and C0 returned '' here, which reads as clean EOF (WP10 F2).
+    async with _text(
+        _corrupt_crc(gzip.compress(payload, mtime=0)), encoding=encoding
+    ) as stream:
+        with pytest.raises(gzip.BadGzipFile):
+            await stream.read(size)
+        for _ in range(2):
+            with pytest.raises(OSError, match="broken"):
+                await stream.read(size)
+
+
 async def test_transport_uncertainty_latches():
     source = _Source(WIRE, fail="consumed")
     stream = AsyncGzipTextFile(None, "rt", fileobj=source, closefd=False)

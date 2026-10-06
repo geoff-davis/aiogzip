@@ -1265,6 +1265,10 @@ class AsyncGzipTextFile:
             else:
                 self._buffer_origin.chars_to_skip += len(buffer) + len(fresh)
             self._set_buffer("")
+        if not result and not bf._read_is_healthy():
+            # The remaining salvage completed no character. An empty result
+            # would read as a clean EOF; report the broken stream instead.
+            bf._check_read_usable()
         return result
 
     async def read(self, size: int = -1) -> str:
@@ -1323,10 +1327,17 @@ class AsyncGzipTextFile:
                     if decoded:
                         chunks.append(apply_nl(decoded))
 
-                final = decoder.decode(b"", final=True)
-                if final:
-                    chunks.append(apply_nl(final))
-                self._finalize_pending_newline_state()
+                if bf._read_is_healthy():
+                    final = decoder.decode(b"", final=True)
+                    if final:
+                        chunks.append(apply_nl(final))
+                    self._finalize_pending_newline_state()
+                elif not chunks:
+                    # A drained validation salvage that completes no character
+                    # is not a clean EOF; report the broken stream instead.
+                    bf._check_read_usable()
+                # Draining a validation salvage is not EOF: an incomplete
+                # trailing character stays undecoded rather than raising.
                 self._set_buffer("")
                 return "".join(chunks)
         else:
