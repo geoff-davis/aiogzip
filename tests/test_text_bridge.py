@@ -262,6 +262,7 @@ class _Source:
         self.close_error = close_error
         self.gate = None
         self.absorb_cancel = False
+        self.consume_on_cancel = False
         self.entered = asyncio.Event()
         self.closed = False
         self.tell = self.buffer.tell
@@ -280,6 +281,11 @@ class _Source:
             try:
                 await self.gate.wait()
             except asyncio.CancelledError:
+                if self.consume_on_cancel:
+                    # Consume input before propagating, so the active call
+                    # sees a moved position and poisons the reader itself.
+                    self.buffer.read(size)
+                    raise
                 if not self.absorb_cancel:
                     raise
         fail, self.fail = self.fail, None
@@ -383,12 +389,24 @@ async def test_close_during_active_work_is_rejected_without_health_change():
     await stream.close()
 
 
-async def _abort_with_active_read(source):
+async def _abort_with_active_read(source, deliveries=None):
     stream = AsyncGzipTextFile(None, "rt", fileobj=source, closefd=True, chunk_size=16)
     reader = None
     with pytest.raises(RuntimeError, match="body"):
         async with stream:
             assert await stream.readline() == LINES[0]
+            if deliveries is not None:
+                # Count poison deliveries while keeping text's own handlers.
+                binary = stream.buffer
+                binary._detach_text_observers()
+
+                def poisoned(validation_failed):
+                    deliveries.append(validation_failed)
+                    stream._mark_binary_read_poisoned(validation_failed)
+
+                binary._attach_text_observers(
+                    closed=stream._mark_binary_closed, poisoned=poisoned
+                )
             source.gate = asyncio.Event()
             reader = asyncio.create_task(stream.read())
             await asyncio.wait_for(source.entered.wait(), 5)
@@ -402,9 +420,15 @@ async def _abort_with_active_read(source):
 async def test_failed_abort_close_leaves_text_refusing_reads(active_call_poisons):
     # The accepted WP8 correction: an abort notifies text when it breaks the
     # reader, so text no longer serves text decoded before a failed abort.
+    # With active-call poison, the cancelled read consumes input first, so
+    # the active call poisons the reader again after the abort notification:
+    # delivery is at-least-once and text's handler must be idempotent.
     source = _Source(WIRE, close_error=OSError("underlying close failed"))
+    source.consume_on_cancel = active_call_poisons
     source.absorb_cancel = not active_call_poisons
-    stream = await _abort_with_active_read(source)
+    deliveries = []
+    stream = await _abort_with_active_read(source, deliveries)
+    assert deliveries == ([False, False] if active_call_poisons else [False])
     assert source.closed is True  # the close was attempted
     assert stream.closed is False  # and failed, so the handle stays open
     assert stream.buffer._read_health is _ReadHealth.BROKEN
