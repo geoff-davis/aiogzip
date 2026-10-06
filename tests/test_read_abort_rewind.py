@@ -82,6 +82,14 @@ async def test_abort_during_a_native_rewind_keeps_the_reader_aborted(
             else:
                 # A backward seek from a healthy reader also rewinds.
                 await stream.read(100)
+            # The abort check must run before the rewind replaces any state.
+            binary = _binary(stream)
+            before = (
+                binary._position,
+                bytes(binary._buffer),
+                binary._buffer_offset,
+            )
+            decoder = binary._decoder
             gated_executor.armed = True
             task = asyncio.create_task(stream.seek(0))
             await asyncio.wait_for(gated_executor.entered.wait(), 5)
@@ -93,7 +101,8 @@ async def test_abort_during_a_native_rewind_keeps_the_reader_aborted(
     with pytest.raises(OSError, match="read aborted because the gzip file was closed"):
         await task
     assert stream.closed
-    binary = _binary(stream)
     assert binary._read_health.name == "BROKEN"
     assert binary._eof
-    assert binary._decoder is None or binary._decoder._discarded
+    assert (binary._position, bytes(binary._buffer), binary._buffer_offset) == before
+    assert binary._decoder is decoder
+    assert decoder is None or decoder._discarded
