@@ -28,6 +28,7 @@ import argparse
 import base64
 import codecs
 import concurrent.futures
+import copy
 import dataclasses
 import json
 import math
@@ -260,8 +261,13 @@ class Result:
         return any(self.claims.values())
 
 
-def compare(pair: Pair, lossy: dict[str, Any] | None = None) -> Result:
-    """Compare one seed; ``lossy`` is the BC2 lossy run for it, if requested."""
+def compare(
+    pair: Pair,
+    lossy: dict[str, Any] | None = None,
+    shadow: dict[str, Any] | None = None,
+) -> Result:
+    """Compare one seed; ``lossy`` is the BC2 lossy run for it and ``shadow``
+    its F2 shadow run, each if requested."""
     seed = pair.scenario["seed"]
     failures = [
         f"candidate model: op {i}: {m}" for i, m in pair.cand_info["violations"]
@@ -279,8 +285,13 @@ def compare(pair: Pair, lossy: dict[str, Any] | None = None) -> Result:
                 failures.append(f"{item} claimed by {owner[item]} and {name}")
             owner.setdefault(item, name)
     if "BC2-LOST-INPUT" in applies:
-        for clause in (bc2_aborted_native_read, bc2_trigger_only):
-            for item in clause(pair).items():
+        clauses = (
+            bc2_aborted_native_read(pair),
+            bc2_trigger_only(pair),
+            bc2_shadow_claim(pair, shadow),
+        )
+        for clause in clauses:
+            for item in clause.items():
                 if item in owner:
                     failures.append(f"{item} claimed by {owner[item]} and BC2")
                 owner.setdefault(item, "BC2-LOST-INPUT")
@@ -975,6 +986,73 @@ def bc2_aborted_native_read(pair: Pair) -> Claim:
     return claim
 
 
+def _f2_abort(pair: Pair) -> tuple[int, str, int] | None:
+    """F2's abort key: context exit aborted a custom-source read call (custom
+    sources park without a record), the candidate reports the read-aborted
+    ``OSError`` with no witness, and b1 let the call finish."""
+    if pair.reference != "b1" or pair.mode not in ("rb", "rt"):
+        return None
+    if pair.scenario["source"]["kind"] != "custom":
+        return None
+    for key in pair.diffs:
+        if key[1] != "abort":
+            continue
+        c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+        injected = {"error": "InjectedAbort", "message": f"abort at {key[0]}"}
+        call = pair.op(key).get("call", {}).get("op")
+        if (
+            call in READ_CALLS | {"buffer_read"}
+            and c.outcome == r.outcome == injected
+            and c.second == {"error": "OSError", "message": READ_ABORTED}
+            and c.parked is None
+            and r.parked is None
+            and c.taken is None
+            and c.pulled is None
+            and r.pulled is None
+            and (r.taken is None or wire_range(pair, r.taken) is not None)
+            and r.second != c.second
+        ):
+            return key
+    return None
+
+
+def shadow_scenario(pair: Pair) -> dict[str, Any] | None:
+    """F2's shadow: the same scenario with the abort's call run without the
+    abort, ``ops[:i] + [call]``, on the same candidate and engine."""
+    key = _f2_abort(pair)
+    if key is None:
+        return None
+    index = key[0]
+    shadow = copy.deepcopy(pair.scenario)
+    shadow["ops"] = shadow["ops"][:index] + [shadow["ops"][index]["call"]]
+    return shadow
+
+
+def bc2_shadow_claim(pair: Pair, shadow: dict[str, Any] | None) -> Claim:
+    """F2: claim the abort when the shadow run reproduces b1's outcome.
+
+    A fail-closed metamorphic check: the shadow run has no model violation,
+    its trace equals the candidate's exactly before the abort's index, and
+    its call row equals b1's second outcome with b1's witness exactly.
+    """
+    claim = Claim()
+    key = _f2_abort(pair)
+    if key is None or shadow is None or shadow.get("violations") != []:
+        return claim
+    index = key[0]
+    rows = parse(shadow["trace"])
+    if [x for x in rows if x.index < index] != [
+        x for x in pair.cand if x.index < index
+    ]:
+        return claim
+    r = pair.ref_by_key[key]
+    call = (index, pair.op(key)["call"]["op"], 0)
+    expected = Row(call, r.second, None, r.parked, r.taken, r.pulled)
+    if [x for x in rows if x.index == index] == [expected]:
+        claim.events.add(key)
+    return claim
+
+
 def lossy_scenario(
     scenario: dict[str, Any], a: int, b: int, engine: str
 ) -> dict[str, Any] | None:
@@ -1187,6 +1265,21 @@ def run(
             if request is not None:
                 requests[seed] = request
     lossy_runs: dict[str, Any] = {}
+    shadows = {}
+    if reference == "b1":
+        for seed, pair in pairs.items():
+            shadow = shadow_scenario(pair)
+            if shadow is not None:
+                shadows[seed] = shadow
+    shadow_runs: dict[str, Any] = {}
+    if shadows:
+        path = workdir / "shadow.jsonl"
+        with path.open("w", encoding="utf-8") as lines:
+            for shadow in shadows.values():
+                lines.write(json.dumps(shadow) + "\n")
+        shadow_runs = _run_root(
+            candidate_root, engine, path, workdir / "shadow.json", "--observe"
+        )["runs"]
     if requests:
         path = workdir / "lossy.jsonl"
         with path.open("w", encoding="utf-8") as lines:
@@ -1195,7 +1288,10 @@ def run(
         lossy_runs = _run_root(
             reference_root, engine, path, workdir / "lossy.json", "--lossy"
         )["runs"]
-    results = [compare(pairs[s], lossy_runs.get(str(s))) for s in seeds]
+    results = [
+        compare(pairs[s], lossy_runs.get(str(s)), shadow_runs.get(str(s)))
+        for s in seeds
+    ]
     claimed = {name: 0 for name in APPLIES[reference]}
     retained = []
     for result in results:
@@ -1210,6 +1306,7 @@ def run(
                     "candidate": cand_runs[str(seed)],
                     "reference": ref_runs[str(seed)],
                     "lossy": lossy_runs.get(str(seed)),
+                    "shadow": shadow_runs.get(str(seed)),
                     "claims": result.claims,
                     "failures": result.failures,
                 }

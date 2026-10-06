@@ -37,6 +37,7 @@ from differential import (
     lossy_scenario,
     parse,
     raw_bytes,
+    shadow_scenario,
 )
 from generator import generate, member_spans, unb64
 from interpreter import Event, Outcome, final_output, recorded_run
@@ -128,8 +129,8 @@ def passes(pair: Pair, predicate: str, lossy=None) -> None:
     assert claims(result, predicate), result.claims
 
 
-def fails(pair: Pair, *unclaimed: str, lossy=None) -> None:
-    result = compare(pair, lossy)
+def fails(pair: Pair, *unclaimed: str, lossy=None, shadow=None) -> None:
+    result = compare(pair, lossy, shadow)
     assert not result.ok, result.claims
     for item in unclaimed:
         assert any(item in failure for failure in result.failures), result.failures
@@ -1234,6 +1235,125 @@ def test_bc2_l1_rejects_a_malformed_shared_witness(taken):
     pair = make_pair(2060, ref, reference="b1", cand=cand)
     assert bc2_request(pair) is None
     assert not compare(pair, lossy).claims["BC2-LOST-INPUT"]
+
+
+# F2: context exit aborts a custom-source read; b1 lets the call finish, and
+# a shadow run of the call without the abort must reproduce b1's outcome.
+
+
+@cache
+def _shadow_run(seed: int) -> str:
+    pair, _lossy = b1_recorded(seed)
+    shadow = shadow_scenario(pair)
+    assert shadow is not None
+    return json.dumps(recorded_run(aiogzip, shadow, ENGINE, "observe"))
+
+
+def b1_f2(seed: int) -> tuple[Pair, dict[str, Any]]:
+    pair, _lossy = b1_recorded(seed)
+    return pair, json.loads(_shadow_run(seed))
+
+
+F2_SEEDS = {
+    4: "the injected failure, with its taken witness",
+    99: "a gzip validation error",
+    621: "the decompressed-size limit",
+}
+
+
+@pytest.mark.parametrize("seed", sorted(F2_SEEDS))
+def test_bc2_f2_shadow_reproduces_b1s_call_outcome(seed):
+    pair, shadow = b1_f2(seed)
+    (key,) = [k for k in pair.diffs if k[1] == "abort"]
+    assert shadow["violations"] == []
+    result = compare(pair, None, shadow)
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT") == [repr(("event", key))]
+
+
+def test_bc2_f2_witness_case_carries_a_taken_range():
+    pair, _shadow = b1_f2(4)
+    assert row(pair.ref, 7, "abort").taken == [20, 23]
+
+
+def test_bc2_f2_rejects_b1s_broken_refusal():
+    # b1's close marks the stream broken under the parked call, which the
+    # shadow (the call without the abort) cannot reproduce: unclaimed.
+    pair, _lossy = b1_recorded(44)
+    shadow = recorded_run(aiogzip, shadow_scenario(pair), ENGINE, "observe")
+    fails(pair, "(2, 'abort', 0)", shadow=shadow)
+
+
+def _f2_mutated(change: str) -> tuple[Pair, dict[str, Any] | None]:
+    pair, shadow = b1_f2(4)
+    key = row(pair.ref, 7, "abort").key
+    ref, cand = pair.ref, pair.cand
+    if change == "no-shadow":
+        shadow = None
+    elif change == "violation":
+        shadow["violations"] = [[3, "injected"]]
+    elif change == "prefix":
+        trace = shadow["trace"]
+        n = max(i for i, raw_row in enumerate(trace) if raw_row[0] < 7)
+        trace[n][2] = {"error": "OSError", "message": "x"}
+    elif change == "extra-row":
+        trace = shadow["trace"]
+        n = next(i for i, raw_row in enumerate(trace) if raw_row[0] == 7)
+        trace.insert(n + 1, copy.deepcopy(trace[n]))
+    elif change == "ref-taken":
+        ref = edit(ref, key, taken=[20, 22])
+    elif change == "ref-untaken":
+        ref = edit(ref, key, taken=None)
+    elif change == "ref-second":
+        message = {"error": "OSError", "message": "injected source failure"}
+        ref = edit(ref, key, second=message)
+    elif change == "cand-second":
+        cand = edit(cand, key, second={"error": "OSError", "message": "x"})
+    elif change == "cand-taken":
+        cand = edit(cand, key, taken=[20, 23])
+    elif change == "parked":
+        parked = {"via": "native", "method": "read", "bytes": None}
+        ref, cand = edit(ref, key, parked=parked), edit(cand, key, parked=parked)
+    elif change == "primary":
+        primary = {"error": "InjectedAbort", "message": "exit at 7"}
+        ref, cand = edit(ref, key, outcome=primary), edit(cand, key, outcome=primary)
+    scenario = None
+    if change == "native":
+        scenario = copy.deepcopy(generate(4))
+        scenario["source"] = {"kind": "native"}
+    return make_pair(4, ref, reference="b1", scenario=scenario, cand=cand), shadow
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "no-shadow",
+        "violation",
+        "prefix",
+        "extra-row",
+        "ref-taken",
+        "ref-untaken",
+        "ref-second",
+        "cand-second",
+        "cand-taken",
+        "parked",
+        "primary",
+        "native",
+    ],
+)
+def test_bc2_f2_rejects_a_near_miss(change):
+    pair, shadow = _f2_mutated(change)
+    fails(pair, "(7, 'abort', 0)", shadow=shadow)
+
+
+def test_bc2_f2_shadow_runs_the_call_without_the_abort():
+    pair, _shadow = b1_f2(4)
+    shadow = shadow_scenario(pair)
+    ops = pair.scenario["ops"]
+    assert shadow["ops"] == ops[:7] + [ops[7]["call"]]
+    assert {k: v for k, v in shadow.items() if k != "ops"} == {
+        k: v for k, v in pair.scenario.items() if k != "ops"
+    }
 
 
 # G custom: a cancelled custom seek0 is an L1 trigger with an empty range.
