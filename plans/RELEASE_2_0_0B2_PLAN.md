@@ -298,7 +298,7 @@ create competing copies of the same checkboxes in every section.
 * [x] G08 — [Cross-item fairness, scheduling and throughput dispositions](reviews/v2.0.0b2-wp5-completion.md#g08-cross-item-fairness)
 * [x] G09 — [Corrected reference C0 pinned with traces and ledger](reviews/v2.0.0b2-c0-record.md)
 * [x] G10 — [Three-state binary read health matching C0](reviews/v2.0.0b2-wp6-completion.md)
-* [ ] G11
+* [x] G11 — [Text replay-origin object without aliasing](reviews/v2.0.0b2-wp7-completion.md)
 * [ ] G12
 * [ ] G13
 * [ ] G14
