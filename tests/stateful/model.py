@@ -928,12 +928,20 @@ class LossyChecker(Checker):
     range starts where the reader's source stood, so the data before the
     position is the same in both). At the trigger event an injected failure
     or a cancellation has no effect,
-    because b1 retries. After the trigger, b1's first physical rewind returns
-    it to the true wire when ``rebase`` is set (a seekable source); on a
-    non-seekable custom source b1 replays its cache, which lacks the lost
-    range, so it never does. Every violation is recorded with its event
-    index; a later trigger gets the candidate's semantics, so it fails
+    because b1 retries. After the trigger, b1 returns to the true wire only at
+    a successful model rewind whose event also completed a physical source
+    seek to or before the lost range's start, when ``rebase`` is set (a
+    seekable source). A rewind b1 answers without a source call (``seek0`` at
+    decompressed position 0) keeps the lossy view, and so does a cancelled
+    call. On a non-seekable custom source b1 replays its cache, which lacks
+    the lost range, so it never returns. Every violation is recorded with its
+    event index; a later trigger gets the candidate's semantics, so it fails
     closed.
+
+    ``acquire`` names the BC3 clause that owns the acquisition event exactly
+    (only "O1"); its contender outcome then takes b1's lifecycle transition
+    (OPENING stays OPENING) instead of the candidate's error check, and the
+    event index is recorded in ``normalized``.
     """
 
     NO_EFFECT = {
@@ -949,6 +957,8 @@ class LossyChecker(Checker):
         engine: str,
         trigger: int,
         rebase: bool,
+        lost_start: int,
+        acquire: str | None = None,
     ) -> None:
         super().__init__(lossy, engine)
         self.true = Checker(true, engine)
@@ -958,8 +968,14 @@ class LossyChecker(Checker):
         self.wire_size = self.true.wire_size
         self.trigger = trigger
         self.rebase = rebase
+        self.lost_start = lost_start
+        if acquire not in (None, "O1"):
+            raise ValueError(f"no lossy normalization for {acquire}")
+        self.acquire = acquire
+        self.normalized: list[int] = []
         self.rebased_at: int | None = None
         self.index: int | None = None
+        self.event: Any = None
         self.lossy = types.SimpleNamespace(**{n: getattr(self, n) for n in self.VIEW})
         self._use(self.true)
         self.lost = False  # whether the lossy view is in force
@@ -970,8 +986,28 @@ class LossyChecker(Checker):
         for name in self.VIEW:
             setattr(self, name, getattr(view, name))
 
+    @property
+    def view(self) -> str:
+        return "lossy" if self.lost and self.rebased_at is None else "true"
+
+    def expect_concurrent(self, index: int, outcome) -> None:
+        if self.acquire == "O1" and index == -1:
+            self.normalized.append(index)
+            return
+        super().expect_concurrent(index, outcome)
+
+    def physical_rewind(self, event) -> bool:
+        """Whether ``event`` completed a source seek back over the lost range.
+
+        A cancelled call never counts, even if its native seek ran.
+        """
+        if event is None or event.outcome.kind == "cancelled":
+            return False
+        return any(target <= self.lost_start for target in event.seeks or ())
+
     def observe(self, event) -> None:
         self.index = event.index
+        self.event = event
         if not self.lost and event.index >= self.trigger:
             self._use(self.lossy)
             self.lost = True
@@ -987,6 +1023,7 @@ class LossyChecker(Checker):
             and self.rebased_at is None
             and self.index is not None
             and self.index > self.trigger
+            and self.physical_rewind(self.event)
         ):
             # The position is then set in the shared decompressed
             # coordinates, which the rewind makes valid on the true wire.

@@ -280,6 +280,10 @@ def compare(pair: Pair, lossy: dict[str, Any] | None = None) -> Result:
             # The lossy model must accept b1's whole run, matching events
             # included; any violation fails the seed.
             failures += [f"lossy model: op {i}: {m}" for i, m in lossy["violations"]]
+            if lossy.get("normalized") and request.acquire is None:
+                failures.append(
+                    "lossy model normalized an acquisition BC3 does not own"
+                )
             claim = bc2_claim(pair, request, lossy, set(owner))
             for item in claim.items():
                 owner.setdefault(item, "BC2-LOST-INPUT")
@@ -809,6 +813,21 @@ class Bc2Request:
     lossy: dict[str, Any]
     rebase: bool
     clause: str  # "L1" or "L2"
+    taken: list[int] = dataclasses.field(default_factory=lambda: [0, 0])
+    # The BC3 clause that owns the acquisition exactly, which the lossy model
+    # then judges by b1's lifecycle transition (only "O1").
+    acquire: str | None = None
+
+    def line(self, scenario: dict[str, Any]) -> dict[str, Any]:
+        """The lossy run's request, as the interpreter reads it."""
+        return {
+            "scenario": scenario,
+            "lossy": self.lossy,
+            "trigger": self.trigger[0],
+            "rebase": self.rebase,
+            "taken": self.taken,
+            "acquire": self.acquire,
+        }
 
 
 def bc2_request(pair: Pair) -> Bc2Request | None:
@@ -830,7 +849,12 @@ def bc2_request(pair: Pair) -> Bc2Request | None:
         if lossy is None:
             return None
         rebase = source["kind"] == "native" or source["seekable"]
-        return Bc2Request(key, lossy, rebase, clause)
+        acquire = None
+        if ("event", (-1, "acquire", 0)) in bc3(pair).items() and scenario[
+            "acquisition"
+        ].get("fault") == "overlap_open":
+            acquire = "O1"
+        return Bc2Request(key, lossy, rebase, clause, list(taken), acquire)
     return None
 
 
@@ -938,13 +962,8 @@ def bc2_claim(
         return claim  # b1's replay was not reproduced; claim nothing
     order = pair.cand_order
     start = order[request.trigger]
-    end = len(pair.cand)
-    if request.rebase:
-        ends = [lossy.get("rebased_at")]
-        if request.clause == "L1":
-            ends.append(_leaves_broken(pair, start))
-        if all(e is not None for e in ends):
-            end = max(_position_of(pair, e) for e in ends) + 1
+    converged = _converged(pair, lossy, start)
+    end = len(pair.cand) if converged is None else converged + 1
     rejected = {index for index, _message in lossy["violations"]}
     trigger = request.trigger
     if (
@@ -966,16 +985,32 @@ def bc2_claim(
     return claim
 
 
-def _leaves_broken(pair: Pair, start: int) -> int | None:
-    for row in pair.cand[start + 1 :]:
-        before, after = pair.health_before(row.key), pair.health_after(row.key)
-        if before == "BROKEN" and after != "BROKEN":
-            return row.index
+def _converged(pair: Pair, lossy: dict[str, Any], start: int) -> int | None:
+    """The candidate-order position of the first event after the trigger
+    after which both models agree: the lossy model is back on the true view,
+    and both are certain of the same position, with the same health and eof.
+    A physical rewind alone is not enough (a relative seek keeps b1 ahead by
+    the lost length)."""
+    ref_order = {row.key: n for n, row in enumerate(pair.ref)}
+    cand_states = pair.cand_info.get("states") or []
+    cand_health = pair.cand_info.get("health") or []
+    ref_states = lossy.get("states") or []
+    ref_health = lossy.get("health") or []
+    for n in range(start + 1, len(pair.cand)):
+        m = ref_order.get(pair.cand[n].key)
+        if m is None or n >= len(cand_states) or m >= len(ref_states):
+            continue
+        (c_pos, c_eof, _), (r_pos, r_eof, view) = cand_states[n], ref_states[m]
+        if (
+            view == "true"
+            and c_pos is not None
+            and c_pos[0] == c_pos[1]
+            and c_pos == r_pos
+            and c_eof == r_eof
+            and cand_health[n][1] == ref_health[m][1]
+        ):
+            return n
     return None
-
-
-def _position_of(pair: Pair, index: int) -> int:
-    return max(n for n, row in enumerate(pair.cand) if row.index == index)
 
 
 # Runner
@@ -1068,13 +1103,7 @@ def run(
         path = workdir / "lossy.jsonl"
         with path.open("w", encoding="utf-8") as lines:
             for seed, request in requests.items():
-                line = {
-                    "scenario": scenarios[seed],
-                    "lossy": request.lossy,
-                    "trigger": request.trigger[0],
-                    "rebase": request.rebase,
-                }
-                lines.write(json.dumps(line) + "\n")
+                lines.write(json.dumps(request.line(scenarios[seed])) + "\n")
         lossy_runs = _run_root(
             reference_root, engine, path, workdir / "lossy.json", "--lossy"
         )["runs"]

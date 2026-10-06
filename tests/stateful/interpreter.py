@@ -64,6 +64,14 @@ class Gate:
         self.busy_lock = threading.Lock()
         self.idle = asyncio.Event()
         self.idle.set()
+        # Absolute source seeks that completed, custom or native, taken by
+        # the next landed event (BC2's physical-rewind witness; raw only).
+        self.seeks: list[int] = []
+
+    def seeked(self, target: int | None) -> None:
+        if target is not None:
+            with self.busy_lock:
+                self.seeks.append(target)
 
     def arm(self) -> None:
         self.armed = True
@@ -121,9 +129,13 @@ class GatedExecutor(concurrent.futures.ThreadPoolExecutor):
                 if not gate.busy:
                     gate.idle.set()
 
+            seek = _native_seek(fn, args)
+
             def counted():
                 try:
-                    return fn(*args, **kwargs)
+                    result = fn(*args, **kwargs)
+                    gate.seeked(seek)
+                    return result
                 finally:
                     with gate.busy_lock:
                         gate.busy -= 1
@@ -137,6 +149,7 @@ class GatedExecutor(concurrent.futures.ThreadPoolExecutor):
         gate.armed = False
         entered, release, ran = gate.entered, gate.release_thread, gate.ran
         record = gate.parked = _native_parked(fn)
+        seek = _native_seek(fn, args)
 
         def parked():
             self.loop.call_soon_threadsafe(entered.set)
@@ -148,6 +161,7 @@ class GatedExecutor(concurrent.futures.ThreadPoolExecutor):
                 if start is not None and isinstance(result, (bytes, bytearray)):
                     # The lost-input witness: the wire range this read took.
                     record["taken"] = [start, start + len(result)]
+                gate.seeked(seek)
                 return result
             finally:
                 ran.set()
@@ -210,6 +224,7 @@ class Source:
         self.offset = offset
         self.frame_index = 0
         self.frame_left = self.frames[0] if self.frames else None
+        self.gate.seeked(offset)
         return offset
 
     def _take(self, size: int) -> bytes:
@@ -286,6 +301,20 @@ def _native_parked(fn) -> dict[str, Any]:
         "method": method,
         "bytes": None if data is None else bytes(data),
     }
+
+
+def _native_seek(fn, args) -> int | None:
+    """The target of an absolute native ``seek`` call, or None for any other
+    call. aiofiles binds the target in its ``partial``; a call submitted
+    with separate arguments carries them in ``args``."""
+    if _native_parked(fn)["method"] != "seek":
+        return None
+    bound = tuple(getattr(fn, "args", ())) + tuple(args)
+    if not bound or not isinstance(bound[0], int):
+        return None
+    if len(bound) > 1 and bound[1] != 0:
+        return None
+    return bound[0]
 
 
 class Sink:
@@ -409,6 +438,9 @@ class Event:
     # The uncompressed range a text handle's buffer_read took from under the
     # text layer (BC7 witness): the binary tell before the read, plus its size.
     pulled: list[int] | None = None
+    # Absolute source seeks completed during the event (BC2 witness; raw
+    # only, never in the trace).
+    seeks: list[int] | None = None
 
 
 Hook = Callable[[Any, Event, "Context"], None]
@@ -604,6 +636,9 @@ async def run(
                     else item
                     for key, item in event.parked.items()
                 }
+        with gate.busy_lock:
+            if gate.seeks:
+                event.seeks, gate.seeks = gate.seeks, []
         events.append(event)
         for hook in hooks:
             hook(context.handle, event, context)
@@ -932,6 +967,9 @@ class _Indexed:
         self.violations: list[list[Any]] = []
         self.health: list[list[str | None]] = []
         self.positions: list[list[int] | None] = []
+        # After each event: the position range (None when unmodeled), eof,
+        # and a lossy model's view ("true" or "lossy"; None otherwise).
+        self.states: list[list[Any]] = []
 
     def __call__(self, handle, event, context) -> None:
         first = self.checkers[0]
@@ -949,6 +987,14 @@ class _Indexed:
             for message in checker.violations[seen:]:
                 self.violations.append([event.index, message])
         after = getattr(first, "health", None)
+        position = getattr(first, "candidates", None)
+        self.states.append(
+            [
+                [position[0], position[-1]] if position and first.modeled else None,
+                getattr(first, "eof", None),
+                getattr(first, "view", None),
+            ]
+        )
         self.health.append(
             [None if before is None else before.value,
              None if after is None else after.value]
@@ -981,18 +1027,28 @@ def recorded_run(
 
         assert request is not None
         checker = LossyChecker(
-            request["lossy"], scenario, engine, request["trigger"], request["rebase"]
+            request["lossy"],
+            scenario,
+            engine,
+            request["trigger"],
+            request["rebase"],
+            request["taken"][0],
+            request.get("acquire"),
         )
         hook = _Indexed(checker)
         hooks = (hook,)
-    _events, trace = replay(package, scenario, hooks)
+    events, trace = replay(package, scenario, hooks)
     run_record["trace"] = trace
+    # Evidence only, never compared: the source seeks each event made.
+    run_record["seeks"] = [[e.index, e.seeks] for e in events if e.seeks]
     if hooks:
         run_record["violations"] = hook.violations
         run_record["health"] = hook.health
         run_record["positions"] = hook.positions
+        run_record["states"] = hook.states
     if check == "lossy":
         run_record["rebased_at"] = checker.rebased_at
+        run_record["normalized"] = checker.normalized
     return run_record
 
 

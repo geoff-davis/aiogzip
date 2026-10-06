@@ -4,8 +4,10 @@ Every candidate trace here is live: the seed's scenario replayed in-process
 against the candidate with the model and observer attached, exactly as the
 runner's ``--observe`` side records it. C0-shaped references are traces
 recorded from C0 (``tests/data/wp10_c0_traces.json``); near misses mutate
-them. b1-shaped references are written from the design's b1 inventory,
-because no b1 comparison may run before these tests pass. See "Rules" in
+them. Most b1-shaped references are written from the design's b1 inventory,
+because no b1 comparison could run before these tests passed; the ones found
+by the first b1 comparison are recorded from b1 itself
+(``tests/data/wp10_b1_runs.json``). See "Rules" in
 plans/design/v2.0.0b2-wp10-qualification.md.
 """
 
@@ -28,6 +30,7 @@ from differential import (
     Bc2Request,
     Pair,
     Row,
+    _converged,
     bc2_request,
     compare,
     encoded,
@@ -36,14 +39,15 @@ from differential import (
     raw_bytes,
 )
 from generator import generate, member_spans, unb64
-from interpreter import final_output, recorded_run
-from model import Checker
+from interpreter import Event, Outcome, final_output, recorded_run
+from model import Checker, LossyChecker
 
 import aiogzip
 
 ENGINE = aiogzip.engine_info().decompression
 DATA = Path(__file__).resolve().parent.parent / "data" / "wp10_c0_traces.json"
 C0 = json.loads(DATA.read_text(encoding="utf-8"))["traces"]
+B1 = json.loads((DATA.parent / "wp10_b1_runs.json").read_text(encoding="utf-8"))["runs"]
 
 
 @cache
@@ -600,11 +604,7 @@ def _b1_emulated(seed: int) -> str:
             generate(seed),
             ENGINE,
             "lossy",
-            {
-                "lossy": request.lossy,
-                "trigger": request.trigger[0],
-                "rebase": request.rebase,
-            },
+            request.line(generate(seed)),
         )
     finally:
         interpreter.Source = real
@@ -629,10 +629,21 @@ BC2_SEEDS = {
     662: "rt fail_consumed, member range to EOF",
     2486: "rb fail_consumed with a checkpoint, member range",
     3958: "rt fail_consumed with a checkpoint, member range",
-    1065: "rt seekable: the span ends at b1's rewind",
-    277: "rb seekable: the span ends at b1's rewind",
-    430: "rt seekable: the span ends at b1's rewind",
+    1065: "rt seekable: a rewind with no source call keeps the lossy view",
+    277: "rb seekable: a rewind with no source call keeps the lossy view",
+    430: "rt seekable: a physical rewind, but the models never converge",
+    2969: "rb seekable: the span ends where the models converge",
+    2361: "rt seekable: the span ends where the models converge",
+    3210: "rb seekable: convergence at a seek_back",
 }
+CONVERGING = (2969, 2361, 3210)
+
+
+def span_end(pair: Pair, lossy: dict[str, Any]) -> int | None:
+    """The candidate-order position where BC2's span ends, if it does."""
+    request = bc2_request(pair)
+    assert request is not None
+    return _converged(pair, lossy, pair.cand_order[request.trigger])
 
 
 @pytest.mark.parametrize("seed", sorted(BC2_SEEDS))
@@ -655,9 +666,15 @@ def test_bc2_cases_cover_each_trigger_kind():
             armed = [op["op"] for op in scenario["ops"][:index] if "fail" in op["op"]]
             name = armed[-1]
         seen.add((scenario["mode"], name, lost))
-        if seed in (1065, 277, 430):
-            assert request.rebase
-            assert json.loads(_b1_emulated(seed))["rebased_at"] is not None
+        pair, lossy = b1_emulated(seed)
+        if seed in (1065, 277):
+            assert request.rebase and lossy["rebased_at"] is None
+        if seed == 430:
+            assert lossy["rebased_at"] is not None
+            assert span_end(pair, lossy) is None
+        if seed in CONVERGING:
+            assert lossy["rebased_at"] is not None
+            assert span_end(pair, lossy) is not None
     for mode in ("rb", "rt"):
         assert {(mode, "fail_no_effect", False), (mode, "cancel", False)} <= seen
         assert {(mode, "fail_consumed", False), (mode, "fail_consumed", True)} <= seen
@@ -742,11 +759,11 @@ def test_bc2_claims_nothing_when_the_lossy_trace_is_not_b1s():
     assert claims(result, "BC2-LOST-INPUT") == []
 
 
-@pytest.mark.parametrize("seed", [1065, 277, 430])
+@pytest.mark.parametrize("seed", CONVERGING)
 def test_bc2_rejects_a_difference_after_the_span(seed):
     pair, lossy = b1_emulated(seed)
-    rebased = lossy["rebased_at"]
-    later = [r for r in pair.ref if r.index > rebased and r.name != "final"]
+    end = pair.cand[span_end(pair, lossy)].index
+    later = [r for r in pair.ref if r.index > end and r.name != "final"]
     assert later
     target = later[-1]
     ref = edit(pair.ref, target.key, outcome={"error": "OSError", "message": "x"})
@@ -754,10 +771,10 @@ def test_bc2_rejects_a_difference_after_the_span(seed):
 
 
 def test_bc2_rejects_a_candidate_refusal_after_its_rewind():
-    seed = 1065
+    seed = 2361
     pair, lossy = b1_emulated(seed)
-    rebased = lossy["rebased_at"]
-    later = [r for r in pair.cand if r.index > rebased and r.name != "final"]
+    end = pair.cand[span_end(pair, lossy)].index
+    later = [r for r in pair.cand if r.index > end and r.name != "final"]
     target = later[-1]
     cand = edit(
         pair.cand, target.key, outcome={"error": "OSError", "message": READ_BROKEN}
@@ -767,13 +784,6 @@ def test_bc2_rejects_a_candidate_refusal_after_its_rewind():
         repr(target.key),
         lossy=lossy,
     )
-
-
-# L2 with the seed-584 shape, written from the design: b1's cancelled native
-# read took the whole wire, b1 then sees a clean end over the empty lossy
-# wire until its seek_mark (9) rewinds the file, and its abort of a native
-# rewind is BC9's b1 outcome. The candidate's cancel settles before its
-# parked read enters the file, so only b1's trigger row has the witness.
 
 
 def unparse(rows: list[Row]) -> list[list[Any]]:
@@ -801,51 +811,140 @@ def unparse(rows: list[Row]) -> list[list[Any]]:
     return trace
 
 
-def b1_584() -> tuple[list[Row], dict[str, Any]]:
-    ref = c0_rows(584)
-    ref = edit(ref, row(ref, 4, "cancel").key, taken=[0, 242])
-    ref = edit(
-        ref,
-        row(ref, 6, "buffer_read").key,
-        outcome={"ok": {"bytes": ""}},
-        pulled=[0, 0],
-    )
-    ref = edit(ref, row(ref, 7, "next").key, outcome={"stop": True})
-    ref = edit(ref, row(ref, 8, "buffer_read").key, pulled=[0, 0])
-    ref = edit(
-        ref,
-        row(ref, 13, "abort").key,
-        second={"error": "ValueError", "message": "seek of closed file"},
-    )
-    lossy = {"trace": unparse(ref), "violations": [], "rebased_at": 9}
-    return ref, lossy
+@pytest.mark.parametrize("field", ["view", "position", "eof", "health"])
+def test_bc2_span_ends_only_when_every_converged_field_agrees(field):
+    pair, lossy = b1_emulated(2969)
+    end = span_end(pair, lossy)
+    m = next(n for n, r in enumerate(pair.ref) if r.key == pair.cand[end].key)
+    position, eof, view = lossy["states"][m]
+    if field == "view":
+        lossy["states"][m] = [position, eof, "lossy"]
+    elif field == "position":
+        lossy["states"][m] = [[position[0] + 1] * 2, eof, view]
+    elif field == "eof":
+        lossy["states"][m] = [position, not eof, view]
+    else:
+        lossy["health"][m] = [lossy["health"][m][0], "BROKEN"]
+    later = span_end(pair, lossy)
+    assert later is None or later > end
 
 
-def test_bc2_l2_584_composes_with_bc9():
-    ref, lossy = b1_584()
-    pair = make_pair(584, ref, reference="b1")
+def test_bc2_span_ends_only_at_a_certain_position():
+    pair, lossy = b1_emulated(2969)
+    end = span_end(pair, lossy)
+    m = next(n for n, r in enumerate(pair.ref) if r.key == pair.cand[end].key)
+    position, eof, view = lossy["states"][m]
+    lossy["states"][m] = [[position[0], position[0] + 1], eof, view]
+    pair.cand_info["states"][end][0] = [position[0], position[0] + 1]
+    later = span_end(pair, lossy)
+    assert later is None or later > end
+
+
+# The lossy model's view switch: a model rewind with an attested physical
+# source seek over the lost range, never a cancelled call.
+
+
+def _lossy_checker(lost_start: int = 10) -> LossyChecker:
+    scenario = generate(2969)
+    return LossyChecker(scenario, scenario, ENGINE, 0, True, lost_start)
+
+
+@pytest.mark.parametrize(
+    ("seeks", "kind", "expected"),
+    [
+        ([0], "ok", True),
+        ([10], "ok", True),
+        ([11], "ok", False),
+        ([20, 0], "error", True),
+        (None, "ok", False),
+        ([0], "cancelled", False),
+    ],
+)
+def test_lossy_checker_physical_rewind_needs_a_seek_over_the_range(
+    seeks, kind, expected
+):
+    event = Event(3, {"op": "seek0"}, Outcome(kind), seeks=seeks)
+    assert _lossy_checker().physical_rewind(event) is expected
+
+
+def test_lossy_checker_stays_lossy_without_a_recorded_seek(monkeypatch):
+    assert _lossy_run(2969)["rebased_at"] is not None
+    monkeypatch.setattr(interpreter.Gate, "seeked", lambda self, target: None)
+    run = _lossy_run(2969)
+    assert run["seeks"] == [] and run["rebased_at"] is None
+
+
+def test_lossy_checker_stays_lossy_after_a_seek_past_the_range():
+    request = bc2_request_for(2969)
+    assert _lossy_run(2969, taken=[-1, -1])["rebased_at"] is None
+    assert request.taken == [0, 0]
+
+
+def test_custom_source_seeks_are_recorded_outside_the_trace():
+    scenario, run = live(2969)
+    assert run["seeks"] and all(targets for _, targets in run["seeks"])
+    assert all(
+        not (isinstance(x, dict) and "seeks" in x) for r in run["trace"] for x in r
+    )
+
+
+def test_native_source_seeks_are_recorded():
+    seeds = [
+        s
+        for s in range(200)
+        if generate(s)["source"]["kind"] == "native"
+        and generate(s)["mode"] in ("rb", "rt")
+        and any(op["op"] == "seek0" for op in generate(s)["ops"])
+    ]
+    assert any(live(seed)[1]["seeks"] for seed in seeds[:10])
+
+
+# Recorded b1 references (tests/data/wp10_b1_runs.json).
+
+
+def b1_recorded(seed: int) -> tuple[Pair, dict[str, Any]]:
+    run = copy.deepcopy(B1[str(seed)])
+    return make_pair(seed, parse(run["trace"]), reference="b1"), run["lossy"]
+
+
+def test_bc2_l2_584_stays_lossy_to_the_end():
+    # b1's cancelled native read took the whole wire. Its later seek_mark and
+    # seek0 stand at decompressed position 0 and make no source call, so b1
+    # never returns to the true wire, and its abort of a rewind it skipped
+    # is a BC2 residual, not BC9.
+    pair, lossy = b1_recorded(584)
     request = bc2_request(pair)
     assert request is not None and request.clause == "L2"
-    assert request.lossy["wire"] == ""
+    assert request.lossy["wire"] == "" and request.taken == [0, 242]
+    assert lossy["rebased_at"] is None and lossy["seeks"] == [[3, [0]]]
     result = compare(pair, lossy)
     assert result.ok, result.failures
-    bc2 = claims(result, "BC2-LOST-INPUT")
-    assert {eval(item)[1][0] for item in bc2} == {4, 6, 7, 8}
-    assert [eval(item)[1][0] for item in claims(result, "BC9-REWIND-ABORT")] == [13]
+    bc2 = {eval(item)[1][0] for item in claims(result, "BC2-LOST-INPUT")}
+    assert bc2 == {4, 6, 7, 8, 10, 12, 13}
+    assert claims(result, "BC9-REWIND-ABORT") == []
 
 
-def test_bc2_l2_rejects_a_difference_after_both_sides_rewound():
-    ref, lossy = b1_584()
-    target = row(ref, 10, "readline")
-    ref = edit(ref, target.key, outcome={"ok": {"str": "x"}})
-    lossy["trace"] = unparse(ref)
-    fails(make_pair(584, ref, reference="b1"), repr(target.key), lossy=lossy)
+def test_bc2_l2_584_fails_if_b1_had_rewound():
+    # Had b1 rewound physically at its seek_mark (9) and converged there or
+    # at its readline (10), the span would end, leaving b1's later lossy
+    # reads and its abort unclaimed.
+    pair, lossy = b1_recorded(584)
+    for m, r in enumerate(pair.ref):
+        if r.index >= 9:
+            position, eof, _ = lossy["states"][m]
+            lossy["states"][m] = [position, eof, "true"]
+    cand_states = pair.cand_info["states"]
+    m = next(n for n, r in enumerate(pair.ref) if r.index == 9)
+    n = next(n for n, r in enumerate(pair.cand) if r.index == 9)
+    lossy["states"][m] = copy.deepcopy(cand_states[n])
+    lossy["health"][m] = copy.deepcopy(pair.cand_info["health"][n])
+    fails(pair, "(12, 'readlines', 0)", "(13, 'abort', 0)", lossy=lossy)
 
 
 def test_bc2_l2_rejects_a_trigger_that_differs_beyond_the_witness():
-    ref, lossy = b1_584()
-    cancel = row(ref, 4, "cancel")
-    ref = edit(ref, cancel.key, second={"ok": {"str": "other"}})
+    pair, lossy = b1_recorded(584)
+    cancel = row(pair.ref, 4, "cancel")
+    ref = edit(pair.ref, cancel.key, second={"ok": {"str": "other"}})
     lossy["trace"] = unparse(ref)
     pair = make_pair(584, ref, reference="b1")
     assert bc2_request(pair) is None
@@ -853,12 +952,69 @@ def test_bc2_l2_rejects_a_trigger_that_differs_beyond_the_witness():
 
 
 def test_bc2_l2_rejects_a_range_with_an_endpoint_inside_a_member():
-    ref, lossy = b1_584()
-    ref = edit(ref, row(ref, 4, "cancel").key, taken=[0, 100])
+    pair, lossy = b1_recorded(584)
+    ref = edit(pair.ref, row(pair.ref, 4, "cancel").key, taken=[0, 100])
     lossy["trace"] = unparse(ref)
     pair = make_pair(584, ref, reference="b1")
     assert bc2_request(pair) is None
     fails(pair, "unclaimed", lossy=lossy)
+
+
+def test_bc2_168_span_runs_past_the_rebase_until_convergence():
+    # b1 rewinds physically at op 5, but its seek_back started from a
+    # position ahead of the candidate's, so the models never converge.
+    pair, lossy = b1_recorded(168)
+    assert lossy["rebased_at"] == 5
+    assert span_end(pair, lossy) is None
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    bc2 = {eval(item)[1][0] for item in claims(result, "BC2-LOST-INPUT")}
+    assert {6, 7} <= bc2
+
+
+@pytest.mark.parametrize("seed", [20, 271, 2716])
+def test_bc2_o1_acquisition_is_normalized_for_the_lossy_model(seed):
+    pair, lossy = b1_recorded(seed)
+    request = bc2_request(pair)
+    assert request is not None and request.acquire == "O1"
+    assert lossy["normalized"] == [-1] and lossy["violations"] == []
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert claims(result, "BC3-OPENING") == ["('event', (-1, 'acquire', 0))"]
+
+
+def test_bc2_o1_normalization_needs_bc3_to_own_the_acquisition():
+    pair, lossy = b1_recorded(20)
+    key = (-1, "acquire", 0)
+    ref = edit(
+        pair.ref,
+        key,
+        second={"error": "ValueError", "message": "File is already closed"},
+    )
+    pair = make_pair(20, ref, reference="b1")
+    request = bc2_request(pair)
+    assert request is not None and request.acquire is None
+    lossy["trace"] = unparse(ref)
+    fails(pair, "normalized an acquisition BC3 does not own", lossy=lossy)
+
+
+@pytest.mark.parametrize(
+    ("acquire", "index", "violates"),
+    [("O1", -1, False), (None, -1, True), ("O1", 4, True)],
+)
+def test_lossy_checker_normalizes_only_the_o1_acquisition(acquire, index, violates):
+    scenario = generate(20)
+    checker = LossyChecker(scenario, scenario, ENGINE, 0, True, 0, acquire)
+    error = ValueError("File is already open")
+    checker.expect_concurrent(index, Outcome("error", error=error))
+    assert bool(checker.violations) is violates
+    assert checker.normalized == ([] if violates else [-1])
+
+
+def test_lossy_checker_normalizes_only_o1():
+    scenario = generate(20)
+    with pytest.raises(ValueError):
+        LossyChecker(scenario, scenario, ENGINE, 0, True, 0, "O2")
 
 
 # lossy_scenario over synthetic text scenarios: whole members removed from
@@ -974,11 +1130,7 @@ def test_lossy_scenario_requires_the_failure_boundary_prefix_to_decode():
 
 def _lossy_run(seed: int, **override) -> dict[str, Any]:
     request = bc2_request_for(seed)
-    fields = {
-        "lossy": request.lossy,
-        "trigger": request.trigger[0],
-        "rebase": request.rebase,
-    } | override
+    fields = request.line(generate(seed)) | override
     real = interpreter.Source
     interpreter.Source = LyingSource
     try:
@@ -1006,7 +1158,8 @@ def _584_lossy_run(**override) -> dict[str, Any]:
     scenario = generate(584)
     lossy = lossy_scenario(scenario, 0, 242, ENGINE)
     assert lossy is not None and lossy["wire"] == ""
-    request = {"lossy": lossy, "trigger": 4, "rebase": False} | override
+    request = {"lossy": lossy, "trigger": 4, "rebase": False, "taken": [0, 242]}
+    request |= override
     return recorded_run(aiogzip, scenario, ENGINE, "lossy", request)
 
 
@@ -1027,8 +1180,8 @@ def test_lossy_checker_keeps_its_state_across_the_switch():
 
 
 def test_lossy_checker_rebases_only_when_asked():
-    assert _lossy_run(1065)["rebased_at"] is not None
-    assert _lossy_run(1065, rebase=False)["rebased_at"] is None
+    assert _lossy_run(2969)["rebased_at"] is not None
+    assert _lossy_run(2969, rebase=False)["rebased_at"] is None
 
 
 # BC3: opening under overlap (b1 only). References are written from the
