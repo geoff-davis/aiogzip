@@ -32,6 +32,7 @@ from differential import (
     Row,
     _converged,
     _wire_scenario,
+    bc2_claim,
     bc2_request,
     bc2_trigger_only,
     compare,
@@ -44,7 +45,7 @@ from differential import (
 )
 from generator import generate, member_spans, unb64
 from interpreter import Event, Outcome, final_output, recorded_run
-from model import Checker, LossyChecker
+from model import Checker, LossyChecker, wire_view
 from oracle import engine_modules, wire_reference
 
 import aiogzip
@@ -2029,3 +2030,233 @@ def test_bc3_rejects_an_opening_under_async_with():
     scenario = generate(1755)
     scenario["acquisition"]["enter"] = "async_with"
     fails(make_pair(1755, b1_o2(1755), reference="b1", scenario=scenario))
+
+
+# H: later losses per physical-source epoch. Seed 129 is a three-member
+# binary read of a custom source without checkpoints (wire 108 bytes).
+
+
+def _h_checker(trigger: int = 2, **lossy_fields) -> LossyChecker:
+    scenario = generate(129)
+    lossy = dict(scenario) | lossy_fields
+    checker = LossyChecker(lossy, scenario, ENGINE, trigger, True, 0)
+    # Past the trigger: on the trigger's lossy view, or (without one) as
+    # after a rebase, on the true view with no epoch open.
+    checker.lost = True
+    checker.state = "lossy" if lossy_fields else "true"
+    return checker
+
+
+def _at(checker: LossyChecker, index: int, taken=None, seeks=None, kind="error"):
+    checker.index = index
+    checker.event = Event(
+        index, {"op": "read"}, Outcome(kind), taken=taken, seeks=seeks
+    )
+    return checker
+
+
+def _expect_without(*ranges: list[int]):
+    scenario = generate(129)
+    wire, spliced, at = unb64(scenario["wire"]), b"", 0
+    for a, b in ranges:
+        spliced, at = spliced + wire[at:a], b
+    view = wire_view(scenario, spliced + wire[at:], ENGINE, lossy_ranges=list(ranges))
+    return Checker(view, ENGINE).expect
+
+
+@pytest.mark.parametrize(
+    ("transition", "taken", "expected"),
+    [
+        ("uncertain_failure", [38, 66], (True, [38, 66])),
+        ("consumed_failure", [0, 0], (True, [0, 0])),
+        ("cancel_uncertain", [108, 108], (True, [108, 108])),
+        ("cancel_uncertain", None, (True, None)),
+        ("cancel_no_effect", [0, 38], (True, [0, 38])),
+        # A cancel settled without effect loses input only with a range.
+        ("cancel_no_effect", [5, 5], (False, None)),
+        ("cancel_no_effect", None, (False, None)),
+        # Without a witness the candidate's semantics stand.
+        ("uncertain_failure", None, (False, None)),
+        ("consumed_failure", None, (False, None)),
+        ("no_effect_failure", [0, 38], (False, None)),
+        # Malformed or impossible ranges are no witness.
+        ("uncertain_failure", [38, 109], (False, None)),
+        ("uncertain_failure", [66, 38], (False, None)),
+        ("uncertain_failure", [-1, 38], (False, None)),
+        ("uncertain_failure", [True, 38], (False, None)),
+        ("uncertain_failure", [0.0, 38], (False, None)),
+        ("uncertain_failure", [0, 38, 66], (False, None)),
+        ("uncertain_failure", (0, 38), (False, None)),
+    ],
+)
+def test_h_later_loss_needs_its_own_witness(transition, taken, expected):
+    assert _at(_h_checker(), 5, taken).later_loss(transition) == expected
+
+
+def test_h_later_loss_is_only_after_the_trigger():
+    checker = _h_checker()
+    assert _at(checker, 2, [0, 38]).later_loss("uncertain_failure") == (False, None)
+    fresh = LossyChecker(generate(129), generate(129), ENGINE, 2, True, 0)
+    assert _at(fresh, 1, [0, 38]).later_loss("uncertain_failure") == (False, None)
+
+
+def test_h_an_empty_cancel_loss_needs_a_custom_source_without_checkpoints():
+    scenario = generate(129)
+    for source in ({"kind": "native"}, scenario["source"] | {"checkpoint": True}):
+        true = scenario | {"source": source}
+        checker = LossyChecker(true, true, ENGINE, 2, True, 0)
+        checker.lost = True
+        assert _at(checker, 5).later_loss("cancel_uncertain") == (False, None)
+
+
+def test_h_a_loss_opens_an_epoch_on_the_oracle_view():
+    checker = _at(_h_checker(), 5, [38, 66])
+    checker.transition("uncertain_failure")
+    assert checker.view == "lossy" and checker.losses == [[5, [38, 66]]]
+    assert checker.deleted == [[38, 66]] and checker.epoch_start == 38
+    assert checker.expect == _expect_without([38, 66])
+    assert checker.violations == []
+
+
+def test_h_losses_accumulate_in_wire_order():
+    checker = _at(_h_checker(), 5, [0, 10])
+    checker.transition("uncertain_failure")
+    _at(checker, 7, [38, 66]).transition("consumed_failure")
+    assert checker.deleted == [[0, 10], [38, 66]] and checker.epoch_start == 0
+    assert checker.expect == _expect_without([0, 10], [38, 66])
+    assert checker.violations == []
+
+
+def test_h_a_loss_before_the_epochs_last_is_a_violation():
+    checker = _at(_h_checker(), 5, [38, 66])
+    checker.transition("uncertain_failure")
+    _at(checker, 7, [60, 70]).transition("uncertain_failure")
+    assert checker.violations and checker.violations[0].startswith("op 7:")
+
+
+def test_h_extends_the_trigger_range():
+    checker = _h_checker(lossy_range=[0, 10])
+    assert checker.view == "lossy" and checker.deleted == [[0, 10]]
+    _at(checker, 5, [38, 66]).transition("uncertain_failure")
+    assert checker.deleted == [[0, 10], [38, 66]]
+    assert checker.expect == _expect_without([0, 10], [38, 66])
+
+
+def test_h_a_loss_over_a_replayed_prefix_is_not_modeled():
+    checker = _h_checker(replayed_prefix=38)
+    assert checker.view == "lossy" and checker.deleted is None
+    _at(checker, 5, [40, 50]).transition("uncertain_failure")
+    assert checker.violations
+
+
+def test_h_the_trigger_epoch_ends_only_over_its_lost_start():
+    checker = _h_checker(lossy_range=[0, 10])
+    _at(checker, 5, [38, 66]).transition("uncertain_failure")
+    _at(checker, 6, seeks=[38], kind="ok").transition("rewind_ok")
+    assert checker.view == "lossy" and checker.rebases == []
+    _at(checker, 7, seeks=[0], kind="ok").transition("rewind_ok")
+    assert checker.view == "true" and checker.rebases == [7]
+
+
+def test_h_an_empty_loss_leaves_the_view():
+    checker = _at(_h_checker(), 5, [38, 38])
+    expect, health = checker.expect, checker.health
+    checker.transition("uncertain_failure")
+    assert checker.losses == [[5, [38, 38]]] and checker.view == "true"
+    assert checker.expect is expect and checker.health == health
+
+
+@pytest.mark.parametrize(("target", "rebased"), [(38, True), (0, True), (39, False)])
+def test_h_a_physical_rewind_over_the_epoch_ends_it(target, rebased):
+    checker = _at(_h_checker(), 5, [38, 66])
+    checker.transition("uncertain_failure")
+    _at(checker, 6, seeks=[target], kind="ok").transition("rewind_ok")
+    assert (checker.view == "true") is rebased
+    assert checker.rebases == ([6] if rebased else [])
+    if rebased:
+        assert checker.deleted == [] and checker.expect == checker.true.expect
+        # The next loss opens a new epoch.
+        _at(checker, 8, [66, 108]).transition("uncertain_failure")
+        assert checker.deleted == [[66, 108]] and checker.epoch_start == 66
+        assert checker.rebased_at == 6
+
+
+@pytest.mark.parametrize(
+    "losses",
+    [
+        "x",
+        [[5]],
+        [(5, None)],
+        [[True, None]],
+        [[5, [1]]],
+        [[5, [2, 1]]],
+        [[5, [-1, 1]]],
+        [[5, [0, 1.0]]],
+        [[5, None], [5, None]],
+        [[7, None], [5, None]],
+    ],
+)
+def test_h_malformed_losses_claim_nothing(losses):
+    pair, lossy = b1_recorded(169)
+    request = bc2_request(pair)
+    assert bc2_claim(pair, request, lossy, set()).events
+    lossy["losses"] = losses
+    assert bc2_claim(pair, request, lossy, set()).events == set()
+
+
+def test_h_a_loss_the_oracle_refuses_is_a_violation(monkeypatch):
+    import model
+
+    monkeypatch.setattr(model, "wire_view", lambda *args, **kwargs: None)
+    checker = _at(_h_checker(), 5, [38, 66])
+    checker.transition("uncertain_failure")
+    assert checker.violations == ["op 5: no model for the losses [[38, 66]]"]
+
+
+# H on recorded b1 runs: each later loss row, and the rows after it until
+# the models agree again, are BC2's.
+
+H_SEEDS = {
+    # Pre-rebase: the loss extends the trigger's epoch.
+    58: [[4, [0, 21]]],
+    3626: [[3, [0, 1]], [5, [1, 8]]],
+    5782: [[9, [236677, 236684]]],
+    # Post-rebase: a cancelled native read opens a new epoch (L2-shaped).
+    53: [[10, [0, 64]]],
+    2473: [[9, [0, 64]]],
+    # Empty cancelled custom reads: no view change.
+    2228: [[1, None], [9, None]],
+}
+
+
+@pytest.mark.parametrize("seed", sorted(H_SEEDS))
+def test_h_recorded_later_losses_are_claimed(seed):
+    pair, lossy = b1_recorded(seed)
+    assert lossy["losses"] == H_SEEDS[seed] and lossy["violations"] == []
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT")
+
+
+@pytest.mark.parametrize(
+    ("seed", "row"),
+    [
+        (53, "(10, 'cancel', 0)"),
+        (2473, "(9, 'cancel', 0)"),
+    ],
+)
+def test_h_recorded_loss_rows_need_the_loss_record(seed, row):
+    # Post-rebase losses only: a pre-rebase loss (58) lies in the trigger's
+    # span, which never converges; there H is the model's view (unit tests).
+    pair, lossy = b1_recorded(seed)
+    bc2 = claims(compare(pair, lossy), "BC2-LOST-INPUT")
+    assert any(row in item for item in bc2)
+    lossy["losses"] = []
+    fails(pair, row, lossy=lossy)
+
+
+def test_h_53_rebases_before_its_second_epoch():
+    _pair, lossy = b1_recorded(53)
+    assert lossy["rebases"] == [9] and lossy["rebased_at"] == 9
+    m = next(n for n, r in enumerate(parse(lossy["trace"])) if r.index == 10)
+    assert lossy["states"][m - 1][2] == "true" and lossy["states"][m][2] == "lossy"

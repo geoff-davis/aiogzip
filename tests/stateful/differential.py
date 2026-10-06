@@ -44,8 +44,8 @@ sys.path.insert(0, str(HERE))
 
 from generator import generate, unb64  # noqa: E402
 from interpreter import Event, Outcome, final_output, symbolic  # noqa: E402
-from model import Checker, text_model  # noqa: E402
-from oracle import engine_modules, raw_reference, wire_reference  # noqa: E402
+from model import Checker, text_model, wire_view  # noqa: E402
+from oracle import engine_modules, raw_reference  # noqa: E402
 
 READ_ABORTED = "read aborted because the gzip file was closed while the call was active"
 READ_BROKEN = "read stream is broken"
@@ -1204,41 +1204,7 @@ def replay_scenario(
 def _wire_scenario(
     scenario: dict[str, Any], spliced: bytes, engine: str, **witness: Any
 ) -> dict[str, Any] | None:
-    """A view no payload model describes, judged by the engine-matched wire
-    oracle: a splice inside a member, or a replayed prefix.
-
-    The view carries only its decoder input and the ``wire`` corruption kind:
-    its expected bytes, guarantee and failure come from ``wire_reference``
-    over that input. A decompression limit the oracle cannot order, or a
-    view the model refuses, stays ineligible (fail closed).
-    """
-    corruption: dict[str, Any] = {"kind": "wire"}
-    if scenario["corruption"]["kind"] == "limit":
-        limit = scenario["corruption"]["limit"]
-        module = engine_modules()[engine]
-        reference = wire_reference(module, spliced)
-        if reference["failure"] == "body invalid" and reference[
-            "validated"
-        ] <= limit < len(reference["output"]):
-            # A batched inflate may raise before it emits the bytes that pass
-            # the limit, so which failure comes first is not determined.
-            return None
-        corruption["limit"] = limit
-    lossy = dict(scenario)
-    lossy.update(
-        wire=base64.b64encode(spliced).decode("ascii"),
-        payloads=[],
-        payload_size=0,
-        member_offsets=None,
-        member_spans=None,
-        corruption=corruption,
-        **witness,
-    )
-    try:
-        Checker(lossy, engine)
-    except (UnicodeDecodeError, ValueError, AssertionError):
-        return None
-    return lossy
+    return wire_view(scenario, spliced, engine, **witness)
 
 
 def bc2_claim(
@@ -1251,10 +1217,24 @@ def bc2_claim(
     claim = Claim()
     if parse(lossy["trace"]) != pair.ref:
         return claim  # b1's replay was not reproduced; claim nothing
+    losses = _losses(lossy)
+    if losses is None:
+        return claim  # malformed loss evidence; claim nothing
     order = pair.cand_order
     start = order[request.trigger]
     converged = _converged(pair, lossy, start)
-    end = len(pair.cand) if converged is None else converged + 1
+    span = set(range(start + 1, len(pair.cand) if converged is None else converged + 1))
+    for index in losses:
+        # H: each later loss opens its own span, from its first row until
+        # the models agree again.
+        rows = [n for n, row in enumerate(pair.cand) if row.key[0] == index]
+        if not rows:
+            return Claim()  # a loss the candidate never ran; claim nothing
+        begin = min(rows)
+        converged = _converged(pair, lossy, begin - 1)
+        span.update(
+            range(begin, len(pair.cand) if converged is None else converged + 1)
+        )
     rejected = {index for index, _message in lossy["violations"]}
     trigger = request.trigger
     if (
@@ -1266,14 +1246,38 @@ def bc2_claim(
         # The candidate settles the cancel before its parked read enters the
         # file, so only b1's trigger row carries the lost-range witness.
         claim.events.add(trigger)
-    for row in pair.cand[start + 1 : end]:
-        key = row.key
+    for n in sorted(span):
+        key = pair.cand[n].key
         if key not in pair.diffs or ("event", key) in owned:
             continue
         if key[0] in rejected or key[1] == "final":
             continue
         claim.events.add(key)
     return claim
+
+
+def _losses(lossy: dict[str, Any]) -> list[int] | None:
+    """The event indices of the lossy run's later losses (H), or None when
+    the record is malformed."""
+    losses = lossy.get("losses", [])
+    if type(losses) is not list:
+        return None
+    indices = []
+    for loss in losses:
+        if type(loss) is not list or len(loss) != 2 or type(loss[0]) is not int:
+            return None
+        taken = loss[1]
+        if taken is not None and not (
+            type(taken) is list
+            and len(taken) == 2
+            and all(type(x) is int for x in taken)
+            and 0 <= taken[0] <= taken[1]
+        ):
+            return None
+        indices.append(loss[0])
+    if indices != sorted(set(indices)):
+        return None
+    return indices
 
 
 def _converged(pair: Pair, lossy: dict[str, Any], start: int) -> int | None:

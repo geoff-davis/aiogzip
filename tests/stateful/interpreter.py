@@ -1071,6 +1071,8 @@ def recorded_run(
     if check == "lossy":
         run_record["rebased_at"] = checker.rebased_at
         run_record["normalized"] = checker.normalized
+        run_record["rebases"] = checker.rebases
+        run_record["losses"] = checker.losses
     return run_record
 
 

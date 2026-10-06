@@ -946,6 +946,46 @@ class Checker(_HandleChecker):
         return lines
 
 
+def wire_view(
+    scenario: dict[str, Any], spliced: bytes, engine: str, **witness: Any
+) -> dict[str, Any] | None:
+    """A view no payload model describes, judged by the engine-matched wire
+    oracle: a splice inside a member, or a replayed prefix.
+
+    The view carries only its decoder input and the ``wire`` corruption kind:
+    its expected bytes, guarantee and failure come from ``wire_reference``
+    over that input. A decompression limit the oracle cannot order, or a
+    view the model refuses, stays ineligible (fail closed).
+    """
+    corruption: dict[str, Any] = {"kind": "wire"}
+    if scenario["corruption"]["kind"] == "limit":
+        limit = scenario["corruption"]["limit"]
+        module = engine_modules()[engine]
+        reference = wire_reference(module, spliced)
+        if reference["failure"] == "body invalid" and reference[
+            "validated"
+        ] <= limit < len(reference["output"]):
+            # A batched inflate may raise before it emits the bytes that pass
+            # the limit, so which failure comes first is not determined.
+            return None
+        corruption["limit"] = limit
+    lossy = dict(scenario)
+    lossy.update(
+        wire=base64.b64encode(spliced).decode("ascii"),
+        payloads=[],
+        payload_size=0,
+        member_offsets=None,
+        member_spans=None,
+        corruption=corruption,
+        **witness,
+    )
+    try:
+        Checker(lossy, engine)
+    except (UnicodeDecodeError, ValueError, AssertionError):
+        return None
+    return lossy
+
+
 class LossyChecker(Checker):
     """b1's reader over the input it actually saw after losing some (BC2).
 
@@ -963,8 +1003,21 @@ class LossyChecker(Checker):
     decompressed position 0) keeps the lossy view, and so does a cancelled
     call. On a non-seekable custom source b1 replays its cache, which lacks
     the lost range, so it never returns. Every violation is recorded with its
-    event index; a later trigger gets the candidate's semantics, so it fails
-    closed.
+    event index.
+
+    H: b1 can lose input again after the trigger. A later uncertain or
+    consumed failure, or an uncertain cancel, is b1's no-effect retry only
+    with its own witness: the event's valid ``taken`` range, or (a cancelled
+    read on a custom source without a checkpoint) an empty loss, as at the
+    trigger. A cancel the candidate settles without effect (native) is a
+    loss when b1 took a nonempty range (L2). Without a witness the event
+    gets the candidate's semantics and fails closed.
+    Losses accumulate per physical-source epoch in true-wire coordinates,
+    in order; the view is then the wire oracle over the true wire with every
+    lost range of the epoch removed. A physical rewind over the epoch's
+    first lost start restores the true view and ends the epoch; the next
+    loss starts a new one. A later loss over a replayed prefix (G native) is
+    not modeled.
 
     ``acquire`` names the BC3 clause that owns the acquisition event exactly
     (only "O1"); its contender outcome then takes b1's lifecycle transition
@@ -990,6 +1043,7 @@ class LossyChecker(Checker):
     ) -> None:
         super().__init__(lossy, engine)
         self.true = Checker(true, engine)
+        self.true_scenario = true
         # The physical source still holds and delivers the lost range; only
         # the reader's view lacks it, so source work is bounded by the true
         # wire.
@@ -1000,13 +1054,30 @@ class LossyChecker(Checker):
         if acquire not in (None, "O1"):
             raise ValueError(f"no lossy normalization for {acquire}")
         self.acquire = acquire
+        self.engine = engine
         self.normalized: list[int] = []
         self.rebased_at: int | None = None
+        self.rebases: list[int] = []
+        # H: later losses as [event index, true-wire range or None (empty)].
+        self.losses: list[list[Any]] = []
         self.index: int | None = None
         self.event: Any = None
         self.lossy = types.SimpleNamespace(**{n: getattr(self, n) for n in self.VIEW})
         self._use(self.true)
-        self.lost = False  # whether the lossy view is in force
+        self.lost = False  # whether the trigger has been reached
+        self.state = "true"  # the view in force: "true" or "lossy"
+        # The current epoch's lost true-wire ranges, or None over a replayed
+        # prefix, and the offset a physical rewind must reach to end it.
+        if "replayed_prefix" in lossy:
+            self.deleted: list[list[int]] | None = None
+        elif (
+            "lossy_range" in lossy and lossy["lossy_range"][0] < lossy["lossy_range"][1]
+        ):
+            self.deleted = [list(lossy["lossy_range"])]
+        else:
+            self.deleted = []
+        self.epoch_start = lost_start
+        self._lost_index: int | None = None
 
     VIEW = ("expect", "upper", "lower")
 
@@ -1016,7 +1087,7 @@ class LossyChecker(Checker):
 
     @property
     def view(self) -> str:
-        return "lossy" if self.lost and self.rebased_at is None else "true"
+        return self.state
 
     def expect_concurrent(self, index: int, outcome) -> None:
         if self.acquire == "O1" and index == -1:
@@ -1031,7 +1102,7 @@ class LossyChecker(Checker):
         """
         if event is None or event.outcome.kind == "cancelled":
             return False
-        return any(target <= self.lost_start for target in event.seeks or ())
+        return any(target <= self.epoch_start for target in event.seeks or ())
 
     def observe(self, event) -> None:
         self.index = event.index
@@ -1039,23 +1110,116 @@ class LossyChecker(Checker):
         if not self.lost and event.index >= self.trigger:
             self._use(self.lossy)
             self.lost = True
+            self.state = "lossy"
         super().observe(event)
+
+    def later_loss(self, transition: str) -> tuple[bool, list[int] | None]:
+        """Whether this event is a witnessed later loss, and its range
+        (None for an empty loss at an unwitnessed source position)."""
+        if (
+            not self.lost
+            or self.index is None
+            or self.index <= self.trigger
+            or self._lost_index == self.index
+            or transition not in (*self.NO_EFFECT, "cancel_no_effect")
+        ):
+            return False, None
+        taken = getattr(self.event, "taken", None)
+        if taken is not None:
+            if (
+                isinstance(taken, list)
+                and len(taken) == 2
+                and all(type(x) is int for x in taken)
+                and 0 <= taken[0] <= taken[1] <= self.wire_size
+                # A cancel the model already settles without effect loses
+                # input only when b1 took some (L2).
+                and (transition != "cancel_no_effect" or taken[0] < taken[1])
+            ):
+                return True, list(taken)
+            return False, None
+        if transition == "cancel_no_effect":
+            return False, None
+        source = self.true_scenario["source"]
+        if (
+            transition == "cancel_uncertain"
+            and source["kind"] == "custom"
+            and not source["checkpoint"]
+        ):
+            return True, None
+        return False, None
+
+    def lose(self, taken: list[int] | None) -> None:
+        """Apply a later loss: extend the epoch, or start a new one."""
+        index = self.index
+        assert index is not None
+        self._lost_index = index
+        self.losses.append([index, taken])
+        if taken is None or taken[0] == taken[1]:
+            return  # nothing lost: the view in force stands
+        if self.state == "true":
+            self.state = "lossy"
+            self.deleted = [taken]
+            self.epoch_start = taken[0]
+            self._view()
+            return
+        if self.deleted is None:
+            self.fail(index, "a later loss over a replayed prefix is not modeled")
+            return
+        if self.deleted and taken[0] < self.deleted[-1][1]:
+            self.fail(
+                index, f"loss {taken} precedes the epoch's loss {self.deleted[-1]}"
+            )
+            return
+        self.deleted.append(taken)
+        self._view()
+
+    def _view(self) -> None:
+        """Use the oracle view of the true wire without the epoch's losses."""
+        if not self.deleted:
+            self._use(self.true)
+            return
+        wire = base64.b64decode(self.true_scenario["wire"])
+        spliced, at = b"", 0
+        for a, b in self.deleted:
+            spliced += wire[at:a]
+            at = b
+        spliced += wire[at:]
+        scenario = wire_view(
+            self.true_scenario,
+            spliced,
+            self.engine,
+            lossy_ranges=[list(r) for r in self.deleted],
+        )
+        if scenario is None:
+            assert self.index is not None
+            self.fail(self.index, f"no model for the losses {self.deleted}")
+            return
+        self._use(Checker(scenario, self.engine))
 
     def transition(self, event: str) -> None:
         if self.index == self.trigger:
             event = self.NO_EFFECT.get(event, event)
+        else:
+            witnessed, taken = self.later_loss(event)
+            if witnessed:
+                self.lose(taken)
+                event = self.NO_EFFECT.get(event, event)
         super().transition(event)
         if (
             event == "rewind_ok"
             and self.rebase
-            and self.rebased_at is None
+            and self.state == "lossy"
             and self.index is not None
             and self.index > self.trigger
             and self.physical_rewind(self.event)
         ):
             # The position is then set in the shared decompressed
             # coordinates, which the rewind makes valid on the true wire.
-            self.rebased_at = self.index
+            if self.rebased_at is None:
+                self.rebased_at = self.index
+            self.rebases.append(self.index)
+            self.state = "true"
+            self.deleted = []
             self._use(self.true)
 
 
