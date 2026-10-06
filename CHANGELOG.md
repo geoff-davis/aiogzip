@@ -14,6 +14,15 @@ All notable changes to this project will be documented in this file.
   `UnicodeDecodeError` and discarding it. When the remaining recovery data
   completes no character, text `read()` raises the terminal broken-stream
   `OSError` instead of returning `''`, which looked like a clean EOF.
+- Leaving a writer's context with an exception while a `write()` or
+  `flush()` is still sending data now waits for that sink call to settle
+  before closing the sink. A custom sink no longer receives a write after
+  `close()`, and a native file no longer fails with "write to closed file".
+  The interrupted call raises `write aborted…` or `flush aborted…`.
+  Cancelling a native write that has not started yet now prevents it.
+- Text `writelines([])` on a broken writer raises the broken-stream
+  `OSError`, matching binary `writelines()` and every other text write,
+  instead of returning success.
 
 ## [2.0.0b1] - 2026-09-01
 

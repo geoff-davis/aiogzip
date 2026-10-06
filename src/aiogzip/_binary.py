@@ -1159,14 +1159,11 @@ class AsyncGzipBinaryFile:
             encoder.discard()
             raise
 
-        # Exceptional context exit can close an owned sink while this
-        # task is suspended in it. A sink that completes that await after
-        # close must not make this torn member look successfully written.
+        # Exceptional context exit settles the sink call this task is
+        # suspended in, then closes it. A sink write that completed before
+        # that settlement must not make this torn member look written.
         if self._is_closed or self._write_broken:
-            raise OSError(
-                "write aborted because the gzip file was closed while "
-                "the call was active"
-            )
+            self._raise_write_call_aborted("write")
 
         # The codec owns uncompressed-byte accounting. Expose its authoritative
         # ledger only after every emitted byte reached the sink.
@@ -1190,15 +1187,25 @@ class AsyncGzipBinaryFile:
                 f"write() argument must be a bytes-like object, not {type(data).__name__}"
             ) from exc
 
-    async def _write_all(self, data: bytes) -> None:
+    async def _write_all(self, data: bytes, call: str = "write") -> None:
         """Write every byte to the underlying sink or raise on no progress."""
-        if self._file is None:
+        sink = self._file
+        if sink is None:
             raise ValueError("File not opened. Call await open() or use async with.")
 
+        native = _is_native_source(sink, "write")
         offset = 0
         length = len(data)
         while offset < length:
-            written = await self._file.write(data if offset == 0 else data[offset:])
+            if self._write_broken:
+                # Exceptional context exit aborted this call between sink
+                # writes and may already have closed the sink.
+                self._raise_write_call_aborted(call)
+            chunk = data if offset == 0 else data[offset:]
+            if native:
+                written = await self._call_native_sink("write", chunk)
+            else:
+                written = await self._call_custom_sink(call, "write", chunk)
             if not isinstance(written, int) or isinstance(written, bool):
                 raise OSError(
                     "underlying file write() returned an invalid byte count "
@@ -1639,6 +1646,18 @@ class AsyncGzipBinaryFile:
             observer(False)
 
     @staticmethod
+    def _raise_write_call_aborted(call: str) -> NoReturn:
+        """Raise the error for a write or flush aborted by context exit."""
+        raise OSError(
+            f"{call} aborted because the gzip file was closed while the call was active"
+        )
+
+    def _check_write_usable(self) -> None:
+        """Refuse any write surface once the member is torn."""
+        if self._write_broken:
+            self._raise_write_broken()
+
+    @staticmethod
     def _raise_write_broken() -> NoReturn:
         """Raise the shared terminal writer error from any write surface."""
         raise OSError(
@@ -1856,6 +1875,64 @@ class AsyncGzipBinaryFile:
         finally:
             self._source_native_call = None
 
+    async def _call_custom_sink(self, call: str, method: str, *args: Any) -> Any:
+        """Track a cooperative sink call so context exit can settle it.
+
+        Mirrors :meth:`_call_custom_source`: exceptional context exit cancels
+        the owning task and waits for this call's ``finally`` boundary before
+        closing the sink, so the sink is never touched after it is closed.
+        """
+        sink = self._file
+        self._source_owner = asyncio.current_task()
+        self._source_abort_requested = False
+        try:
+            result = getattr(sink, method)(*args)
+            if method == "write" or hasattr(result, "__await__"):
+                result = await result
+            return result
+        except BaseException as error:
+            if self._source_abort_requested:
+                if isinstance(error, asyncio.CancelledError):
+                    # Context exit owns exactly one cancellation; converted
+                    # below. Outside cancellation counts stay with the caller.
+                    owner = self._source_owner
+                    if owner is not None:
+                        owner.uncancel()
+                self._raise_write_call_aborted(call)
+            raise
+        finally:
+            self._source_owner = None
+            waiter = self._source_work
+            self._source_work = None
+            if waiter is not None and not waiter.done():
+                waiter.set_result(None)
+
+    async def _call_native_sink(self, method: str, *args: Any) -> Any:
+        """Retain native sink completion independently of executor cancellation.
+
+        Cancellation and context exit both wait for a started native call to
+        finish its last file access; a queued call that has not started is
+        prevented, so the file is never touched after close.
+        """
+        sink = self._file
+        loop = asyncio.get_running_loop()
+        if sink._loop is not loop:
+            raise RuntimeError("aiofiles sink belongs to a different event loop")
+        call = _NativeSourceCall(sink._file, method, args, loop, track_position=False)
+        work = loop.run_in_executor(sink._executor, call)
+        self._source_native_call = call
+        try:
+            return await work
+        except asyncio.CancelledError as cancellation:
+            try:
+                await _settle_before_cancel(call.completion(cancel_pending=True))
+            except asyncio.CancelledError:
+                # Repeated cancellation cannot interrupt settlement.
+                pass
+            raise cancellation
+        finally:
+            self._source_native_call = None
+
     async def _cleanup_failed_enter(
         self,
         file: Any,
@@ -1909,23 +1986,22 @@ class AsyncGzipBinaryFile:
         operation = encoder.flush()
         try:
             for flushed_data in operation:
-                await self._write_all(flushed_data)
+                await self._write_all(flushed_data, "flush")
 
             # Also flush the underlying file if it has a flush method.
-            flush_method = getattr(self._file, "flush", None)
-            if callable(flush_method):
-                result = flush_method()
-                if hasattr(result, "__await__"):
-                    await result
+            sink = self._file
+            if self._write_broken:
+                self._raise_write_call_aborted("flush")
+            if _is_native_source(sink, "flush"):
+                await self._call_native_sink("flush")
+            elif callable(getattr(sink, "flush", None)):
+                await self._call_custom_sink("flush", "flush")
 
             # See write(): exceptional context exit can close the sink while
             # this reserved call is awaiting it. Never report that as a
             # successful durability boundary for an unterminated member.
             if self._is_closed or self._write_broken:
-                raise OSError(
-                    "flush aborted because the gzip file was closed while "
-                    "the call was active"
-                )
+                self._raise_write_call_aborted("flush")
         except asyncio.CancelledError:
             self._write_broken = True
             encoder.discard()
@@ -2062,9 +2138,9 @@ class AsyncGzipBinaryFile:
         work = self._source_work
         owner = self._source_owner
         if owner is not None:
-            # Supported custom sources finish all activity before read/seek
-            # returns or raises. Cancel that call and wait for its finally
-            # boundary before invoking close on the source.
+            # Supported custom sources and sinks finish all activity before
+            # read/seek/write/flush returns or raises. Cancel that call and
+            # wait for its finally boundary before invoking close on the file.
             self._source_abort_requested = True
             if work is None:
                 work = asyncio.get_running_loop().create_future()

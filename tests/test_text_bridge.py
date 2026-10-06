@@ -42,6 +42,7 @@ ALLOWLIST = {
     # lifecycle
     "_close_on_context_exit",
     "_check_write_call_available",
+    "_check_write_usable",
 }
 
 

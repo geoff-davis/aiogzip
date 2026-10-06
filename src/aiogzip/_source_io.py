@@ -53,6 +53,7 @@ class _NativeSourceCall:
         "source",
         "method",
         "args",
+        "track_position",
         "no_effect",
         "prevented",
         "_loop",
@@ -70,10 +71,14 @@ class _NativeSourceCall:
         method: str,
         args: tuple[Any, ...],
         loop: asyncio.AbstractEventLoop,
+        *,
+        track_position: bool = True,
     ) -> None:
         self.source = source
         self.method = method
         self.args = args
+        # Sink writes need settlement only, not no-effect position evidence.
+        self.track_position = track_position
         self.no_effect = False
         self.prevented = False
         self._loop = loop
@@ -90,7 +95,7 @@ class _NativeSourceCall:
                 return None  # The atomic entry guard forbids all source access.
             self._started = True
         try:
-            before = _source_position(self.source)
+            before = _source_position(self.source) if self.track_position else None
             try:
                 result = getattr(self.source, self.method)(*self.args)
             except BaseException:

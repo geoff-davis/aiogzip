@@ -2098,6 +2098,9 @@ class AsyncGzipTextFile:
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
 
+        # Like binary writelines(), refuse a torn member even when there is
+        # nothing to write.
+        self._binary_file._check_write_usable()
         pending: List[str] = []
         pending_chars = 0
         iterator = iter(lines)

@@ -186,12 +186,14 @@ class TestResourceCleanup:
                 self.closed = False
 
             async def write(self, data):
+                if self.closed:
+                    raise AssertionError("sink written after close")
                 self.calls += 1
                 if self.calls > 1:
                     self.write_started.set()
                     await self.release_write.wait()
                     if self.closed:
-                        raise OSError("underlying file is closed")
+                        raise AssertionError("sink write resumed after close")
                 return len(data)
 
             async def close(self):
@@ -206,11 +208,14 @@ class TestResourceCleanup:
                 await writer.write_started.wait()
                 raise ValueError("body failure")
 
+        # BC8: exit settles the active sink write (cancelling it) before
+        # closing, so the sink never sees a write after close. b1 closed the
+        # sink first and let the blocked write resume against it.
         assert stream.closed is True
         assert writer.closed is True
         assert write_task is not None
         writer.release_write.set()
-        with pytest.raises(OSError, match="underlying file is closed"):
+        with pytest.raises(OSError, match="write aborted"):
             await write_task
 
     async def test_aborted_active_write_cannot_report_success_after_sink_resumes(self):
