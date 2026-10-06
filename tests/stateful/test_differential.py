@@ -2036,8 +2036,10 @@ def test_bc3_rejects_an_opening_under_async_with():
 # binary read of a custom source without checkpoints (wire 108 bytes).
 
 
-def _h_checker(trigger: int = 2, **lossy_fields) -> LossyChecker:
+def _h_checker(trigger: int = 2, source=None, **lossy_fields) -> LossyChecker:
     scenario = generate(129)
+    if source is not None:
+        scenario = scenario | {"source": source}
     lossy = dict(scenario) | lossy_fields
     checker = LossyChecker(lossy, scenario, ENGINE, trigger, True, 0)
     # Past the trigger: on the trigger's lossy view, or (without one) as
@@ -2071,10 +2073,6 @@ def _expect_without(*ranges: list[int]):
         ("consumed_failure", [0, 0], (True, [0, 0])),
         ("cancel_uncertain", [108, 108], (True, [108, 108])),
         ("cancel_uncertain", None, (True, None)),
-        ("cancel_no_effect", [0, 38], (True, [0, 38])),
-        # A cancel settled without effect loses input only with a range.
-        ("cancel_no_effect", [5, 5], (False, None)),
-        ("cancel_no_effect", None, (False, None)),
         # Without a witness the candidate's semantics stand.
         ("uncertain_failure", None, (False, None)),
         ("consumed_failure", None, (False, None)),
@@ -2091,6 +2089,29 @@ def _expect_without(*ranges: list[int]):
 )
 def test_h_later_loss_needs_its_own_witness(transition, taken, expected):
     assert _at(_h_checker(), 5, taken).later_loss(transition) == expected
+
+
+NATIVE = {"kind": "native"}
+CHECKPOINT = generate(129)["source"] | {"checkpoint": True}
+
+
+@pytest.mark.parametrize(
+    ("source", "taken", "expected"),
+    [
+        (NATIVE, [0, 38], (True, [0, 38])),
+        # A native cancel settled without effect loses input only with a
+        # nonempty range.
+        (NATIVE, [5, 5], (False, None)),
+        (NATIVE, None, (False, None)),
+        (NATIVE, [0, 109], (False, None)),
+        # A checkpoint source restores the cancelled read: no loss.
+        (CHECKPOINT, [0, 38], (False, None)),
+        (CHECKPOINT, None, (False, None)),
+    ],
+)
+def test_h_a_settled_cancel_is_a_loss_only_on_a_native_source(source, taken, expected):
+    checker = _at(_h_checker(source=source), 5, taken)
+    assert checker.later_loss("cancel_no_effect") == expected
 
 
 def test_h_later_loss_is_only_after_the_trigger():
@@ -2260,3 +2281,72 @@ def test_h_53_rebases_before_its_second_epoch():
     assert lossy["rebases"] == [9] and lossy["rebased_at"] == 9
     m = next(n for n, r in enumerate(parse(lossy["trace"])) if r.index == 10)
     assert lossy["states"][m - 1][2] == "true" and lossy["states"][m][2] == "lossy"
+
+
+def _h_claim(seed: int, mutate) -> set:
+    pair, lossy = b1_recorded(seed)
+    request = bc2_request(pair)
+    assert bc2_claim(pair, request, lossy, set()).events
+    mutate(pair, request, lossy)
+    return bc2_claim(pair, request, lossy, set()).events
+
+
+def _set_losses(value):
+    def mutate(pair, request, lossy):
+        lossy["losses"] = value(pair, request) if callable(value) else value
+
+    return mutate
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        # The record must exist.
+        lambda pair, request, lossy: lossy.pop("losses"),
+        # Indices must be single b1 rows after the trigger.
+        _set_losses([[-1, [0, 64]]]),
+        _set_losses(lambda pair, request: [[request.trigger[0], [0, 64]]]),
+        _set_losses(lambda pair, request: [[request.trigger[0] - 1, [0, 64]]]),
+        _set_losses([[999, [0, 64]]]),
+        # A range must be that row's taken, within the true wire.
+        _set_losses([[10, [0, 63]]]),
+        _set_losses([[10, [1, 64]]]),
+        _set_losses(
+            lambda pair, request: [[10, [0, len(unb64(pair.scenario["wire"])) + 1]]]
+        ),
+        # An empty loss must be a custom cancelled read without checkpoints.
+        _set_losses([[10, None]]),
+        # A loss at a row without a taken witness.
+        _set_losses([[11, [0, 0]]]),
+    ],
+)
+def test_h_losses_must_be_bound_to_b1s_native_rows(mutate):
+    assert _h_claim(53, mutate) == set()
+
+
+def test_h_53_losses_record_is_its_witness():
+    pair, _lossy = b1_recorded(53)
+    assert row(pair.ref, 10, "cancel").taken == [0, 64]
+
+
+def _non_cancel_after(pair, request):
+    return next(
+        r.index
+        for r in pair.ref
+        if r.index > request.trigger[0] and r.name != "cancel" and r.index >= 0
+    )
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        # None on a row that is not a cancelled read.
+        _set_losses(lambda pair, request: [[_non_cancel_after(pair, request), None]]),
+        # A range on a cancelled read that has no taken witness.
+        _set_losses([[1, [0, 0]], [9, None]]),
+        # The empty-loss shape needs a custom source without checkpoints.
+        lambda pair, request, lossy: pair.scenario["source"].update(checkpoint=True),
+    ],
+)
+def test_h_empty_losses_must_be_custom_cancelled_reads(mutate):
+    assert _h_claim(2228, mutate) == set()

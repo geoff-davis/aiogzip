@@ -1009,8 +1009,8 @@ class LossyChecker(Checker):
     consumed failure, or an uncertain cancel, is b1's no-effect retry only
     with its own witness: the event's valid ``taken`` range, or (a cancelled
     read on a custom source without a checkpoint) an empty loss, as at the
-    trigger. A cancel the candidate settles without effect (native) is a
-    loss when b1 took a nonempty range (L2). Without a witness the event
+    trigger. A native cancel, which the candidate settles without effect,
+    is a loss when b1 took a nonempty range (L2). Without a witness the event
     gets the candidate's semantics and fails closed.
     Losses accumulate per physical-source epoch in true-wire coordinates,
     in order; the view is then the wire oracle over the true wire with every
@@ -1124,6 +1124,11 @@ class LossyChecker(Checker):
             or transition not in (*self.NO_EFFECT, "cancel_no_effect")
         ):
             return False, None
+        source = self.true_scenario["source"]
+        if transition == "cancel_no_effect" and source["kind"] != "native":
+            # Only a native cancel loses input the candidate settles without
+            # effect (L2); a checkpoint source restores it.
+            return False, None
         taken = getattr(self.event, "taken", None)
         if taken is not None:
             if (
@@ -1139,7 +1144,6 @@ class LossyChecker(Checker):
             return False, None
         if transition == "cancel_no_effect":
             return False, None
-        source = self.true_scenario["source"]
         if (
             transition == "cancel_uncertain"
             and source["kind"] == "custom"

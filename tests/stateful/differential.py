@@ -1217,7 +1217,7 @@ def bc2_claim(
     claim = Claim()
     if parse(lossy["trace"]) != pair.ref:
         return claim  # b1's replay was not reproduced; claim nothing
-    losses = _losses(lossy)
+    losses = _losses(pair, request, lossy)
     if losses is None:
         return claim  # malformed loss evidence; claim nothing
     order = pair.cand_order
@@ -1256,25 +1256,45 @@ def bc2_claim(
     return claim
 
 
-def _losses(lossy: dict[str, Any]) -> list[int] | None:
+def _losses(pair: Pair, request: Bc2Request, lossy: dict[str, Any]) -> list[int] | None:
     """The event indices of the lossy run's later losses (H), or None when
-    the record is malformed."""
-    losses = lossy.get("losses", [])
+    the record is missing, malformed, or not bound to b1's rows: each index
+    is a single b1 row after the trigger, a range is that row's ``taken``
+    within the true wire, and an empty (None) loss is a cancelled read on a
+    custom source without checkpoints."""
+    losses = lossy.get("losses")
     if type(losses) is not list:
         return None
+    wire_size = len(base64.b64decode(pair.scenario["wire"]))
+    source = pair.scenario["source"]
     indices = []
     for loss in losses:
         if type(loss) is not list or len(loss) != 2 or type(loss[0]) is not int:
             return None
-        taken = loss[1]
-        if taken is not None and not (
+        index, taken = loss
+        rows = [row for row in pair.ref if row.index == index]
+        if index <= request.trigger[0] or len(rows) != 1:
+            return None
+        (row,) = rows
+        if taken is None:
+            if not (
+                source["kind"] == "custom"
+                and not source["checkpoint"]
+                and row.name == "cancel"
+                and row.outcome == {"cancelled": True}
+                and row.taken is None
+            ):
+                return None
+        elif not (
             type(taken) is list
             and len(taken) == 2
             and all(type(x) is int for x in taken)
-            and 0 <= taken[0] <= taken[1]
+            and 0 <= taken[0] <= taken[1] <= wire_size
+            and type(row.taken) is list
+            and row.taken == taken
         ):
             return None
-        indices.append(loss[0])
+        indices.append(index)
     if indices != sorted(set(indices)):
         return None
     return indices
