@@ -299,7 +299,7 @@ create competing copies of the same checkboxes in every section.
 * [x] G09 — [Corrected reference C0 pinned with traces and ledger](reviews/v2.0.0b2-c0-record.md)
 * [x] G10 — [Three-state binary read health matching C0](reviews/v2.0.0b2-wp6-completion.md)
 * [x] G11 — [Text replay-origin object without aliasing](reviews/v2.0.0b2-wp7-completion.md)
-* [ ] G12
+* [x] G12 — [Narrow text/binary bridge with one health authority](reviews/v2.0.0b2-wp8-completion.md)
 * [ ] G13
 * [ ] G14
 * [ ] G15
