@@ -233,6 +233,7 @@ class AsyncGzipBinaryFile:
         "_source_native_call",
         "_source_owner",
         "_source_abort_requested",
+        "_read_aborts",
         "_pending_compressed_chunk",
         "_replay_offset",
         "_cache_rewindable_reads",
@@ -353,6 +354,7 @@ class AsyncGzipBinaryFile:
         self._source_native_call: Optional[_NativeSourceCall] = None
         self._source_owner: Optional[asyncio.Task[Any]] = None
         self._source_abort_requested = False
+        self._read_aborts = 0
         self._pending_compressed_chunk: Optional[bytes] = None
         self._replay_offset: Optional[int] = None
         self._cache_rewindable_reads: bool = False
@@ -1641,6 +1643,7 @@ class AsyncGzipBinaryFile:
         """
         self._read_health = _BROKEN
         self._eof = True
+        self._read_aborts += 1
         observer = self._read_poison_observer
         if observer is not None:
             observer(False)
@@ -1718,10 +1721,19 @@ class AsyncGzipBinaryFile:
             raise ValueError("File not opened. Call await open() or use async with.")
         seek_method = getattr(self._file, "seek", None)
         if self._underlying_seekable and callable(seek_method):
+            aborts = self._read_aborts
             if _is_native_source(self._file, "seek"):
                 await self._call_native_source("seek", 0, os.SEEK_SET)
             else:
                 await self._call_custom_source("seek", 0, os.SEEK_SET)
+            if self._read_aborts != aborts:
+                # Context exit aborted the reader while the seek settled. A
+                # native seek is awaited rather than cancelled, so it returns
+                # normally; never revive the aborted reader with a new decoder.
+                raise OSError(
+                    "read aborted because the gzip file was closed while "
+                    "the call was active"
+                )
         elif self._cache_rewindable_reads:
             self._replay_offset = 0
         else:

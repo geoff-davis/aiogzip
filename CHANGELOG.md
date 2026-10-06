@@ -23,6 +23,10 @@ All notable changes to this project will be documented in this file.
 - Text `writelines([])` on a broken writer raises the broken-stream
   `OSError`, matching binary `writelines()` and every other text write,
   instead of returning success.
+- Leaving a reader's context with an exception while a native file's
+  `seek()` rewind is still running no longer lets that `seek()` return `0`
+  (or raise `seek of closed file`) from the closed reader. It raises the
+  `read aborted…` error, as a custom source already did.
 
 ## [2.0.0b1] - 2026-09-01
 
