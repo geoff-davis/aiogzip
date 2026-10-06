@@ -355,13 +355,15 @@ async def test_salvage_ending_inside_a_character_keeps_complete_text(first_size)
 @pytest.mark.parametrize(("newline", "expected"), [(None, "ab\n"), ("", "ab\r")])
 async def test_salvage_ending_in_a_cr_resolves_it_as_a_line_end(newline, expected):
     # Every continuation of a trailing CR begins with this resolution, so
-    # emitting it is safe; pins b1/C0 behaviour.
+    # emitting it is safe; pins b1/C0 behaviour. The newline kind stays
+    # unrecorded: the continuation could have made the CR part of a CRLF.
     async with _text(
         _corrupt_crc(gzip.compress(b"ab\r", mtime=0)), newline=newline
     ) as (stream):
         with pytest.raises(gzip.BadGzipFile):
             await stream.read(100)
         assert await stream.read() == expected
+        assert stream.newlines is None
         with pytest.raises(OSError, match="broken"):
             await stream.read()
 
@@ -382,6 +384,35 @@ async def test_salvage_completing_no_character_is_never_clean_eof(
         for _ in range(2):
             with pytest.raises(OSError, match="broken"):
                 await stream.read(size)
+
+
+async def _drain_lines(stream, surface):
+    if surface == "readline":
+        return await stream.readline()
+    if surface == "readlines":
+        return await stream.readlines()
+    if surface == "anext":
+        return await anext(stream)
+    return await anext(stream.iter_batches())
+
+
+@pytest.mark.parametrize(
+    ("payload", "encoding"), [(b"", "utf-8"), ("".encode("utf-16"), "utf-16")]
+)
+@pytest.mark.parametrize("surface", ["readline", "readlines", "anext", "iter_batches"])
+async def test_line_surfaces_never_report_empty_salvage_as_eof(
+    payload, encoding, surface
+):
+    # These surfaces needed no BC7 change: an empty salvage forces another
+    # binary access, which raises. Pins that they never signal EOF.
+    async with _text(
+        _corrupt_crc(gzip.compress(payload, mtime=0)), encoding=encoding
+    ) as stream:
+        with pytest.raises(gzip.BadGzipFile):
+            await _drain_lines(stream, surface)
+        for _ in range(2):
+            with pytest.raises(OSError, match="broken"):
+                await _drain_lines(stream, surface)
 
 
 async def test_transport_uncertainty_latches():
