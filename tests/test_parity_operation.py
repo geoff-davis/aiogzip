@@ -232,9 +232,14 @@ def test_ownership_guards_match_between_drivers(case):
     # A guard rejection never changes codec state.
     assert results[0][2] == results[0][3]
     if case == "closed":
-        # Closing an exhausted start() operation leaves the encoder usable.
+        # Closing an exhausted start() operation leaves the encoder usable
+        # and, before finish(), unfinished.
         after = results[0][3]
-        assert (after["active"], after["unusable"]) == (False, False)
+        assert (after["active"], after["unusable"], after["finished"]) == (
+            False,
+            False,
+            False,
+        )
     if case in ("close-before-start", "early-close"):
         # Closing before exhaustion abandons the codec under either driver.
         after = results[0][3]
