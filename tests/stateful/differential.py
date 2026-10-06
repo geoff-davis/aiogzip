@@ -1223,9 +1223,7 @@ def bc2_claim(
     claim = Claim()
     if parse(lossy["trace"]) != pair.ref:
         return claim  # b1's replay was not reproduced; claim nothing
-    if not (
-        _states_ok(pair.cand_info.get("states")) and _states_ok(lossy.get("states"))
-    ):
+    if not _convergence_ok(pair, lossy):
         return claim  # convergence evidence is malformed; claim nothing
     losses = _losses(pair, request, lossy)
     if losses is None:
@@ -1316,15 +1314,55 @@ def _losses(pair: Pair, request: Bc2Request, lossy: dict[str, Any]) -> list[int]
     return indices
 
 
-def _states_ok(states: Any) -> bool:
-    """Whether a run's per-event states have the shape convergence reads:
-    [position, eof, view, pending injected failure]."""
-    return type(states) is list and all(
-        type(state) is list
-        and len(state) == 4
-        and state[3] in (None, "no_effect", "consumed")
-        for state in states
+HEALTH_VALUES = (None, "HEALTHY", "VALIDATION_SALVAGE", "BROKEN")
+
+
+def _convergence_ok(pair: Pair, lossy: dict[str, Any]) -> bool:
+    """Whether both runs' convergence evidence is exactly well formed: one
+    ``states`` and one ``health`` record per trace row, each state
+    ``[position, eof, view, pending]`` (position None or ``[lo, hi]`` ints
+    with ``0 <= lo <= hi``, eof a bool, view None for the candidate and
+    ``"true"``/``"lossy"`` for the lossy run, pending an injected failure
+    kind or None), each health entry two values of ``HEALTH_VALUES``."""
+    sides = (
+        (pair.cand_info, len(pair.cand), (None,)),
+        (lossy, len(pair.ref), ("true", "lossy")),
     )
+    for record, rows, views in sides:
+        states, health = record.get("states"), record.get("health")
+        if type(states) is not list or type(health) is not list:
+            return False
+        if len(states) != rows or len(health) != rows:
+            return False
+        for state in states:
+            if type(state) is not list or len(state) != 4:
+                return False
+            position, eof, view, pending = state
+            if position is not None and not (
+                type(position) is list
+                and len(position) == 2
+                and all(type(x) is int for x in position)
+                and 0 <= position[0] <= position[1]
+            ):
+                return False
+            if type(eof) is not bool:
+                return False
+            if not _exact(view, views) or not _exact(pending, PENDING):
+                return False
+        for entry in health:
+            if type(entry) is not list or len(entry) != 2:
+                return False
+            if not all(_exact(value, HEALTH_VALUES) for value in entry):
+                return False
+    return True
+
+
+PENDING = (None, "no_effect", "consumed")
+
+
+def _exact(value: Any, allowed: tuple[str | None, ...]) -> bool:
+    """Whether ``value`` is exactly one of ``allowed`` (a str or None)."""
+    return (value is None or type(value) is str) and value in allowed
 
 
 def _converged(pair: Pair, lossy: dict[str, Any], start: int) -> int | None:

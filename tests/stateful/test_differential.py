@@ -2672,21 +2672,79 @@ def test_bc2_5712_claims_the_read_after_the_pending_failure():
     fails(pair, "(9, 'next', 0)", lossy=lossy)
 
 
-@pytest.mark.parametrize(
-    ("side", "mutate"),
-    [
-        ("lossy", lambda states: states.__setitem__(0, states[0][:3])),
-        ("lossy", lambda states: states[0].__setitem__(3, "armed")),
-        ("lossy", lambda states: states.__setitem__(0, tuple(states[0]))),
-        ("cand", lambda states: states.__setitem__(-1, states[-1][:3])),
-        ("cand", lambda states: states[0].append(None)),
-    ],
-)
-def test_bc2_malformed_states_claim_nothing(side, mutate):
+def _state(index: int, field: int, value):
+    return lambda record: record["states"][index].__setitem__(field, value)
+
+
+def _health(index: int, value):
+    return lambda record: record["health"].__setitem__(index, value)
+
+
+CONVERGENCE_MUTATIONS = [
+    # Positions: None or exactly [lo, hi] ints with 0 <= lo <= hi.
+    _state(0, 0, [True, 0]),
+    _state(0, 0, [0, False]),
+    _state(0, 0, [0.0, 0]),
+    _state(0, 0, 0),
+    _state(0, 0, [0]),
+    _state(0, 0, [0, 0, 0]),
+    _state(0, 0, (0, 0)),
+    _state(0, 0, [-1, 0]),
+    _state(0, 0, [2, 1]),
+    # eof is exactly a bool.
+    _state(0, 1, 0),
+    _state(0, 1, None),
+    _state(0, 1, "False"),
+    # Pending is exactly an injected failure kind or None.
+    _state(0, 3, "armed"),
+    _state(0, 3, 0),
+    # Shapes.
+    lambda record: record["states"].__setitem__(0, record["states"][0][:3]),
+    lambda record: record["states"][0].append(None),
+    lambda record: record["states"].__setitem__(0, tuple(record["states"][0])),
+    lambda record: record["states"].pop(),
+    lambda record: record["states"].append(copy.deepcopy(record["states"][-1])),
+    lambda record: record.pop("states"),
+    lambda record: record.__setitem__("states", {}),
+    # Health: exactly two values of None/HEALTHY/VALIDATION_SALVAGE/BROKEN.
+    _health(0, ["HEALTHY"]),
+    _health(0, ["HEALTHY", "HEALTHY", "HEALTHY"]),
+    _health(0, ["HEALTHY", "healthy"]),
+    _health(0, ["HEALTHY", 0]),
+    _health(0, ("HEALTHY", "HEALTHY")),
+    _health(0, "HEALTHY"),
+    lambda record: record["health"].pop(),
+    lambda record: record["health"].append(["HEALTHY", "HEALTHY"]),
+    lambda record: record.pop("health"),
+]
+
+
+@pytest.mark.parametrize("side", ["cand", "lossy"])
+@pytest.mark.parametrize("mutate", CONVERGENCE_MUTATIONS)
+def test_bc2_malformed_convergence_evidence_claims_nothing(side, mutate):
     pair, lossy = b1_recorded(5712)
     request = bc2_request(pair)
     assert bc2_claim(pair, request, lossy, set()).events
-    mutate(lossy["states"] if side == "lossy" else pair.cand_info["states"])
+    mutate(pair.cand_info if side == "cand" else lossy)
+    assert bc2_claim(pair, request, lossy, set()).events == set()
+
+
+@pytest.mark.parametrize(
+    ("side", "view"),
+    [
+        ("cand", "true"),
+        ("cand", "lossy"),
+        ("cand", ""),
+        ("lossy", None),
+        ("lossy", "TRUE"),
+        ("lossy", "other"),
+        ("lossy", True),
+    ],
+)
+def test_bc2_wrong_views_claim_nothing(side, view):
+    pair, lossy = b1_recorded(5712)
+    request = bc2_request(pair)
+    _state(0, 2, view)(pair.cand_info if side == "cand" else lossy)
     assert bc2_claim(pair, request, lossy, set()).events == set()
 
 
