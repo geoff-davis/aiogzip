@@ -5,13 +5,20 @@ buffer, logical position, whether the decoder is live or discarded, active call
 and closure), poison-observer events, the immediate and later results, and the
 recovery path. Deeper behavioral coverage stays in the source-settlement,
 native-work, file-state and regression suites.
+
+Expected health after each transition comes from the WP10 model's read-health
+table (``tests/stateful/model.py``), so the table and these focused cases
+cannot drift apart; every snapshot must also be a reachable
+(lifecycle, health, eof) combination.
 """
 
 import asyncio
 import gzip
 import io
 import random
+import sys
 import threading
+from pathlib import Path
 
 import aiofiles.threadpool
 import pytest
@@ -19,9 +26,18 @@ import pytest
 from aiogzip import AsyncGzipBinaryFile, ConcurrentOperationError
 from aiogzip._binary import _ReadHealth
 
+sys.path.insert(0, str(Path(__file__).parent / "stateful"))
+import model  # noqa: E402
+
 HEALTHY = _ReadHealth.HEALTHY
 SALVAGE = _ReadHealth.VALIDATION_SALVAGE
 BROKEN = _ReadHealth.BROKEN
+
+
+def after(health, event):
+    """The model table's health after ``event``, as the implementation's enum."""
+    return _ReadHealth[model.health_after(model.Health[health.name], event).name]
+
 
 PAYLOAD = b"transition matrix payload\n" * 200
 WIRE = gzip.compress(PAYLOAD, mtime=0)
@@ -71,6 +87,9 @@ def opened(source, **options):
 
 def snapshot(stream):
     decoder = stream._decoder
+    lifecycle = model.CLOSED if stream.closed else model.OPEN
+    combination = (lifecycle, model.Health[stream._read_health.name], stream._eof)
+    assert combination in model.REACHABLE, combination
     return dict(
         health=stream._read_health,
         eof=stream._eof,
@@ -142,7 +161,8 @@ async def test_healthy_read_reaches_validated_eof_then_close_discards():
     assert snapshot(stream) == validated
     assert await stream.read() == b""
     await stream.close()
-    assert snapshot(stream) == dict(validated, decoder_live=False, closed=True)
+    closed = dict(validated, health=after(HEALTHY, "close"))
+    assert snapshot(stream) == dict(closed, decoder_live=False, closed=True)
     assert events == []
 
 
@@ -166,18 +186,27 @@ async def test_decoder_failures_retain_exact_salvage_then_fail(wire, match, reta
     events = observe(stream)
     with pytest.raises(gzip.BadGzipFile, match=match):
         await stream.read()
-    failed = state(SALVAGE, eof=True, buffered=retained, decoder_live=False)
+    failed = state(
+        after(HEALTHY, "validation_failure"),
+        eof=True,
+        buffered=retained,
+        decoder_live=False,
+    )
     assert snapshot(stream) == failed
     assert events == [True]
     if retained:
         # Salvage is recovery data, an exact payload prefix, never clean EOF.
         assert await stream.read() == PAYLOAD[:retained]
-        assert snapshot(stream) == dict(failed, buffered=0, position=retained)
+        drained = after(SALVAGE, "salvage_exhausted")
+        assert snapshot(stream) == dict(
+            failed, health=drained, buffered=0, position=retained
+        )
     await assert_terminal(stream)
-    assert snapshot(stream)["health"] is SALVAGE
+    refused = after(SALVAGE, "terminal_refusal")
+    assert snapshot(stream)["health"] is refused
     await stream.close()
     assert snapshot(stream)["closed"] is True
-    assert snapshot(stream)["health"] is SALVAGE
+    assert snapshot(stream)["health"] is after(refused, "close")
 
 
 async def test_decompression_limit_is_broken_without_salvage():
@@ -186,13 +215,13 @@ async def test_decompression_limit_is_broken_without_salvage():
     events = observe(stream)
     with pytest.raises(OSError, match="max_decompressed_size"):
         await stream.read()
-    broken = state(BROKEN, eof=True, decoder_live=False)
+    broken = state(after(HEALTHY, "limit_failure"), eof=True, decoder_live=False)
     assert snapshot(stream) == broken
     assert events == [False]
     await assert_terminal(stream)
-    assert snapshot(stream) == broken
+    assert snapshot(stream) == dict(broken, health=after(BROKEN, "terminal_refusal"))
     await stream.close()
-    assert snapshot(stream) == dict(broken, closed=True)
+    assert snapshot(stream) == dict(broken, health=after(BROKEN, "close"), closed=True)
 
 
 # Source outcomes
@@ -204,7 +233,7 @@ async def test_no_effect_source_error_keeps_the_reader_healthy():
     events = observe(stream)
     with pytest.raises(OSError, match="transient"):
         await stream.read()
-    assert snapshot(stream) == FRESH
+    assert snapshot(stream) == dict(FRESH, health=after(HEALTHY, "no_effect_failure"))
     assert await stream.read() == PAYLOAD
     assert snapshot(stream) == state(
         HEALTHY, eof=True, position=len(PAYLOAD), decoder_live=True
@@ -220,15 +249,17 @@ async def test_consumed_or_uncertain_source_error_breaks_the_reader(checkpoint):
     events = observe(stream)
     with pytest.raises(OSError, match="consuming input"):
         await stream.read()
-    broken = state(BROKEN, eof=True, decoder_live=False)
+    # A tell() checkpoint proves consumption; without one it is uncertain.
+    event = "consumed_failure" if checkpoint else "uncertain_failure"
+    broken = state(after(HEALTHY, event), eof=True, decoder_live=False)
     assert snapshot(stream) == broken
     assert events == [False]
     # Never relabeled as salvage to let a retry pass.
     await assert_terminal(stream)
-    assert snapshot(stream) == broken
+    assert snapshot(stream) == dict(broken, health=after(BROKEN, "terminal_refusal"))
     # Physical rewind is the recovery path.
     assert await stream.seek(0) == 0
-    assert snapshot(stream) == FRESH
+    assert snapshot(stream) == dict(FRESH, health=after(BROKEN, "rewind_ok"))
     assert await stream.read() == PAYLOAD
     await stream.close()
 
@@ -275,7 +306,9 @@ async def test_native_cancellation_settles_and_keeps_the_reader_healthy(
         with pytest.raises(asyncio.CancelledError):
             await caller
         # Settled native input is retained, not lost or poisoned.
-        assert snapshot(stream) == FRESH
+        assert snapshot(stream) == dict(
+            FRESH, health=after(HEALTHY, "cancel_no_effect")
+        )
         assert events == []
         assert await stream.read() == PAYLOAD
     finally:
@@ -299,7 +332,9 @@ async def test_overlap_rejection_does_not_touch_health():
     assert stream._read_call_active is True
     with pytest.raises(ConcurrentOperationError):
         await stream.read(1)
-    assert snapshot(stream) == dict(FRESH, active=True)
+    assert snapshot(stream) == dict(
+        FRESH, health=after(HEALTHY, "overlap_rejected"), active=True
+    )
     source.gate.set()
     assert await first == PAYLOAD
     assert snapshot(stream) == state(
@@ -314,7 +349,12 @@ async def test_close_of_a_broken_reader_keeps_health_and_eof():
     with pytest.raises(OSError, match="max_decompressed_size"):
         await stream.read()
     await stream.close()
-    assert snapshot(stream) == state(BROKEN, eof=True, decoder_live=False, closed=True)
+    assert snapshot(stream) == state(
+        after(after(HEALTHY, "limit_failure"), "close"),
+        eof=True,
+        decoder_live=False,
+        closed=True,
+    )
 
 
 async def test_close_during_open_is_rejected_and_health_stays_healthy():
@@ -352,13 +392,13 @@ async def test_rewind_recovers_a_broken_reader_to_fresh_health(seekable):
         await stream.read()
     broken = snapshot(stream)
     assert (broken["health"], broken["eof"], broken["decoder_live"]) == (
-        BROKEN,
+        after(HEALTHY, "limit_failure"),
         True,
         False,
     )
     old_decoder = stream._decoder
     assert await stream.seek(0) == 0
-    assert snapshot(stream) == FRESH
+    assert snapshot(stream) == dict(FRESH, health=after(BROKEN, "rewind_ok"))
     assert stream._decoder is not old_decoder
     assert await stream.read(100) == LARGE[:100]
     assert snapshot(stream)["health"] is HEALTHY
@@ -378,8 +418,10 @@ async def test_failed_rewind_leaves_the_reader_broken():
     broken = snapshot(stream)
     with pytest.raises(OSError):
         await stream.seek(0)
-    assert snapshot(stream) == broken
-    assert broken == state(BROKEN, eof=True, decoder_live=False)
+    assert snapshot(stream) == dict(broken, health=after(BROKEN, "rewind_failed"))
+    assert broken == state(
+        after(HEALTHY, "limit_failure"), eof=True, decoder_live=False
+    )
     await assert_terminal(stream)
     await stream.close()
 
@@ -389,7 +431,7 @@ async def test_absolute_rewind_of_a_healthy_reader_restarts_cleanly():
     await stream.open()
     assert await stream.read(100) == PAYLOAD[:100]
     assert await stream.seek(0) == 0
-    assert snapshot(stream) == FRESH
+    assert snapshot(stream) == dict(FRESH, health=after(HEALTHY, "rewind_ok"))
     assert await stream.read() == PAYLOAD
     await stream.close()
 
@@ -409,7 +451,7 @@ async def test_exceptional_exit_with_active_custom_work_breaks_the_reader(monkey
             await asyncio.wait_for(source.entered.wait(), 5)
             assert stream._read_call_active is True
             raise RuntimeError("body")
-    aborted = state(BROKEN, eof=True, decoder_live=False, closed=True)
+    aborted = state(after(HEALTHY, "abort"), eof=True, decoder_live=False, closed=True)
     assert snapshot(stream) == aborted
     assert calls == [stream]
     source.gate.set()
@@ -453,7 +495,9 @@ async def test_exceptional_exit_with_active_native_work_breaks_the_reader(
         # The native reservation is released before the abort marks the handle
         # closed. At C0 that ordering left the closed reader's decoder live;
         # WP6's abort close now discards it whenever no reservation remains.
-        aborted = state(BROKEN, eof=True, decoder_live=False, closed=True)
+        aborted = state(
+            after(HEALTHY, "abort"), eof=True, decoder_live=False, closed=True
+        )
         assert snapshot(stream) == aborted
         assert calls == [stream]
         with pytest.raises(OSError, match=ABORTED):
