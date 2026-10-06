@@ -51,13 +51,18 @@ from model import (  # noqa: E402
     text_model,
     wire_view,
 )
-from oracle import engine_modules, raw_reference  # noqa: E402
+from oracle import engine_modules, raw_reference, wire_reference  # noqa: E402
 
 READ_ABORTED = "read aborted because the gzip file was closed while the call was active"
 READ_BROKEN = "read stream is broken"
 B1_READ_CLOSED = {
     "error": "OSError",
     "message": "Error reading from file: I/O operation on closed file",
+}
+B1_READ_BROKEN_SEEK0 = {
+    "error": "OSError",
+    "message": "read stream is broken after failed or cancelled decompression; "
+    "seek to 0 to recover, or close and reopen the gzip file",
 }
 WRITE_BROKEN = "write stream is broken"
 CLOSED = {"error": "ValueError", "message": "I/O operation on closed file."}
@@ -297,6 +302,7 @@ def compare(
             bc2_aborted_native_read(pair),
             bc2_trigger_only(pair),
             bc2_shadow_claim(pair, shadow),
+            bc2_broken_refusal(pair, shadow),
         )
         for clause in clauses:
             for item in clause.items():
@@ -1129,6 +1135,146 @@ def bc2_shadow_claim(pair: Pair, shadow: dict[str, Any] | None) -> Claim:
     expected = Row(call, r.second, None, r.parked, r.taken, r.pulled)
     if [x for x in rows if x.index == index] == [expected]:
         claim.events.add(key)
+    return claim
+
+
+F2B_CALL = {"op": "abort", "call": {"op": "readline", "limit": -1}}
+
+
+def _exact_ints(values: Any, length: int) -> list[int] | None:
+    """``values`` as a list of exactly ``length`` non-bool ints, else None."""
+    if not isinstance(values, list) or len(values) != length:
+        return None
+    if not all(type(x) is int for x in values):
+        return None
+    return values
+
+
+def _source_read(pair: Pair, index: int) -> list[int] | None:
+    """b1's parked source read at ``index`` as ``[start, end]``, or None.
+
+    The whole ``source_reads`` evidence must be well formed: records
+    ``[event index, [origin, start, end]]`` of exact ints. Exactly one record
+    is at ``index``, its origin (the last completed source seek) is 0, and
+    ``0 <= start <= end <= len(wire)``.
+    """
+    records = pair.ref_info.get("source_reads")
+    if not isinstance(records, list):
+        return None
+    found = []
+    for record in records:
+        if not isinstance(record, list) or len(record) != 2:
+            return None
+        if type(record[0]) is not int or _exact_ints(record[1], 3) is None:
+            return None
+        if record[0] == index:
+            found.append(record[1])
+    if len(found) != 1:
+        return None
+    origin, start, end = found[0]
+    if origin != 0 or wire_range(pair, [start, end]) is None:
+        return None
+    return [start, end]
+
+
+def _seeks_to_zero(pair: Pair) -> bool:
+    """Every completed source seek b1 made targets 0, and the evidence is
+    well formed: records ``[event index, [target, ...]]`` of exact ints."""
+    records = pair.ref_info.get("seeks")
+    if not isinstance(records, list):
+        return False
+    for record in records:
+        if not isinstance(record, list) or len(record) != 2:
+            return False
+        at, targets = record
+        if type(at) is not int or not isinstance(targets, list) or not targets:
+            return False
+        if not all(type(t) is int and t == 0 for t in targets):
+            return False
+    return True
+
+
+def _certain(positions: Any, n: int | None) -> int | None:
+    """The exact position ``[p, p]`` recorded before row ``n``, else None."""
+    if n is None or not isinstance(positions, list) or not 0 <= n < len(positions):
+        return None
+    position = _exact_ints(positions[n], 2)
+    if position is None or position[0] != position[1] or position[0] < 0:
+        return None
+    return position[0]
+
+
+def bc2_broken_refusal(pair: Pair, shadow: dict[str, Any] | None) -> Claim:
+    """F2b: b1 refuses an aborted ``readline()`` as broken.
+
+    b1's exit marks the stream broken and at EOF under a custom-source
+    ``readline(-1)`` parked in its source read. The read then returns and is
+    decoded, and b1 reports the abort only when its buffer holds a newline;
+    otherwise the EOF branch raises the broken refusal. Every b1 decoder
+    reset restarts at wire 0 (a completed seek to 0, or replay of an
+    uncapped cache), so the compressed input b1 can have decoded is a
+    contiguous prefix of ``wire[:end]``, ``end`` being where its parked read
+    returned. Its decoded bytes are then a prefix of the engine-matched
+    oracle's output for ``wire[:end]``; with no newline there from b1's
+    position ``p``, b1 cannot have found one. The shadow's readline must
+    agree, starting with the oracle's bytes from ``p``.
+    """
+    claim = Claim()
+    key = _f2_abort(pair)
+    if key is None or pair.mode != "rb" or shadow is None:
+        return claim
+    if pair.diffs != {key} or pair.final_diffs or pair.cand_only or pair.ref_only:
+        return claim
+    if pair.op(key) != F2B_CALL:
+        return claim
+    r = pair.ref_by_key[key]
+    if r.second != B1_READ_BROKEN_SEEK0 or r.taken is not None:
+        return claim
+    source = pair.scenario["source"]
+    if not (
+        source["seekable"]
+        or (
+            "max_rewind_cache_size" in pair.scenario
+            and pair.scenario["max_rewind_cache_size"] is None
+        )
+    ):
+        return claim
+    index = key[0]
+    extent = _source_read(pair, index)
+    if extent is None or not _seeks_to_zero(pair):
+        return claim
+    # b1's position: the candidate's and the shadow's, each exactly certain.
+    if shadow.get("violations") != []:
+        return claim
+    p = _certain(pair.cand_info.get("positions"), pair.cand_order.get(key))
+    if p is None:
+        return claim
+    try:
+        rows = parse(shadow["trace"])
+    except (KeyError, TypeError, ValueError):
+        return claim
+    if [x for x in rows if x.index < index] != [
+        x for x in pair.cand if x.index < index
+    ]:
+        return claim
+    calls = [n for n, x in enumerate(rows) if x.index == index]
+    if len(calls) != 1 or rows[calls[0]].key != (index, "readline", 0):
+        return claim
+    if _certain(shadow.get("positions"), calls[0]) != p:
+        return claim
+    line = rows[calls[0]]
+    if not isinstance(line.outcome, dict) or line.outcome.keys() != {"ok"}:
+        return claim
+    shadow_bytes = raw_bytes(line.outcome["ok"])
+    if shadow_bytes is None or line != Row(line.key, line.outcome):
+        return claim
+    wire = unb64(pair.scenario["wire"])
+    out = wire_reference(engine_modules()[pair.engine], wire[: extent[1]])["output"]
+    if p > len(out) or b"\n" in out[p:]:
+        return claim
+    if not shadow_bytes.startswith(out[p:]):
+        return claim
+    claim.events.add(key)
     return claim
 
 

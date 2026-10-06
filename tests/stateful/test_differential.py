@@ -13,6 +13,7 @@ plans/design/v2.0.0b2-wp10-qualification.md.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import copy
 import dataclasses
@@ -25,6 +26,7 @@ from typing import Any
 import interpreter
 import pytest
 from differential import (
+    B1_READ_BROKEN_SEEK0,
     CLOSED,
     READ_BROKEN,
     Bc2Request,
@@ -35,6 +37,7 @@ from differential import (
     _wire_scenario,
     bc2_claim,
     bc2_request,
+    bc2_shadow_claim,
     bc2_trigger_only,
     compare,
     encoded,
@@ -944,7 +947,11 @@ def test_native_source_seeks_are_recorded():
 
 def b1_evidence(seed: int) -> dict[str, Any]:
     run = copy.deepcopy(B1[str(seed)])
-    return {"seeks": run["seeks"], "origins": run["origins"]}
+    return {
+        "seeks": run["seeks"],
+        "origins": run["origins"],
+        "source_reads": run["source_reads"],
+    }
 
 
 def b1_recorded(seed: int) -> tuple[Pair, dict[str, Any]]:
@@ -1345,9 +1352,11 @@ def test_bc2_f2_witness_case_carries_a_taken_range():
 
 def test_bc2_f2_rejects_b1s_broken_refusal():
     # b1's close marks the stream broken under the parked call, which the
-    # shadow (the call without the abort) cannot reproduce: unclaimed.
-    pair, _lossy = b1_recorded(44)
-    shadow = recorded_run(aiogzip, shadow_scenario(pair), ENGINE, "observe")
+    # shadow (the call without the abort) cannot reproduce: F2 leaves it to
+    # F2b, and without F2b's parked-read evidence it stays unclaimed.
+    pair, shadow = b1_f2(44)
+    assert not bc2_shadow_claim(pair, shadow).events
+    del pair.ref_info["source_reads"]
     fails(pair, "(2, 'abort', 0)", shadow=shadow)
 
 
@@ -1423,6 +1432,242 @@ def test_bc2_f2_shadow_runs_the_call_without_the_abort():
     }
 
 
+# F2b: context exit aborts a custom-source readline(-1); b1's parked read
+# returns without decoding a newline, so b1 refuses the call as broken.
+
+F2B_SEEDS = {
+    44: "an empty payload",
+    647: "an unterminated tail after cache replay",
+    3228: "an unterminated one-byte member",
+    3497: "an unterminated last byte",
+    3645: "a three-byte frame after a physical seek to 0",
+    4925: "a first read that decodes nothing",
+}
+# The parked read b1 returned, as recorded: [origin, start, end].
+F2B_READS = {3645: [0, 0, 3], 4925: [0, 0, 64]}
+
+
+@pytest.mark.parametrize("seed", sorted(F2B_SEEDS))
+def test_bc2_f2b_claims_b1s_broken_readline_refusal(seed):
+    pair, shadow = b1_f2(seed)
+    (key,) = pair.diffs
+    assert key[1] == "abort" and pair.op(key)["call"] == {"op": "readline", "limit": -1}
+    assert pair.ref_by_key[key].second == B1_READ_BROKEN_SEEK0
+    result = compare(pair, None, shadow)
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT") == [repr(("event", key))]
+    if seed in F2B_READS:
+        assert pair.ref_info["source_reads"] == [[key[0], F2B_READS[seed]]]
+
+
+def test_bc2_f2b_4925s_parked_read_decodes_nothing():
+    pair, _shadow = b1_f2(4925)
+    wire = unb64(pair.scenario["wire"])
+    assert wire_reference(engine_modules()[ENGINE], wire[:64])["output"] == b""
+    assert b"\n" in wire_reference(engine_modules()[ENGINE], wire[:128])["output"]
+
+
+def _f2b_mutated(seed: int, change: str):
+    pair, shadow = b1_f2(seed)
+    (key,) = pair.diffs
+    index = key[0]
+    scenario = copy.deepcopy(pair.scenario)
+    info = copy.deepcopy(pair.ref_info)
+    ref, cand = list(pair.ref), list(pair.cand)
+    cand_info = copy.deepcopy(pair.cand_info)
+    reads = info["source_reads"]
+    n = pair.cand_order[key]
+    shadow_n = next(m for m, x in enumerate(parse(shadow["trace"])) if x.index == index)
+    wire_len = len(unb64(scenario["wire"]))
+    if change == "newline-decoded":
+        reads[0][1][2] = wire_len
+    elif change == "half-decoded":
+        reads[0][1][2] = 128
+    elif change == "position-past-output":
+        cand_info["positions"][n] = [50, 50]
+        shadow["positions"][shadow_n] = [50, 50]
+    elif change == "candidate-position-uncertain":
+        cand_info["positions"][n] = [0, 1]
+    elif change == "candidate-position-missing":
+        cand_info["positions"] = cand_info["positions"][:n]
+    elif change == "candidate-position-bool":
+        cand_info["positions"][n] = [False, False]
+    elif change == "shadow-position-differs":
+        shadow["positions"][shadow_n] = [1, 1]
+    elif change == "shadow-position-missing":
+        shadow["positions"][shadow_n] = None
+    elif change == "shadow-violation":
+        shadow["violations"] = [[index, "injected"]]
+    elif change == "shadow-trace-differs":
+        shadow["trace"][1][2] = {"ok": "changed"}
+    elif change == "shadow-call-missing":
+        del shadow["trace"][shadow_n]
+        del shadow["positions"][shadow_n]
+    elif change == "shadow-error":
+        shadow["trace"][shadow_n][2] = {"error": "OSError", "message": "x"}
+    elif change == "shadow-digest":
+        shadow["trace"][shadow_n][2] = {"ok": {"bytes_len": 2, "sha256": "0"}}
+    elif change == "shadow-inconsistent":
+        shadow["trace"][shadow_n][2] = {"ok": {"bytes": "0a"}}
+    elif change == "no-shadow":
+        shadow = None
+    elif change == "reads-absent":
+        del info["source_reads"]
+    elif change == "reads-wrong-index":
+        reads[0][0] = index - 1
+    elif change == "reads-twice":
+        reads.append(copy.deepcopy(reads[0]))
+    elif change == "reads-origin":
+        reads[0][1][0] = 1
+    elif change == "reads-reversed":
+        reads[0][1][1:] = [reads[0][1][2] + 1, reads[0][1][2]]
+    elif change == "reads-past-wire":
+        reads[0][1][2] = wire_len + 1
+    elif change == "reads-bool":
+        reads[0][1][1] = False
+    elif change == "reads-malformed-elsewhere":
+        reads.append(["x", [0, 0, 0]])
+    elif change == "seek-nonzero":
+        info["seeks"].append([0, [5]])
+    elif change == "seek-malformed":
+        info["seeks"].append([0, ["0"]])
+    elif change == "seek-bool":
+        info["seeks"].append([0, [False]])
+    elif change == "candidate-message":
+        ref = edit(ref, key, second={"error": "OSError", "message": "other"})
+        cand = edit(cand, key, second={"error": "OSError", "message": "other"})
+    elif change == "b1-close-and-reopen":
+        message = B1_READ_BROKEN_SEEK0["message"].replace(
+            "seek to 0 to recover, or close", "close"
+        )
+        ref = edit(ref, key, second={"error": "OSError", "message": message})
+    elif change == "b1-taken":
+        ref = edit(ref, key, taken=[0, 0])
+    elif change == "primary-not-injected":
+        ref = edit(ref, key, outcome={"error": "OSError", "message": "x"})
+        cand = edit(cand, key, outcome={"error": "OSError", "message": "x"})
+    elif change == "limit":
+        scenario["ops"][index]["call"]["limit"] = 5
+    elif change == "text-mode":
+        scenario["mode"] = "rt"
+    elif change == "native":
+        scenario["source"]["kind"] = "native"
+    elif change == "capped-cache":
+        scenario["source"]["seekable"] = False
+        scenario["max_rewind_cache_size"] = 1000
+    elif change == "default-cache":
+        scenario["source"]["seekable"] = False
+        scenario.pop("max_rewind_cache_size", None)
+    elif change == "later-difference":
+        later = next(x for x in ref if x.index > index and x.name != "final")
+        ref = edit(ref, later.key, outcome={"ok": "changed"})
+    elif change == "final-difference":
+        ref = edit_final(ref, source_closes=7)
+    else:
+        raise AssertionError(change)
+    mutated = Pair(scenario, "b1", cand, ref, cand_info, ENGINE, info)
+    return mutated, shadow, key
+
+
+F2B_NEAR_MISSES = {
+    4925: (
+        "newline-decoded",
+        "half-decoded",
+        "position-past-output",
+        "candidate-position-uncertain",
+        "candidate-position-missing",
+        "candidate-position-bool",
+        "shadow-position-differs",
+        "shadow-position-missing",
+        "shadow-violation",
+        "shadow-trace-differs",
+        "shadow-call-missing",
+        "shadow-error",
+        "shadow-digest",
+        "no-shadow",
+        "reads-absent",
+        "reads-wrong-index",
+        "reads-twice",
+        "reads-origin",
+        "reads-reversed",
+        "reads-past-wire",
+        "reads-bool",
+        "reads-malformed-elsewhere",
+        "seek-nonzero",
+        "seek-malformed",
+        "seek-bool",
+        "candidate-message",
+        "b1-close-and-reopen",
+        "b1-taken",
+        "primary-not-injected",
+        "limit",
+        "text-mode",
+        "native",
+        "capped-cache",
+        "default-cache",
+        "final-difference",
+    ),
+    44: ("later-difference",),
+    647: ("shadow-inconsistent",),
+}
+
+
+@pytest.mark.parametrize(
+    ("seed", "change"),
+    [(seed, change) for seed, changes in F2B_NEAR_MISSES.items() for change in changes],
+)
+def test_bc2_f2b_near_misses_stay_unclaimed(seed, change):
+    pair, shadow, key = _f2b_mutated(seed, change)
+    result = compare(pair, None, shadow)
+    assert repr(("event", key)) not in claims(result, "BC2-LOST-INPUT"), change
+
+
+def test_source_records_only_a_parked_read_that_returned():
+    async def scenario() -> list[Any]:
+        gate = interpreter.Gate()
+        config = {"seekable": True, "checkpoint": False, "frames": [4]}
+        source = interpreter.Source(bytes(range(20)), config, gate)
+        seen = []
+        await source.read(3)  # not parked
+        seen.append(source.parked_read)
+        gate.arm()
+        task = asyncio.create_task(source.read(10))
+        await gate.entered.wait()
+        gate.release()
+        await task  # parked, then returned: the frame's last byte
+        seen.append(source.parked_read)
+        source.parked_read = None
+        source.fail = "consumed"
+        gate.arm()
+        task = asyncio.create_task(source.read(10))
+        await gate.entered.wait()
+        gate.release()
+        with pytest.raises(OSError):
+            await task  # a parked read that failed records nothing
+        seen.append(source.parked_read)
+        gate.arm()
+        task = asyncio.create_task(source.seek(2))
+        await gate.entered.wait()
+        gate.release()
+        await task  # a parked seek records nothing, and moves the origin
+        seen.append(source.parked_read)
+        gate.arm()
+        task = asyncio.create_task(source.read(1))
+        await gate.entered.wait()
+        gate.release()
+        await task
+        seen.append(source.parked_read)
+        unseekable = interpreter.Source(
+            bytes(5), {"seekable": False, "checkpoint": False}, interpreter.Gate()
+        )
+        with pytest.raises(OSError):
+            await unseekable.seek(3)  # a failed seek leaves the origin
+        seen.append(unseekable.origin)
+        return seen
+
+    assert asyncio.run(scenario()) == [None, [0, 3, 4], None, None, [2, 2, 3], 0]
+
+
 # G custom: a cancelled custom seek0 is an L1 trigger with an empty range.
 
 
@@ -1496,7 +1741,11 @@ KEEP = object()
 def _g_native(seeks=KEEP, origins=KEEP) -> Pair:
     pair, _lossy = b1_recorded(1620)
     info = b1_evidence(1620)
-    assert info == {"seeks": [[2, [0]]], "origins": [[2, [[49, 0]]]]}
+    assert info == {
+        "seeks": [[2, [0]]],
+        "origins": [[2, [[49, 0]]]],
+        "source_reads": [],
+    }
     if seeks is not KEEP:
         info["seeks"] = seeks
     if origins is not KEEP:

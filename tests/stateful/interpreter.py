@@ -189,6 +189,11 @@ class Source:
         self.fail: str | None = None
         # The lost-input witness: the wire range an injected failure took.
         self.taken: list[int] | None = None
+        # The parked-read witness: [origin, start, end] of a read that parked
+        # at the gate and then returned, where origin is the offset of the
+        # last completed seek (0 initially). Raw only, taken by the next event.
+        self.origin = 0
+        self.parked_read: list[int] | None = None
         self.closes = 0
         self.calls_after_close = 0
         # Work counters (never part of the public trace).
@@ -228,6 +233,7 @@ class Source:
         if whence != 0:
             raise OSError("test source supports absolute seeks only")
         self.offset = offset
+        self.origin = offset
         self.frame_index = 0
         self.frame_left = self.frames[0] if self.frames else None
         self.gate.seeked(offset)
@@ -250,7 +256,7 @@ class Source:
     async def read(self, size: int = -1) -> bytes:
         if self.closes:
             self.calls_after_close += 1
-        await _park(self.gate)
+        parked = await _park(self.gate)
         self.reads += 1
         fail, self.fail = self.fail, None
         if fail == "no_effect":
@@ -266,10 +272,13 @@ class Source:
                 # failure has no effect; only a checkpoint can show that.
                 raise OSError("injected source failure at end of input")
             raise OSError("injected source failure after consuming input")
+        start = self.offset
         data = self._take(size)
         self.bytes += len(data)
         if not data and size != 0:
             self.empty_reads += 1
+        if parked:
+            self.parked_read = [self.origin, start, self.offset]
         return data
 
     async def close(self) -> None:
@@ -383,13 +392,15 @@ class Sink:
         self.closes += 1
 
 
-async def _park(gate: Gate) -> None:
-    """Park the calling coroutine if the gate is armed."""
+async def _park(gate: Gate) -> bool:
+    """Park the calling coroutine if the gate is armed; True if it parked."""
     if gate.armed:
         gate.armed = False
         release = gate.release_async
         gate.entered.set()
         await release.wait()
+        return True
+    return False
 
 
 # The differential's subprocesses collect garbage before each fd count, so a
@@ -460,6 +471,9 @@ class Event:
     # Parked native seeks as [offset before, target] (G native witness; raw
     # only, never in the trace).
     origins: list[list[int]] | None = None
+    # A custom source read that parked and returned during the event, as
+    # [origin, start, end] (F2b witness; raw only, never in the trace).
+    source_read: list[int] | None = None
 
 
 Hook = Callable[[Any, Event, "Context"], None]
@@ -639,6 +653,8 @@ async def run(
             spent = now
         if source is not None and source.taken is not None:
             event.taken, source.taken = source.taken, None
+        if source is not None and source.parked_read is not None:
+            event.source_read, source.parked_read = source.parked_read, None
         if gate.parked is not None and event.op["op"] != "final":
             if gate.parked["via"] == "native" and gate.release_thread.is_set():
                 # Let a released native call finish, so its witness is final
@@ -1066,6 +1082,9 @@ def recorded_run(
     # Evidence only, never compared: the source seeks each event made.
     run_record["seeks"] = [[e.index, e.seeks] for e in events if e.seeks]
     run_record["origins"] = [[e.index, e.origins] for e in events if e.origins]
+    run_record["source_reads"] = [
+        [e.index, e.source_read] for e in events if e.source_read
+    ]
     if hooks:
         run_record["violations"] = hook.violations
         run_record["health"] = hook.health
