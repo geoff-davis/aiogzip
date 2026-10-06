@@ -1477,37 +1477,69 @@ def test_bc2_g_native_1620_replays_the_prefix_into_mid_member_state():
     assert "invalid distance too far back" in pair.ref_by_key[key].outcome["message"]
 
 
-def _g_native(seeks=None, origins=None, scenario=None) -> Pair:
+KEEP = object()
+
+
+def _g_native(seeks=KEEP, origins=KEEP) -> Pair:
     pair, _lossy = b1_recorded(1620)
     info = b1_evidence(1620)
     assert info == {"seeks": [[2, [0]]], "origins": [[2, [[49, 0]]]]}
-    if seeks is not None:
+    if seeks is not KEEP:
         info["seeks"] = seeks
-    if origins is not None:
+    if origins is not KEEP:
         info["origins"] = origins
-    return make_pair(1620, pair.ref, reference="b1", scenario=scenario, ref_info=info)
+    return make_pair(1620, pair.ref, reference="b1", ref_info=info)
+
+
+def test_bc2_g_native_control_is_a_trigger():
+    request = bc2_request(_g_native())
+    assert request is not None and request.clause == "G"
 
 
 @pytest.mark.parametrize(
     "seeks, origins",
     [
-        (None, []),  # no origin witnessed (the probe found the file closed)
-        (None, [[2, [[49, 0]]], [2, [[49, 0]]]]),  # two records at the event
-        (None, [[2, [[49, 0], [49, 0]]]]),  # two origins in one record
-        (None, [[3, [[49, 0]]]]),  # at another event
-        (None, [[2, [[49, 1]]]]),  # a seek not to 0
-        (None, [[2, [[49, True]]]]),
-        (None, [[2, [[True, 0]]]]),
-        (None, [[2, [["49", 0]]]]),
-        (None, [[2, [[49]]]]),
-        (None, [[2, [[49, 0, 0]]]]),
-        (None, [[2, [-1, 0]]]),
-        (None, [[2, [[-1, 0]]]]),
-        (None, [[2, [[172, 0]]]]),  # the whole wire: b1 may have seen EOF
-        (None, [[2, [[173, 0]]]]),  # past the wire
-        ([], None),  # no completed seek
-        ([[2, [0, 0]]], None),
-        ([[2, [5]]], None),
+        (KEEP, []),  # no origin witnessed (the probe found the file closed)
+        (KEEP, [[2, [[49, 0]]], [2, [[49, 0]]]]),  # two records at the event
+        (KEEP, [[2, [[49, 0], [49, 0]]]]),  # two origins in one record
+        (KEEP, [[3, [[49, 0]]]]),  # at another event
+        (KEEP, [[2.0, [[49, 0]]]]),  # a float event index
+        (KEEP, [[True, [[49, 0]]]]),
+        (KEEP, [[2, [[49, 1]]]]),  # a seek not to 0
+        (KEEP, [[2, [[49, True]]]]),
+        (KEEP, [[2, [[49, False]]]]),
+        (KEEP, [[2, [[49, 0.0]]]]),
+        (KEEP, [[2, [[True, 0]]]]),
+        (KEEP, [[2, [[49.0, 0]]]]),
+        (KEEP, [[2, [["49", 0]]]]),
+        (KEEP, [[2, [[49]]]]),
+        (KEEP, [[2, [[49, 0, 0]]]]),
+        (KEEP, [[2, [-1, 0]]]),
+        (KEEP, [[2, [[-1, 0]]]]),
+        (KEEP, [[2, [None]]]),
+        (KEEP, [[2, ["49,0"]]]),
+        (KEEP, [[2, None]]),  # a null payload
+        (KEEP, [[2, "[[49, 0]]"]]),  # a string payload
+        (KEEP, [[2]]),  # a short record
+        (KEEP, [[2, [[49, 0]], 1]]),  # a long record
+        (KEEP, [2, [[49, 0]]]),  # not a list of records
+        (KEEP, [[2, [[49, 0]]], [5]]),  # a malformed record elsewhere
+        (KEEP, None),
+        (KEEP, "origins"),
+        (KEEP, [[2, [[172, 0]]]]),  # the whole wire: b1 may have seen EOF
+        (KEEP, [[2, [[173, 0]]]]),  # past the wire
+        ([], KEEP),  # no completed seek
+        ([[2, [0, 0]]], KEEP),
+        ([[2, [5]]], KEEP),
+        ([[2, [False]]], KEEP),  # a Boolean target
+        ([[2, [0.0]]], KEEP),  # a float target
+        ([[2.0, [0]]], KEEP),  # a float event index
+        ([[2, None]], KEEP),
+        ([[2, "0"]], KEEP),
+        ([[2]], KEEP),
+        ([[2, [0]], [7, None]], KEEP),
+        ([2, [0]], KEEP),
+        (None, KEEP),
     ],
 )
 def test_bc2_g_native_rejects_malformed_or_missing_evidence(seeks, origins):
@@ -1515,6 +1547,28 @@ def test_bc2_g_native_rejects_malformed_or_missing_evidence(seeks, origins):
     request = bc2_request(pair)
     assert request is None or request.clause != "G"
     fails(pair, "unclaimed")
+
+
+@pytest.mark.parametrize(
+    "parked",
+    [
+        {"method": "seek", "bytes": None},  # no via
+        {"via": "custom", "method": "seek", "bytes": None},
+        {"via": "native", "method": "seek", "bytes": b64(b"x")},
+        {"via": "native", "method": "seek"},
+        {"via": "native", "method": "seek", "bytes": None, "extra": 1},
+        {"via": "native", "method": "read", "bytes": None},
+    ],
+)
+def test_bc2_g_native_requires_the_exact_parked_seek_witness(parked):
+    pair, _lossy = b1_recorded(1620)
+    key = row(pair.ref, 2, "cancel").key
+    ref = edit(pair.ref, key, parked=parked)
+    cand = edit(pair.cand, key, parked=parked)  # rows stay identical
+    pair = make_pair(1620, ref, reference="b1", cand=cand, ref_info=b1_evidence(1620))
+    assert pair.cand_by_key[key] == pair.ref_by_key[key]
+    request = bc2_request(pair)
+    assert request is None or request.clause != "G"
 
 
 def test_bc2_g_native_rejects_a_cancel_whose_rows_differ():

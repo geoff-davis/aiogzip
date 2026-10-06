@@ -922,7 +922,7 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
         and pair.op(key)["call"]["op"] == "seek0"
         and c == r
         and c.outcome == {"cancelled": True}
-        and (r.parked or {}).get("method") == "seek"
+        and r.parked == NATIVE_SEEK
         and origin is not None
     ):
         # G native: the parked seek moved the file to 0 under the cancel and
@@ -931,17 +931,48 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
     return None
 
 
+# The exact parked witness of a native seek (G native).
+NATIVE_SEEK = {"via": "native", "method": "seek", "bytes": None}
+
+
+def _evidence(pair: Pair, name: str, index: int) -> list[list[Any]] | None:
+    """The reference's ``name`` evidence records at event ``index``, or None
+    when the evidence is malformed anywhere: it must be a list of
+    ``[event index, list]`` records whose index is exactly an int."""
+    records = pair.ref_info.get(name, [])
+    if not isinstance(records, list):
+        return None
+    found = []
+    for record in records:
+        if not isinstance(record, list) or len(record) != 2:
+            return None
+        at, payload = record
+        if type(at) is not int or not isinstance(payload, list):
+            return None
+        if at == index:
+            found.append(payload)
+    return found
+
+
 def _seek_origin(pair: Pair, key) -> int | None:
     """The file offset b1's parked native seek left, or None unless the
     reference recorded exactly one seek, to 0, at the event, with exactly one
     origin ``[p, 0]`` where ``[0, p]`` is a valid wire range short of the
-    wire's end (a regular file then cannot have reported its end to b1)."""
+    wire's end (a regular file then cannot have reported its end to b1).
+    Malformed evidence never raises; it makes no trigger."""
     index = key[0]
-    seeks = [s for i, s in pair.ref_info.get("seeks") or [] if i == index]
-    origins = [o for i, o in pair.ref_info.get("origins") or [] if i == index]
-    if seeks != [[0]] or len(origins) != 1 or len(origins[0]) != 1:
+    seeks = _evidence(pair, "seeks", index)
+    origins = _evidence(pair, "origins", index)
+    if seeks is None or origins is None:
         return None
-    witness = origins[0][0]
+    if len(seeks) != 1 or len(seeks[0]) != 1:
+        return None
+    (seek,) = seeks[0]
+    if type(seek) is not int or seek != 0:
+        return None
+    if len(origins) != 1 or len(origins[0]) != 1:
+        return None
+    (witness,) = origins[0]
     if not isinstance(witness, list) or len(witness) != 2:
         return None
     origin, target = witness
