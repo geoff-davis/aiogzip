@@ -277,6 +277,9 @@ def compare(pair: Pair, lossy: dict[str, Any] | None = None) -> Result:
     if "BC2-LOST-INPUT" in applies:
         request = bc2_request(pair)
         if request is not None and lossy is not None:
+            # The lossy model must accept b1's whole run, matching events
+            # included; any violation fails the seed.
+            failures += [f"lossy model: op {i}: {m}" for i, m in lossy["violations"]]
             claim = bc2_claim(pair, request, lossy, set(owner))
             for item in claim.items():
                 owner.setdefault(item, "BC2-LOST-INPUT")

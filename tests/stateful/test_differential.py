@@ -699,6 +699,26 @@ def test_bc2_rejects_reference_data_the_lossy_model_does_not_accept():
     fails(pair, f"({index}, ", lossy=lossy)
 
 
+def test_bc2_fails_a_lossy_violation_at_a_matching_event():
+    pair, lossy = b1_emulated(2060)
+    matching = [r for r in pair.cand if r.key not in pair.diffs and r.index >= 0]
+    index = matching[-1].index
+    assert all(r.key not in pair.diffs for r in pair.cand if r.index == index)
+    lossy["violations"] = [[index, "injected"]]
+    fails(pair, f"lossy model: op {index}: injected", lossy=lossy)
+
+
+def test_bc2_fails_a_lossy_violation_with_no_differences():
+    scenario, run = live(2060)
+    rows = parse(run["trace"])
+    pair = make_pair(2060, rows, reference="b1")
+    assert not pair.diffs and bc2_request(pair) is not None
+    lossy = {"trace": run["trace"], "violations": [], "rebased_at": None}
+    assert compare(pair, lossy).ok
+    lossy["violations"] = [[0, "injected"]]
+    fails(pair, "lossy model: op 0: injected", lossy=lossy)
+
+
 def test_bc2_claims_nothing_when_the_lossy_trace_is_not_b1s():
     pair, lossy = b1_emulated(2060)
     lossy["trace"] = lossy["trace"][:-1]
