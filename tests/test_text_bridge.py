@@ -400,13 +400,17 @@ async def _drain_lines(stream, surface):
     ("payload", "encoding"), [(b"", "utf-8"), ("".encode("utf-16"), "utf-16")]
 )
 @pytest.mark.parametrize("surface", ["readline", "readlines", "anext", "iter_batches"])
+@pytest.mark.parametrize("newline", [None, ""])
 async def test_line_surfaces_never_report_empty_salvage_as_eof(
-    payload, encoding, surface
+    payload, encoding, surface, newline
 ):
     # These surfaces needed no BC7 change: an empty salvage forces another
-    # binary access, which raises. Pins that they never signal EOF.
+    # binary access, which raises. Pins that they never signal EOF, on both
+    # the fast (newline=None) and generic (newline="") line paths.
     async with _text(
-        _corrupt_crc(gzip.compress(payload, mtime=0)), encoding=encoding
+        _corrupt_crc(gzip.compress(payload, mtime=0)),
+        encoding=encoding,
+        newline=newline,
     ) as stream:
         with pytest.raises(gzip.BadGzipFile):
             await _drain_lines(stream, surface)
