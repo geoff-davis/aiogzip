@@ -300,7 +300,7 @@ create competing copies of the same checkboxes in every section.
 * [x] G10 — [Three-state binary read health matching C0](reviews/v2.0.0b2-wp6-completion.md)
 * [x] G11 — [Text replay-origin object without aliasing](reviews/v2.0.0b2-wp7-completion.md)
 * [x] G12 — [Narrow text/binary bridge with one health authority](reviews/v2.0.0b2-wp8-completion.md)
-* [ ] G13
+* [x] G13 — [Hot-path parity matrices, codec guidance and justified cleanup](reviews/v2.0.0b2-wp9-completion.md)
 * [ ] G14
 * [ ] G15
 * [ ] G16
