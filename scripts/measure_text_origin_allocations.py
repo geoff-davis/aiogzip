@@ -2,9 +2,10 @@
 """Count text replay-origin objects by category for representative workloads.
 
 WP7 evidence: the live origin is updated in place (no object per refill or
-line), rollback keeps an immutable field tuple (no object), and an
-unpublished-read pending origin is one object per such read. Counts are of
-_TextBufferOrigin constructions attributed to the method that requested them.
+line), rollback constructs none (it allocates a field tuple per capture,
+which this probe does not count), and an unpublished-read pending origin is
+one object per such read. Counts are of _TextBufferOrigin constructions only,
+attributed to the method that requested them.
 
     uv run python scripts/measure_text_origin_allocations.py [--output FILE]
 """
