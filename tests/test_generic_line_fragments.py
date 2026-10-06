@@ -10,7 +10,9 @@ from aiogzip import AsyncGzipTextFile
 
 
 @pytest.mark.parametrize("newline", [None, "", "\r\n"])
-@pytest.mark.parametrize("encoding", ["utf-8", "utf-16", "iso2022_jp"])
+@pytest.mark.parametrize(
+    "encoding", ["utf-8", "utf-16", "utf-16-le", "utf-16-be", "iso2022_jp"]
+)
 @pytest.mark.parametrize("following", ["\nrest", "日rest", ""])
 async def test_carriage_return_exactly_at_decode_boundary(newline, encoding, following):
     chunk_size = 7

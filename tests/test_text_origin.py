@@ -7,6 +7,7 @@ import io
 from pathlib import Path
 
 import pytest
+from conftest import FramedAsyncReader
 
 import aiogzip._text as text_module
 from aiogzip import AsyncGzipTextFile
@@ -110,7 +111,8 @@ def test_decoder_state_values_are_immutable():
     # immutable (bytes, int).
     import codecs
 
-    for encoding in ("utf-8", "utf-16", "iso2022_jp", "shift_jis", "gb18030"):
+    encodings = ("utf-8", "utf-16", "utf-16-le", "utf-16-be", "iso2022_jp")
+    for encoding in (*encodings, "shift_jis", "gb18030"):
         decoder = codecs.getincrementaldecoder(encoding)()
         decoder.decode(b"\x1b$B" if encoding == "iso2022_jp" else b"\xe6")
         state = decoder.getstate()
@@ -204,3 +206,57 @@ async def test_tell_and_seek_round_trip_across_compaction():
             assert await stream.read() == rest
     finally:
         await stream.close()
+
+
+# Explicit-endian UTF-16 (§11.2): no BOM, so every origin starts mid-stream with
+# a plain decoder state. Odd chunk sizes split code units and surrogate pairs.
+
+UTF16_PAYLOAD = "日本\r\n🚀x\r" + "q" * 37 + "\n終🚀\r\nend"
+
+
+def _utf16_stream(encoding, newline, chunk_size):
+    data = UTF16_PAYLOAD.encode(encoding)
+    return AsyncGzipTextFile(
+        None,
+        "rt",
+        fileobj=FramedAsyncReader(gzip.compress(data, mtime=0)),
+        closefd=False,
+        newline=newline,
+        encoding=encoding,
+        chunk_size=chunk_size,
+    )
+
+
+@pytest.mark.parametrize("chunk_size", [3, 5, 7])
+@pytest.mark.parametrize("newline", [None, "", "\r\n"])
+@pytest.mark.parametrize("encoding", ["utf-16-le", "utf-16-be"])
+async def test_explicit_endian_utf16_lines_and_cookies(encoding, newline, chunk_size):
+    reference = io.TextIOWrapper(
+        io.BytesIO(UTF16_PAYLOAD.encode(encoding)), encoding=encoding, newline=newline
+    )
+    expected = list(reference)
+    async with _utf16_stream(encoding, newline, chunk_size) as stream:
+        for line in expected:
+            cookie = await stream.tell()
+            assert await stream.readline() == line
+            await stream.seek(cookie)
+            assert await stream.readline() == line
+        assert await stream.read() == ""
+        assert stream.newlines == reference.newlines
+
+
+@pytest.mark.parametrize("chunk_size", [3, 5])
+@pytest.mark.parametrize("encoding", ["utf-16-le", "utf-16-be"])
+async def test_explicit_endian_utf16_sized_read_cookies(encoding, chunk_size):
+    text = UTF16_PAYLOAD
+    async with _utf16_stream(encoding, "", chunk_size) as stream:
+        position = 0
+        while position < len(text):
+            cookie = await stream.tell()
+            piece = await stream.read(2)
+            assert piece == text[position : position + 2]
+            await stream.seek(cookie)
+            assert await stream.read() == text[position:]
+            await stream.seek(cookie)
+            assert await stream.read(2) == piece
+            position += len(piece)

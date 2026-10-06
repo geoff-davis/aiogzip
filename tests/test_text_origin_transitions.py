@@ -143,10 +143,14 @@ async def test_pending_origin_clears_after_failure(monkeypatch, producer, failur
 class _FailOnceReader:
     """No-effect transient failure on one read, after a cursor checkpoint."""
 
-    def __init__(self, data, failing_read):
+    def __init__(self, data):
         self._buffer = io.BytesIO(data)
         self._reads = 0
-        self._failing_read = failing_read
+        self._failing_read = 0
+
+    def fail_after(self, reads):
+        """Fail the source read ``reads`` reads from now."""
+        self._failing_read = self._reads + reads
 
     def tell(self):
         return self._buffer.tell()
@@ -161,16 +165,31 @@ class _FailOnceReader:
         return False
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16-le", "utf-16-be"])
 @pytest.mark.parametrize("newline", [None, ""], ids=["fast", "generic"])
 async def test_readlines_rollback_restores_offset_origin_and_batch(
-    monkeypatch, newline
+    monkeypatch, newline, encoding
 ):
-    lines = [f"line {i:04d}\n" for i in range(400)]
-    source = _FailOnceReader(gzip.compress("".join(lines).encode(), mtime=0), 6)
+    # 13 UTF-8 bytes per line, so a 63-byte chunk boundary can split 日.
+    lines = [f"日 l{i:04d}xxx\n" for i in range(400)]
+    data = gzip.compress("".join(lines).encode(encoding), mtime=0)
+    source = _FailOnceReader(data)
     async with AsyncGzipTextFile(
-        None, "rt", fileobj=source, closefd=False, chunk_size=64, newline=newline
+        None,
+        "rt",
+        fileobj=source,
+        closefd=False,
+        chunk_size=63,
+        newline=newline,
+        encoding=encoding,
     ) as stream:
-        first = await stream.readline()
+        consumed = []
+        # Roll back to an origin holding a split code unit, so the saved
+        # decoder state is not the empty initial state.
+        while not stream._buffer_origin.decoder_state[0]:
+            consumed.append(await stream.readline())
+            assert len(consumed) < 100
+        source.fail_after(2)
         buffer, offset = stream._text_buffer, stream._text_buffer_offset
         origin = dataclasses.replace(stream._buffer_origin)
         live = stream._buffer_origin
@@ -195,21 +214,37 @@ async def test_readlines_rollback_restores_offset_origin_and_batch(
             # The fast path had a batch in flight, cleared after the restore.
             assert batch_at_restore
         assert stream._pending_read_origin is None
-        assert [first, *await stream.readlines()] == lines
+        cookie = await stream.tell()
+        rest = await stream.readlines()
+        assert [*consumed, *rest] == lines
+        # A cookie taken after the rollback replays from the restored origin.
+        await stream.seek(cookie)
+        assert await stream.readlines() == rest
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16-le", "utf-16-be"])
 async def test_buffered_readline_restores_origin_then_appends_recovered_text(
-    monkeypatch,
+    monkeypatch, encoding
 ):
     # One long generic-newline line spanning many chunks, after a short line.
-    letters = random.Random(0).choices("abcdefghijklmnopqrstuvwxyz", k=2000)
+    letters = random.Random(0).choices("abcdefghijklmnopqrstuvwxyz日本", k=2000)
     long_line = "".join(letters) + "\n"  # incompressible: spans many chunks
-    payload = "head\n" + long_line + "tail\n"
-    source = _FailOnceReader(gzip.compress(payload.encode(), mtime=0), 8)
+    # A head that leaves the long line's origin holding a split code unit.
+    head = "h" * (61 if encoding == "utf-8" else 30) + "日\n"
+    payload = head + long_line + "tail\n"
+    source = _FailOnceReader(gzip.compress(payload.encode(encoding), mtime=0))
     async with AsyncGzipTextFile(
-        None, "rt", fileobj=source, closefd=False, chunk_size=64, newline=""
+        None,
+        "rt",
+        fileobj=source,
+        closefd=False,
+        chunk_size=63,
+        newline="",
+        encoding=encoding,
     ) as stream:
-        assert await stream.readline() == "head\n"
+        assert await stream.readline() == head
+        assert stream._buffer_origin.decoder_state[0]
+        source.fail_after(3)
         buffer, offset = stream._text_buffer, stream._text_buffer_offset
         origin = dataclasses.replace(stream._buffer_origin)
         restores = _spy_restore(monkeypatch, stream)
@@ -225,5 +260,8 @@ async def test_buffered_readline_restores_origin_then_appends_recovered_text(
         assert stream._text_buffer.startswith(buffer)
         assert len(stream._text_buffer) > len(buffer)
         assert stream._pending_read_origin is None
+        cookie = await stream.tell()
         assert await stream.readline() == long_line
         assert await stream.readline() == "tail\n"
+        await stream.seek(cookie)
+        assert await stream.readline() == long_line
