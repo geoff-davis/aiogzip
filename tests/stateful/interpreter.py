@@ -31,6 +31,9 @@ from generator import write_payload
 
 SCENARIO_TIMEOUT = 30.0
 INLINE_LIMIT = 64
+# Text payloads are at most a few thousand characters, so text stays inline:
+# the differential compares returned text exactly, not by digest.
+TEXT_INLINE_LIMIT = 8192
 
 
 class InjectedAbort(Exception):
@@ -52,6 +55,14 @@ class Gate:
         self.entered = asyncio.Event()
         self.release_async = asyncio.Event()
         self.release_thread = threading.Event()
+        # Set once a parked native call has returned (or raised) in its worker.
+        self.ran = threading.Event()
+        # Executor jobs other than the parked call, submitted and not finished,
+        # and an on-loop signal set whenever that count returns to zero.
+        self.busy = 0
+        self.busy_lock = threading.Lock()
+        self.idle = asyncio.Event()
+        self.idle.set()
 
     def arm(self) -> None:
         self.armed = True
@@ -59,6 +70,7 @@ class Gate:
         self.entered = asyncio.Event()
         self.release_async = asyncio.Event()
         self.release_thread = threading.Event()
+        self.ran = threading.Event()
 
     def release(self) -> None:
         self.armed = False
@@ -67,16 +79,25 @@ class Gate:
 
 
 # Loop turns allowed for a cancellation or abort to settle on-loop before the
-# parked worker is released. Turns, not time: no thread can make progress
-# while parked, so the outcome is deterministic.
+# parked worker is released. Turns, not time, once no other executor job is in
+# flight: then nothing but the loop can make progress, so the outcome is
+# deterministic. An in-flight job (C0's exit closing a native file on another
+# worker, say) is waited for, and its completion gets a fresh round of turns.
 SETTLE_TURNS = 50
 
 
 async def settle_then_release(gate: Gate, task: asyncio.Task | None) -> None:
-    for _ in range(SETTLE_TURNS):
-        if task is not None and task.done():
-            break
-        await asyncio.sleep(0)
+    while not (task is not None and task.done()):
+        for _ in range(SETTLE_TURNS):
+            if task is not None and task.done():
+                break
+            await asyncio.sleep(0)
+        else:
+            if not gate.busy:
+                break
+            # Woken by the job's completion, not by time; the scenario's
+            # hard timeout bounds the wait.
+            await gate.idle.wait()
     gate.release()
 
 
@@ -91,16 +112,44 @@ class GatedExecutor(concurrent.futures.ThreadPoolExecutor):
     def submit(self, fn, /, *args, **kwargs):  # type: ignore[override]
         gate = self.gate
         if not gate.armed:
-            return super().submit(fn, *args, **kwargs)
+            with gate.busy_lock:
+                gate.busy += 1
+                gate.idle.clear()  # submissions come from the loop's thread
+
+            def mark_idle():
+                if not gate.busy:
+                    gate.idle.set()
+
+            def counted():
+                try:
+                    return fn(*args, **kwargs)
+                finally:
+                    with gate.busy_lock:
+                        gate.busy -= 1
+                        if not gate.busy:
+                            try:
+                                self.loop.call_soon_threadsafe(mark_idle)
+                            except RuntimeError:
+                                pass  # the scenario's loop has already closed
+
+            return super().submit(counted)
         gate.armed = False
-        entered, release = gate.entered, gate.release_thread
-        gate.parked = _native_parked(fn)
+        entered, release, ran = gate.entered, gate.release_thread, gate.ran
+        record = gate.parked = _native_parked(fn)
 
         def parked():
             self.loop.call_soon_threadsafe(entered.set)
-            if not release.wait(SCENARIO_TIMEOUT):
-                raise TimeoutError("gated executor was never released")
-            return fn(*args, **kwargs)
+            try:
+                if not release.wait(SCENARIO_TIMEOUT):
+                    raise TimeoutError("gated executor was never released")
+                start = _native_offset(fn) if record["method"] == "read" else None
+                result = fn(*args, **kwargs)
+                if start is not None and isinstance(result, (bytes, bytearray)):
+                    # The lost-input witness: the wire range this read took.
+                    record["taken"] = [start, start + len(result)]
+                return result
+            finally:
+                ran.set()
 
         return super().submit(parked)
 
@@ -117,6 +166,8 @@ class Source:
         self._seekable = config["seekable"]
         self.gate = gate
         self.fail: str | None = None
+        # The lost-input witness: the wire range an injected failure took.
+        self.taken: list[int] | None = None
         self.closes = 0
         self.calls_after_close = 0
         # Work counters (never part of the public trace).
@@ -181,9 +232,12 @@ class Source:
         self.reads += 1
         fail, self.fail = self.fail, None
         if fail == "no_effect":
+            self.taken = [self.offset, self.offset]
             raise OSError("injected source failure without effect")
         if fail == "consumed":
+            start = self.offset
             taken = self._take(size)
+            self.taken = [start, self.offset]
             self.bytes += len(taken)
             if not taken:
                 # At the end of the source there is nothing to consume, so the
@@ -198,6 +252,19 @@ class Source:
 
     async def close(self) -> None:
         self.closes += 1
+
+
+def _native_offset(fn) -> int | None:
+    """The raw file offset a parked native call starts from, if it has one.
+
+    aiofiles submits a ``partial`` of the file's bound method; the candidate a
+    ``_NativeSourceCall`` holding the file as ``source``.
+    """
+    target = getattr(fn, "source", None)
+    if target is None:
+        target = getattr(getattr(fn, "func", None), "__self__", None)
+    tell = getattr(target, "tell", None)
+    return tell() if callable(tell) else None
 
 
 def _native_parked(fn) -> dict[str, Any]:
@@ -293,6 +360,19 @@ def decode_output(data: bytes) -> dict[str, Any]:
     return {"decoded": decoded, "complete": complete, "error": None}
 
 
+def final_output(output: bytes, retain: bool) -> dict[str, Any]:
+    """A writer's final ``output`` and ``output_raw`` fields, before encoding.
+
+    W1-eligible scenarios keep the raw bytes for the exact-prefix predicate;
+    the rest compare a digest.
+    """
+    if retain:
+        output_raw = {"base64": base64.b64encode(output).decode("ascii")}
+    else:
+        output_raw = {"bytes_len": len(output), "sha256": _digest(output)}
+    return {"output": decode_output(output), "output_raw": output_raw}
+
+
 @dataclasses.dataclass
 class Outcome:
     kind: str  # "ok", "error", "cancelled", "stop", "skipped"
@@ -311,6 +391,11 @@ class Event:
     # had no active call (raw only; the trace shows it as the call outcome).
     note: str | None = None
     parked: dict[str, Any] | None = None  # the parked call (raw only)
+    # The wire range a failed or cancelled source call took (BC2 witness).
+    taken: list[int] | None = None
+    # The uncompressed range a text handle's buffer_read took from under the
+    # text layer (BC7 witness): the binary tell before the read, plus its size.
+    pulled: list[int] | None = None
 
 
 Hook = Callable[[Any, Event, "Context"], None]
@@ -484,8 +569,17 @@ async def run(
             now = source.counters()
             event.work = {key: now[key] - spent[key] for key in now}
             spent = now
+        if source is not None and source.taken is not None:
+            event.taken, source.taken = source.taken, None
         if gate.parked is not None and event.op["op"] != "final":
+            if gate.parked["via"] == "native" and gate.release_thread.is_set():
+                # Let a released native call finish, so its witness is final
+                # and no worker still touches the file during the next op.
+                gate.ran.wait(SCENARIO_TIMEOUT)
             event.parked, gate.parked = gate.parked, None
+            taken = event.parked.pop("taken", None)
+            if taken is not None:
+                event.taken = taken
             if retain:
                 event.parked = {
                     key: {"base64": base64.b64encode(item).decode("ascii")}
@@ -584,10 +678,19 @@ async def run(
             abort.first = None  # type: ignore[attr-defined]
             abort.index = index  # type: ignore[attr-defined]
             raise abort
+        pulled = None
+        if name == "buffer_read":
+            try:
+                pulled = await handle.buffer.tell()
+            except Exception:  # noqa: BLE001 - no witness; the read records why
+                pulled = None
         outcome = await _call(_surface(handle, op, text_options))
         if name == "tell_mark" and outcome.kind == "ok":
             cookies[op["label"]] = outcome.value
-        land(Event(index, op, outcome))
+        event = Event(index, op, outcome)
+        if pulled is not None and outcome.kind == "ok":
+            event.pulled = [pulled, pulled + len(outcome.value)]
+        land(event)
 
     async def body() -> None:
         for index, op in enumerate(body_ops):
@@ -718,13 +821,7 @@ async def run(
             output = path.read_bytes()
         else:
             output = b""
-        final["output"] = decode_output(output)
-        # W1-eligible scenarios keep the raw bytes for the exact-prefix
-        # predicate; the rest compare a digest.
-        if retain:
-            final["output_raw"] = {"base64": base64.b64encode(output).decode("ascii")}
-        else:
-            final["output_raw"] = {"bytes_len": len(output), "sha256": _digest(output)}
+        final.update(final_output(output, retain))
     fds_after = _open_fds()
     if fds_before is not None and fds_after is not None:
         final["fd_delta"] = fds_after - fds_before
@@ -747,7 +844,7 @@ def symbolic(events: list[Event], workdir: str | None = None) -> list[Any]:
                 return {"bytes": bytes(item).hex()}
             return {"bytes_len": len(item), "sha256": _digest(bytes(item))}
         if isinstance(item, str):
-            if len(item) <= INLINE_LIMIT:
+            if len(item) <= TEXT_INLINE_LIMIT:
                 return {"str": item}
             return {
                 "str_len": len(item),
@@ -787,6 +884,10 @@ def symbolic(events: list[Event], workdir: str | None = None) -> list[Any]:
             row.append(outcome(event.second, event.op.get("call", {}).get("op", name)))
         if event.parked is not None:
             row.append({"parked": value(event.parked, name)})
+        if event.taken is not None:
+            row.append({"taken": list(event.taken)})
+        if event.pulled is not None:
+            row.append({"pulled": list(event.pulled)})
         trace.append(row)
     return trace
 
@@ -802,12 +903,95 @@ def replay(package, scenario: dict[str, Any], hooks: tuple[Hook, ...] = ()):
     return events, symbolic(events, directory)
 
 
+class _Indexed:
+    """A replay hook recording each new model violation with its event."""
+
+    def __init__(self, *checkers) -> None:
+        self.checkers = checkers
+        self.violations: list[list[Any]] = []
+        self.health: list[list[str | None]] = []
+        self.positions: list[list[int] | None] = []
+
+    def __call__(self, handle, event, context) -> None:
+        first = self.checkers[0]
+        before = getattr(first, "health", None)
+        position = getattr(first, "candidates", None)
+        self.positions.append(
+            [position[0], position[-1]] if position and first.modeled else None
+        )
+        for checker in self.checkers:
+            seen = len(checker.violations)
+            if hasattr(checker, "observe"):
+                checker.observe(event)
+            else:
+                checker(handle, event, context)
+            for message in checker.violations[seen:]:
+                self.violations.append([event.index, message])
+        after = getattr(first, "health", None)
+        self.health.append(
+            [None if before is None else before.value,
+             None if after is None else after.value]
+        )  # fmt: skip
+
+
+def recorded_run(
+    package,
+    scenario: dict[str, Any],
+    engine: str,
+    check: str | None = None,
+    request: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """One scenario's run record: the trace, plus the model's per-event view.
+
+    ``check`` is None (trace only), "observe" (the candidate's model and
+    observer) or "lossy" (a BC2 request's lossy model).
+    """
+    run_record: dict[str, Any] = {}
+    hooks: tuple[Hook, ...] = ()
+    if check == "observe":
+        from model import make_checker
+        from observer import Observer
+
+        checker = make_checker(scenario, engine)
+        hook = _Indexed(checker, Observer(checker))
+        hooks = (hook,)
+    elif check == "lossy":
+        from model import LossyChecker
+
+        assert request is not None
+        checker = LossyChecker(
+            request["lossy"], scenario, engine, request["trigger"], request["rebase"]
+        )
+        hook = _Indexed(checker)
+        hooks = (hook,)
+    _events, trace = replay(package, scenario, hooks)
+    run_record["trace"] = trace
+    if hooks:
+        run_record["violations"] = hook.violations
+        run_record["health"] = hook.health
+        run_record["positions"] = hook.positions
+    if check == "lossy":
+        run_record["rebased_at"] = checker.rebased_at
+    return run_record
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
     parser.add_argument("--scenarios", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    checks = parser.add_mutually_exclusive_group()
+    checks.add_argument(
+        "--observe",
+        action="store_true",
+        help="candidate only: run the model and the private-state observer",
+    )
+    checks.add_argument(
+        "--lossy",
+        action="store_true",
+        help="each scenario line is a BC2 request; run the lossy model",
+    )
     args = parser.parse_args()
     root = args.source_root.resolve()
     os.environ["AIOGZIP_ENGINE"] = args.engine
@@ -822,18 +1006,29 @@ def main() -> None:
         assert set(engines.values()) == {"stdlib-zlib"}, engines
     else:
         assert engines["decompression"] == "zlib-ng", engines
-    traces = {}
+    runs = {}
     with args.scenarios.open(encoding="utf-8") as lines:
         for line in lines:
-            scenario = json.loads(line)
-            _events, trace = replay(aiogzip, scenario)
-            traces[str(scenario["seed"])] = trace
+            request = json.loads(line)
+            scenario = request["scenario"] if args.lossy else request
+            if args.lossy:
+                run_record = recorded_run(
+                    aiogzip, scenario, engines["decompression"], "lossy", request
+                )
+            else:
+                run_record = recorded_run(
+                    aiogzip,
+                    scenario,
+                    engines["decompression"],
+                    "observe" if args.observe else None,
+                )
+            runs[str(scenario["seed"])] = run_record
     record = {
-        "schema": 1,
+        "schema": 2,
         "source_import": str(origin),
         "engines": engines,
         "python": sys.version,
-        "traces": traces,
+        "runs": runs,
     }
     with args.output.open("x", encoding="utf-8") as output:
         json.dump(record, output, ensure_ascii=False)

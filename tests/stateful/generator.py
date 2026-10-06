@@ -20,7 +20,7 @@ from typing import Any
 
 from oracle import engine_modules, raw_reference
 
-SCHEMA = 1
+SCHEMA = 2  # 2: read scenarios record member_spans
 ENCODINGS = ("utf-8", "utf-16", "shift_jis")
 NEWLINES = (None, "", "\n", "\r", "\r\n")
 CHUNK_SIZES = (7, 64, 512, 4096, 65536)
@@ -213,6 +213,42 @@ def members_with_padding(members: list[bytes], offsets: list[int]) -> list[bytes
     return parts
 
 
+def member_spans(
+    members: list[bytes],
+    offsets: list[int],
+    corruption: dict[str, Any],
+    written: int,
+) -> list[list[int]]:
+    """Each member's ``[start, end)`` in the wire as written.
+
+    ``written`` is the damaged wire's length before trailing padding. A
+    truncated member ends at the cut, which is EOF, and the members after it
+    are not in the wire. A body corruption whose span runs past the body
+    replaces it with fewer bytes, shortening its member. Padding is whatever
+    no span covers. A deletion that runs past that member's trailer leaves
+    the rest of the wire as unparsed damage, so the member's span then runs
+    to the end of the written wire and no later span is recorded. Recorded
+    in the scenario so the lossy-input predicate never depends on
+    regeneration.
+    """
+    spans = [[o, o + len(m)] for m, o in zip(members, offsets, strict=True)]
+    clean = spans[-1][1] if spans else 0
+    if corruption["kind"] == "body" and written < clean:
+        index, shrink = corruption["member"], clean - written
+        deleted_end = min(corruption["at"] + corruption["span"], clean)
+        if deleted_end > spans[index][1]:
+            return spans[:index] + [[spans[index][0], written]]
+        spans[index][1] -= shrink
+        for span in spans[index + 1 :]:
+            span[0] -= shrink
+            span[1] -= shrink
+    if corruption["kind"] == "truncate":
+        index = corruption["member"]
+        spans = spans[: index + 1]
+        spans[index][1] = corruption["cut"]
+    return spans
+
+
 def _layout(rng: random.Random, members: list[bytes]) -> list[int]:
     offsets, position = [], 0
     for member in members:
@@ -347,6 +383,7 @@ def generate(seed: int) -> dict[str, Any]:
     offsets = _layout(rng, members)
     trailing = b"\0" * rng.choice((0, 0, 0, 1, 7))
     wire, corruption = _choose_corruption(rng, members, payloads, offsets, text)
+    spans = member_spans(members, offsets, corruption, len(wire))
     if corruption["kind"] in ("none", "limit", "crc", "isize", "body"):
         wire += trailing
     kind = rng.choices(("custom", "native"), weights=(3, 1))[0]
@@ -370,6 +407,7 @@ def generate(seed: int) -> dict[str, Any]:
         "payload_size": len(whole),
         "payloads": [b64(p) for p in payloads],
         "member_offsets": offsets,
+        "member_spans": spans,
         "corruption": corruption,
         "wire": b64(wire),
     }

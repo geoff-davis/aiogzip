@@ -493,6 +493,16 @@ class Checker(_HandleChecker):
     def at_validated_eof(self) -> bool:
         return self.expect.clean and self.position == len(self.upper)
 
+    def narrow_to_end(self) -> None:
+        """An empty result that could have returned data narrows to the end.
+
+        Of the offsets an uncertain position allows, only the end of a clean
+        stream yields nothing; any other would have delivered data.
+        """
+        end = len(self.upper)
+        if self.modeled and self.expect.clean and end in self.candidates:
+            self.position = end
+
     def check_line(self, index: int, line: Any, limit: int) -> None:
         if not self.modeled or not line:
             return
@@ -634,6 +644,7 @@ class Checker(_HandleChecker):
             self.handle_error(index, op, outcome.error)
             return
         if outcome.kind == "stop":
+            self.narrow_to_end()
             if self.modeled and not (
                 self.at_validated_eof() and self.health is HEALTHY
             ):
@@ -664,6 +675,8 @@ class Checker(_HandleChecker):
             return
         if name == "readlines":
             hint = op.get("hint", -1)
+            if not value:
+                self.narrow_to_end()
             if not value and self.modeled and not self.at_validated_eof():
                 self.fail(index, "readlines returned [] before validated EOF")
             for line in value:
@@ -678,6 +691,8 @@ class Checker(_HandleChecker):
                 self.fail(index, f"line longer than limit {limit}")
             if name == "next" and not value:
                 self.fail(index, "iteration yielded an empty line")
+            if not value and limit != 0:
+                self.narrow_to_end()
             if (
                 name == "readline"
                 and limit != 0
@@ -694,6 +709,8 @@ class Checker(_HandleChecker):
         if size is not None and size >= 0 and len(value) > size:
             self.fail(index, f"{name} returned {len(value)} > {size}")
         before_health = self.health
+        if size and not value:
+            self.narrow_to_end()
         self.accept_data(index, value)
         if not self.modeled:
             return
@@ -898,6 +915,66 @@ class Checker(_HandleChecker):
                     start = end
                     break
         return lines
+
+
+class LossyChecker(Checker):
+    """b1's reader over the input it actually saw after losing some (BC2).
+
+    Built on the lossy scenario: the true wire with the lost range removed.
+    At the trigger event an injected failure or a cancellation has no effect,
+    because b1 retries. After the trigger, b1's first physical rewind returns
+    it to the true wire when ``rebase`` is set (a seekable source); on a
+    non-seekable custom source b1 replays its cache, which lacks the lost
+    range, so it never does. Every violation is recorded with its event
+    index; a later trigger gets the candidate's semantics, so it fails
+    closed.
+    """
+
+    NO_EFFECT = {
+        "uncertain_failure": "no_effect_failure",
+        "consumed_failure": "no_effect_failure",
+        "cancel_uncertain": "cancel_no_effect",
+    }
+
+    def __init__(
+        self,
+        lossy: dict[str, Any],
+        true: dict[str, Any],
+        engine: str,
+        trigger: int,
+        rebase: bool,
+    ) -> None:
+        super().__init__(lossy, engine)
+        self.true = Checker(true, engine)
+        # The physical source still holds and delivers the lost range; only
+        # the reader's view lacks it, so source work is bounded by the true
+        # wire.
+        self.wire_size = self.true.wire_size
+        self.trigger = trigger
+        self.rebase = rebase
+        self.rebased_at: int | None = None
+        self.index: int | None = None
+
+    def observe(self, event) -> None:
+        self.index = event.index
+        super().observe(event)
+
+    def transition(self, event: str) -> None:
+        if self.index == self.trigger:
+            event = self.NO_EFFECT.get(event, event)
+        super().transition(event)
+        if (
+            event == "rewind_ok"
+            and self.rebase
+            and self.rebased_at is None
+            and self.index is not None
+            and self.index > self.trigger
+        ):
+            # The position is then set in the shared decompressed
+            # coordinates, which the rewind makes valid on the true wire.
+            self.rebased_at = self.index
+            for name in ("expect", "upper", "lower", "wire_size"):
+                setattr(self, name, getattr(self.true, name))
 
 
 class WriteChecker(_HandleChecker):
