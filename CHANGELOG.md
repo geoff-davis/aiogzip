@@ -36,11 +36,12 @@ resource after its owner had released it.
 - `tell()` on a text file during an in-progress long-line or sized read no
   longer returns a cookie that skips characters the read had decoded but not
   yet returned. Seeking back to such a cookie now replays every character.
-- After a CRC or `ISIZE` failure, text `read()` returns the recoverable text
-  that ends inside a multibyte character instead of raising
-  `UnicodeDecodeError` and discarding it. When the remaining recovery data
-  completes no character, text `read()` raises the terminal broken-stream
-  `OSError` instead of returning `''`, which looked like a clean EOF.
+- After an integrity failure, when the recovery bytes end inside a
+  multibyte character, text `read()` returns every complete recoverable
+  character instead of raising `UnicodeDecodeError` and losing them. When
+  the remaining recovery data completes no character, text `read()` raises
+  the terminal broken-stream `OSError` instead of returning `''`, which
+  looked like a clean EOF.
 - Leaving a writer's context with an exception while a `write()` or
   `flush()` is still sending data now waits for that sink call to settle
   before closing the sink. A custom sink no longer receives a write after
@@ -54,6 +55,9 @@ resource after its owner had released it.
   `seek()` rewind is still running no longer lets that `seek()` return `0`
   (or raise `seek of closed file`) from the closed reader. It raises the
   `read aborted…` error, as a custom source already did.
+- When a reader's context exits with an exception and closing the underlying
+  file then fails, a text handle that stays open no longer returns text it
+  had decoded before the exit. Later reads raise the broken-stream `OSError`.
 
 ### Changed
 
@@ -78,8 +82,8 @@ resource after its owner had released it.
 - Text `readlines()` with small size hints now does linear total work over
   a pending batch of lines, instead of rescanning and copying the whole
   remaining batch on every call.
-- Reading very long lines with any `newline` setting other than `'\n'` no
-  longer takes superlinear time in the line length.
+- Reading very long lines with `newline=""` or `newline="\r\n"` no longer
+  takes superlinear time in the line length.
 - The new ownership guarantees have a measured cost on per-call paths.
   Against `2.0.0b1`, `flush()` is about 6–8% slower in microbenchmarks, and
   `read1()`, `readinto1()` and small-buffer `readline()` are about 6–9%
