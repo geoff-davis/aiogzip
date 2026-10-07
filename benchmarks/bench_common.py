@@ -7,7 +7,6 @@ used across all benchmark modules.
 
 import gzip
 import json
-import os
 import random
 import shutil
 import statistics
@@ -141,8 +140,11 @@ class DataGenerator:
 
     @staticmethod
     def generate_binary(size_mb: int) -> bytes:
-        """Generate random binary data."""
-        return os.urandom(int(size_mb * 1024 * 1024))
+        """Generate incompressible binary data, identical for every run.
+
+        Seeded so that comparisons measure both sides on the same bytes.
+        """
+        return random.Random(0).randbytes(int(size_mb * 1024 * 1024))
 
     @staticmethod
     def generate_text(size_mb: int) -> str:
