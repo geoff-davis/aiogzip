@@ -266,13 +266,18 @@ Always include:
   fragmented-transport and concurrent-ingest examples, exact Boolean
   validation, completed-member metadata, and the final alpha performance and
   artifact gates.
-- **2.0.0b1 (current release)** - Freezes the documented 2.0 public API,
+- **2.0.0b1** - Freezes the documented 2.0 public API,
   adds deterministic runtime and typing contracts, proves the supported
   dependency floors and installed artifacts, and publishes the beta stability
-  policy. Development continues as `2.0.0b2.dev0` while the Beta classifier
-  and frozen compatibility contract remain in force.
+  policy.
+- **2.0.0b2 (current release)** - Keeps the frozen API and corrects
+  cancellation, ownership and recovery cases in which b1 could lose, skip or
+  misreport data (behavior exceptions BC1–BC10), with explicit binary read
+  health, a text replay-origin object and a narrow text/binary bridge.
+  Development continues as `2.0.0rc1.dev0` while the Beta classifier and
+  frozen compatibility contract remain in force; an RC is not guaranteed.
 
 ---
 
-**Last Updated:** 2026-10-06
+**Last Updated:** 2026-10-07
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
