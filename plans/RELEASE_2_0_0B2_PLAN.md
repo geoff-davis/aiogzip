@@ -301,11 +301,11 @@ create competing copies of the same checkboxes in every section.
 * [x] G11 — [Text replay-origin object without aliasing](reviews/v2.0.0b2-wp7-completion.md)
 * [x] G12 — [Narrow text/binary bridge with one health authority](reviews/v2.0.0b2-wp8-completion.md)
 * [x] G13 — [Hot-path parity matrices, codec guidance and justified cleanup](reviews/v2.0.0b2-wp9-completion.md)
-* [ ] G14
-* [ ] G15
-* [ ] G16
+* [x] G14 — [Stateful, adversarial, cancellation and fault-injection tests](reviews/v2.0.0b2-wp10-qualification.md#g14-stateful-adversarial-cancellation-and-fault-injection-tests)
+* [x] G15 — [Public contract: API, runtime manifest, typing and installed artifacts](reviews/v2.0.0b2-wp10-qualification.md#g15-public-contract)
+* [x] G16 — [Environments and artifacts](reviews/v2.0.0b2-wp10-qualification.md#g16-environments-and-artifacts)
 * [ ] G17
-* [ ] G18
+* [x] G18 — [Documentation and index](reviews/v2.0.0b2-wp10-qualification.md#g18-documentation-and-index)
 * [ ] G19
 * [ ] G20
 * [ ] G21
