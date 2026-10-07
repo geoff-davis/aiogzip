@@ -44,7 +44,13 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from generator import generate, unb64  # noqa: E402
-from interpreter import Event, Outcome, final_output, symbolic  # noqa: E402
+from interpreter import (  # noqa: E402
+    Event,
+    Outcome,
+    _open_fds,
+    final_output,
+    symbolic,
+)
 from model import (  # noqa: E402
     INCOMPLETE_TAIL,
     NATIVE_SEEK,
@@ -70,6 +76,8 @@ B1_READ_BROKEN_SEEK0 = {
     "seek to 0 to recover, or close and reopen the gzip file",
 }
 WRITE_BROKEN = "write stream is broken"
+# Whether this platform counts open descriptors (it needs /proc/self/fd).
+FD_COUNTS = _open_fds() is not None
 CLOSED = {"error": "ValueError", "message": "I/O operation on closed file."}
 REOPEN = {"error": "ValueError", "message": "Cannot reopen a closed file"}
 ALREADY_OPEN = {"error": "ValueError", "message": "File is already open"}
@@ -229,10 +237,11 @@ class Pair:
             if k != final and self.cand_by_key[k] != self.ref_by_key[k]
         }
         fields = self.cand_final.keys() | self.ref_final.keys()
-        if "fd_delta" not in self.cand_final:
+        if not FD_COUNTS and "fd_delta" not in self.cand_final:
             # Only platforms with /proc/self/fd count descriptors. The
             # references were recorded on one, so a candidate run elsewhere
-            # has no fd_delta to compare against theirs.
+            # has no fd_delta to compare against theirs. Where counts exist,
+            # a candidate without the field is still a difference.
             fields.discard("fd_delta")
         self.final_diffs = {
             f for f in fields if self.cand_final.get(f) != self.ref_final.get(f)

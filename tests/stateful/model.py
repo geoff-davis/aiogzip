@@ -266,14 +266,18 @@ def expectation(scenario: dict[str, Any], engine: str) -> Expectation:
             try:
                 decoder.decode(output, final=clean)
             except UnicodeError as error:
+                if not is_decode_error(error):
+                    raise
                 if clean:
                     raise AssertionError(
                         "a clean wire view does not decode as text"
                     ) from error
                 # Text holds only the bytes before the first undecodable
                 # sequence; the reader may raise the gzip failure first, but a
-                # decode error is not modeled and stays a violation.
-                output, lower = output[: error.start], min(lower, error.start)
+                # decode error is not modeled and stays a violation. A missing
+                # BOM before Python 3.13 carries no offset: it fails at 0.
+                at = error.start if isinstance(error, UnicodeDecodeError) else 0
+                output, lower = output[:at], min(lower, at)
         return Expectation(output, lower, clean, failure, reference)
     if kind == "none" or (kind == "limit" and corruption["limit"] >= len(whole)):
         return Expectation(whole, len(whole), True, None)
