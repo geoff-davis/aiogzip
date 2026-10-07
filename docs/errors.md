@@ -52,6 +52,9 @@ exception as a programming error: it is not a lock, and catching it in a retry
 loop is not supported synchronization. Separate handles may progress
 concurrently because they do not share gzip or buffer state.
 
+Handles are asyncio objects bound to the event loop that uses them; they are
+not thread-safe. Do not call one handle from several threads or event loops.
+
 When several tasks intentionally share a handle, use an application lock that
 covers the complete logical operation, not only the first low-level call:
 
@@ -111,6 +114,18 @@ except OSError as exc:
 ```
 
 ## Where errors surface
+
+Decompressed bytes reach the caller in one of three states:
+
+- **Provisional output:** bytes from a member whose trailer has not been
+  checked yet. Normal reads deliver these as they decode; a later CRC,
+  `ISIZE`, truncation or trailing-data error can still invalidate them.
+- **Validated output:** once the reader reaches clean EOF (an empty read),
+  or a codec or streaming iterator is exhausted without an error, every
+  member has passed its trailer check.
+- **Recovery data:** bytes still readable after an integrity failure has
+  been raised (see below). They are not validated and must not be trusted
+  as that member's content.
 
 > **Warning — successful output is not yet proof of integrity.**
 > `GzipDecoder.feed()` and `decompress_chunks()` can produce payload before the

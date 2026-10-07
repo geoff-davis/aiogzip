@@ -194,13 +194,17 @@ the decompression cost required to reach a later uncompressed offset.
 ## Cancellation
 
 Large compression and decompression calls may run in an executor. A worker
-thread cannot be stopped after its awaiting task is cancelled, so the codec
-state may still advance.
+thread cannot be stopped after its awaiting task is cancelled, so cancellation
+waits until the worker has finished before it propagates; the codec state has
+then advanced.
 
-If an executor-backed read is cancelled, close that reader and open a new one;
-later reads and seeks on the old handle raise `OSError`. If an executor-backed
-write is cancelled, discard that incomplete output member and create a new
-writer rather than continuing on the broken stream.
+If a read is cancelled while decompression runs in an executor, the reader
+is broken: later reads raise `OSError`. A successful `seek(0)` on a source
+that can rewind recovers it; otherwise close the reader and open a new one.
+If an executor-backed write is cancelled, discard that incomplete output
+member and create a new writer rather than continuing on the broken stream.
+A cancelled source read has different consequences, described under
+[Source failures and cancellation](#source-failures-and-cancellation).
 
 ```python
 import asyncio
