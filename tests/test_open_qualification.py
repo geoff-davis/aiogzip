@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import aiofiles.threadpool
 import pytest
@@ -19,6 +20,10 @@ from aiogzip import (
     ConcurrentOperationError,
     _binary,
 )
+
+sys.path.insert(0, str(Path(__file__).parent / "stateful"))
+from model import CLOSED, OPEN, OPENING, U  # noqa: E402
+from observer import assert_lifecycle  # noqa: E402
 
 
 def handle(text, writing, path=None, **options):
@@ -68,12 +73,14 @@ async def test_queued_native_acquisition_survives_repeated_cancel(
             assert not acquired and not opener.done()
             with pytest.raises(ConcurrentOperationError):
                 await f.close()
+            assert_lifecycle(f, OPENING, "overlapping_open_or_close")
             release.set()
             with pytest.raises(asyncio.CancelledError, match="request-0"):
                 await opener
             assert len(acquired) == 1 and acquired[0].closed
-            assert (f._binary_file if text else f._file) is None
+            assert_lifecycle(f, OPENING, "acquisition_fails")
             await f.close()
+            assert_lifecycle(f, U, "close")
         finally:
             release.set()
             await asyncio.gather(opener, return_exceptions=True)
@@ -197,6 +204,7 @@ async def test_native_cleanup_stays_reserved_through_repeated_cancel(
             await f.open()
         with pytest.raises(ConcurrentOperationError):
             await f.close()
+        assert_lifecycle(f, OPENING, "overlapping_open_or_close")
         release.set()
         with pytest.raises(asyncio.CancelledError, match="cleanup-0") as caught:
             await opener
@@ -204,8 +212,9 @@ async def test_native_cleanup_stays_reserved_through_repeated_cancel(
         assert primary.__cause__ is original_cause
         assert opener.cancelled()
         assert events == ["close"] and raw.closed
-        assert (f._binary_file if text else f._file) is None
+        assert_lifecycle(f, OPENING, "cleanup_raises_base_exception")
         await f.close()
+        assert_lifecycle(f, U, "close")
     finally:
         release.set()
         await asyncio.gather(opener, return_exceptions=True)
@@ -273,31 +282,36 @@ async def test_custom_initialization_failure_is_unpublished_and_retryable(
     opener = asyncio.create_task(f.open())
     try:
         await asyncio.wait_for(entered.wait(), 5)
-        assert (f._binary_file if text else f._file) is None
+        assert_lifecycle(f, U, "open_starts")
         with pytest.raises(ConcurrentOperationError):
             await f.open()
         with pytest.raises(ConcurrentOperationError):
             await f.close()
+        assert_lifecycle(f, OPENING, "overlapping_open_or_close")
         if failure == "cancel":
             opener.cancel()
         release.set()
         if failure == "error" and not writing:
             # A failing seekability probe has always meant non-seekable.
             assert await opener is f
+            assert_lifecycle(f, OPENING, "open_succeeds")
         else:
             with pytest.raises(
                 asyncio.CancelledError if failure == "cancel" else OSError
             ):
                 await opener
             assert resource.closes == (0 if external else 1)
-            assert (f._binary_file if text else f._file) is None
+            assert_lifecycle(f, OPENING, "initialization_fails")
             # A fresh acquisition or caller-owned resource can be retried.
             if not external:
                 resource = Resource()
                 resource.fail = False
             assert await f.open() is f
+            assert_lifecycle(f, OPENING, "open_succeeds")
         await f.close()
+        assert_lifecycle(f, OPEN, "close")
         await f.close()
+        assert_lifecycle(f, CLOSED, "close")
         assert resource.closes == (0 if external else 1)
     finally:
         release.set()
@@ -354,8 +368,10 @@ async def test_partial_initial_header_ownership(monkeypatch, text, external, out
     try:
         if outcome == "short":
             await f.open()
+            assert_lifecycle(f, OPENING, "open_succeeds")
             await f.write("payload" if text else b"payload")
             await f.close()
+            assert_lifecycle(f, OPEN, "close")
             assert gzip.decompress(sink.data) == b"payload"
         else:
             with pytest.raises(OSError) as caught:
@@ -363,11 +379,13 @@ async def test_partial_initial_header_ownership(monkeypatch, text, external, out
             if outcome == "error":
                 assert caught.value is primary and primary.__cause__ is original_cause
             assert bytes(sink.data) == b"\x1f\x8b"
-            assert (f._binary_file if text else f._file) is None
+            assert_lifecycle(f, OPENING, "initialization_fails")
             with pytest.raises(ValueError, match="not opened"):
                 await f.write("late" if text else b"late")
+            assert_lifecycle(f, U, "call_starts")
         await f.close()
         await f.close()
+        assert_lifecycle(f, CLOSED, "close")
         assert sink.closes == (0 if external else 1)
     finally:
         await f.close()
@@ -407,18 +425,23 @@ async def test_context_exit_during_open_does_not_abandon_opener(
             # not replace the body's error or claim to have closed the opener.
             error = ValueError("body failure")
             assert await f.__aexit__(ValueError, error, None) is None
+            assert_lifecycle(f, OPENING, "exceptional_context_exit")
         else:
             with pytest.raises(ConcurrentOperationError):
                 await f.__aexit__(None, None, None)
+            assert_lifecycle(f, OPENING, "overlapping_open_or_close")
         assert not f.closed and not opener.done() and resource.closes == 0
         release.set()
         assert await opener is f
+        assert_lifecycle(f, OPENING, "open_succeeds")
         if text:
             assert f.buffer._closed_observer is not None
             assert f.buffer._read_poison_observer is not None
             await f.buffer.close()
             assert f.closed
+            assert_lifecycle(f.buffer, OPEN, "close")
         await f.close()
+        assert_lifecycle(f, CLOSED if text else OPEN, "close")
         assert resource.closes == 1
     finally:
         release.set()
@@ -454,8 +477,9 @@ async def test_native_acquisition_error_and_cancel_preserve_primary_cancel(
         with pytest.raises(asyncio.CancelledError, match="acquire-0") as caught:
             await opener
         assert caught.value.__cause__ is failure
-        assert (f._binary_file if text else f._file) is None
+        assert_lifecycle(f, OPENING, "acquisition_fails")
         await f.close()
+        assert_lifecycle(f, U, "close")
     finally:
         release.set()
         await asyncio.gather(opener, return_exceptions=True)
@@ -495,14 +519,16 @@ async def test_cooperative_cleanup_finishes_before_releasing_open_reservation(
             await f.close()
         with pytest.raises(ConcurrentOperationError):
             await f.open()
+        assert_lifecycle(f, OPENING, "overlapping_open_or_close")
         opener.cancel("during cleanup")
         with pytest.raises(asyncio.CancelledError, match="during cleanup") as caught:
             await opener
         assert caught.value.__context__ is primary
         assert events == ["closed"]
         assert opener.cancelled()
-        assert (f._binary_file if text else f._file) is None
+        assert_lifecycle(f, OPENING, "cleanup_raises_base_exception")
         await f.close()
+        assert_lifecycle(f, U, "close")
     finally:
         release.set()
         await asyncio.gather(opener, return_exceptions=True)
@@ -553,6 +579,7 @@ async def test_cancelled_acquisition_retains_close_through_more_cancellation(
         assert not opener.done() and not acquired[0].closed
         with pytest.raises(ConcurrentOperationError):
             await f.close()
+        assert_lifecycle(f, OPENING, "overlapping_open_or_close")
         release_close.set()
         with pytest.raises(
             asyncio.CancelledError, match="original acquisition cancel"
@@ -561,8 +588,9 @@ async def test_cancelled_acquisition_retains_close_through_more_cancellation(
         assert caught.value.__cause__ is None
         assert any("later cleanup cancel" in note for note in caught.value.__notes__)
         assert acquired[0].closed and acquired[0].closes == 1
-        assert (f._binary_file if text else f._file) is None
+        assert_lifecycle(f, OPENING, "acquisition_fails")
         await f.close()
+        assert_lifecycle(f, U, "close")
     finally:
         release_open.set()
         release_close.set()

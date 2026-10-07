@@ -78,6 +78,18 @@ general buffers are rejected. Codec instances and operation iterators are not
 thread-safe. Preserve these ownership and immutable-input boundaries when
 changing the architecture.
 
+### File-state invariants
+
+The asyncio file handles' lifecycle, read health, source and native-work
+ownership, text checkpoint and text/binary bridge are specified in
+`plans/design/v2.0.0b2-file-state-model.md`, which names the tests that pin
+each rule (including the stateful harness in `tests/stateful/`). Every
+approved behavior difference from b1 is recorded in
+`plans/reviews/v2.0.0b2-behavior-exceptions.md`. Read both before changing
+`_binary.py`, `_text.py` or `_source_io.py`. A change to a documented
+transition or to observable behavior needs a model or ledger update, not a
+silent test edit. `plans/README.md` indexes every plan and record.
+
 ### Test Organization
 
 Tests are organized by priority:
@@ -262,5 +274,5 @@ Always include:
 
 ---
 
-**Last Updated:** 2026-09-01
+**Last Updated:** 2026-10-06
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!

@@ -72,3 +72,52 @@ def test_metadata_types_keep_private_inspection_aliases():
     assert _inspection.GzipMemberInfo is _metadata.GzipMemberInfo
     assert _inspection.GzipInfo is _metadata.GzipInfo
     assert _inspection.VerificationResult is _metadata.VerificationResult
+
+
+def _private_classes():
+    """Every class named ``_...`` defined in an aiogzip module."""
+    import importlib
+    import inspect
+    import pkgutil
+
+    found = {}
+    for info in pkgutil.iter_modules(aiogzip.__path__):
+        module = importlib.import_module(f"aiogzip.{info.name}")
+        for value in vars(module).values():
+            if (
+                inspect.isclass(value)
+                and value.__name__.startswith("_")
+                and value.__module__.startswith("aiogzip.")
+            ):
+                found[value] = f"{value.__module__}.{value.__qualname__}"
+    return found
+
+
+def test_no_private_type_is_exported():
+    """No public name is, or inherits from, a private aiogzip class.
+
+    The 2.0.0b2 work (WP6-WP9) added private state types; none may leak into
+    the public surface. ``codec._CodecBase`` is b1's shared base of the two
+    public codecs and is the only private class allowed in a public MRO.
+    """
+    import inspect
+
+    from aiogzip import codec
+
+    private = _private_classes()
+    names = set(private.values())
+    assert {
+        "aiogzip._binary._ReadHealth",
+        "aiogzip._codec_async._StreamBudget",
+        "aiogzip._source_io._NativeSourceCall",
+        "aiogzip._text._TextBufferOrigin",
+    } <= names
+
+    allowed_bases = {"aiogzip.codec._CodecBase"}
+    for module in (aiogzip, codec):
+        for name in module.__all__:
+            value = getattr(module, name)
+            assert value not in private, f"{module.__name__}.{name}"
+            if inspect.isclass(value):
+                leaked = {private[b] for b in value.__mro__ if b in private}
+                assert leaked <= allowed_bases, f"{module.__name__}.{name}: {leaked}"

@@ -5,6 +5,7 @@ import gzip
 import io
 import os
 import warnings
+from enum import Enum, auto
 from pathlib import Path
 from typing import (
     Any,
@@ -64,6 +65,40 @@ def _decompression_error_message(error: gzip.BadGzipFile) -> str:
     elif "ended before" in detail and "truncated" not in detail:
         detail = f"truncated or incomplete stream ({detail})"
     return f"Error decompressing gzip data: {detail}"
+
+
+def _observer_failure_outcome(
+    primary: BaseException, observer_error: BaseException
+) -> BaseException:
+    """Choose what to raise when cleanup failed and a text observer also failed.
+
+    The observer never reorders cleanup errors: it becomes a note on the error
+    cleanup selected, unless it is an interrupt or cancellation and that error
+    is ordinary.
+    """
+    if isinstance(primary, Exception) and not isinstance(observer_error, Exception):
+        return observer_error
+    primary.add_note(f"A text observer also failed: {observer_error!r}")
+    return primary
+
+
+class _ReadHealth(Enum):
+    """Binary reader health, orthogonal to EOF, closure and active calls.
+
+    VALIDATION_SALVAGE follows a reported integrity failure: decoded bytes
+    remain readable as recovery data, then reads fail terminally. BROKEN is
+    terminal until a successful rewind or reopen.
+    """
+
+    HEALTHY = auto()
+    VALIDATION_SALVAGE = auto()
+    BROKEN = auto()
+
+
+# Module aliases keep hot read guards to one identity check on a global.
+_HEALTHY = _ReadHealth.HEALTHY
+_VALIDATION_SALVAGE = _ReadHealth.VALIDATION_SALVAGE
+_BROKEN = _ReadHealth.BROKEN
 
 
 class ConcurrentOperationError(OSError):
@@ -198,6 +233,7 @@ class AsyncGzipBinaryFile:
         "_source_native_call",
         "_source_owner",
         "_source_abort_requested",
+        "_read_aborts",
         "_pending_compressed_chunk",
         "_replay_offset",
         "_cache_rewindable_reads",
@@ -213,8 +249,7 @@ class AsyncGzipBinaryFile:
         "_close_lock",
         "_closed_observer",
         "_read_poison_observer",
-        "_read_broken",
-        "_read_validation_failed",
+        "_read_health",
         "_max_decompressed_size",
         "_strict_size",
         "_fast_compress",
@@ -319,6 +354,7 @@ class AsyncGzipBinaryFile:
         self._source_native_call: Optional[_NativeSourceCall] = None
         self._source_owner: Optional[asyncio.Task[Any]] = None
         self._source_abort_requested = False
+        self._read_aborts = 0
         self._pending_compressed_chunk: Optional[bytes] = None
         self._replay_offset: Optional[int] = None
         self._cache_rewindable_reads: bool = False
@@ -340,8 +376,8 @@ class AsyncGzipBinaryFile:
         self._close_lock = asyncio.Lock()
         self._closed_observer: Optional[Callable[[], None]] = None
         self._read_poison_observer: Optional[Callable[[bool], None]] = None
-        self._read_broken: bool = False
-        self._read_validation_failed: bool = False
+        self._read_health: _ReadHealth
+        self._reset_read_health()
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._strict_size = validated_strict_size
 
@@ -422,8 +458,7 @@ class AsyncGzipBinaryFile:
                 )
                 self._eof = False
                 self._read_call_active = False
-                self._read_broken = False
-                self._read_validation_failed = False
+                self._reset_read_health()
                 self._position = 0
                 self._mtime = None
                 self._decoder_header_generation = 0
@@ -468,52 +503,6 @@ class AsyncGzipBinaryFile:
     ) -> None:
         """Exit the context manager, flushing and closing the file."""
         await self._close_on_context_exit(self.close, exc_val)
-
-    async def _close_on_context_exit(
-        self,
-        close_call: Callable[[], Awaitable[None]],
-        body_error: Optional[BaseException],
-    ) -> None:
-        """Apply the shared normal/exceptional context-exit close protocol."""
-        if body_error is None:
-            # A producer can reserve the handle again before this task resumes
-            # from its completion future. Keep retrying until normal close owns
-            # a genuinely idle handle; an infinite producer naturally keeps the
-            # clean exit pending rather than leaking the resource.
-            try:
-                while True:
-                    try:
-                        await close_call()
-                        return
-                    except ConcurrentOperationError:
-                        if not await self._wait_for_active_call():
-                            raise
-            except asyncio.CancelledError:
-                # Cancellation can land while the clean exit is waiting for an
-                # active call. Abort that call's handle before preserving the
-                # cancellation so timeout/TaskGroup exit cannot leak it.
-                try:
-                    await self._abort_active_call_on_exit()
-                except BaseException:
-                    pass
-                raise
-
-        try:
-            await close_call()
-        except ConcurrentOperationError:
-            # A task spawned from the body may still own the codec. Preserve
-            # the body's exception and close resources without discarding the
-            # live operation underneath that task.
-            try:
-                await self._abort_active_call_on_exit()
-            except asyncio.CancelledError:
-                # Cancellation delivered during cleanup is the current task's
-                # control flow (timeout/TaskGroup), not a secondary close error.
-                raise
-            except Exception:
-                # As in close()'s failed-write path, the primary exception wins
-                # after the underlying close has at least been attempted.
-                pass
 
     # Sync-protocol stubs. Without these, ``with`` / ``for`` fail with generic
     # "does not support the context manager protocol" / "is not iterable"
@@ -595,7 +584,11 @@ class AsyncGzipBinaryFile:
                 # recovery path for a poisoned reader. Other seeks cannot safely
                 # use state from the failed decoder, including relative seeks that
                 # happen to target 0.
-                if self._read_broken and whence == os.SEEK_SET and offset == 0:
+                if (
+                    self._read_health is not _HEALTHY
+                    and whence == os.SEEK_SET
+                    and offset == 0
+                ):
                     await self._rewind_reader()
                     rewound = True
                     self._check_read_call_not_aborted()
@@ -728,7 +721,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
         if size is not None and size > _MAX_CHUNK_SIZE:
             raise ValueError(
@@ -808,7 +801,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
         view = memoryview(b)
         if view.readonly:
@@ -842,7 +835,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
 
         if size is None:
@@ -890,7 +883,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
         view = memoryview(b)
         if view.readonly:
@@ -915,7 +908,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
         if limit is None or limit < 0:
             # Any negative limit means "no limit", matching io.IOBase. Values
@@ -939,7 +932,7 @@ class AsyncGzipBinaryFile:
         elif limit != -1 and buf_len - start >= limit:
             end = start + limit
         elif self._eof:
-            if self._read_broken:
+            if self._read_health is not _HEALTHY:
                 self._check_read_usable()
             end = buf_len
         else:
@@ -974,7 +967,7 @@ class AsyncGzipBinaryFile:
                 end = start + limit
             elif self._eof:
                 # A poisoned, unterminated remainder is not a clean final line.
-                if self._read_broken:
+                if self._read_health is not _HEALTHY:
                     self._check_read_usable()
                 end = buf_len
             else:
@@ -1005,7 +998,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
 
         lines: List[bytes] = []
@@ -1021,7 +1014,10 @@ class AsyncGzipBinaryFile:
                     total += len(line)
                     if hint > 0 and total >= hint:
                         break
-                    if self._read_broken and self._validation_line_salvage_complete():
+                    if (
+                        self._read_health is not _HEALTHY
+                        and self._validation_line_salvage_complete()
+                    ):
                         # Publish every complete recovery line exactly once.
                         # A trailing unterminated span stays buffered so the
                         # next line call reports the terminal validation error.
@@ -1133,6 +1129,7 @@ class AsyncGzipBinaryFile:
 
         # Reserve inline so the primitive path avoids the measured context-
         # manager cost; the codec/sink work itself is shared with composites.
+        # Parity: tests/test_parity_binary_write.py
         self._check_write_call_available()
         self._write_call_active = True
         try:
@@ -1164,14 +1161,11 @@ class AsyncGzipBinaryFile:
             encoder.discard()
             raise
 
-        # Exceptional context exit can close an owned sink while this
-        # task is suspended in it. A sink that completes that await after
-        # close must not make this torn member look successfully written.
+        # Exceptional context exit settles the sink call this task is
+        # suspended in, then closes it. A sink write that completed before
+        # that settlement must not make this torn member look written.
         if self._is_closed or self._write_broken:
-            raise OSError(
-                "write aborted because the gzip file was closed while "
-                "the call was active"
-            )
+            self._raise_write_call_aborted("write")
 
         # The codec owns uncompressed-byte accounting. Expose its authoritative
         # ledger only after every emitted byte reached the sink.
@@ -1195,15 +1189,25 @@ class AsyncGzipBinaryFile:
                 f"write() argument must be a bytes-like object, not {type(data).__name__}"
             ) from exc
 
-    async def _write_all(self, data: bytes) -> None:
+    async def _write_all(self, data: bytes, call: str = "write") -> None:
         """Write every byte to the underlying sink or raise on no progress."""
-        if self._file is None:
+        sink = self._file
+        if sink is None:
             raise ValueError("File not opened. Call await open() or use async with.")
 
+        native = _is_native_source(sink, "write")
         offset = 0
         length = len(data)
         while offset < length:
-            written = await self._file.write(data if offset == 0 else data[offset:])
+            if self._write_broken:
+                # Exceptional context exit aborted this call between sink
+                # writes and may already have closed the sink.
+                self._raise_write_call_aborted(call)
+            chunk = data if offset == 0 else data[offset:]
+            if native:
+                written = await self._call_native_sink("write", chunk)
+            else:
+                written = await self._call_custom_sink(call, "write", chunk)
             if not isinstance(written, int) or isinstance(written, bool):
                 raise OSError(
                     "underlying file write() returned an invalid byte count "
@@ -1240,7 +1244,7 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_broken:
+        if self._read_call_active or self._read_health is not _HEALTHY:
             self._check_read_call_usable(True)
 
         if size is None:
@@ -1361,6 +1365,10 @@ class AsyncGzipBinaryFile:
             # that all accepted members and trailers were complete.
             self._eof = True
             pieces: List[bytes] = []
+            # finish() is driven synchronously: nothing between try and the
+            # loop's end can suspend, so task cancellation cannot land here.
+            # The live cancellation boundaries are the source read above
+            # (_read_compressed_chunk) and the feed path's driver below.
             try:
                 try:
                     for piece in decoder.finish():
@@ -1368,9 +1376,6 @@ class AsyncGzipBinaryFile:
                 finally:
                     self._sync_decoder_mtime(decoder)
                 return pieces
-            except asyncio.CancelledError:
-                self._poison_read(decoder)
-                raise
             except gzip.BadGzipFile as error:
                 self._retain_validation_pieces(pieces)
                 self._poison_read(decoder, validation_failed=True)
@@ -1446,13 +1451,44 @@ class AsyncGzipBinaryFile:
         self._check_read_call_available()
         self._check_read_usable(allow_buffered=allow_buffered)
 
+    # Private wrapper support. AsyncGzipTextFile uses these operations, plus a
+    # reviewed allowlist of other private names (tests/test_text_bridge.py);
+    # binary health stays the single authority and text keeps no copy of it.
+
+    def _attach_text_observers(
+        self,
+        *,
+        closed: Callable[[], None],
+        poisoned: Callable[[bool], None],
+    ) -> None:
+        """Attach the owning text wrapper's callbacks; never replace another's.
+
+        ``poisoned(validation_failed)`` runs after health is committed, at least
+        once per poisoning event: an abort and a later failure of the active
+        call can both deliver it, so handlers must be idempotent. ``closed()``
+        runs once, after closure is latched and both callbacks are detached.
+        """
+        if self._closed_observer is not None or self._read_poison_observer is not None:
+            raise RuntimeError("gzip binary file already has text observers attached")
+        self._closed_observer = closed
+        self._read_poison_observer = poisoned
+
+    def _detach_text_observers(self) -> None:
+        """Drop both callbacks; idempotent, and never closes any resource."""
+        self._closed_observer = None
+        self._read_poison_observer = None
+
+    def _read_is_healthy(self) -> bool:
+        """Return whether the reader has no terminal or salvage failure."""
+        return self._read_health is _HEALTHY
+
     def _has_validation_failure(self) -> bool:
         """Return whether integrity validation poisoned the current reader."""
-        return self._read_broken and self._read_validation_failed
+        return self._read_health is _VALIDATION_SALVAGE
 
     def _can_restore_failed_read(self) -> bool:
         """Return whether failed-call bytes remain reachable by retry or salvage."""
-        return not self._read_broken or self._has_validation_failure()
+        return self._read_health is not _BROKEN
 
     def _read_buffer_exhausted(self) -> bool:
         """Return whether no decoded binary bytes remain buffered."""
@@ -1461,6 +1497,76 @@ class AsyncGzipBinaryFile:
     def _validation_salvage_exhausted(self) -> bool:
         """Return whether validation salvage has no binary bytes left to serve."""
         return self._has_validation_failure() and self._read_buffer_exhausted()
+
+    def _check_read_usable(self, *, allow_buffered: bool = False) -> None:
+        """Reject unsafe access, optionally allowing pre-failure decoded bytes."""
+        if self._read_health is _HEALTHY:
+            return
+        if self._has_validation_failure() and allow_buffered:
+            if len(self._buffer) - self._buffer_offset > 0:
+                return
+        if self.seekable():
+            recovery = "seek to 0 to recover, or close and reopen the gzip file"
+        else:
+            recovery = "close and reopen the gzip file"
+        raise OSError(
+            f"read stream is broken after failed or cancelled decompression; {recovery}"
+        )
+
+    async def _close_on_context_exit(
+        self,
+        close_call: Callable[[], Awaitable[None]],
+        body_error: Optional[BaseException],
+    ) -> None:
+        """Apply the shared normal/exceptional context-exit close protocol."""
+        if body_error is None:
+            # A producer can reserve the handle again before this task resumes
+            # from its completion future. Keep retrying until normal close owns
+            # a genuinely idle handle; an infinite producer naturally keeps the
+            # clean exit pending rather than leaking the resource.
+            try:
+                while True:
+                    try:
+                        await close_call()
+                        return
+                    except ConcurrentOperationError:
+                        if not await self._wait_for_active_call():
+                            raise
+            except asyncio.CancelledError:
+                # Cancellation can land while the clean exit is waiting for an
+                # active call. Abort that call's handle before preserving the
+                # cancellation so timeout/TaskGroup exit cannot leak it.
+                try:
+                    await self._abort_active_call_on_exit()
+                except BaseException:
+                    pass
+                raise
+
+        try:
+            await close_call()
+        except ConcurrentOperationError:
+            # A task spawned from the body may still own the codec. Preserve
+            # the body's exception and close resources without discarding the
+            # live operation underneath that task.
+            try:
+                await self._abort_active_call_on_exit()
+            except asyncio.CancelledError:
+                # Cancellation delivered during cleanup is the current task's
+                # control flow (timeout/TaskGroup), not a secondary close error.
+                raise
+            except Exception:
+                # As in close()'s failed-write path, the primary exception wins
+                # after the underlying close has at least been attempted.
+                pass
+
+    def _check_write_call_available(self) -> None:
+        """Reject overlapping writer calls before they mutate codec state."""
+        if self._write_call_active:
+            raise ConcurrentOperationError(
+                "gzip writer already has an active write or flush call"
+            )
+
+    # End of private wrapper support.
 
     def _validation_line_salvage_complete(self) -> bool:
         """Return whether no complete recovery line remains buffered."""
@@ -1505,42 +1611,54 @@ class AsyncGzipBinaryFile:
         if not waiter.done():
             waiter.set_result(None)
 
-    def _check_read_usable(self, *, allow_buffered: bool = False) -> None:
-        """Reject unsafe access, optionally allowing pre-failure decoded bytes."""
-        if not self._read_broken:
-            return
-        if self._has_validation_failure() and allow_buffered:
-            if len(self._buffer) - self._buffer_offset > 0:
-                return
-        if self.seekable():
-            recovery = "seek to 0 to recover, or close and reopen the gzip file"
-        else:
-            recovery = "close and reopen the gzip file"
-        raise OSError(
-            f"read stream is broken after failed or cancelled decompression; {recovery}"
-        )
-
     def _poison_read(
         self,
         decoder: GzipDecoder,
         *,
         validation_failed: bool = False,
     ) -> None:
-        """Make a failed decoder terminal while retaining pre-failure output."""
-        self._read_broken = True
-        self._read_validation_failed = validation_failed
+        """Make a failed decoder terminal while retaining pre-failure output.
+
+        Health and EOF are committed before the text observer runs; an observer
+        error still propagates but can no longer skip the decoder discard.
+        """
+        self._read_health = _VALIDATION_SALVAGE if validation_failed else _BROKEN
         self._eof = True
+        try:
+            observer = self._read_poison_observer
+            if observer is not None:
+                observer(validation_failed)
+        finally:
+            decoder.discard()
+
+    def _reset_read_health(self) -> None:
+        """Mark the reader healthy: at construction, open and successful rewind."""
+        self._read_health = _HEALTHY
+
+    def _break_read_on_abort(self) -> None:
+        """Make the reader terminal when an exceptional context exit aborts it.
+
+        Health and EOF are committed before the text observer runs, so an
+        observer error cannot roll them back.
+        """
+        self._read_health = _BROKEN
+        self._eof = True
+        self._read_aborts += 1
         observer = self._read_poison_observer
         if observer is not None:
-            observer(validation_failed)
-        decoder.discard()
+            observer(False)
 
-    def _check_write_call_available(self) -> None:
-        """Reject overlapping writer calls before they mutate codec state."""
-        if self._write_call_active:
-            raise ConcurrentOperationError(
-                "gzip writer already has an active write or flush call"
-            )
+    @staticmethod
+    def _raise_write_call_aborted(call: str) -> NoReturn:
+        """Raise the error for a write or flush aborted by context exit."""
+        raise OSError(
+            f"{call} aborted because the gzip file was closed while the call was active"
+        )
+
+    def _check_write_usable(self) -> None:
+        """Refuse any write surface once the member is torn."""
+        if self._write_broken:
+            self._raise_write_broken()
 
     @staticmethod
     def _raise_write_broken() -> NoReturn:
@@ -1562,9 +1680,8 @@ class AsyncGzipBinaryFile:
         """Latch closure and synchronously notify an owning text wrapper."""
         self._is_closed = True
         self._pending_compressed_chunk = None
-        self._read_poison_observer = None
         observer = self._closed_observer
-        self._closed_observer = None
+        self._detach_text_observers()
         if observer is not None:
             observer()
 
@@ -1604,10 +1721,19 @@ class AsyncGzipBinaryFile:
             raise ValueError("File not opened. Call await open() or use async with.")
         seek_method = getattr(self._file, "seek", None)
         if self._underlying_seekable and callable(seek_method):
+            aborts = self._read_aborts
             if _is_native_source(self._file, "seek"):
                 await self._call_native_source("seek", 0, os.SEEK_SET)
             else:
                 await self._call_custom_source("seek", 0, os.SEEK_SET)
+            if self._read_aborts != aborts:
+                # Context exit aborted the reader while the seek settled. A
+                # native seek is awaited rather than cancelled, so it returns
+                # normally; never revive the aborted reader with a new decoder.
+                raise OSError(
+                    "read aborted because the gzip file was closed while "
+                    "the call was active"
+                )
         elif self._cache_rewindable_reads:
             self._replay_offset = 0
         else:
@@ -1623,8 +1749,7 @@ class AsyncGzipBinaryFile:
             max_decompressed_size=self._max_decompressed_size,
         )
         self._decoder_header_generation = 0
-        self._read_broken = False
-        self._read_validation_failed = False
+        self._reset_read_health()
         del self._buffer[:]
         self._buffer_offset = 0
         self._eof = False
@@ -1666,7 +1791,8 @@ class AsyncGzipBinaryFile:
         except Exception as e:
             raise OSError(f"Error reading from file: {e}") from e
 
-        self._check_read_call_not_aborted()
+        # Cache before the abort check: the source has consumed this chunk, so
+        # a reader left open by a failed abort close must replay it on rewind.
         if chunk and self._cache_rewindable_reads:
             cap = self._max_rewind_cache_size
             if cap is not None and len(self._compressed_cache) + len(chunk) > cap:
@@ -1674,6 +1800,7 @@ class AsyncGzipBinaryFile:
                 self._cache_rewindable_reads = False
             else:
                 self._compressed_cache.extend(chunk)
+        self._check_read_call_not_aborted()
         return chunk
 
     def _poison_source(self) -> None:
@@ -1748,7 +1875,10 @@ class AsyncGzipBinaryFile:
                 raise cancellation from failure
             else:
                 if method == "read":
-                    if not self._is_closed and not self._read_broken:
+                    # Keep consumed input whatever the read health: an abort
+                    # whose close fails leaves the reader open for recovery.
+                    # Closing clears it.
+                    if not self._is_closed:
                         self._pending_compressed_chunk = result
                 else:
                     # A cancelled rewind cannot leave old codec state aligned
@@ -1759,6 +1889,64 @@ class AsyncGzipBinaryFile:
             if not call.no_effect:
                 self._poison_source()
             raise
+        finally:
+            self._source_native_call = None
+
+    async def _call_custom_sink(self, call: str, method: str, *args: Any) -> Any:
+        """Track a cooperative sink call so context exit can settle it.
+
+        Mirrors :meth:`_call_custom_source`: exceptional context exit cancels
+        the owning task and waits for this call's ``finally`` boundary before
+        closing the sink, so the sink is never touched after it is closed.
+        """
+        sink = self._file
+        self._source_owner = asyncio.current_task()
+        self._source_abort_requested = False
+        try:
+            result = getattr(sink, method)(*args)
+            if method == "write" or hasattr(result, "__await__"):
+                result = await result
+            return result
+        except BaseException as error:
+            if self._source_abort_requested:
+                if isinstance(error, asyncio.CancelledError):
+                    # Context exit owns exactly one cancellation; converted
+                    # below. Outside cancellation counts stay with the caller.
+                    owner = self._source_owner
+                    if owner is not None:
+                        owner.uncancel()
+                self._raise_write_call_aborted(call)
+            raise
+        finally:
+            self._source_owner = None
+            waiter = self._source_work
+            self._source_work = None
+            if waiter is not None and not waiter.done():
+                waiter.set_result(None)
+
+    async def _call_native_sink(self, method: str, *args: Any) -> Any:
+        """Retain native sink completion independently of executor cancellation.
+
+        Cancellation and context exit both wait for a started native call to
+        finish its last file access; a queued call that has not started is
+        prevented, so the file is never touched after close.
+        """
+        sink = self._file
+        loop = asyncio.get_running_loop()
+        if sink._loop is not loop:
+            raise RuntimeError("aiofiles sink belongs to a different event loop")
+        call = _NativeSourceCall(sink._file, method, args, loop, track_position=False)
+        work = loop.run_in_executor(sink._executor, call)
+        self._source_native_call = call
+        try:
+            return await work
+        except asyncio.CancelledError as cancellation:
+            try:
+                await _settle_before_cancel(call.completion(cancel_pending=True))
+            except asyncio.CancelledError:
+                # Repeated cancellation cannot interrupt settlement.
+                pass
+            raise cancellation
         finally:
             self._source_native_call = None
 
@@ -1815,23 +2003,22 @@ class AsyncGzipBinaryFile:
         operation = encoder.flush()
         try:
             for flushed_data in operation:
-                await self._write_all(flushed_data)
+                await self._write_all(flushed_data, "flush")
 
             # Also flush the underlying file if it has a flush method.
-            flush_method = getattr(self._file, "flush", None)
-            if callable(flush_method):
-                result = flush_method()
-                if hasattr(result, "__await__"):
-                    await result
+            sink = self._file
+            if self._write_broken:
+                self._raise_write_call_aborted("flush")
+            if _is_native_source(sink, "flush"):
+                await self._call_native_sink("flush")
+            elif callable(getattr(sink, "flush", None)):
+                await self._call_custom_sink("flush", "flush")
 
             # See write(): exceptional context exit can close the sink while
             # this reserved call is awaiting it. Never report that as a
             # successful durability boundary for an unterminated member.
             if self._is_closed or self._write_broken:
-                raise OSError(
-                    "flush aborted because the gzip file was closed while "
-                    "the call was active"
-                )
+                self._raise_write_call_aborted("flush")
         except asyncio.CancelledError:
             self._write_broken = True
             encoder.discard()
@@ -1870,9 +2057,29 @@ class AsyncGzipBinaryFile:
         if self._writing_mode:
             self._check_write_call_available()
 
-        # Mark as closed immediately to prevent concurrent close attempts.
-        self._mark_closed()
+        # Mark as closed immediately to prevent concurrent close attempts. A
+        # failing closed observer must not skip finalization or cleanup.
+        observer_error: Optional[BaseException] = None
+        try:
+            self._mark_closed()
+        except BaseException as error:
+            observer_error = error
+        try:
+            await self._finish_close()
+        except BaseException as primary:
+            if observer_error is None:
+                raise
+            selected = _observer_failure_outcome(primary, observer_error)
+            if selected is primary:
+                raise
+            # An interrupt from the observer outranks the ordinary cleanup
+            # error, which stays attached as its context (not its cause).
+            raise selected  # noqa: B904
+        if observer_error is not None:
+            raise observer_error
 
+    async def _finish_close(self) -> None:
+        """Finalize the codec and close owned resources after closure is latched."""
         close_file = (
             self._file
             if self._file is not None and (self._owns_file or self._closefd)
@@ -1918,46 +2125,77 @@ class AsyncGzipBinaryFile:
                 )
             if self._is_closed:
                 return
+            observer_error: Optional[BaseException] = None
             if self._writing_mode:
                 self._write_broken = True
             else:
-                self._read_broken = True
-                self._read_validation_failed = False
-                self._eof = True
-
-            work = self._source_work
-            owner = self._source_owner
-            if owner is not None:
-                # Supported custom sources finish all activity before read/seek
-                # returns or raises. Cancel that call and wait for its finally
-                # boundary before invoking close on the source.
-                self._source_abort_requested = True
-                if work is None:
-                    work = asyncio.get_running_loop().create_future()
-                    self._source_work = work
-                owner.cancel()
-            elif self._source_native_call is not None:
-                work = self._source_native_call.completion()
-            if work is not None:
                 try:
-                    await _settle_before_cancel(work)
-                except asyncio.CancelledError:
+                    self._break_read_on_abort()
+                except BaseException as error:
+                    observer_error = error
+            try:
+                await self._finish_abort()
+            except BaseException as primary:
+                if observer_error is None:
                     raise
-                except Exception:
-                    # The read/seek owner observes the native failure. Its
-                    # settlement still permits this context to release the file.
-                    pass
-            close_file = (
-                self._file
-                if self._file is not None and (self._owns_file or self._closefd)
-                else None
-            )
-            if close_file is not None:
-                # Do not latch closed until resource cleanup actually succeeds.
-                # A failure or cancellation leaves the broken handle reportably
-                # open so an explicit close() can retry the underlying close.
-                await self._close_underlying(close_file)
+                selected = _observer_failure_outcome(primary, observer_error)
+                if selected is primary:
+                    raise
+                # An interrupt from the observer outranks the ordinary cleanup
+                # error, which stays attached as its context (not its cause).
+                raise selected  # noqa: B904
+            if observer_error is not None:
+                raise observer_error
+
+    async def _finish_abort(self) -> None:
+        """Settle active work and close resources after an abort is committed.
+
+        Runs under the close lock taken by ``_abort_active_call_on_exit``.
+        """
+        work = self._source_work
+        owner = self._source_owner
+        if owner is not None:
+            # Supported custom sources and sinks finish all activity before
+            # read/seek/write/flush returns or raises. Cancel that call and
+            # wait for its finally boundary before invoking close on the file.
+            self._source_abort_requested = True
+            if work is None:
+                work = asyncio.get_running_loop().create_future()
+                self._source_work = work
+            owner.cancel()
+        elif self._source_native_call is not None:
+            work = self._source_native_call.completion()
+        if work is not None:
+            try:
+                await _settle_before_cancel(work)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # The read/seek owner observes the native failure. Its
+                # settlement still permits this context to release the file.
+                pass
+        close_file = (
+            self._file
+            if self._file is not None and (self._owns_file or self._closefd)
+            else None
+        )
+        if close_file is not None:
+            # Do not latch closed until resource cleanup actually succeeds.
+            # A failure or cancellation leaves the broken handle reportably
+            # open so an explicit close() can retry the underlying close.
+            await self._close_underlying(close_file)
+        try:
             self._mark_closed()
+        finally:
+            # A reservation released before closure saw an open handle and
+            # kept the decoder; one still active discards it on release.
+            # Either way a closed reader never keeps its codec state.
+            if (
+                not self._writing_mode
+                and not self._read_call_active
+                and self._decoder is not None
+            ):
+                self._decoder.discard()
 
     @staticmethod
     async def _close_underlying(file: Any) -> None:

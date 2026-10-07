@@ -1,0 +1,46 @@
+{
+  "artifact": {
+    "file_count": 223,
+    "kind": "sdist",
+    "path": "/tmp/claude-1000/-home-geoff-Projects-personal-aiogzip/ed2d880c-00c7-43cd-92df-0341e13ebc8a/scratchpad/b2-release-7/dist/aiogzip-2.0.0b2.tar.gz",
+    "sha256": "cd709884e58597497e93878e11f5bd1a73b09030815fe5a3b72d45eb510b0173",
+    "size": 657856
+  },
+  "engine": {
+    "compression": "stdlib-zlib",
+    "crc32": "stdlib-zlib",
+    "decompression": "stdlib-zlib"
+  },
+  "environment_root": "/tmp/aiogzip-release-4cwu0d3x/venv-sdist",
+  "implementation": "CPython",
+  "package_path": "/tmp/aiogzip-release-4cwu0d3x/venv-sdist/lib/python3.14/site-packages/aiogzip/__init__.py",
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "python": "3.14.2",
+  "requirements": [
+    "aiocsv>=1.2.3;extra=='csv'",
+    "aiofiles>=23.2.1",
+    "aiogzip[test];extra=='dev'",
+    "hypothesis>=6.0.0;extra=='test'",
+    "mkdocs-material>=9.5.0;extra=='docs'",
+    "mkdocs>=1.5.0;extra=='docs'",
+    "mkdocstrings[python]>=0.24.0;extra=='docs'",
+    "mypy>=1.0.0;extra=='test'",
+    "prek;extra=='dev'",
+    "psutil;extra=='test'",
+    "pytest-asyncio>=0.24;extra=='test'",
+    "pytest-cov>=4.0.0;extra=='test'",
+    "pytest-timeout>=2.3.1;extra=='test'",
+    "pytest>=8.0.0;extra=='test'",
+    "ruff==0.15.20;extra=='dev'",
+    "ty>=0.0.1a16;extra=='test'",
+    "types-aiofiles;extra=='test'",
+    "zlib-ng>=0.4.0;extra=='fast'"
+  ],
+  "version": "2.0.0b2",
+  "versions": {
+    "aiocsv": "1.4.1",
+    "aiofiles": "25.1.0",
+    "zlib-ng": null
+  },
+  "working_directory": "/tmp/aiogzip-release-4cwu0d3x/run-sdist"
+}

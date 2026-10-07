@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Report and enforce aiogzip's exact minimum-runtime CI environments."""
+"""Report and enforce aiogzip's CI runtime environments.
+
+By default each mode pins the exact minimum runtime floors. With ``--latest``
+the same distributions must be present at any version (the unpinned lanes);
+zlib-ng must still be absent outside the fast modes, and every lane asserts
+its engine selection.
+"""
 
 from __future__ import annotations
 
@@ -40,8 +46,10 @@ def _is_source_checkout(module_path: PurePath) -> bool:
     )
 
 
-def report(mode: str, *, require_installed_artifact: bool) -> dict[str, object]:
-    """Return the environment report after enforcing one exact floor mode."""
+def report(
+    mode: str, *, require_installed_artifact: bool, latest: bool = False
+) -> dict[str, object]:
+    """Return the environment report after enforcing one mode."""
     expected = _EXPECTED_VERSIONS[mode]
     versions = {
         distribution: _version(distribution)
@@ -50,12 +58,18 @@ def report(mode: str, *, require_installed_artifact: bool) -> dict[str, object]:
 
     for distribution, expected_version in expected.items():
         actual = versions[distribution]
-        _require(
-            actual == expected_version,
-            f"{distribution} version mismatch: {actual!r} != {expected_version!r}",
-        )
+        if latest:
+            _require(actual is not None, f"{distribution} must be installed")
+        else:
+            _require(
+                actual == expected_version,
+                f"{distribution} version mismatch: {actual!r} != {expected_version!r}",
+            )
 
-    for distribution in {"aiocsv", "zlib-ng"} - expected.keys():
+    # Unpinned lanes may carry aiocsv for the CSV tests; zlib-ng would change
+    # the engine selection, so its absence is always enforced.
+    absent = {"zlib-ng"} if latest else {"aiocsv", "zlib-ng"}
+    for distribution in absent - expected.keys():
         _require(
             versions[distribution] is None,
             f"{distribution} must be absent in {mode} mode, got "
@@ -82,6 +96,11 @@ def report(mode: str, *, require_installed_artifact: bool) -> dict[str, object]:
         "decompression engine mismatch: "
         f"{engine.decompression!r} != {expected_engine!r}",
     )
+    # zlib-ng compression is opt-in per call; the default is stdlib everywhere.
+    _require(
+        engine.compression == "stdlib-zlib",
+        f"compression engine mismatch: {engine.compression!r} != 'stdlib-zlib'",
+    )
     if mode == "fast-forced-stdlib":
         _require(
             os.environ.get("AIOGZIP_ENGINE", "").strip().lower() == "stdlib",
@@ -90,6 +109,7 @@ def report(mode: str, *, require_installed_artifact: bool) -> dict[str, object]:
 
     return {
         "mode": mode,
+        "latest": latest,
         "python": platform.python_version(),
         "implementation": platform.python_implementation(),
         "platform": platform.platform(),
@@ -111,13 +131,20 @@ def main() -> int:
         action="store_true",
         help="fail if aiogzip resolves from a src/aiogzip checkout",
     )
+    parser.add_argument(
+        "--latest",
+        action="store_true",
+        help="require the mode's distributions at any version, not the floors",
+    )
     parser.add_argument("--output", type=Path, help="also write the report as JSON")
     args = parser.parse_args()
 
     rendered = (
         json.dumps(
             report(
-                args.mode, require_installed_artifact=args.require_installed_artifact
+                args.mode,
+                require_installed_artifact=args.require_installed_artifact,
+                latest=args.latest,
             ),
             indent=2,
             sort_keys=True,

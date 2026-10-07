@@ -52,6 +52,9 @@ exception as a programming error: it is not a lock, and catching it in a retry
 loop is not supported synchronization. Separate handles may progress
 concurrently because they do not share gzip or buffer state.
 
+Handles are asyncio objects bound to the event loop that uses them; they are
+not thread-safe. Do not call one handle from several threads or event loops.
+
 When several tasks intentionally share a handle, use an application lock that
 covers the complete logical operation, not only the first low-level call:
 
@@ -112,6 +115,21 @@ except OSError as exc:
 
 ## Where errors surface
 
+Decompressed bytes reach the caller in one of three states:
+
+- **Provisional output:** bytes from a member whose trailer has not been
+  checked yet. Normal reads deliver these as they decode; a later CRC,
+  `ISIZE`, truncation or trailing-data error can still invalidate them.
+- **Validated output:** every member has passed its trailer check once a
+  file read reaches the end of the stream (`read()` or `read(n)` with
+  `n > 0` returns empty without an error), once the operation returned by
+  `GzipDecoder.finish()` is exhausted without an error, or once
+  `decompress_chunks()` is exhausted without an error. An empty `read(0)`
+  and an exhausted `feed()` operation validate nothing.
+- **Recovery data:** bytes still readable after an integrity failure has
+  been raised (see below). They are not validated and must not be trusted
+  as that member's content.
+
 > **Warning — successful output is not yet proof of integrity.**
 > `GzipDecoder.feed()` and `decompress_chunks()` can produce payload before the
 > member trailer arrives. CRC, `ISIZE`, truncation, and trailing-data errors may
@@ -158,6 +176,12 @@ decoder only when the source can rewind (directly or through its replay cache).
 Close and recreate a non-rewindable source. Decompression-limit failures,
 cancellation, and unexpected internal failures poison the reader without
 automatically enabling the integrity-failure salvage path.
+
+For text readers, the only guaranteed recovery is calling `seek(0)` directly.
+A cookie saved with `tell()` before the failure is not a recovery point:
+`seek(cookie)` may raise the same terminal `OSError` instead of rewinding. Call
+`seek(0)` first; once the reader has recovered, a saved cookie is an ordinary
+position again.
 
 ## Codec finalization and operation abandonment
 

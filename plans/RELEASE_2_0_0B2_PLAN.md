@@ -1,7 +1,7 @@
 # aiogzip 2.0.0b2: Correctness, Performance, and File-State Plan
 
 > **Revision 2 — 2026-09-07. Supersedes the September 1 b2 plan.**
-> **Status:** WP0–WP5 completed locally (C0 pinned as `refs/c0/v2.0.0b2`); WP6 onward and release qualification remain pending.
+> **Status:** WP0–WP6 completed locally (C0 pinned as `refs/c0/v2.0.0b2`); WP7 onward and release qualification remain pending.
 > **Target:** `2.0.0b2`.
 > **Commit this file as:** `plans/RELEASE_2_0_0B2_PLAN.md`.
 > **Historical reviewed starting point:** `dc8950cb334e1cf4082f2bf50074464e06c72287`.
@@ -282,7 +282,7 @@ create competing copies of the same checkboxes in every section.
 | G16 | WP10 | Required interpreter/platform/engine/dependency and installed-artifact evidence passes |
 | G17 | WP10 | Performance, asymptotic-work, memory, and fairness gates pass with honest dispositions |
 | G18 | WP10 | Docs, plan index, maintained examples, and qualification record are complete |
-| G19 | WP11 | External human approval covers exact final candidate; findings closed or accepted appropriately |
+| G19 | WP11 | Exact final candidate approved under the §16 amendment: cross technical review, exact-SHA hosted CI, explicit maintainer approval, and disclosure that no non-maintainer human reviewed b2; findings closed or accepted appropriately |
 | G20 | WP11 | Version, changelog, reproducible artifact evidence, hashes, and release notes are consistent |
 | G21 | Maintainer | Tag, public publication, hashes, smokes, and documentation verified |
 | G22 | Maintainer | Post-release record and RC plan rebased on verified b2 |
@@ -297,17 +297,17 @@ create competing copies of the same checkboxes in every section.
 * [x] G07 — [Partial-read measurement, limits and eager-drain disposition](reviews/v2.0.0b2-wp5-completion.md#g07-partial-read-amplification)
 * [x] G08 — [Cross-item fairness, scheduling and throughput dispositions](reviews/v2.0.0b2-wp5-completion.md#g08-cross-item-fairness)
 * [x] G09 — [Corrected reference C0 pinned with traces and ledger](reviews/v2.0.0b2-c0-record.md)
-* [ ] G10
-* [ ] G11
-* [ ] G12
-* [ ] G13
-* [ ] G14
-* [ ] G15
-* [ ] G16
-* [ ] G17
-* [ ] G18
-* [ ] G19
-* [ ] G20
+* [x] G10 — [Three-state binary read health matching C0](reviews/v2.0.0b2-wp6-completion.md)
+* [x] G11 — [Text replay-origin object without aliasing](reviews/v2.0.0b2-wp7-completion.md)
+* [x] G12 — [Narrow text/binary bridge with one health authority](reviews/v2.0.0b2-wp8-completion.md)
+* [x] G13 — [Hot-path parity matrices, codec guidance and justified cleanup](reviews/v2.0.0b2-wp9-completion.md)
+* [x] G14 — [Stateful, adversarial, cancellation and fault-injection tests](reviews/v2.0.0b2-wp10-qualification.md#g14-stateful-adversarial-cancellation-and-fault-injection-tests)
+* [x] G15 — [Public contract: API, runtime manifest, typing and installed artifacts](reviews/v2.0.0b2-wp10-qualification.md#g15-public-contract)
+* [x] G16 — [Environments and artifacts](reviews/v2.0.0b2-wp10-qualification.md#g16-environments-and-artifacts)
+* [x] G17 — [Performance](reviews/v2.0.0b2-wp10-qualification.md#g17-performance)
+* [x] G18 — [Documentation and index](reviews/v2.0.0b2-wp10-qualification.md#g18-documentation-and-index)
+* [x] G19 — [Cross review and maintainer approval of `d841d94`](reviews/v2.0.0b2-candidate-review.md)
+* [x] G20 — [Version, changelog, artifacts and release notes](reviews/v2.0.0b2-release-prep.md) (artifact source `3c421a1`)
 * [ ] G21
 * [ ] G22
 
@@ -1350,6 +1350,36 @@ the existing release policy. Agent reviews are useful inputs, not that approval.
 Missing external review keeps release readiness open but does not prevent Codex from
 finishing local code, tests, and artifacts. Never manufacture review evidence.
 
+**Amendment (2026-10-07): sole-maintainer approval.** aiogzip has one human
+developer, the maintainer, so no non-maintainer human is available to approve
+b2. At the maintainer's direction, G19 follows the 2.0.0b1 precedent
+([independent review](reviews/v2.0.0b1-independent-review.md)) instead:
+
+1. **Cross technical review.** No agent is independent of all of b2: Codex
+   implemented WP1–WP5 (b1 to C0, except `2f78925`), and Claude implemented
+   `2f78925` and WP6–WP10 (C0 to the candidate). Each part is therefore
+   reviewed by an agent that did not write it. Codex reviews C0 to the
+   candidate plus `2f78925`. A fresh Claude subagent, with no access to the
+   implementing session's history, reviews b1 to C0 apart from `2f78925`.
+   Both work from the
+   [candidate review packet](reviews/v2.0.0b2-candidate-review.md), and both
+   answer every review question in this section for the whole candidate,
+   because interactions cross the boundary. These are fresh reviews, not
+   restatements of the per-gate reviews. The record calls this a cross
+   review, never a single independent review.
+2. **Hosted evidence.** The required CI checks have passed on the candidate's
+   pull request at the reviewed SHA.
+3. **Human approval.** The maintainer approves that exact SHA after reading the
+   complete review record. The approval exists only as the maintainer's explicit
+   statement; nothing is inferred from automated output.
+4. **Disclosure.** The review record and the release notes' provenance say that
+   no non-maintainer human reviewed b2, and that the technical review was a
+   cross review by the two implementing agents.
+
+Every finding is recorded with its resolution, and a later change to a release
+input requires a new candidate, a new review and a new approval, as above. This
+amendment changes who approves, not what must be reviewed.
+
 Review questions should emphasize actual native completion, ownership of late I/O
 results, opening/closing resource publication, and whether a later member can mask
 lost input. Also review cookie normalization, exception allowlisting, cumulative
@@ -1509,7 +1539,9 @@ Use the canonical G00-G22 register once; update gates with their evidence in the
 same commit. Preserve independently green work packages and small reviewable diffs.
 Run cumulative and C0 performance comparisons, full engine/platform/dependency tests,
 installed wheel/sdist and maintained examples, typing, lint, docs, and hooks.
-Obtain external human approval on the exact candidate before publication readiness.
+Before publication readiness, approve the exact candidate under the §16 sole-maintainer
+amendment: cross technical review, exact-SHA hosted CI, explicit maintainer approval, and
+disclosure that no non-maintainer human reviewed b2.
 
 Do not push, merge, tag, publish, edit remote issues/settings, or invent test,
 benchmark, engine, platform, artifact, hosted-CI, or review evidence. Leave

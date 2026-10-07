@@ -99,8 +99,8 @@ class TestHighPriorityEdgeCases:
 
         with pytest.raises(OSError, match=message):
             await f.read()
-        assert f._read_broken is True
-        assert f._read_validation_failed is validation_failed
+        assert f._read_is_healthy() is False
+        assert f._has_validation_failure() is validation_failed
         if validation_failed:
             assert await f.read() == b"test data"
         with pytest.raises(OSError, match="broken.*close and reopen"):
@@ -1011,7 +1011,7 @@ class TestMediumPriorityEdgeCases:
         async with AsyncGzipBinaryFile(temp_file, "rb") as gz:
             with pytest.raises(_gzip.BadGzipFile):
                 await gz.read()
-            assert gz._read_broken is True
+            assert gz._read_is_healthy() is False
             salvaged = await gz.read()
             assert salvaged
             assert (b"y" * (128 * 1024)).startswith(salvaged)
@@ -1046,8 +1046,8 @@ class TestMediumPriorityEdgeCases:
             with pytest.raises(_gzip.BadGzipFile, match="CRC check failed"):
                 await stream.readinto(bytearray(len(first_body) + 1))
 
-            assert stream._read_broken is True
-            assert stream._read_validation_failed is True
+            assert stream._read_is_healthy() is False
+            assert stream._has_validation_failure() is True
             assert await stream.read() == first_body + b"corrupt second member"
             with pytest.raises(OSError, match="broken.*close and reopen"):
                 await stream.read(1)
@@ -1191,8 +1191,8 @@ class TestMediumPriorityEdgeCases:
             with pytest.raises(OSError, match="max_decompressed_size"):
                 await stream.readinto(bytearray(len(first_body) + 1))
 
-            assert stream._read_broken is True
-            assert stream._read_validation_failed is False
+            assert stream._read_is_healthy() is False
+            assert stream._has_validation_failure() is False
             assert len(stream._buffer) - stream._buffer_offset == len(first_body)
             with pytest.raises(OSError, match="broken.*close and reopen"):
                 await stream.read(1)
@@ -1610,7 +1610,7 @@ class TestReadCancellationDuringOffload:
             with pytest.raises(asyncio.CancelledError):
                 await task
 
-            assert f._read_broken is True
+            assert f._read_is_healthy() is False
             with pytest.raises(OSError, match="broken.*close and reopen"):
                 await f.read()
             with pytest.raises(OSError, match="broken.*close and reopen"):

@@ -1,0 +1,23 @@
+G19 round 2: please verify your F1 closure and confirm your answers at the new reviewed SHA 4163fa5ae497d0a01776cb28add4eb7b170b6c42.
+
+Same rules as before: read-only (no repo edits, staging, commits or pushes; no benchmarks or timing runs; don't change the checkout), probes and extracts only under /tmp/claude-1000/g19-claude-review/, and do not read anything under ~/.claude/. The working tree is at 4163fa5.
+
+What changed since your round 1 at eb09d46:
+- The release-input change is 3c421a1, made at the maintainer's direction from your findings. See `git show 3c421a1` and `git diff eb09d46 4163fa5 --stat`. Everything after 3c421a1 is plans/ only. Check that `git diff --name-only 3c421a1 4163fa5 | grep -v '^plans/'` prints nothing.
+- F1: `_read_compressed_chunk` now caches the chunk before `_check_read_call_not_aborted()`, and `_call_native_source` keeps a cancelled read's completed result whenever the handle is open, whatever its read health.
+  - New tests: tests/test_abort_rewind_cache.py.
+  - Ledger: plans/reviews/v2.0.0b2-behavior-exceptions.md, section "BC2 post-G19 repair".
+- N1: the BC8 W2 clause requires `parts == []` and the writer model's broken latch before the call, recorded per event as `write_broken`. Near-miss tests are in tests/stateful/test_differential.py.
+- F2: the CHANGELOG and the draft release notes in plans/reviews/v2.0.0b2-release-prep.md are narrowed.
+- F3: recorded under Remaining limitations in plans/reviews/v2.0.0b2-candidate-review.md, along with your round 1 summary and the findings table. Please check that the summary represents your review fairly.
+- G20 artifacts rebuilt from 3c421a1: wheel dd6c63bd718fc609d886e5cc152812ed859d2c5f7ae6b79c6f942b64671c22e3, sdist cd709884e58597497e93878e11f5bd1a73b09030815fe5a3b72d45eb510b0173.
+- Differential sweeps rerun at 3c421a1 (seeds 0-5999, both references, both engines): 0 failures, claim counts unchanged.
+- Hosted CI run 37693379337 passed all 20 jobs at 4163fa5.
+
+Deliverable, returned as text:
+1. Header: reviewed SHA and your model ID.
+2. F1 closure: rerun your probe_hole.py on the candidate with both engines, and check the fix and tests for anything they miss. Look for other places where a consumed result can still be dropped without invalidating the cache.
+3. F2, F3, N1: is each disposition adequate?
+4. All 11 questions at 4163fa5: say whether each round 1 answer stands or changes, with evidence for any change.
+5. Any new findings, with severity, location, a concrete failure scenario, and whether you reproduced it.
+6. A one-line verdict for your scope.

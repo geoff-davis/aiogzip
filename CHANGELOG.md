@@ -4,11 +4,105 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0b2] - 2026-10-07
+
+This beta keeps the 2.0 public API frozen: every public signature, type and
+codec-lifecycle rule is unchanged from `2.0.0b1`, and the runtime contract
+manifest is identical. It corrects cancellation, ownership and recovery
+cases in which `2.0.0b1` could lose, skip or misreport data, or touch a
+resource after its owner had released it.
+
 ### Fixed
 
+- Cancelling a compression or decompression step, or a native read, write,
+  flush, seek or open, whose work is running in an executor thread now waits
+  for that thread to finish before the cancellation propagates. Closing a
+  handle, or shutting down the event loop's executor, can no longer run
+  cleanup while that work on the same handle is still active. As in
+  `2.0.0b1`, cancelling `close()` itself does not wait for the underlying
+  file's own native close to finish.
+- A cancelled or failed source read can no longer make a later read silently
+  skip compressed input. When a native aiofiles read completes after
+  cancellation, the reader keeps its bytes and uses them on the next read.
+  When a custom source fails or is cancelled and cannot prove it consumed
+  nothing, the reader becomes broken instead of accepting whatever the
+  source returns next. A `seek(0)` that completes, or reopening the source,
+  recovers it.
+- Every resource acquired while opening a handle now has exactly one owner. A
+  concurrent `open()` or `close()` during acquisition raises
+  `ConcurrentOperationError` instead of leaking a file, and cancelling a
+  path-backed `open()` waits for the native open and closes what it opened.
+  An external file object stays caller-owned if opening fails.
+- `decompress_chunks()` and `compress_chunks()` yield to the event loop at
+  bounded intervals even when the source is always ready or produces many
+  empty or tiny items, so sibling tasks are no longer starved.
 - `tell()` on a text file during an in-progress long-line or sized read no
   longer returns a cookie that skips characters the read had decoded but not
   yet returned. Seeking back to such a cookie now replays every character.
+- After an integrity failure, when the recovery bytes end inside a
+  multibyte character, text `read()` returns every complete recoverable
+  character instead of raising `UnicodeDecodeError` and losing them. When
+  the remaining recovery data completes no character, text `read()` raises
+  the terminal broken-stream `OSError` instead of returning `''`, which
+  looked like a clean EOF.
+- Leaving a writer's context with an exception while a `write()` or
+  `flush()` is still sending data now waits for that sink call to settle
+  before closing the sink. A custom sink no longer receives a write after
+  `close()`, and a native file no longer fails with "write to closed file".
+  The interrupted call raises `write aborted…` or `flush aborted…`.
+  Cancelling a native write that has not started yet now prevents it.
+- Text `writelines([])` on a broken writer raises the broken-stream
+  `OSError`, matching binary `writelines()` and every other text write,
+  instead of returning success.
+- Leaving a reader's context with an exception while a native file's
+  `seek()` rewind is still running no longer lets that `seek()` return `0`
+  (or raise `seek of closed file`) from the closed reader. It raises the
+  `read aborted…` error, as a custom source already did.
+- When a reader's context exits with an exception and closing the underlying
+  file then fails, a text handle that stays open no longer returns text it
+  had decoded before the exit. Later reads raise the broken-stream `OSError`.
+
+### Changed
+
+- Compatibility correction: after a custom source raises or is cancelled,
+  an `OSError` no longer means a retry is safe. The reader stays usable
+  only when an unchanged synchronous `tell()` on the source proves no input
+  was consumed, so a custom source's `tell()` is now called
+  once before each physical read and seek, and once after a failure. It must
+  be cheap and free of side effects. Async `tell()` methods do not count.
+- After an integrity failure, `seek(cookie)` on a text reader may refuse a
+  cookie saved before the failure with the terminal `OSError`, where
+  `2.0.0b1` sometimes rewound to it. Call `seek(0)` first; the saved cookie
+  is then an ordinary position again. `seek(0)` remains the only guaranteed
+  recovery, as documented.
+- Internally, binary and text handles now share one read-health authority,
+  one source and native-call owner, and an explicit opening state. This
+  private refactor removes no public name and changes no documented
+  behavior beyond the corrections above.
+
+### Performance
+
+- Text `readlines()` with small size hints now does linear total work over
+  a pending batch of lines, instead of rescanning and copying the whole
+  remaining batch on every call.
+- Reading very long lines with `newline=""` or `newline="\r\n"` no longer
+  takes superlinear time in the line length.
+- The new ownership guarantees have a measured cost on per-call paths.
+  Against `2.0.0b1`, `flush()` is about 6–8% slower in microbenchmarks, and
+  `read1()`, `readinto1()` and small-buffer `readline()` are about 6–9%
+  slower, because each source or sink call is now tracked until it settles.
+  Reads at default chunk sizes amortize the cost. Every release-benchmark
+  slowdown above 5% was investigated; none attributed to this release
+  exceeds 10%.
+
+### Documentation
+
+- The errors guide describes provisional, validated and recovery output,
+  memory retention by small reads, source failures and cancellation, and
+  opening ownership. It now states correctly that a reader broken by a
+  cancelled executor read recovers through a `seek(0)` that completes.
+- The streaming guide documents event-loop fairness, and the codec guide
+  warns that the last yielded bytes are not completion.
 
 ## [2.0.0b1] - 2026-09-01
 
@@ -884,6 +978,7 @@ All notable changes to this project will be documented in this file.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
 
 [Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b1...HEAD
+[2.0.0b2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b1...v2.0.0b2
 [2.0.0b1]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a4...v2.0.0b1
 [2.0.0a4]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a3...v2.0.0a4
 [2.0.0a3]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a2...v2.0.0a3

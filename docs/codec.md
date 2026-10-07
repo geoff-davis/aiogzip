@@ -180,6 +180,15 @@ Abandonment is deliberately deterministic:
   immediately releasing the operation's captured input and the codec's mutable
   and incomplete state while preserving validated member records.
 
+> **Warning — the last yielded bytes are not completion.** An operation can
+> yield a chunk that completes a valid gzip byte sequence, such as the final
+> trailer bytes of `finish()`, and still own the codec. It completes only when
+> the iterator is exhausted (`StopIteration`). Counted `next()` calls, a
+> `break` after the expected bytes, and `itertools.islice()` all leave the
+> codec reserved and `finished` false. Always exhaust the operation, or close
+> it explicitly and accept that the codec becomes unusable. This is the frozen
+> contract, not a defect for a finalizer to fix.
+
 When an operation is still reachable, exhaust it if the stream should remain
 usable. Otherwise call its idempotent `close()` method. A `try`/`finally`
 ensures an exception or early return cannot leave the codec reserved:

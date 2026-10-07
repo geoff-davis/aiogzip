@@ -231,7 +231,7 @@ class TestBinaryLiveMtime:
             with pytest.raises(asyncio.CancelledError):
                 await task
             assert stream.mtime == 707
-            assert stream._read_broken is True
+            assert stream._read_is_healthy() is False
         finally:
             await stream.close()
 
@@ -268,7 +268,7 @@ class TestBinaryLiveMtime:
             with pytest.raises(asyncio.CancelledError):
                 await task
             assert stream.mtime is None
-            assert stream._read_broken is True
+            assert stream._read_is_healthy() is False
         finally:
             await stream.close()
 

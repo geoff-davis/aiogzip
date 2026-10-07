@@ -55,6 +55,19 @@ A zero-byte compressed source produces no output, matching a zero-byte file.
 This differs intentionally from streaming compression, where an empty payload
 must still produce a valid empty gzip member.
 
+## Fairness
+
+Both `decompress_chunks()` and `compress_chunks()` yield to the event loop
+at bounded intervals while they work, even when the source is always ready
+or yields many empty or tiny items, so sibling tasks keep making progress.
+These checkpoints are internal: they produce no empty output chunks, read no
+item ahead and start no background task, and their budgets are not
+configurable. They bound the work between yields, not wall-clock time, so a
+single large synchronous step can still hold the loop for its duration;
+large codec steps run in an executor. Your own consumer code runs between
+checkpoints, so slow synchronous work in an `async for` body still delays
+other tasks.
+
 ## Integrity validation
 
 > **Warning — exhaust the iterator to establish integrity.** Decompression

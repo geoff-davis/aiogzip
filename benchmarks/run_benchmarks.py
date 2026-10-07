@@ -44,6 +44,8 @@ CATEGORIES = {
     "inspection": "bench_inspection",
     "streaming": "bench_streaming",
     "micro": "bench_micro",
+    "read_health": "bench_read_health",
+    "text_origin": "bench_text_origin",
     "regressions": "bench_codec_regressions",
 }
 

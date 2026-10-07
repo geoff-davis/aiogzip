@@ -7,6 +7,7 @@ import os
 import re
 import secrets
 import struct
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Any,
@@ -54,6 +55,37 @@ _LINE_RE_CR = re.compile(r"[^\r]*\r")
 # test is a C-speed scan, so the guard costs far less than the regex pass.
 _SPLITLINES_UNSAFE_LF = "\r\v\f\x1c\x1d\x1e\x85\u2028\u2029"
 _SPLITLINES_UNSAFE_CR = "\n\v\f\x1c\x1d\x1e\x85\u2028\u2029"
+
+
+@dataclass(slots=True)
+class _TextBufferOrigin:
+    """Replay checkpoint for the buffered text: where it began and what to skip.
+
+    The handle's live origin is updated in place; an unpublished-read origin is
+    an independent object, and rollback keeps an immutable field tuple. decoder_state follows the codecs
+    getstate() contract, an immutable (bytes, int), so copies may share it.
+    """
+
+    byte_offset: int
+    decoder_state: Tuple[Any, int]
+    trailing_cr: bool
+    seen_newline_types: int
+    chars_to_skip: int
+
+    def restore(self, saved: "_OriginFields") -> None:
+        (
+            self.byte_offset,
+            self.decoder_state,
+            self.trailing_cr,
+            self.seen_newline_types,
+            self.chars_to_skip,
+        ) = saved
+
+
+# A rollback copy of the origin's fields, in declaration order. An immutable
+# tuple cannot alias the live origin, and building one inline costs less than
+# constructing an object on every readlines() call.
+_OriginFields = Tuple[int, Tuple[Any, int], bool, int, int]
 
 
 class _TextReadReservation:
@@ -164,7 +196,7 @@ class AsyncGzipTextFile:
         "_close_lock",
         "_read_call_active",
         "_pending_read_origin",
-        "_read_poisoned",
+        "_read_poison_seen",
         "_write_call_active",
         "_read_call",
         "_write_call",
@@ -177,11 +209,7 @@ class AsyncGzipTextFile:
         "_seen_newline_types",
         "_decoder_byte_position",
         "_cookie_nonce",
-        "_buffer_origin_offset",
-        "_buffer_origin_decoder_state",
-        "_buffer_origin_trailing_cr",
-        "_buffer_origin_seen_newline_types",
-        "_buffer_origin_chars_to_skip",
+        "_buffer_origin",
         "_universal_newlines",
         "_max_decompressed_size",
         "_max_rewind_cache_size",
@@ -295,10 +323,11 @@ class AsyncGzipTextFile:
         self._close_complete: bool = False
         self._close_lock = asyncio.Lock()
         self._read_call_active: bool = False
-        self._pending_read_origin: Optional[
-            Tuple[int, Tuple[Any, int], bool, int, int]
-        ] = None
-        self._read_poisoned: bool = False
+        self._pending_read_origin: Optional[_TextBufferOrigin] = None
+        # One-way hint, not a health copy: set when binary reports poison and
+        # cleared only when text rewinds. It lets a healthy hot-path call skip
+        # the binary query; every decision it gates asks binary's authority.
+        self._read_poison_seen: bool = False
         self._write_call_active: bool = False
         self._read_call = _TextReadReservation(self)
         self._write_call = _TextWriteReservation(self)
@@ -325,12 +354,9 @@ class AsyncGzipTextFile:
         # is what plain-position bookkeeping must compare against.
         self._decoder_byte_position: int = 0
         self._cookie_nonce: int = secrets.randbits(64)
-        initial_decoder_state = self._decoder.getstate()
-        self._buffer_origin_offset: int = 0
-        self._buffer_origin_decoder_state: Tuple[Any, int] = initial_decoder_state
-        self._buffer_origin_trailing_cr: bool = False
-        self._buffer_origin_seen_newline_types: int = 0
-        self._buffer_origin_chars_to_skip: int = 0
+        self._buffer_origin = _TextBufferOrigin(
+            0, self._decoder.getstate(), False, 0, 0
+        )
         self._universal_newlines: bool = newline in {None, ""}
         self._max_decompressed_size: Optional[int] = max_decompressed_size
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
@@ -414,8 +440,10 @@ class AsyncGzipTextFile:
                         raise
                     failure.add_note(f"Opening cleanup also failed: {cleanup!r}")
                 raise
-            binary_file._closed_observer = self._mark_binary_closed
-            binary_file._read_poison_observer = self._mark_binary_read_poisoned
+            binary_file._attach_text_observers(
+                closed=self._mark_binary_closed,
+                poisoned=self._mark_binary_read_poisoned,
+            )
             self._binary_file = binary_file
             return self
         finally:
@@ -487,25 +515,30 @@ class AsyncGzipTextFile:
         if origin is not None:
             # Local fragments have advanced the decoder, but have not yet
             # published text. Replay their origin plus any consumed prefix.
-            if origin[1] == (b"", 0) and not origin[2] and not origin[4]:
-                return origin[0]
+            if (
+                origin.decoder_state == (b"", 0)
+                and not origin.trailing_cr
+                and not origin.chars_to_skip
+            ):
+                return origin.byte_offset
             return self._encode_cookie(
-                origin_offset=origin[0],
-                decoder_state=origin[1],
-                trailing_cr=origin[2],
-                seen_newlines=origin[3],
-                chars_to_skip=origin[4],
+                origin_offset=origin.byte_offset,
+                decoder_state=origin.decoder_state,
+                trailing_cr=origin.trailing_cr,
+                seen_newlines=origin.seen_newline_types,
+                chars_to_skip=origin.chars_to_skip,
             )
         decoder_state = self._decoder.getstate()
         if self._can_use_plain_position(decoder_state):
             return self._binary_file._position
 
         if self._buffered_text_len() > 0:
-            origin_offset = self._buffer_origin_offset
-            decoder_state = self._buffer_origin_decoder_state
-            trailing_cr = self._buffer_origin_trailing_cr
-            seen_newlines = self._buffer_origin_seen_newline_types
-            chars_to_skip = self._buffer_origin_chars_to_skip + self._text_buffer_offset
+            live = self._buffer_origin
+            origin_offset = live.byte_offset
+            decoder_state = live.decoder_state
+            trailing_cr = live.trailing_cr
+            seen_newlines = live.seen_newline_types
+            chars_to_skip = live.chars_to_skip + self._text_buffer_offset
         else:
             origin_offset = self._binary_file._position
             decoder_state = self._decoder.getstate()
@@ -554,7 +587,7 @@ class AsyncGzipTextFile:
                     chars_to_skip,
                 ) = self._decode_cookie(offset)
                 await self._binary_file.seek(origin_offset)
-                self._read_poisoned = False
+                self._read_poison_seen = False
                 self._decoder.setstate(decoder_state)
                 self._decoder_byte_position = origin_offset
                 self._trailing_cr = trailing_cr
@@ -632,8 +665,11 @@ class AsyncGzipTextFile:
         self._is_closed = True
 
     def _mark_binary_read_poisoned(self, validation_failed: bool) -> None:
-        """Mirror binary poison and discard text unreachable after terminal errors."""
-        self._read_poisoned = True
+        """Latch that poison reached this handle; drop text a terminal error strands.
+
+        Idempotent: binary may deliver one poisoning more than once.
+        """
+        self._read_poison_seen = True
         if not validation_failed:
             self._set_buffer("")
 
@@ -647,13 +683,13 @@ class AsyncGzipTextFile:
     def _check_text_read_call_usable(self) -> None:
         """Reject overlapping text reads or terminal binary poison."""
         self._check_text_read_call_available()
-        if self._read_poisoned:
+        if self._read_poison_seen:
             self._check_text_read_usable()
 
     def _check_text_read_usable(self) -> None:
         """Reject terminal poison while allowing explicit validation salvage."""
         binary_file = self._binary_file
-        if binary_file is None or not binary_file._read_broken:
+        if binary_file is None or binary_file._read_is_healthy():
             return
         if binary_file._has_validation_failure() and self._buffered_text_len() > 0:
             return
@@ -754,6 +790,7 @@ class AsyncGzipTextFile:
         # Keep the primitive encoder/sink body inline: both the reservation
         # context manager and a direct helper call exceeded the 5% small-write
         # threshold in pinned release measurements.
+        # Parity: tests/test_parity_text_inline.py (T1)
         self._check_text_write_call_available()
         self._write_call_active = True
         try:
@@ -831,7 +868,7 @@ class AsyncGzipTextFile:
         if self._text_buffer_offset > self._TEXT_COMPACTION_THRESHOLD:
             # Keep the original decoder state and accumulate the characters a
             # cookie must replay before reaching the compacted unread suffix.
-            self._buffer_origin_chars_to_skip += self._text_buffer_offset
+            self._buffer_origin.chars_to_skip += self._text_buffer_offset
             self._text_buffer = self._text_buffer[self._text_buffer_offset :]
             self._text_buffer_offset = 0
 
@@ -842,7 +879,7 @@ class AsyncGzipTextFile:
         end = start + size
         if end >= len(buf):
             # Consuming everything — return without slice when possible
-            self._buffer_origin_chars_to_skip += len(buf)
+            self._buffer_origin.chars_to_skip += len(buf)
             self._text_buffer = ""
             self._text_buffer_offset = 0
             return buf if start == 0 else buf[start:]
@@ -865,7 +902,7 @@ class AsyncGzipTextFile:
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
         await self._binary_file.seek(0)
-        self._read_poisoned = False
+        self._read_poison_seen = False
         self._decoder.reset()
         self._decoder_byte_position = 0
         self._set_buffer("")
@@ -887,11 +924,12 @@ class AsyncGzipTextFile:
         seen_newlines: int,
     ) -> None:
         """Record the decoder state from which the current buffered text can be replayed."""
-        self._buffer_origin_offset = origin_offset
-        self._buffer_origin_decoder_state = decoder_state
-        self._buffer_origin_trailing_cr = trailing_cr
-        self._buffer_origin_seen_newline_types = seen_newlines
-        self._buffer_origin_chars_to_skip = 0
+        origin = self._buffer_origin
+        origin.byte_offset = origin_offset
+        origin.decoder_state = decoder_state
+        origin.trailing_cr = trailing_cr
+        origin.seen_newline_types = seen_newlines
+        origin.chars_to_skip = 0
 
     def _capture_buffer_origin(self) -> None:
         """Snapshot the current decoder state before decoding fresh unread text."""
@@ -1062,15 +1100,17 @@ class AsyncGzipTextFile:
         if bf is None:
             return False
 
-        # Inline _capture_buffer_origin when buffer is empty
+        # Inline _capture_buffer_origin when buffer is empty.
+        # Parity: tests/test_parity_text_inline.py (T2)
         if len(self._text_buffer) == self._text_buffer_offset:
             self._text_buffer = ""
             self._text_buffer_offset = 0
-            self._buffer_origin_offset = bf._position
-            self._buffer_origin_decoder_state = self._decoder.getstate()
-            self._buffer_origin_trailing_cr = self._trailing_cr
-            self._buffer_origin_seen_newline_types = self._seen_newline_types
-            self._buffer_origin_chars_to_skip = 0
+            origin = self._buffer_origin
+            origin.byte_offset = bf._position
+            origin.decoder_state = self._decoder.getstate()
+            origin.trailing_cr = self._trailing_cr
+            origin.seen_newline_types = self._seen_newline_types
+            origin.chars_to_skip = 0
 
         raw_chunk = await bf.read(self._chunk_size)
         self._decoder_byte_position = bf._position
@@ -1099,6 +1139,7 @@ class AsyncGzipTextFile:
         Mirrors :meth:`_read_chunk_and_decode` but returns the translated text
         instead of appending it to the buffer, so callers can accumulate it in
         a local list (avoiding the quadratic ``str +=`` for large reads).
+        Parity: tests/test_parity_text_inline.py (T3).
 
         Returns:
             (text, more): ``text`` is the translated text decoded this round
@@ -1143,7 +1184,7 @@ class AsyncGzipTextFile:
             # The binary salvage buffer is exhausted, but decoded text from it
             # remains publishable. Return that short final span exactly once;
             # the next call reaches the binary broken-stream error.
-            self._buffer_origin_chars_to_skip += len(buffer)
+            self._buffer_origin.chars_to_skip += len(buffer)
             self._set_buffer("")
             return prefix
         pieces: List[str] = []
@@ -1151,7 +1192,7 @@ class AsyncGzipTextFile:
         fresh_origin: Optional[Tuple[int, Tuple[Any, int], bool, int]] = None
         origin_chars = 0
         if not available:
-            self._pending_read_origin = (
+            self._pending_read_origin = _TextBufferOrigin(
                 bf._position,
                 self._decoder.getstate(),
                 self._trailing_cr,
@@ -1220,10 +1261,14 @@ class AsyncGzipTextFile:
                     trailing_cr=fresh_origin[2],
                     seen_newlines=fresh_origin[3],
                 )
-                self._buffer_origin_chars_to_skip = len(fresh) - origin_chars
+                self._buffer_origin.chars_to_skip = len(fresh) - origin_chars
             else:
-                self._buffer_origin_chars_to_skip += len(buffer) + len(fresh)
+                self._buffer_origin.chars_to_skip += len(buffer) + len(fresh)
             self._set_buffer("")
+        if not result and not bf._read_is_healthy():
+            # The remaining salvage completed no character. An empty result
+            # would read as a clean EOF; report the broken stream instead.
+            bf._check_read_usable()
         return result
 
     async def read(self, size: int = -1) -> str:
@@ -1247,7 +1292,7 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
-        if self._read_call_active or self._read_poisoned:
+        if self._read_call_active or self._read_poison_seen:
             self._check_text_read_call_usable()
 
         if size is None:
@@ -1282,10 +1327,17 @@ class AsyncGzipTextFile:
                     if decoded:
                         chunks.append(apply_nl(decoded))
 
-                final = decoder.decode(b"", final=True)
-                if final:
-                    chunks.append(apply_nl(final))
-                self._finalize_pending_newline_state()
+                if bf._read_is_healthy():
+                    final = decoder.decode(b"", final=True)
+                    if final:
+                        chunks.append(apply_nl(final))
+                    self._finalize_pending_newline_state()
+                elif not chunks:
+                    # A drained validation salvage that completes no character
+                    # is not a clean EOF; report the broken stream instead.
+                    bf._check_read_usable()
+                # Draining a validation salvage is not EOF: an incomplete
+                # trailing character stays undecoded rather than raising.
                 self._set_buffer("")
                 return "".join(chunks)
         else:
@@ -1345,7 +1397,7 @@ class AsyncGzipTextFile:
                 self._newline == ""
                 and cr_length == 1
                 and cr_is_trailing
-                and (not bf._eof or bf._read_broken)
+                and (not bf._eof or not bf._read_is_healthy())
             )
             rel_pos = pos_r - base
             if should_wait_for_lf:
@@ -1451,7 +1503,7 @@ class AsyncGzipTextFile:
         if (
             self._universal_newlines
             and self._trailing_cr
-            and (bf is None or not bf._read_broken)
+            and (bf is None or bf._read_is_healthy())
         ):
             self._seen_newline_types |= self._SEEN_CR
             self._trailing_cr = False
@@ -1533,7 +1585,7 @@ class AsyncGzipTextFile:
             self._seen_newline_types,
         )
         if not prefix:
-            self._pending_read_origin = (*fresh_origin, 0)
+            self._pending_read_origin = _TextBufferOrigin(*fresh_origin, 0)
         pieces: List[str] = []
         added = 0
         fresh_line_size: Optional[int] = None
@@ -1576,7 +1628,7 @@ class AsyncGzipTextFile:
                     trailing_cr=fresh_origin[2],
                     seen_newlines=fresh_origin[3],
                 )
-                self._buffer_origin_chars_to_skip = len(fresh)
+                self._buffer_origin.chars_to_skip = len(fresh)
             return result
 
         result = prefix + fresh
@@ -1587,7 +1639,7 @@ class AsyncGzipTextFile:
             trailing_cr=fresh_origin[2],
             seen_newlines=fresh_origin[3],
         )
-        self._buffer_origin_chars_to_skip = len(fresh)
+        self._buffer_origin.chars_to_skip = len(fresh)
         return result if result else None
 
     def _validation_line_salvage_complete(self) -> bool:
@@ -1655,7 +1707,7 @@ class AsyncGzipTextFile:
 
             if (
                 lines
-                and self._read_poisoned
+                and self._read_poison_seen
                 and self._validation_line_salvage_complete()
             ):
                 return lines
@@ -1676,12 +1728,13 @@ class AsyncGzipTextFile:
         """Return the next line from the file."""
         if self._is_closed:
             raise StopAsyncIteration
-        if self._read_call_active or self._read_poisoned:
+        if self._read_call_active or self._read_poison_seen:
             self._check_text_read_call_usable()
 
         if self._line_term is not None:
             # Keep pending-line consumption inline: a helper call in this
             # per-line hot path measurably lowers iteration throughput.
+            # Parity: tests/test_parity_text_inline.py (T4)
             idx = self._pending_idx
             pending = self._pending_lines
             if idx < len(pending):
@@ -1740,7 +1793,7 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
-        if self._read_call_active or self._read_poisoned:
+        if self._read_call_active or self._read_poison_seen:
             self._check_text_read_call_usable()
 
         if limit is None or limit < 0:
@@ -1774,6 +1827,7 @@ class AsyncGzipTextFile:
 
         # Keep the bounded hot path inline: this avoids a helper frame and
         # computes the buffered length only once before a refill.
+        # Parity: tests/test_parity_text_inline.py (T5)
         pos, length = self._find_line_terminator(0)
         if pos != -1:
             end = pos + length
@@ -1817,13 +1871,10 @@ class AsyncGzipTextFile:
         total = buf_len
         carry_cr = self._newline in ("", "\r\n")
         carry = "\r" if carry_cr and prefix.endswith("\r") else ""
-        self._pending_read_origin = (
-            state[2],
-            state[3],
-            state[4],
-            state[5],
-            state[6] + state[1],
-        )
+        saved_buffer, saved_offset, saved_origin = state
+        pending = _TextBufferOrigin(*saved_origin)
+        pending.chars_to_skip += saved_offset
+        self._pending_read_origin = pending
         try:
             while True:
                 self._text_buffer = ""
@@ -1852,7 +1903,7 @@ class AsyncGzipTextFile:
                         pieces[-1] = chunk[:take]
                     result = "".join(pieces)
                     if take == len(chunk):
-                        self._buffer_origin_chars_to_skip += len(chunk)
+                        self._buffer_origin.chars_to_skip += len(chunk)
                         self._text_buffer = ""
                         self._text_buffer_offset = 0
                     else:
@@ -1866,15 +1917,9 @@ class AsyncGzipTextFile:
             # observer. Do not resurrect it; only retryable/validation-salvage
             # failures retain the old prefix and successfully decoded pieces.
             if bf._can_restore_failed_read():
-                (
-                    self._text_buffer,
-                    self._text_buffer_offset,
-                    self._buffer_origin_offset,
-                    self._buffer_origin_decoder_state,
-                    self._buffer_origin_trailing_cr,
-                    self._buffer_origin_seen_newline_types,
-                    self._buffer_origin_chars_to_skip,
-                ) = state
+                self._text_buffer = saved_buffer
+                self._text_buffer_offset = saved_offset
+                self._buffer_origin.restore(saved_origin)
                 self._text_buffer += "".join(pieces[fresh_start:])
             raise
 
@@ -1888,44 +1933,35 @@ class AsyncGzipTextFile:
 
     def _readlines_rollback_state(
         self,
-    ) -> Tuple[str, int, int, Tuple[Any, int], bool, int, int]:
+    ) -> Tuple[str, int, _OriginFields]:
         """Capture the replay metadata needed to undo a composite publication."""
+        origin = self._buffer_origin
         return (
             self._text_buffer,
             self._text_buffer_offset,
-            self._buffer_origin_offset,
-            self._buffer_origin_decoder_state,
-            self._buffer_origin_trailing_cr,
-            self._buffer_origin_seen_newline_types,
-            self._buffer_origin_chars_to_skip,
+            (
+                origin.byte_offset,
+                origin.decoder_state,
+                origin.trailing_cr,
+                origin.seen_newline_types,
+                origin.chars_to_skip,
+            ),
         )
 
     def _rollback_readlines(
         self,
-        state: Tuple[str, int, int, Tuple[Any, int], bool, int, int],
+        state: Tuple[str, int, _OriginFields],
         lines: List[str],
     ) -> None:
         """Restore text consumed by a failed composite read when recoverable."""
         binary_file = self._binary_file
         if binary_file is None or not binary_file._can_restore_failed_read():
             return
-        (
-            original_buffer,
-            original_offset,
-            origin_offset,
-            origin_decoder_state,
-            origin_trailing_cr,
-            origin_seen_newlines,
-            origin_chars_to_skip,
-        ) = state
+        original_buffer, original_offset, saved_origin = state
         unread = self._text_buffer[self._text_buffer_offset :]
         self._text_buffer = original_buffer[:original_offset] + "".join(lines) + unread
         self._text_buffer_offset = original_offset
-        self._buffer_origin_offset = origin_offset
-        self._buffer_origin_decoder_state = origin_decoder_state
-        self._buffer_origin_trailing_cr = origin_trailing_cr
-        self._buffer_origin_seen_newline_types = origin_seen_newlines
-        self._buffer_origin_chars_to_skip = origin_chars_to_skip
+        self._buffer_origin.restore(saved_origin)
         self._pending_lines = []
         self._pending_idx = 0
 
@@ -1958,7 +1994,7 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._mode_op != "r":
             raise OSError("File not open for reading")
-        if self._read_call_active or self._read_poisoned:
+        if self._read_call_active or self._read_poison_seen:
             self._check_text_read_call_usable()
 
         state = self._readlines_rollback_state()
@@ -1977,7 +2013,10 @@ class AsyncGzipTextFile:
                     total_size += len(line)
                     if hint > 0 and total_size >= hint:
                         break
-                    if self._read_poisoned and self._validation_line_salvage_complete():
+                    if (
+                        self._read_poison_seen
+                        and self._validation_line_salvage_complete()
+                    ):
                         break
                 return lines
         except BaseException:
@@ -2059,6 +2098,9 @@ class AsyncGzipTextFile:
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
 
+        # Like binary writelines(), refuse a torn member even when there is
+        # nothing to write.
+        self._binary_file._check_write_usable()
         pending: List[str] = []
         pending_chars = 0
         iterator = iter(lines)

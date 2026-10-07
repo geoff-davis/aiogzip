@@ -417,7 +417,7 @@ class TestFileobjSupport:
         with pytest.raises(ConcurrentOperationError, match="active read call"):
             await stream.close()
         assert stream.closed is False
-        assert stream._read_broken is False
+        assert stream._read_is_healthy() is True
 
         reader.release_read.set()
         assert await first == payload[:1]

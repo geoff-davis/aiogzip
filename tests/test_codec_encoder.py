@@ -2,6 +2,7 @@
 
 import gzip
 import inspect
+import itertools
 import struct
 import zlib
 
@@ -308,3 +309,93 @@ def test_public_methods_are_synchronous():
         method = getattr(GzipEncoder, name)
         assert not inspect.iscoroutinefunction(method)
         assert not inspect.isasyncgenfunction(method)
+
+
+# The last yielded bytes are not completion (plan §13.2). A finish() operation
+# can yield a complete, valid member while still owning the encoder; only
+# StopIteration (exhaustion) completes it. Operations are created and
+# exhausted one at a time.
+
+_COMPLETION_PAYLOAD = b"completion payload " * 32
+
+
+def _finishing_encoder():
+    encoder = GzipEncoder(mtime=0, output_chunk_size=4)
+    wire = b"".join(encoder.start()) + b"".join(encoder.feed(_COMPLETION_PAYLOAD))
+    return encoder, wire
+
+
+def _finish_chunk_count():
+    encoder, _ = _finishing_encoder()
+    return len(list(encoder.finish()))
+
+
+def _assert_still_reserved(encoder, wire):
+    assert gzip.decompress(wire) == _COMPLETION_PAYLOAD
+    assert encoder.finished is False
+    with pytest.raises(RuntimeError, match="has an active operation"):
+        encoder.flush()
+
+
+def test_counted_next_reaching_a_valid_member_is_not_completion():
+    encoder, wire = _finishing_encoder()
+    operation = encoder.finish()
+    while True:
+        wire += next(operation)
+        try:
+            gzip.decompress(wire)
+        except (EOFError, gzip.BadGzipFile, zlib.error):
+            continue
+        break
+    _assert_still_reserved(encoder, wire)
+    with pytest.raises(StopIteration):
+        next(operation)
+    assert encoder.finished is True
+
+
+def test_break_after_trailer_bytes_is_not_completion():
+    encoder, wire = _finishing_encoder()
+    operation = encoder.finish()
+    remaining = _finish_chunk_count()
+    for chunk in operation:
+        wire += chunk
+        remaining -= 1
+        if remaining == 0:
+            break
+    _assert_still_reserved(encoder, wire)
+    assert list(operation) == []
+    assert encoder.finished is True
+
+
+def test_islice_to_the_chunk_count_is_not_completion():
+    encoder, wire = _finishing_encoder()
+    operation = encoder.finish()
+    wire += b"".join(itertools.islice(operation, _finish_chunk_count()))
+    _assert_still_reserved(encoder, wire)
+    assert list(operation) == []
+    assert encoder.finished is True
+
+
+@pytest.mark.parametrize("style", ["for", "join"])
+def test_full_exhaustion_completes(style):
+    encoder, wire = _finishing_encoder()
+    operation = encoder.finish()
+    if style == "for":
+        for chunk in operation:
+            wire += chunk
+    else:
+        wire += b"".join(operation)
+    assert gzip.decompress(wire) == _COMPLETION_PAYLOAD
+    assert encoder.finished is True
+    assert encoder._active_token is None
+
+
+def test_early_close_after_trailer_bytes_abandons_the_encoder():
+    encoder, wire = _finishing_encoder()
+    operation = encoder.finish()
+    wire += b"".join(itertools.islice(operation, _finish_chunk_count()))
+    assert gzip.decompress(wire) == _COMPLETION_PAYLOAD
+    operation.close()
+    assert encoder.finished is False
+    with pytest.raises(OSError, match="unusable"):
+        encoder.flush()

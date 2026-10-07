@@ -14,6 +14,7 @@ import sys
 import threading
 from pathlib import Path
 
+import aiofiles.threadpool
 import pytest
 
 # A broken drain loop can block the event loop, so an asyncio timeout is
@@ -434,6 +435,78 @@ async def test_top_level_cancellation_closes_handles_and_removes_staging(
     with pytest.raises(asyncio.CancelledError):
         await task
 
+    assert trackers and trackers[0].active == 0
+    assert not destination.exists()
+    assert _partial_directories(destination) == []
+
+
+async def test_cancellation_inside_native_source_read_settles_before_close(
+    tmp_path, monkeypatch
+):
+    """Plan section 14.4: cancel the ingest while one shard's native source
+    read is running in its executor worker. The cancellation waits for that
+    worker to return before the shard's handle closes; no task outlives the
+    ingest, staging is removed, and nothing is published."""
+    loop = asyncio.get_running_loop()
+    fixtures = tmp_path / "fixtures"
+    example.generate_fixtures(fixtures, rows_per_shard=100)
+    target = (fixtures / "events-000.jsonl.gz").resolve()
+    destination = tmp_path / "published"
+    entered = asyncio.Event()
+    release = threading.Event()
+    events = []
+    trackers = []
+    original_tracker = example._ConcurrencyTracker
+    original_open = aiofiles.threadpool.sync_open
+
+    class CapturedTracker(original_tracker):
+        def __init__(self):
+            super().__init__()
+            trackers.append(self)
+
+    class GatedReader(io.BufferedReader):
+        gated = False
+
+        def read(self, size=-1, /):
+            if not GatedReader.gated:
+                GatedReader.gated = True
+                events.append("read entered")
+                loop.call_soon_threadsafe(entered.set)
+                if not release.wait(10):
+                    raise RuntimeError("native read gate was never released")
+                events.append("read returned")
+            return super().read(size)
+
+        def close(self):
+            events.append("closed")
+            super().close()
+
+    def gated_open(file, mode="r", *args, **kwargs):
+        if mode == "rb" and Path(file).resolve() == target:
+            return GatedReader(io.FileIO(file, "rb"))
+        return original_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr(example, "_ConcurrencyTracker", CapturedTracker)
+    monkeypatch.setattr(aiofiles.threadpool, "sync_open", gated_open)
+    before = asyncio.all_tasks()
+    task = asyncio.create_task(_ingest(_inputs(fixtures), destination))
+    try:
+        await asyncio.wait_for(entered.wait(), 10)
+        task.cancel()
+        # The worker still holds the read: cancellation cannot finish, and
+        # the shard's handle stays open.
+        for _ in range(20):
+            await asyncio.sleep(0.005)
+        assert not task.done()
+        assert events == ["read entered"]
+    finally:
+        release.set()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert events == ["read entered", "read returned", "closed"]
+    assert asyncio.all_tasks() - before == set()
     assert trackers and trackers[0].active == 0
     assert not destination.exists()
     assert _partial_directories(destination) == []

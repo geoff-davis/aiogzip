@@ -1,6 +1,8 @@
 # pyrefly: ignore
 # pyrefly: disable=all
 import asyncio
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -9,6 +11,10 @@ from aiogzip import (
     AsyncGzipTextFile,
     ConcurrentOperationError,
 )
+
+sys.path.insert(0, str(Path(__file__).parent / "stateful"))
+from model import CLOSED, OPEN, OPENING, U  # noqa: E402
+from observer import assert_lifecycle  # noqa: E402
 
 
 class TestClosefdParameter:
@@ -67,6 +73,7 @@ class TestClosefdParameter:
             await f.write(b"test data")
 
         assert f._is_closed is True
+        assert_lifecycle(f, OPEN, "close")
 
     async def test_closefd_with_text_file(self, tmp_path):
         import aiofiles
@@ -186,12 +193,14 @@ class TestResourceCleanup:
                 self.closed = False
 
             async def write(self, data):
+                if self.closed:
+                    raise AssertionError("sink written after close")
                 self.calls += 1
                 if self.calls > 1:
                     self.write_started.set()
                     await self.release_write.wait()
                     if self.closed:
-                        raise OSError("underlying file is closed")
+                        raise AssertionError("sink write resumed after close")
                 return len(data)
 
             async def close(self):
@@ -206,11 +215,15 @@ class TestResourceCleanup:
                 await writer.write_started.wait()
                 raise ValueError("body failure")
 
+        # BC8: exit settles the active sink write (cancelling it) before
+        # closing, so the sink never sees a write after close. b1 closed the
+        # sink first and let the blocked write resume against it.
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "context_exit_abort")
         assert writer.closed is True
         assert write_task is not None
         writer.release_write.set()
-        with pytest.raises(OSError, match="underlying file is closed"):
+        with pytest.raises(OSError, match="write aborted"):
             await write_task
 
     async def test_aborted_active_write_cannot_report_success_after_sink_resumes(self):
@@ -243,6 +256,7 @@ class TestResourceCleanup:
                 raise ValueError("body failure")
 
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "context_exit_abort")
         assert writer.closed is True
         assert write_task is not None
         writer.release_write.set()
@@ -278,6 +292,7 @@ class TestResourceCleanup:
                 raise ValueError("body failure")
 
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "context_exit_abort")
         assert writer.closed is True
         assert flush_task is not None
         writer.release_flush.set()
@@ -360,6 +375,7 @@ class TestResourceCleanup:
                 raise ValueError("body failure")
 
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "context_exit_abort")
         assert reader.closed is True
         assert read_task is not None
         reader.release_read.set()
@@ -414,6 +430,7 @@ class TestResourceCleanup:
                 raise ValueError("body failure")
 
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "context_exit_abort")
         assert stream.buffer.closed is True
         assert read_task is not None
         reader.release_read.set()
@@ -535,10 +552,12 @@ class TestResourceCleanup:
         await stream.open()
         await stream.write("日本語")
         await stream.buffer.close()
+        assert_lifecycle(stream.buffer, OPEN, "close")
 
         with pytest.raises(ValueError, match="I/O operation on closed file"):
             await stream.close()
         assert stream.closed is True
+        assert_lifecycle(stream, CLOSED, "close")
 
     @pytest.mark.parametrize("text_mode", [False, True])
     async def test_cancelled_clean_exit_aborts_active_call_and_closes(self, text_mode):
@@ -592,6 +611,7 @@ class TestResourceCleanup:
             await context_task
 
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "context_exit_abort")
         assert reader.closed is True
         assert read_task is not None
         reader.release_read.set()
@@ -820,6 +840,7 @@ class TestResourceCleanup:
         assert write_task is not None
         assert await write_task == len(payload)
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "close")
         assert writer.closed is True
         assert gzip.decompress(bytes(writer.buffer)) == payload
 
@@ -897,6 +918,7 @@ class TestResourceCleanup:
         assert releaser is not None
         await asyncio.gather(producer, releaser)
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "close")
         assert writer.closed is True
         assert gzip.decompress(bytes(writer.buffer)) == expected
 
@@ -949,6 +971,7 @@ class TestResourceCleanup:
             await context_task
 
         assert stream.closed is False
+        assert_lifecycle(stream, OPEN, "context_exit_abort_cleanup_fails")
         assert reader.closed is False
         assert read_task is not None
         reader.release_read.set()
@@ -957,6 +980,7 @@ class TestResourceCleanup:
 
         await stream.close()
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "close")
         assert reader.closed is True
         assert reader.close_calls == 2
 
@@ -999,6 +1023,7 @@ class TestResourceCleanup:
                 raise ValueError("body failure")
 
         assert stream.closed is False
+        assert_lifecycle(stream, OPEN, "context_exit_abort_cleanup_fails")
         assert stream.buffer.closed is False
         assert reader.closed is False
         assert read_task is not None
@@ -1008,6 +1033,7 @@ class TestResourceCleanup:
 
         await stream.close()
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "close")
         assert stream.buffer.closed is True
         assert reader.closed is True
         assert reader.close_calls == 2
@@ -1055,12 +1081,14 @@ class TestResourceCleanup:
         with pytest.raises(ConcurrentOperationError, match="active write or flush"):
             await stream.close()
         assert stream.closed is False
+        assert_lifecycle(stream, OPEN, "close_during_call")
         assert stream.buffer.closed is False
 
         writer.release_write.set()
         assert await write_task == len(text)
         await stream.close()
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "close")
         assert gzip.decompress(bytes(writer.buffer)) == raw
 
     async def test_clean_text_context_exit_waits_for_active_write_and_closes(self):
@@ -1109,6 +1137,7 @@ class TestResourceCleanup:
         assert write_task is not None
         assert await write_task == len(text)
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "close")
         assert writer.closed is True
         assert gzip.decompress(bytes(writer.buffer)) == raw
 
@@ -1153,6 +1182,7 @@ class TestResourceCleanup:
         writer.release_trailer.set()
         await asyncio.gather(first_close, second_close)
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "close")
         assert gzip.decompress(bytes(writer.buffer)) == b"payload"
 
     async def test_concurrent_binary_close_waits_through_trailer_write(self):
@@ -1196,6 +1226,7 @@ class TestResourceCleanup:
         writer.release_trailer.set()
         await asyncio.gather(first_close, second_close)
         assert stream.closed is True
+        assert_lifecycle(stream, OPEN, "close")
         assert gzip.decompress(bytes(writer.buffer)) == b"payload"
 
     async def test_operations_after_close_raise_errors(self, temp_file):
@@ -1218,6 +1249,7 @@ class TestResourceCleanup:
             await f.close()
 
         assert f._is_closed is True
+        assert_lifecycle(f, OPEN, "close")
         await f.close()
         await f.close()
 
@@ -1280,6 +1312,7 @@ class TestResourceCleanup:
         async with f:
             assert await f.read(1) == "a"
         assert f.closed is True
+        assert_lifecycle(f, OPEN, "close")
         assert f.buffer.closed is True
 
 
@@ -1301,11 +1334,13 @@ class TestOpenCloseLifecycle:
         assert f.closed is False
         ret = await f.open()
         assert ret is f  # open() returns self
+        assert_lifecycle(f, OPENING, "open_succeeds")
         try:
             assert await f.read() == b"hello\nworld\n"
         finally:
             await f.close()
         assert f.closed is True
+        assert_lifecycle(f, OPEN, "close")
 
     @pytest.mark.asyncio
     async def test_text_open_read_close(self, tmp_path):
@@ -1314,11 +1349,13 @@ class TestOpenCloseLifecycle:
         f = AsyncGzipTextFile(p, "rt")
         ret = await f.open()
         assert ret is f
+        assert_lifecycle(f, OPENING, "open_succeeds")
         try:
             assert await f.read() == "hello\nworld\n"
         finally:
             await f.close()
         assert f.closed is True
+        assert_lifecycle(f, OPEN, "close")
 
     @pytest.mark.asyncio
     async def test_binary_open_write_round_trip(self, tmp_path):
@@ -1344,6 +1381,7 @@ class TestOpenCloseLifecycle:
         try:
             with pytest.raises(ValueError, match="already open"):
                 await f.open()
+            assert_lifecycle(f, OPEN, "open")
         finally:
             await f.close()
 
@@ -1358,6 +1396,7 @@ class TestOpenCloseLifecycle:
         await f.close()
         with pytest.raises(ValueError, match="closed"):
             await f.open()
+        assert_lifecycle(f, CLOSED, "open")
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
@@ -1368,6 +1407,7 @@ class TestOpenCloseLifecycle:
         f = cls(p, mode)
         with pytest.raises(ValueError, match="File not opened"):
             await f.read()
+        assert_lifecycle(f, U, "call_starts")
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("cls", [AsyncGzipBinaryFile, AsyncGzipTextFile])
@@ -1380,8 +1420,10 @@ class TestOpenCloseLifecycle:
 
         async with cls(p, mode) as f:
             assert f.closed is False
+            assert_lifecycle(f, OPENING, "open_succeeds")
             assert await f.read() == expected
         assert f.closed is True
+        assert_lifecycle(f, OPEN, "close")
 
 
 class TestRepr:
@@ -1485,6 +1527,7 @@ class TestFailedOpenRecovery:
             # The failed open leaves no half-open state behind: the handle is
             # cleared, the caller's fileobj is untouched, and a retry works.
             assert f._file is None
+            assert_lifecycle(f, OPENING, "initialization_fails")
             assert writer.closed is False
 
             async with f:
@@ -1571,6 +1614,7 @@ class TestCancelledOpenRecovery:
             await task
 
         assert f._file is None
+        assert_lifecycle(f, OPENING, "initialization_fails")
         async with f:  # retry succeeds
             await f.write(b"recovered")
 
@@ -1585,6 +1629,7 @@ class TestCancelledOpenRecovery:
             await task
 
         assert f._binary_file is None
+        assert_lifecycle(f, OPENING, "initialization_fails")
         async with f:
             await f.write("recovered")
 
@@ -1607,6 +1652,7 @@ class TestFailedTextOpenRecovery:
                 await f.open()
 
             assert f._binary_file is None
+            assert_lifecycle(f, OPENING, "initialization_fails")
             assert writer.closed is False
 
             async with f:

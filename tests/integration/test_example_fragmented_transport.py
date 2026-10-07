@@ -12,6 +12,10 @@ import pytest
 
 import aiogzip
 
+# A blocked event loop defeats asyncio timeouts; the thread watchdog makes a
+# hang fail the test.
+pytestmark = pytest.mark.timeout(60, method="thread")
+
 REPO_ROOT = Path(__file__).parents[2]
 EXAMPLE_PATH = REPO_ROOT / "examples" / "fragmented_transport.py"
 

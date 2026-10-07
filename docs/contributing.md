@@ -85,6 +85,25 @@ commands and any material wins or regressions in the pull request. The
 [benchmark guide](https://github.com/geoff-davis/aiogzip/tree/main/benchmarks)
 documents the comparison methodology and focused categories.
 
+### Hot-path duplication map
+
+A few hot paths deliberately duplicate a slower reference path, because
+removing the duplication measurably cost throughput. Each duplicate carries a
+`Parity:` comment naming the parametrized test module that pins it to its
+reference. Change both paths together, keep the parity module passing, and
+re-run the constraining benchmark before merging either path into the other.
+
+| Duplicated path | Reference path | Why it is duplicated | Constraining benchmark | Parity module |
+| --- | --- | --- | --- | --- |
+| `_Operation.__next__` (`codec.py`) | `_Operation._advance_raw` | Avoids a helper frame on every public advancement | `regressions` codec rows, `micro` Small writes | `test_parity_operation.py` |
+| `GzipEncoder._feed_snapshot` | `GzipEncoder.feed` | The file writer's per-call path; avoids three helper frames per tiny write | `micro` Small writes, `io` Text write | `test_parity_encoder_feed.py` |
+| Inline reservation in `AsyncGzipBinaryFile.write` | `_BinaryWriteReservation` (`writelines`, `flush`, writer `seek`) | The context manager exceeded the small-write budget | `micro` Small writes | `test_parity_binary_write.py` |
+| Inline encoder/sink body in `AsyncGzipTextFile.write` | `_write_batch_reserved` under `_write_call` | The reservation context manager and helper both exceeded 5% on small writes | `micro` Text writelines batching, `io` Text write | `test_parity_text_inline.py` |
+| Inline origin capture in `_read_chunk_and_decode` | `_capture_buffer_origin` | Avoids a helper frame per refill | `io` Text line iteration, `text_origin` | `test_parity_text_inline.py` |
+| `_decode_next_chunk` | `_read_chunk_and_decode` | Returns text for local accumulation, avoiding quadratic `str +=` | `io` Text large reads, Text read (bulk) | `test_parity_text_inline.py` |
+| Pending-line consumption inline in `__anext__` | `readline()` | A helper call per line lowers iteration throughput | `micro` Line iteration, `io` Text line iteration | `test_parity_text_inline.py` |
+| Bounded fast path inline in `readline()` | `_take_buffered_line` | Avoids a helper frame and a second buffered-length computation | `micro` readline() loop | `test_parity_text_inline.py` |
+
 ## Package Layout
 
 Core implementation is split across focused modules in `src/aiogzip`:
