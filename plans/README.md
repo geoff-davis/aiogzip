@@ -63,6 +63,7 @@ The RC hardening program is parked, and no RC plan is committed under
 - [WP8 completion: G12 bridge and one health authority](reviews/v2.0.0b2-wp8-completion.md)
 - [WP9 completion: G13 hot-path parity](reviews/v2.0.0b2-wp9-completion.md)
 - [WP10 qualification: G14–G18](reviews/v2.0.0b2-wp10-qualification.md)
+- [G17 pre-registration: performance windows](reviews/v2.0.0b2-g17-preregistration.md)
 
 ### b2 WP5 working records
 
