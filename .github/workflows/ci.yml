@@ -57,6 +57,29 @@ jobs:
       - name: Type check with Ty
         run: ty check src tests/typing/public_api_positive.py
 
+  # The deploy workflow builds docs only after merge; this catches broken
+  # links, nav entries and API references on every PR.
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[docs]"
+
+      - name: Build documentation strictly
+        run: mkdocs build --strict
+
   build:
     # The type of runner that the job will run on
     runs-on: ${{ matrix.os }}
@@ -97,6 +120,13 @@ jobs:
       - name: Install dependencies
         run: uv pip install --system -e ".[test,csv]"
 
+      # Records the interpreter, the imported package, engine selection and
+      # runtime dependency versions this leg actually tested.
+      - name: Attest runtime environment
+        run: >-
+          python scripts/report_runtime_versions.py --mode csv --latest
+          --output runtime-report.json
+
       # This explicit check makes the supported-Python matrix the portability
       # gate for the structured runtime manifest. The test suite also covers
       # deterministic capture and intentional failure cases.
@@ -122,6 +152,14 @@ jobs:
           path: .coverage
           include-hidden-files: true
 
+      - name: Upload runtime attestation
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-build-${{ matrix.os }}-${{ matrix.python-version }}
+          path: runtime-report.json
+          if-no-files-found: warn
+
   # The main matrix above installs only [test,csv], so it exercises the
   # pure-Python default (stdlib zlib, zlib-ng absent) — the common
   # `pip install aiogzip` install — across the full version/OS sweep. This
@@ -145,6 +183,17 @@ jobs:
       - name: Install dependencies (with fast extra)
         run: uv pip install --system -e ".[test,csv,fast]"
 
+      - name: Attest runtime environment (zlib-ng active)
+        run: >-
+          python scripts/report_runtime_versions.py --mode fast --latest
+          --output runtime-fast.json
+
+      - name: Attest runtime environment (stdlib forced)
+        run: >-
+          AIOGZIP_ENGINE=stdlib python scripts/report_runtime_versions.py
+          --mode fast-forced-stdlib --latest
+          --output runtime-fast-forced-stdlib.json
+
       - name: Run tests with zlib-ng active
         run: |
           pytest --cov --cov-report=term-missing --cov-fail-under=85
@@ -152,6 +201,16 @@ jobs:
       - name: Run tests with stdlib forced (zlib-ng installed but disabled)
         run: |
           AIOGZIP_ENGINE=stdlib pytest -q
+
+      - name: Upload runtime attestations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-fast-engine
+          path: |
+            runtime-fast.json
+            runtime-fast-forced-stdlib.json
+          if-no-files-found: warn
 
   # Resolve nothing implicitly in this matrix: build one wheel, install it
   # without dependencies, then add each exact runtime floor. Current test
@@ -182,7 +241,8 @@ jobs:
         run: |
           uv venv --python 3.11 .minimum-venv
           uv pip install --python .minimum-venv/bin/python \
-            "pytest>=8,<10" "pytest-asyncio>=0.24" "hypothesis>=6" \
+            "pytest>=8,<10" "pytest-asyncio>=0.24" "pytest-timeout>=2.3.1" \
+            "hypothesis>=6" \
             psutil "mypy>=1" types-aiofiles "ty>=0.0.1a16"
           uv pip install --python .minimum-venv/bin/python \
             --no-deps dist/*.whl
@@ -211,11 +271,19 @@ jobs:
           if [[ "${{ matrix.mode }}" == "fast-forced-stdlib" ]]; then
             AIOGZIP_ENGINE=stdlib .minimum-venv/bin/python \
               scripts/report_runtime_versions.py \
-              --mode "${{ matrix.mode }}" --require-installed-artifact
+              --mode "${{ matrix.mode }}" --require-installed-artifact \
+              --output runtime-report.json
           else
             .minimum-venv/bin/python scripts/report_runtime_versions.py \
-              --mode "${{ matrix.mode }}" --require-installed-artifact
+              --mode "${{ matrix.mode }}" --require-installed-artifact \
+              --output runtime-report.json
           fi
+
+      - name: Upload runtime attestation
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-minimum-${{ matrix.mode }}
+          path: runtime-report.json
 
       - name: Check installed public API and typing contract
         if: matrix.mode == 'base'
@@ -368,12 +436,24 @@ jobs:
         shell: bash
         run: |
           uv pip install --python "$ARTIFACT_PYTHON" \
-            pytest pytest-asyncio aiofiles aiocsv
+            pytest pytest-asyncio pytest-timeout aiofiles aiocsv
           if [[ "${{ matrix.mode }}" == "fast" ]]; then
             uv pip install --python "$ARTIFACT_PYTHON" zlib-ng
           fi
           uv pip install --python "$ARTIFACT_PYTHON" \
             --no-deps "$ARTIFACT_PATH"
+
+      - name: Attest installed runtime outside checkout
+        shell: bash
+        run: |
+          run_directory="$RUNNER_TEMP/aiogzip-runtime-report"
+          mkdir -p "$run_directory"
+          cd "$run_directory"
+          "$ARTIFACT_PYTHON" \
+            "$GITHUB_WORKSPACE/scripts/report_runtime_versions.py" \
+            --mode "${{ matrix.mode == 'fast' && 'fast' || 'csv' }}" --latest \
+            --require-installed-artifact \
+            --output "$GITHUB_WORKSPACE/runtime-report.json"
 
       - name: Smoke installed artifact outside checkout
         shell: bash
@@ -415,6 +495,7 @@ jobs:
           path: |
             artifact-report.json
             example-report.json
+            runtime-report.json
           if-no-files-found: warn
 
   # Posts the coverage comment from the ubuntu/3.12 build leg's uploaded

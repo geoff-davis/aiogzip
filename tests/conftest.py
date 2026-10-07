@@ -124,3 +124,18 @@ def mock_codec_executor(monkeypatch):
         monkeypatch.setattr(loop, "run_in_executor", submit)
 
     return install
+
+
+# A hang in the stateful harness must fail its test, not stall CI.
+# faulthandler_timeout only dumps stacks, and a scenario's asyncio.timeout
+# cannot fire while the event loop itself is blocked, so every stateful test
+# gets a thread-method timeout. The row-coverage test replays the whole PR
+# seed set when run alone, hence the generous bound.
+_STATEFUL = Path(__file__).resolve().parent / "stateful"
+_STATEFUL_TIMEOUT = pytest.mark.timeout(300, method="thread")
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if Path(item.path).resolve().parent == _STATEFUL:
+            item.add_marker(_STATEFUL_TIMEOUT)

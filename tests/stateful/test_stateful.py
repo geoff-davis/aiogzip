@@ -22,11 +22,13 @@ from observer import Observer
 import aiogzip
 
 # Seeds outside the base range that once exposed a defect or a model gap,
-# plus 5767, the only seed below 6000 that aborts a BROKEN reader.
+# plus 5767, the only seed below 6000 that aborts a BROKEN reader. (943, also
+# such a seed, is inside the base range.)
 REGRESSION_SEEDS = (
-    943, 1062, 1071, 1149, 1494, 1506, 1530, 1726,
+    1062, 1071, 1149, 1494, 1506, 1530, 1726,
     1737, 1754, 1787, 1818, 2105, 2254, 5767,
 )  # fmt: skip
+assert not set(REGRESSION_SEEDS) & set(range(1000))
 PR_SEEDS = tuple(range(1000)) + REGRESSION_SEEDS
 
 # Table rows the generator cannot reach, each with the focused test that
