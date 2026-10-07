@@ -65,6 +65,7 @@ The RC hardening program is parked, and no RC plan is committed under
 - [WP10 qualification: G14–G18](reviews/v2.0.0b2-wp10-qualification.md)
 - [G17 pre-registration: performance windows](reviews/v2.0.0b2-g17-preregistration.md)
 - [WP11 release preparation: G20](reviews/v2.0.0b2-release-prep.md)
+- [WP11 candidate review: G19](reviews/v2.0.0b2-candidate-review.md)
 
 ### b2 WP5 working records
 

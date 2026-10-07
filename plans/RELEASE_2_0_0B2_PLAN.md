@@ -282,7 +282,7 @@ create competing copies of the same checkboxes in every section.
 | G16 | WP10 | Required interpreter/platform/engine/dependency and installed-artifact evidence passes |
 | G17 | WP10 | Performance, asymptotic-work, memory, and fairness gates pass with honest dispositions |
 | G18 | WP10 | Docs, plan index, maintained examples, and qualification record are complete |
-| G19 | WP11 | External human approval covers exact final candidate; findings closed or accepted appropriately |
+| G19 | WP11 | External human approval covers exact final candidate; findings closed or accepted appropriately (as amended in §16) |
 | G20 | WP11 | Version, changelog, reproducible artifact evidence, hashes, and release notes are consistent |
 | G21 | Maintainer | Tag, public publication, hashes, smokes, and documentation verified |
 | G22 | Maintainer | Post-release record and RC plan rebased on verified b2 |
@@ -1350,6 +1350,30 @@ the existing release policy. Agent reviews are useful inputs, not that approval.
 Missing external review keeps release readiness open but does not prevent Codex from
 finishing local code, tests, and artifacts. Never manufacture review evidence.
 
+**Amendment (2026-10-07): sole-maintainer approval.** aiogzip has one human
+developer, the maintainer, so no non-maintainer human is available to approve
+b2. At the maintainer's direction, G19 follows the 2.0.0b1 precedent
+([independent review](reviews/v2.0.0b1-independent-review.md)) instead:
+
+1. **Independent technical review.** An agent that authored none of the b2
+   implementation reviews the exact final candidate as a whole. For b2 that is
+   Codex, because Claude implemented every work package and Codex only
+   reviewed. The review works from the
+   [candidate review packet](reviews/v2.0.0b2-candidate-review.md) and answers
+   each review question in this section. It is a fresh whole-candidate review,
+   not a restatement of the per-gate reviews.
+2. **Hosted evidence.** The required CI checks have passed on the candidate's
+   pull request at the reviewed SHA.
+3. **Human approval.** The maintainer approves that exact SHA after reading the
+   complete review record. The approval exists only as the maintainer's explicit
+   statement; nothing is inferred from automated output.
+4. **Disclosure.** The review record and the release notes' provenance say that
+   no non-maintainer human reviewed b2.
+
+Every finding is recorded with its resolution, and a later change to a release
+input requires a new candidate, a new review and a new approval, as above. This
+amendment changes who approves, not what must be reviewed.
+
 Review questions should emphasize actual native completion, ownership of late I/O
 results, opening/closing resource publication, and whether a later member can mask
 lost input. Also review cookie normalization, exception allowlisting, cumulative
@@ -1509,7 +1533,8 @@ Use the canonical G00-G22 register once; update gates with their evidence in the
 same commit. Preserve independently green work packages and small reviewable diffs.
 Run cumulative and C0 performance comparisons, full engine/platform/dependency tests,
 installed wheel/sdist and maintained examples, typing, lint, docs, and hooks.
-Obtain external human approval on the exact candidate before publication readiness.
+Obtain external human approval on the exact candidate before publication readiness
+(for b2, the §16 sole-maintainer amendment applies).
 
 Do not push, merge, tag, publish, edit remote issues/settings, or invent test,
 benchmark, engine, platform, artifact, hosted-CI, or review evidence. Leave
