@@ -3575,3 +3575,302 @@ def test_bc10_near_misses_stay_unclaimed(change):
     mutated = _bc10_mutated(change)
     assert bc10(mutated).events == set(), change
     assert not compare(mutated).ok
+
+
+# R3, a later G native: after the trigger, a cancelled native seek0 whose
+# parked seek ran from ``before`` leaves b1's decoder past wire[:before],
+# reading the wire again from 0. Seed 2719: an empty L2 loss at EOF (op 2),
+# then the seek ran 82 -> 0 under op 3's cancel, and b1's readline (op 4)
+# serves "c" past the true stream's end.
+
+R3_OP = {"op": "cancel", "call": {"op": "seek0"}}
+
+
+def _r3_checker(seed: int = 2719, **fields) -> LossyChecker:
+    """Past an empty-range trigger at op 2, healthy, at certain position 1."""
+    scenario = generate(seed) | {"source": {"kind": "native"}}
+    lossy = scenario | fields
+    checker = LossyChecker(lossy, scenario, ENGINE, 2, True, 0)
+    checker.lost = True
+    checker.state = "lossy"
+    checker.lifecycle = model.OPEN
+    checker.position = 1
+    return checker
+
+
+def _r3(
+    checker: LossyChecker,
+    index: int = 3,
+    origins: Any = ((82, 0),),
+    *,
+    seeks: Any = (0,),
+    parked: Any = model.NATIVE_SEEK,
+    op: Any = R3_OP,
+    outcome: Outcome | None = None,
+    transition: str = "cancel_no_effect",
+) -> LossyChecker:
+    def plain(value: Any) -> Any:
+        return [plain(x) for x in value] if isinstance(value, tuple) else value
+
+    checker.index = index
+    checker.event = Event(
+        index,
+        op,
+        outcome or Outcome("cancelled"),
+        parked=parked,
+        seeks=plain(seeks),
+        origins=plain(origins),
+    )
+    checker.transition(transition)
+    return checker
+
+
+def _replayed(before: int, seed: int = 2719) -> Any:
+    scenario = generate(seed)
+    wire = unb64(scenario["wire"])
+    view = wire_view(scenario, wire[:before] + wire, ENGINE, replayed_prefix=before)
+    return Checker(view, ENGINE)
+
+
+@pytest.mark.parametrize("before", [82, 40, 1])
+def test_r3_a_later_native_replay_switches_to_the_replayed_view(before):
+    checker = _r3(_r3_checker(), origins=((before, 0),))
+    assert checker.violations == [] and checker.replays == [[3, before]]
+    assert checker.view == "lossy" and checker.deleted is None
+    assert checker.epoch_start == 0
+    assert checker.expect == _replayed(before).expect
+    assert checker.health is model.HEALTHY and checker.position == 1
+
+
+def test_r3_2719_replay_serves_the_byte_past_the_true_end():
+    assert _replayed(82).upper == b"cc"
+    checker = _r3(_r3_checker())
+    checker.observe(Event(4, {"op": "readline", "limit": 3}, Outcome("ok", b"c")))
+    assert checker.violations == []
+    # Without the replay, the same byte is past the end.
+    stale = _r3_checker()
+    stale.observe(Event(4, {"op": "readline", "limit": 3}, Outcome("ok", b"c")))
+    assert stale.violations
+    # The replayed view allows no byte the oracle does not.
+    over = _r3(_r3_checker())
+    over.observe(Event(4, {"op": "readline", "limit": 3}, Outcome("ok", b"cc")))
+    assert over.violations
+
+
+def test_r3_ends_only_at_a_physical_rewind_to_0():
+    checker = _r3(_r3_checker())
+    _at(checker, 5, seeks=[1], kind="ok").transition("rewind_ok")
+    assert checker.view == "lossy" and checker.rebases == []
+    _at(checker, 6, seeks=[0], kind="ok").transition("rewind_ok")
+    assert checker.view == "true" and checker.rebases == [6]
+
+
+NOT_R3 = {
+    "at-trigger": {"index": 2},
+    "before-trigger": {"index": 1},
+    "origin-0": {"origins": ((0, 0),)},
+    "origin-past-wire": {"origins": ((83, 0),)},
+    "origin-negative": {"origins": ((-1, 0),)},
+    "origin-bool": {"origins": ((True, 0),)},
+    "origin-float": {"origins": ((82.0, 0),)},
+    "origin-target-1": {"origins": ((82, 1),)},
+    "origin-triple": {"origins": ((82, 0, 0),)},
+    "two-origins": {"origins": ((82, 0), (82, 0))},
+    "no-origins": {"origins": None},
+    "no-seek": {"seeks": None},
+    "seek-1": {"seeks": (1,)},
+    "two-seeks": {"seeks": (0, 0)},
+    "bool-seek": {"seeks": (False,)},
+    "not-parked": {"parked": None},
+    "parked-read": {"parked": {"via": "native", "method": "read", "bytes": None}},
+    "cancel-read": {"op": {"op": "cancel", "call": {"op": "read"}}},
+    "seek-not-cancelled": {"op": {"op": "seek0"}, "outcome": Outcome("ok", 0)},
+    "lost-race": {"outcome": Outcome("ok", 0)},
+    "other-transition": {"transition": "cancel_uncertain"},
+}
+
+
+@pytest.mark.parametrize("change", NOT_R3)
+def test_r3_needs_g_natives_exact_shape(change):
+    checker = _r3(_r3_checker(), **NOT_R3[change])
+    assert checker.replays == [] and checker.deleted == []
+    assert not any("replay" in v for v in checker.violations)
+
+
+def test_r3_needs_a_native_source():
+    scenario = generate(129)
+    checker = LossyChecker(scenario, scenario, ENGINE, 2, True, 0)
+    checker.lost = True
+    _r3(checker, origins=((40, 0),))
+    assert checker.replays == [] and checker.violations == []
+
+
+@pytest.mark.parametrize(
+    ("state", "message"),
+    [
+        ({"candidates": [0, 1]}, "a later replay at an uncertain position"),
+        ({"deleted": [[10, 20]]}, "a later replay over the epoch [[10, 20]]"),
+        ({"deleted": None}, "a later replay over the epoch None"),
+    ],
+)
+def test_r3_outside_its_model_is_a_violation(state, message):
+    checker = _r3_checker()
+    for name, value in state.items():
+        setattr(checker, name, value)
+    _r3(checker)
+    assert checker.replays == [[3, 82]]
+    assert checker.violations[0] == f"op 3: {message}"
+
+
+@pytest.mark.parametrize("health", [model.SALVAGE, model.BROKEN])
+def test_r3_outside_healthy_is_the_candidates_no_effect(health):
+    checker = _r3_checker()
+    checker.health = health
+    expect = checker.expect
+    _r3(checker)
+    assert checker.replays == [] and checker.violations == []
+    assert checker.expect is expect and checker.deleted == []
+    assert checker.health is health
+
+
+def test_r3_outside_healthy_fresh_data_still_fails():
+    # A broken reader that then served data fails the ordinary checks.
+    checker = _r3_checker()
+    checker.health = model.BROKEN
+    _r3(checker)
+    checker.observe(Event(4, {"op": "readline", "limit": 3}, Outcome("ok", b"c")))
+    assert checker.replays == [] and checker.violations
+
+
+def test_r3_over_the_true_view_is_modeled():
+    checker = _r3_checker()
+    checker.state = "true"
+    _r3(checker)
+    assert checker.violations == [] and checker.view == "lossy"
+
+
+def test_r3_the_oracle_refusing_its_view_is_a_violation(monkeypatch):
+    monkeypatch.setattr(model, "wire_view", lambda *args, **kwargs: None)
+    checker = _r3(_r3_checker())
+    assert checker.violations == ["op 3: no model for a replay from 82"]
+
+
+def test_r3_2719_is_claimed():
+    pair, lossy = b1_recorded(2719)
+    request = bc2_request(pair)
+    assert request is not None and request.clause == "L2"
+    assert request.trigger == (2, "cancel", 0) and request.taken == [82, 82]
+    assert lossy["replays"] == [[3, 82]] and lossy["violations"] == []
+    assert pair.ref_info["origins"] == [[3, [[82, 0]]]]
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    bc2 = claims(result, "BC2-LOST-INPUT")
+    for key in ((4, "readline", 0), (5, "seek_back", 0)):
+        assert repr(("event", key)) in bc2
+
+
+def test_r3_2719_rows_need_the_replay_record():
+    pair, lossy = b1_recorded(2719)
+    lossy["replays"] = []
+    fails(pair, "(4, 'readline', 0)", lossy=lossy)
+
+
+def _r3_claim(mutate) -> set:
+    pair, lossy = b1_recorded(2719)
+    request = bc2_request(pair)
+    assert bc2_claim(pair, request, lossy, set()).events
+    pair = mutate(pair, lossy) or pair
+    return bc2_claim(pair, request, lossy, set()).events
+
+
+def _set_replays(value):
+    def mutate(pair, lossy):
+        lossy["replays"] = value
+
+    return mutate
+
+
+def _ref_evidence(name, value):
+    def mutate(pair, lossy):
+        return dataclasses.replace(pair, ref_info=pair.ref_info | {name: value})
+
+    return mutate
+
+
+def _cand_parked(pair, lossy):
+    cand = edit(pair.cand, (3, "cancel", 0), parked=None)
+    return dataclasses.replace(pair, cand=cand)
+
+
+R3_UNBOUND = {
+    "absent": lambda pair, lossy: lossy.pop("replays") and None,
+    "empty": _set_replays([]),
+    "not-a-list": _set_replays("x"),
+    "tuple-entry": _set_replays([(3, 82)]),
+    "short-entry": _set_replays([[3]]),
+    "bool-index": _set_replays([[True, 82]]),
+    "float-origin": _set_replays([[3, 82.0]]),
+    "wrong-origin": _set_replays([[3, 81]]),
+    "wrong-index": _set_replays([[4, 82]]),
+    "at-trigger": _set_replays([[2, 82]]),
+    "duplicate": _set_replays([[3, 82], [3, 82]]),
+    "extra": _set_replays([[3, 82], [7, 82]]),
+    "ref-origins-absent": _ref_evidence("origins", []),
+    "ref-origin-moved": _ref_evidence("origins", [[3, [[81, 0]]]]),
+    "ref-origin-zero": _ref_evidence("origins", [[3, [[0, 0]]]]),
+    "ref-seeks-absent": _ref_evidence("seeks", []),
+    "ref-origins-malformed": _ref_evidence("origins", [[3, [[82, 0]]], "x"]),
+    "cand-unparked": _cand_parked,
+    "health-salvage": lambda pair, lossy: _health_before(pair, lossy, "SALVAGE"),
+    "health-broken": lambda pair, lossy: _health_before(pair, lossy, "BROKEN"),
+}
+
+
+def _r3_row(pair: Pair) -> int:
+    """2719's replay row in b1's trace order (the acquisition row is 0)."""
+    n = pair.ref.index(pair.ref_by_key[(3, "cancel", 0)])
+    assert n == 4
+    return n
+
+
+def _health_before(pair: Pair, lossy: dict[str, Any], health: str) -> None:
+    n = _r3_row(pair)
+    assert lossy["health"][n][0] == "HEALTHY"
+    lossy["health"][n][0] = {"SALVAGE": "VALIDATION_SALVAGE"}.get(health, health)
+
+
+@pytest.mark.parametrize("change", R3_UNBOUND)
+def test_r3_replays_must_be_exactly_b1s(change):
+    assert _r3_claim(R3_UNBOUND[change]) == set()
+
+
+def test_r3_health_is_read_at_b1s_row_not_the_event_index():
+    # Row 3 is event 2's: its health does not decide event 3's replay.
+    pair, lossy = b1_recorded(2719)
+    request = bc2_request(pair)
+    claimed = bc2_claim(pair, request, lossy, set()).events
+    assert pair.ref[3].key == (2, "cancel", 0) and _r3_row(pair) == 4
+    lossy["health"][3][0] = "BROKEN"
+    assert bc2_claim(pair, request, lossy, set()).events == claimed
+
+
+def test_r3_2719_needs_its_recorded_health():
+    pair, lossy = b1_recorded(2719)
+    _health_before(pair, lossy, "SALVAGE")
+    fails(pair, "(4, 'readline', 0)", lossy=lossy)
+
+
+def test_r3_5218_replays_nothing_outside_healthy():
+    # b1's op 1 fails the stream; op 3's G-native shape (origin 14) lands in
+    # VALIDATION_SALVAGE, where b1 refuses reads until op 6's physical
+    # rewind resets the decoder.
+    pair, lossy = b1_recorded(5218)
+    assert pair.ref_info["origins"] == [[3, [[14, 0]]]]
+    n = pair.ref.index(pair.ref_by_key[(3, "cancel", 0)])
+    assert lossy["health"][n][0] == "VALIDATION_SALVAGE"
+    assert lossy["replays"] == [] and lossy["violations"] == []
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT")
+    lossy["replays"] = [[3, 14]]
+    assert bc2_claim(pair, bc2_request(pair), lossy, set()).events == set()

@@ -47,9 +47,11 @@ from generator import generate, unb64  # noqa: E402
 from interpreter import Event, Outcome, final_output, symbolic  # noqa: E402
 from model import (  # noqa: E402
     INCOMPLETE_TAIL,
+    NATIVE_SEEK,
     Checker,
     later_loss_kind,
     loss_witness,
+    native_seek_origin,
     salvage,
     text_model,
     wire_view,
@@ -1081,7 +1083,7 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
         and wire_range(pair, r.taken) is not None
     ):
         return "L2", r.taken
-    origin = _seek_origin(pair, key)
+    origin = _g_origin(pair, key)
     if (
         key[1] == "cancel"
         and pair.op(key)["call"]["op"] == "seek0"
@@ -1094,10 +1096,6 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
         # b1 kept its decoder, which has consumed wire[:origin].
         return "G", [origin, origin]
     return None
-
-
-# The exact parked witness of a native seek (G native).
-NATIVE_SEEK = {"via": "native", "method": "seek", "bytes": None}
 
 
 def _evidence(pair: Pair, name: str, index: int) -> list[list[Any]] | None:
@@ -1120,36 +1118,45 @@ def _evidence(pair: Pair, name: str, index: int) -> list[list[Any]] | None:
 
 
 def _seek_origin(pair: Pair, key) -> int | None:
-    """The file offset b1's parked native seek left, or None unless the
-    reference recorded exactly one seek, to 0, at the event, with exactly one
-    origin ``[p, 0]`` where ``[0, p]`` is a valid wire range short of the
-    wire's end (a regular file then cannot have reported its end to b1).
-    Malformed evidence never raises; it makes no trigger."""
+    """The file offset b1's parked native seek at ``key`` started from, or
+    None unless the reference recorded exactly one seek record and one
+    origins record at the event, together G native's exact witness
+    (``native_seek_origin``: one seek, to 0, from ``0 <= before <=
+    len(wire)``). Malformed evidence never raises; it gives None."""
     index = key[0]
     seeks = _evidence(pair, "seeks", index)
     origins = _evidence(pair, "origins", index)
-    if seeks is None or origins is None:
+    if seeks is None or origins is None or len(seeks) != 1 or len(origins) != 1:
         return None
-    if len(seeks) != 1 or len(seeks[0]) != 1:
-        return None
-    (seek,) = seeks[0]
-    if type(seek) is not int or seek != 0:
-        return None
-    if len(origins) != 1 or len(origins[0]) != 1:
-        return None
-    (witness,) = origins[0]
-    if not isinstance(witness, list) or len(witness) != 2:
-        return None
-    origin, target = witness
-    if type(target) is not int or target != 0:
-        return None
-    if wire_range(pair, [0, origin]) is None:
-        return None
-    if origin == len(unb64(pair.scenario["wire"])):
-        # b1 may already have seen the source's end, and then never reads
-        # again; whether it did is not witnessed, so no trigger.
+    wire_size = len(unb64(pair.scenario["wire"]))
+    return native_seek_origin(seeks[0], origins[0], wire_size)
+
+
+def _g_origin(pair: Pair, key) -> int | None:
+    """The G-native trigger's origin: short of the wire's end, since at the
+    end b1 may already have seen the source's end, and then never reads
+    again; whether it did is not witnessed, so no trigger."""
+    origin = _seek_origin(pair, key)
+    if origin is None or origin == len(unb64(pair.scenario["wire"])):
         return None
     return origin
+
+
+def _replay_shape(pair: Pair, key) -> int | None:
+    """R3: the origin of a G-native-shaped event at ``key``, or None: a
+    cancelled native ``seek0`` identical on both sides with b1's exact
+    parked native seek, which ran from ``0 < before <= len(wire)``."""
+    if pair.scenario["source"]["kind"] != "native" or key[1] != "cancel":
+        return None
+    c, r = pair.cand_by_key.get(key), pair.ref_by_key.get(key)
+    if c is None or r is None or c != r:
+        return None
+    if pair.op(key) != {"op": "cancel", "call": {"op": "seek0"}}:
+        return None
+    if c.outcome != {"cancelled": True} or r.parked != NATIVE_SEEK:
+        return None
+    origin = _seek_origin(pair, key)
+    return origin if origin else None  # an origin of 0 replays nothing
 
 
 def wire_range(pair: Pair, taken: Any) -> list[int] | None:
@@ -1532,13 +1539,16 @@ def bc2_claim(
     losses = _losses(pair, request, lossy)
     if losses is None:
         return claim  # malformed loss evidence; claim nothing
+    replays = _replays(pair, request, lossy)
+    if replays is None:
+        return claim  # replay evidence not exactly b1's; claim nothing
     order = pair.cand_order
     start = order[request.trigger]
     converged = _converged(pair, lossy, start)
     span = set(range(start + 1, len(pair.cand) if converged is None else converged + 1))
-    for index in losses:
-        # H: each later loss opens its own span, from its first row until
-        # the models agree again.
+    for index in sorted(losses + replays):
+        # H: each later loss (and R3: each later replay) opens its own span,
+        # from its first row until the models agree again.
         rows = [n for n, row in enumerate(pair.cand) if row.key[0] == index]
         if not rows:
             return Claim()  # a loss the candidate never ran; claim nothing
@@ -1616,6 +1626,38 @@ def _losses(pair: Pair, request: Bc2Request, lossy: dict[str, Any]) -> list[int]
     if indices != sorted(set(indices)):
         return None
     return indices
+
+
+def _replays(
+    pair: Pair, request: Bc2Request, lossy: dict[str, Any]
+) -> list[int] | None:
+    """R3: the event indices of the lossy run's later G-native replays, or
+    None when the record is missing or malformed, or is not exactly the
+    replays b1's rows and evidence call for: in trace order, every b1 row
+    after the trigger of G native's shape (``_replay_shape``), each the
+    only row of its event, met while the lossy model was HEALTHY (its
+    health record, aligned to b1's rows and validated by
+    ``_convergence_ok``), as ``[index, before]``. Removing the record from
+    a run that replayed therefore leaves BC2 claiming nothing."""
+    replays = lossy.get("replays")
+    if type(replays) is not list or not all(
+        type(entry) is list and len(entry) == 2 and all(type(x) is int for x in entry)
+        for entry in replays
+    ):
+        return None
+    expected = []
+    for n, row in enumerate(pair.ref):
+        if row.index <= request.trigger[0]:
+            continue
+        before = _replay_shape(pair, row.key)
+        if before is None or lossy["health"][n][0] != "HEALTHY":
+            continue
+        if sum(1 for x in pair.ref if x.index == row.index) != 1:
+            return None
+        expected.append([row.index, before])
+    if replays != expected:
+        return None
+    return [index for index, _before in expected]
 
 
 HEALTH_VALUES = (None, "HEALTHY", "VALIDATION_SALVAGE", "BROKEN")

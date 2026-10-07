@@ -1030,6 +1030,32 @@ def wire_view(
     return lossy
 
 
+# The exact parked witness of a native seek (G native).
+NATIVE_SEEK = {"via": "native", "method": "seek", "bytes": None}
+
+
+def native_seek_origin(seeks: Any, origins: Any, wire_size: int) -> int | None:
+    """The offset a parked native ``seek0`` ran from (G native's witness), or
+    None unless the event completed exactly one source seek, to 0, and
+    recorded exactly one origin ``[before, 0]`` with
+    ``0 <= before <= wire_size``, all exact non-bool ints. Shared by the
+    G-native trigger, R3, and the claim's check of R3's record; each adds
+    its own bound on ``before``. Malformed evidence never raises."""
+    if type(seeks) is not list or seeks != [0] or type(seeks[0]) is not int:
+        return None
+    if type(origins) is not list or len(origins) != 1:
+        return None
+    (witness,) = origins
+    if type(witness) is not list or len(witness) != 2:
+        return None
+    before, target = witness
+    if type(before) is not int or type(target) is not int or target != 0:
+        return None
+    if not 0 <= before <= wire_size:
+        return None
+    return before
+
+
 def later_loss_kind(
     op: dict[str, Any], kind: str, message: str | None, source: dict[str, Any]
 ) -> str | None:
@@ -1127,6 +1153,19 @@ class LossyChecker(Checker):
     loss starts a new one. A later loss over a replayed prefix (G native) is
     not modeled.
 
+    R3 (a later G native): after the trigger, a cancelled ``seek0`` whose
+    parked native seek ran from ``before`` (``0 < before``) under the
+    cancel leaves b1's decoder past ``wire[:before]``, reading the wire
+    again from 0. Only from health HEALTHY: in SALVAGE or BROKEN the reader
+    consumes no fresh source data before a rewind resets the decoder, so
+    the event keeps the candidate's semantics and records nothing. The
+    model then needs a certain position and the true view in force
+    (``true``, or ``lossy`` with an empty epoch); the view becomes the wire
+    oracle over ``wire[:before] + wire`` with position and health kept, as
+    a replayed prefix whose epoch a physical rewind to 0 ends. Anything
+    else is a violation. Each replay is recorded in ``replays`` as
+    ``[index, before]``.
+
     ``acquire`` names the BC3 clause that owns the acquisition event exactly
     (only "O1"); its contender outcome then takes b1's lifecycle transition
     (OPENING stays OPENING) instead of the candidate's error check, and the
@@ -1179,6 +1218,8 @@ class LossyChecker(Checker):
         self.rebases: list[int] = []
         # H: later losses as [event index, true-wire range or None (empty)].
         self.losses: list[list[Any]] = []
+        # R3: later G-native replays as [event index, origin].
+        self.replays: list[list[int]] = []
         self.index: int | None = None
         self.event: Any = None
         self.lossy = types.SimpleNamespace(**{n: getattr(self, n) for n in self.VIEW})
@@ -1388,9 +1429,56 @@ class LossyChecker(Checker):
             return
         self.fail(index, f"{name} after an F1a error: {describe(outcome)}")
 
+    def replay_origin(self, transition: str) -> int | None:
+        """R3: the origin of this event's later G-native replay, or None."""
+        event = self.event
+        if (
+            not self.lost
+            or self.index is None
+            or self.index <= self.trigger
+            or transition != "cancel_no_effect"
+            or not self.native
+            or event is None
+            or event.op != {"op": "cancel", "call": {"op": "seek0"}}
+            or event.outcome.kind != "cancelled"
+            or event.parked != NATIVE_SEEK
+            or self.health is not HEALTHY
+        ):
+            # Outside HEALTHY the replay is a no-op: the reader consumes no
+            # fresh source data until a rewind, which resets the decoder.
+            return None
+        before = native_seek_origin(event.seeks, event.origins, self.wire_size)
+        return before if before else None  # an origin of 0 replays nothing
+
+    def replay(self, before: int) -> None:
+        """Apply R3: b1's decoder reads the wire again after ``wire[:before]``."""
+        index = self.index
+        assert index is not None
+        self.replays.append([index, before])
+        if not self.certain:
+            self.fail(index, "a later replay at an uncertain position")
+        elif self.state == "lossy" and self.deleted != []:
+            self.fail(index, f"a later replay over the epoch {self.deleted}")
+        else:
+            wire = base64.b64decode(self.true_scenario["wire"])
+            view = wire_view(
+                self.true_scenario,
+                wire[:before] + wire,
+                self.engine,
+                replayed_prefix=before,
+            )
+            if view is None:
+                self.fail(index, f"no model for a replay from {before}")
+                return
+            self.state = "lossy"
+            self.deleted = None
+            self.epoch_start = 0
+            self._use(Checker(view, self.engine))
+
     def transition(self, event: str) -> None:
         if event == "rewind_ok":
             self._rewound = True
+        replay = None
         if self.index == self.trigger:
             event = self.NO_EFFECT.get(event, event)
         else:
@@ -1398,6 +1486,10 @@ class LossyChecker(Checker):
             if witnessed:
                 self.lose(taken)
                 event = self.NO_EFFECT.get(event, event)
+            else:
+                replay = self.replay_origin(event)
+        if replay is not None:
+            self.replay(replay)  # judged by the health before the event
         super().transition(event)
         if (
             event == "rewind_ok"

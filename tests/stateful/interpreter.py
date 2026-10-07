@@ -1096,6 +1096,7 @@ def recorded_run(
         run_record["rebases"] = checker.rebases
         run_record["losses"] = checker.losses
         run_record["f1a"] = checker.f1a
+        run_record["replays"] = checker.replays
     return run_record
 
 
