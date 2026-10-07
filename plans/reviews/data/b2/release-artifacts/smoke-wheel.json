@@ -11,9 +11,9 @@
     "crc32": "stdlib-zlib",
     "decompression": "stdlib-zlib"
   },
-  "environment_root": "/tmp/aiogzip-release-vtahyk7s/venv-wheel",
+  "environment_root": "/tmp/aiogzip-release-hmlod80p/venv-wheel",
   "implementation": "CPython",
-  "package_path": "/tmp/aiogzip-release-vtahyk7s/venv-wheel/lib/python3.14/site-packages/aiogzip/__init__.py",
+  "package_path": "/tmp/aiogzip-release-hmlod80p/venv-wheel/lib/python3.14/site-packages/aiogzip/__init__.py",
   "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
   "python": "3.14.2",
   "requirements": [
@@ -42,5 +42,5 @@
     "aiofiles": "25.1.0",
     "zlib-ng": null
   },
-  "working_directory": "/tmp/aiogzip-release-vtahyk7s/run-wheel"
+  "working_directory": "/tmp/aiogzip-release-hmlod80p/run-wheel"
 }

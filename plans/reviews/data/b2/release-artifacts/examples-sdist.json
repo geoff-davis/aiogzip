@@ -1,10 +1,10 @@
 {
   "examples": [
-    "/tmp/aiogzip-release-vtahyk7s/sdist/aiogzip-2.0.0b2/examples/fragmented_transport.py",
-    "/tmp/aiogzip-release-vtahyk7s/sdist/aiogzip-2.0.0b2/examples/concurrent_jsonl_ingest.py"
+    "/tmp/aiogzip-release-hmlod80p/sdist/aiogzip-2.0.0b2/examples/fragmented_transport.py",
+    "/tmp/aiogzip-release-hmlod80p/sdist/aiogzip-2.0.0b2/examples/concurrent_jsonl_ingest.py"
   ],
   "metadata_version": "2.0.0b2",
-  "package_path": "/tmp/aiogzip-release-vtahyk7s/venv-sdist/lib/python3.14/site-packages/aiogzip/__init__.py",
+  "package_path": "/tmp/aiogzip-release-hmlod80p/venv-sdist/lib/python3.14/site-packages/aiogzip/__init__.py",
   "python": "3.14.2",
   "scenarios": [
     "success",
