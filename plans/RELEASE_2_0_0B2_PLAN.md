@@ -282,7 +282,7 @@ create competing copies of the same checkboxes in every section.
 | G16 | WP10 | Required interpreter/platform/engine/dependency and installed-artifact evidence passes |
 | G17 | WP10 | Performance, asymptotic-work, memory, and fairness gates pass with honest dispositions |
 | G18 | WP10 | Docs, plan index, maintained examples, and qualification record are complete |
-| G19 | WP11 | External human approval covers exact final candidate; findings closed or accepted appropriately (as amended in §16) |
+| G19 | WP11 | Exact final candidate approved under the §16 amendment: cross technical review, exact-SHA hosted CI, explicit maintainer approval, and disclosure that no non-maintainer human reviewed b2; findings closed or accepted appropriately |
 | G20 | WP11 | Version, changelog, reproducible artifact evidence, hashes, and release notes are consistent |
 | G21 | Maintainer | Tag, public publication, hashes, smokes, and documentation verified |
 | G22 | Maintainer | Post-release record and RC plan rebased on verified b2 |
@@ -1355,20 +1355,26 @@ developer, the maintainer, so no non-maintainer human is available to approve
 b2. At the maintainer's direction, G19 follows the 2.0.0b1 precedent
 ([independent review](reviews/v2.0.0b1-independent-review.md)) instead:
 
-1. **Independent technical review.** An agent that authored none of the b2
-   implementation reviews the exact final candidate as a whole. For b2 that is
-   Codex, because Claude implemented every work package and Codex only
-   reviewed. The review works from the
-   [candidate review packet](reviews/v2.0.0b2-candidate-review.md) and answers
-   each review question in this section. It is a fresh whole-candidate review,
-   not a restatement of the per-gate reviews.
+1. **Cross technical review.** No agent is independent of all of b2: Codex
+   implemented WP1–WP5 (b1 to C0, except `2f78925`), and Claude implemented
+   `2f78925` and WP6–WP10 (C0 to the candidate). Each part is therefore
+   reviewed by an agent that did not write it. Codex reviews C0 to the
+   candidate plus `2f78925`. A fresh Claude subagent, with no access to the
+   implementing session's history, reviews b1 to C0 apart from `2f78925`.
+   Both work from the
+   [candidate review packet](reviews/v2.0.0b2-candidate-review.md), and both
+   answer every review question in this section for the whole candidate,
+   because interactions cross the boundary. These are fresh reviews, not
+   restatements of the per-gate reviews. The record calls this a cross
+   review, never a single independent review.
 2. **Hosted evidence.** The required CI checks have passed on the candidate's
    pull request at the reviewed SHA.
 3. **Human approval.** The maintainer approves that exact SHA after reading the
    complete review record. The approval exists only as the maintainer's explicit
    statement; nothing is inferred from automated output.
 4. **Disclosure.** The review record and the release notes' provenance say that
-   no non-maintainer human reviewed b2.
+   no non-maintainer human reviewed b2, and that the technical review was a
+   cross review by the two implementing agents.
 
 Every finding is recorded with its resolution, and a later change to a release
 input requires a new candidate, a new review and a new approval, as above. This
@@ -1533,8 +1539,9 @@ Use the canonical G00-G22 register once; update gates with their evidence in the
 same commit. Preserve independently green work packages and small reviewable diffs.
 Run cumulative and C0 performance comparisons, full engine/platform/dependency tests,
 installed wheel/sdist and maintained examples, typing, lint, docs, and hooks.
-Obtain external human approval on the exact candidate before publication readiness
-(for b2, the §16 sole-maintainer amendment applies).
+Before publication readiness, approve the exact candidate under the §16 sole-maintainer
+amendment: cross technical review, exact-SHA hosted CI, explicit maintainer approval, and
+disclosure that no non-maintainer human reviewed b2.
 
 Do not push, merge, tag, publish, edit remote issues/settings, or invent test,
 benchmark, engine, platform, artifact, hosted-CI, or review evidence. Leave
