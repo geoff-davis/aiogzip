@@ -120,9 +120,12 @@ Decompressed bytes reach the caller in one of three states:
 - **Provisional output:** bytes from a member whose trailer has not been
   checked yet. Normal reads deliver these as they decode; a later CRC,
   `ISIZE`, truncation or trailing-data error can still invalidate them.
-- **Validated output:** once the reader reaches clean EOF (an empty read),
-  or a codec or streaming iterator is exhausted without an error, every
-  member has passed its trailer check.
+- **Validated output:** every member has passed its trailer check once a
+  file read reaches the end of the stream (`read()` or `read(n)` with
+  `n > 0` returns empty without an error), once the operation returned by
+  `GzipDecoder.finish()` is exhausted without an error, or once
+  `decompress_chunks()` is exhausted without an error. An empty `read(0)`
+  and an exhausted `feed()` operation validate nothing.
 - **Recovery data:** bytes still readable after an integrity failure has
   been raised (see below). They are not validated and must not be trusted
   as that member's content.

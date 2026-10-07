@@ -199,8 +199,10 @@ waits until the worker has finished before it propagates; the codec state has
 then advanced.
 
 If a read is cancelled while decompression runs in an executor, the reader
-is broken: later reads raise `OSError`. A successful `seek(0)` on a source
-that can rewind recovers it; otherwise close the reader and open a new one.
+is broken: later reads raise `OSError`. A successful `seek(0)` recovers it,
+either because the source can rewind or because a non-seekable source's
+replay cache still holds the compressed input from the start. If `seek(0)`
+fails, close the reader and open a new one.
 If an executor-backed write is cancelled, discard that incomplete output
 member and create a new writer rather than continuing on the broken stream.
 A cancelled source read has different consequences, described under
