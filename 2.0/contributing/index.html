@@ -689,6 +689,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Performance-Sensitive Changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hot-path-duplication-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hot-path duplication map
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -788,6 +805,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Performance-Sensitive Changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hot-path-duplication-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hot-path duplication map
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -900,6 +934,81 @@ design. Include the
 commands and any material wins or regressions in the pull request. The
 <a href="https://github.com/geoff-davis/aiogzip/tree/main/benchmarks">benchmark guide</a>
 documents the comparison methodology and focused categories.</p>
+<h3 id="hot-path-duplication-map">Hot-path duplication map</h3>
+<p>A few hot paths deliberately duplicate a slower reference path, because
+removing the duplication measurably cost throughput. Each duplicate carries a
+<code>Parity:</code> comment naming the parametrized test module that pins it to its
+reference. Change both paths together, keep the parity module passing, and
+re-run the constraining benchmark before merging either path into the other.</p>
+<table>
+<thead>
+<tr>
+<th>Duplicated path</th>
+<th>Reference path</th>
+<th>Why it is duplicated</th>
+<th>Constraining benchmark</th>
+<th>Parity module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_Operation.__next__</code> (<code>codec.py</code>)</td>
+<td><code>_Operation._advance_raw</code></td>
+<td>Avoids a helper frame on every public advancement</td>
+<td><code>regressions</code> codec rows, <code>micro</code> Small writes</td>
+<td><code>test_parity_operation.py</code></td>
+</tr>
+<tr>
+<td><code>GzipEncoder._feed_snapshot</code></td>
+<td><code>GzipEncoder.feed</code></td>
+<td>The file writer's per-call path; avoids three helper frames per tiny write</td>
+<td><code>micro</code> Small writes, <code>io</code> Text write</td>
+<td><code>test_parity_encoder_feed.py</code></td>
+</tr>
+<tr>
+<td>Inline reservation in <code>AsyncGzipBinaryFile.write</code></td>
+<td><code>_BinaryWriteReservation</code> (<code>writelines</code>, <code>flush</code>, writer <code>seek</code>)</td>
+<td>The context manager exceeded the small-write budget</td>
+<td><code>micro</code> Small writes</td>
+<td><code>test_parity_binary_write.py</code></td>
+</tr>
+<tr>
+<td>Inline encoder/sink body in <code>AsyncGzipTextFile.write</code></td>
+<td><code>_write_batch_reserved</code> under <code>_write_call</code></td>
+<td>The reservation context manager and helper both exceeded 5% on small writes</td>
+<td><code>micro</code> Text writelines batching, <code>io</code> Text write</td>
+<td><code>test_parity_text_inline.py</code></td>
+</tr>
+<tr>
+<td>Inline origin capture in <code>_read_chunk_and_decode</code></td>
+<td><code>_capture_buffer_origin</code></td>
+<td>Avoids a helper frame per refill</td>
+<td><code>io</code> Text line iteration, <code>text_origin</code></td>
+<td><code>test_parity_text_inline.py</code></td>
+</tr>
+<tr>
+<td><code>_decode_next_chunk</code></td>
+<td><code>_read_chunk_and_decode</code></td>
+<td>Returns text for local accumulation, avoiding quadratic <code>str +=</code></td>
+<td><code>io</code> Text large reads, Text read (bulk)</td>
+<td><code>test_parity_text_inline.py</code></td>
+</tr>
+<tr>
+<td>Pending-line consumption inline in <code>__anext__</code></td>
+<td><code>readline()</code></td>
+<td>A helper call per line lowers iteration throughput</td>
+<td><code>micro</code> Line iteration, <code>io</code> Text line iteration</td>
+<td><code>test_parity_text_inline.py</code></td>
+</tr>
+<tr>
+<td>Bounded fast path inline in <code>readline()</code></td>
+<td><code>_take_buffered_line</code></td>
+<td>Avoids a helper frame and a second buffered-length computation</td>
+<td><code>micro</code> readline() loop</td>
+<td><code>test_parity_text_inline.py</code></td>
+</tr>
+</tbody>
+</table>
 <h2 id="package-layout">Package Layout</h2>
 <p>Core implementation is split across focused modules in <code>src/aiogzip</code>:</p>
 <ul>

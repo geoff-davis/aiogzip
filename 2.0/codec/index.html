@@ -992,6 +992,16 @@ or output has been copied into a second contiguous buffer.</p>
   immediately releasing the operation's captured input and the codec's mutable
   and incomplete state while preserving validated member records.</li>
 </ul>
+<blockquote>
+<p><strong>Warning — the last yielded bytes are not completion.</strong> An operation can
+yield a chunk that completes a valid gzip byte sequence, such as the final
+trailer bytes of <code>finish()</code>, and still own the codec. It completes only when
+the iterator is exhausted (<code>StopIteration</code>). Counted <code>next()</code> calls, a
+<code>break</code> after the expected bytes, and <code>itertools.islice()</code> all leave the
+codec reserved and <code>finished</code> false. Always exhaust the operation, or close
+it explicitly and accept that the codec becomes unusable. This is the frozen
+contract, not a defect for a finalizer to fix.</p>
+</blockquote>
 <p>When an operation is still reachable, exhaust it if the stream should remain
 usable. Otherwise call its idempotent <code>close()</code> method. A <code>try</code>/<code>finally</code>
 ensures an exception or early return cannot leave the codec reserved:</p>

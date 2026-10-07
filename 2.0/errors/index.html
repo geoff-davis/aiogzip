@@ -928,6 +928,8 @@ public <code>ConcurrentOperationError</code>. The active call is left intact. Tr
 exception as a programming error: it is not a lock, and catching it in a retry
 loop is not supported synchronization. Separate handles may progress
 concurrently because they do not share gzip or buffer state.</p>
+<p>Handles are asyncio objects bound to the event loop that uses them; they are
+not thread-safe. Do not call one handle from several threads or event loops.</p>
 <p>When several tasks intentionally share a handle, use an application lock that
 covers the complete logical operation, not only the first low-level call:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
@@ -976,6 +978,21 @@ its stable message prefix:</p>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="k">raise</span>
 </code></pre></div>
 <h2 id="where-errors-surface">Where errors surface</h2>
+<p>Decompressed bytes reach the caller in one of three states:</p>
+<ul>
+<li><strong>Provisional output:</strong> bytes from a member whose trailer has not been
+  checked yet. Normal reads deliver these as they decode; a later CRC,
+  <code>ISIZE</code>, truncation or trailing-data error can still invalidate them.</li>
+<li><strong>Validated output:</strong> every member has passed its trailer check once a
+  file read reaches the end of the stream (<code>read()</code> or <code>read(n)</code> with
+  <code>n &gt; 0</code> returns empty without an error), once the operation returned by
+  <code>GzipDecoder.finish()</code> is exhausted without an error, or once
+  <code>decompress_chunks()</code> is exhausted without an error. An empty <code>read(0)</code>
+  and an exhausted <code>feed()</code> operation validate nothing.</li>
+<li><strong>Recovery data:</strong> bytes still readable after an integrity failure has
+  been raised (see below). They are not validated and must not be trusted
+  as that member's content.</li>
+</ul>
 <blockquote>
 <p><strong>Warning — successful output is not yet proof of integrity.</strong>
 <code>GzipDecoder.feed()</code> and <code>decompress_chunks()</code> can produce payload before the
@@ -1017,6 +1034,11 @@ decoder only when the source can rewind (directly or through its replay cache).
 Close and recreate a non-rewindable source. Decompression-limit failures,
 cancellation, and unexpected internal failures poison the reader without
 automatically enabling the integrity-failure salvage path.</p>
+<p>For text readers, the only guaranteed recovery is calling <code>seek(0)</code> directly.
+A cookie saved with <code>tell()</code> before the failure is not a recovery point:
+<code>seek(cookie)</code> may raise the same terminal <code>OSError</code> instead of rewinding. Call
+<code>seek(0)</code> first; once the reader has recovered, a saved cookie is an ordinary
+position again.</p>
 <h2 id="codec-finalization-and-operation-abandonment">Codec finalization and operation abandonment</h2>
 <p>Every state-changing <code>GzipEncoder</code> or <code>GzipDecoder</code> call reserves the codec and
 returns a lazy <code>CodecOperation</code>. Engine errors, integrity failures, or closing
