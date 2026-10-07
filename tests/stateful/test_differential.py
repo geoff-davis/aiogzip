@@ -40,6 +40,7 @@ from differential import (
     bc2_request,
     bc2_shadow_claim,
     bc2_trigger_only,
+    bc10,
     compare,
     encoded,
     lossy_scenario,
@@ -3436,3 +3437,90 @@ def test_lossy_checker_keeps_f1a_terminal_without_a_successful_rewind(rewind):
     assert checker.f1a_error is not None
     checker.observe(Event(5, F1A_READ, Outcome("ok", " α \r")))
     assert any("after an F1a error" in m for m in checker.violations)
+
+
+# BC10: after an integrity failure the candidate refuses a saved text cookie
+# that b1 rewound to (seed 899; 55c1e3e lets a cookie's binary origin pass
+# 0). Claimed only as the sole difference; it proves no cookie origin.
+
+BC10_KEY = (4, "seek_mark", 0)
+
+
+def test_bc10_failed_text_cookie_recovery_is_claimed():
+    pair, lossy = b1_recorded(899)
+    assert pair.diffs == {BC10_KEY}
+    assert pair.health_before(BC10_KEY) == "VALIDATION_SALVAGE"
+    assert pair.cand_by_key[BC10_KEY].outcome == B1_READ_BROKEN_SEEK0
+    assert pair.ref_by_key[BC10_KEY].outcome == row(pair.ref, 2, "tell_mark").outcome
+    assert bc2_request(pair) is None
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert claims(result, "BC10-TEXT-COOKIE-RECOVERY") == [repr(("event", BC10_KEY))]
+
+
+def _bc10_mutated(change: str) -> Pair:
+    pair, _ = b1_recorded(899)
+    scenario = copy.deepcopy(pair.scenario)
+    ref, cand = list(pair.ref), list(pair.cand)
+    cand_info = copy.deepcopy(pair.cand_info)
+    reference = "b1"
+    refused = pair.cand_by_key[BC10_KEY].outcome
+    n = pair.cand_order[BC10_KEY]
+    if change == "healthy":
+        cand_info["health"][n] = ["HEALTHY", "HEALTHY"]
+    elif change == "literal-seek0":
+        # The same refusal at the literal seek(0) instead.
+        ref = edit(ref, BC10_KEY, outcome=refused)
+        cand = edit(cand, (5, "seek0", 0), outcome=refused)
+    elif change == "unseekable-refusal":
+        message = B1_READ_BROKEN_SEEK0["message"].replace(
+            "seek to 0 to recover, or close", "close"
+        )
+        cand = edit(cand, BC10_KEY, outcome={"error": "OSError", "message": message})
+    elif change == "other-symbol":
+        ref = edit(ref, BC10_KEY, outcome={"ok": "C2"})
+    elif change == "b1-error":
+        ref = edit(ref, BC10_KEY, outcome=refused | {"message": "other"})
+    elif change == "later-difference":
+        ref = edit(ref, (5, "seek0", 0), outcome={"ok": 1})
+    elif change == "final-difference":
+        ref = edit_final(ref, source_closes=2)
+    elif change == "one-sided":
+        ref = [r for r in ref if r.key != (6, "fail_no_effect", 0)]
+    elif change == "extra-field":
+        scenario["ops"][4] = {"op": "seek_mark", "label": "m1", "whence": 0}
+    elif change == "no-mark":
+        scenario["ops"][2] = {"op": "tell_mark", "label": "m9"}
+        scenario["ops"][1] = {"op": "tell_mark", "label": "m8"}
+    elif change == "taken":
+        cand = edit(cand, BC10_KEY, taken=[0, 0])
+        ref = edit(ref, BC10_KEY, taken=[0, 0])
+    elif change == "binary":
+        scenario["mode"] = "rb"
+    elif change == "c0":
+        reference = "c0"
+    return Pair(scenario, reference, cand, ref, cand_info, ENGINE, pair.ref_info)
+
+
+BC10_NEAR_MISSES = [
+    "healthy",
+    "literal-seek0",
+    "unseekable-refusal",
+    "other-symbol",
+    "b1-error",
+    "later-difference",
+    "final-difference",
+    "one-sided",
+    "extra-field",
+    "no-mark",
+    "taken",
+    "binary",
+    "c0",
+]
+
+
+@pytest.mark.parametrize("change", BC10_NEAR_MISSES)
+def test_bc10_near_misses_stay_unclaimed(change):
+    mutated = _bc10_mutated(change)
+    assert bc10(mutated).events == set(), change
+    assert not compare(mutated).ok

@@ -12,8 +12,9 @@ plans/design/v2.0.0b2-wp10-qualification.md, which this implements:
   traces share must appear in the same order, and a key on one side only is
   a one-sided event that only ``BC3-OPENING`` clause O2 may claim;
 - event-specific predicates claim first (``BC3-OPENING``,
-  ``BC7-TEXT-SALVAGE``, ``BC8-WRITER-ABORT``, ``BC9-REWIND-ABORT``), and an
-  item two of them claim fails the seed;
+  ``BC7-TEXT-SALVAGE``, ``BC8-WRITER-ABORT``, ``BC9-REWIND-ABORT``,
+  ``BC10-TEXT-COOKIE-RECOVERY``), and an item two of them claim fails the
+  seed;
 - ``BC2-LOST-INPUT`` then claims the remaining differing events in its span,
   subject to the lossy model run over b1's replay (a second subprocess).
 
@@ -95,6 +96,7 @@ PREDICATES = (
     "BC7-TEXT-SALVAGE",
     "BC8-WRITER-ABORT",
     "BC9-REWIND-ABORT",
+    "BC10-TEXT-COOKIE-RECOVERY",
 )
 APPLIES = {
     "c0": ("BC7-TEXT-SALVAGE", "BC8-WRITER-ABORT", "BC9-REWIND-ABORT"),
@@ -403,6 +405,60 @@ def _f1a_slot(pair: Pair, row: Row) -> str | None:
     ):
         return slot
     return None
+
+
+# BC10
+
+
+def bc10(pair: Pair) -> Claim:
+    """b1 rewinds to a saved text cookie after an integrity failure; the
+    candidate refuses it with the broken-stream error.
+
+    After 55c1e3e a cookie can carry a binary origin past 0, which a
+    failed reader cannot replay from; only a literal ``seek(0)`` is the
+    documented recovery. This claims the cookie seek only, and only as the
+    seed's sole difference: the candidate was in VALIDATION_SALVAGE or
+    BROKEN before it, refuses exactly with the seekable broken-stream
+    error, and b1 returns the cookie symbol its last ``tell_mark`` with the
+    same label returned. It proves nothing about either cookie's origin.
+    """
+    claim = Claim()
+    if pair.reference != "b1" or pair.mode != "rt":
+        return claim
+    if pair.final_diffs or pair.cand_only or pair.ref_only or len(pair.diffs) != 1:
+        return claim
+    (key,) = pair.diffs
+    op = pair.op(key)
+    if key[1] != "seek_mark" or op.keys() != {"op", "label"}:
+        return claim
+    if pair.health_before(key) not in ("VALIDATION_SALVAGE", "BROKEN"):
+        return claim
+    c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+    if (c.second, c.parked, c.taken, c.pulled) != (None, None, None, None):
+        return claim
+    if (r.second, r.parked, r.taken, r.pulled) != (None, None, None, None):
+        return claim
+    marks = [
+        index
+        for index in range(key[0])
+        if pair.ops[index] == {"op": "tell_mark", "label": op["label"]}
+    ]
+    if not marks:
+        return claim
+    mark = (marks[-1], "tell_mark", 0)
+    saved = pair.ref_by_key.get(mark)
+    if saved is None or saved != pair.cand_by_key.get(mark):
+        return claim
+    symbol = saved.outcome
+    if not (
+        isinstance(symbol, dict)
+        and symbol.keys() == {"ok"}
+        and isinstance(symbol["ok"], str)
+    ):
+        return claim
+    if c.outcome == B1_READ_BROKEN_SEEK0 and r.outcome == symbol:
+        claim.events.add(key)
+    return claim
 
 
 # BC9
@@ -885,6 +941,7 @@ SPECIFIC = (
     ("BC7-TEXT-SALVAGE", bc7),
     ("BC8-WRITER-ABORT", bc8),
     ("BC9-REWIND-ABORT", bc9),
+    ("BC10-TEXT-COOKIE-RECOVERY", bc10),
 )
 
 
