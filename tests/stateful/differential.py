@@ -877,7 +877,10 @@ def bc2_request(pair: Pair) -> Bc2Request | None:
     common = [row.key for row in pair.cand if row.key in pair.ref_by_key]
     for key in common:
         c, r = pair.cand_by_key[key], pair.ref_by_key[key]
-        if pair.health_before(key) != "HEALTHY":
+        health = pair.health_before(key)
+        if health != "HEALTHY" and not (
+            health == "VALIDATION_SALVAGE" and _g_custom(pair, key, c, r)
+        ):
             continue
         trigger = _trigger(pair, key, c, r, source)
         if trigger is None:
@@ -897,6 +900,22 @@ def bc2_request(pair: Pair) -> Bc2Request | None:
             acquire = "O1"
         return Bc2Request(key, lossy, rebase, clause, list(taken), acquire)
     return None
+
+
+def _g_custom(pair: Pair, key, c: Row, r: Row) -> bool:
+    """Exactly G custom: a cancelled parked custom ``seek0`` without a
+    checkpoint, identical on both sides. The one trigger admitted from
+    validation salvage: the cancel lands before the source moves, so b1
+    keeps its salvage, which the lossy run then replays."""
+    source = pair.scenario["source"]
+    return (
+        source["kind"] == "custom"
+        and not source["checkpoint"]
+        and key[1] == "cancel"
+        and pair.op(key) == {"op": "cancel", "call": {"op": "seek0"}}
+        and c == r
+        and c.outcome == {"cancelled": True}
+    )
 
 
 def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] | None:
@@ -1285,15 +1304,21 @@ def lossy_scenario(
 
     Eligible when the range is empty, or when neither endpoint lies strictly
     inside a recorded member span; for text, the rebuilt payload must also
-    satisfy the model's incremental text oracle.
+    satisfy the model's incremental text oracle. A range that starts at 0
+    and ends in padding (no span covers ``b``), or with an endpoint inside a
+    member, is spliced and judged by the wire oracle instead.
     """
     spans = scenario.get("member_spans")
     if spans is None:
         return None
     if a == b:
         return scenario
+    wire = unb64(scenario["wire"])
+    if a == 0 and b < len(wire) and not any(s <= b < e for s, e in spans):
+        # The lossy wire starts in padding, which only the wire oracle
+        # models: zero padding is legal only after a completed member.
+        return _wire_scenario(scenario, wire[b:], engine, lossy_range=[a, b])
     if any(s < a < e or s < b < e for s, e in spans):
-        wire = unb64(scenario["wire"])
         return _wire_scenario(scenario, wire[:a] + wire[b:], engine, lossy_range=[a, b])
     lost = b - a
     payloads = scenario["payloads"]
@@ -1315,7 +1340,6 @@ def lossy_scenario(
                     corruption[field] -= lost
     shift = [[s - lost, e - lost] if s >= b else [s, e] for s, e in spans]
     new_spans = [shift[i] for i in keep]
-    wire = unb64(scenario["wire"])
     lossy = dict(scenario)
     lossy.update(
         wire=base64.b64encode(wire[:a] + wire[b:]).decode("ascii"),

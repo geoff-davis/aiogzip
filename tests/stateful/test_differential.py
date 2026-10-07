@@ -651,7 +651,7 @@ BC2_SEEDS = {
     2486: "rb fail_consumed with a checkpoint, member range",
     3958: "rt fail_consumed with a checkpoint, member range",
     1065: "rt seekable: a rewind with no source call keeps the lossy view",
-    277: "rb seekable: a rewind with no source call keeps the lossy view",
+    277: "rb seekable: a G-custom cancel from salvage, rebased by a later rewind",
     430: "rt seekable: a physical rewind, but the models never converge",
     2969: "rb seekable: b1 spends an armed failure the candidate keeps",
     2361: "rt seekable: the span ends where the models converge",
@@ -688,8 +688,13 @@ def test_bc2_cases_cover_each_trigger_kind():
             name = armed[-1]
         seen.add((scenario["mode"], name, lost))
         pair, lossy = b1_emulated(seed)
-        if seed in (1065, 277):
+        if seed == 1065:
             assert request.rebase and lossy["rebased_at"] is None
+        if seed == 277:
+            # Validation salvage admits the exact G-custom trigger (op 5),
+            # ahead of the HEALTHY read cancel at op 10.
+            assert request.trigger == (5, "cancel", 0) and request.taken == [0, 0]
+            assert lossy["rebased_at"] == 9
         if seed == 430:
             assert lossy["rebased_at"] is not None
             assert span_end(pair, lossy) is None
@@ -1695,6 +1700,117 @@ def test_bc2_g_rejects_a_lossy_violation_after_the_rewind_cancel():
     pair, lossy = b1_recorded(1956)
     lossy["violations"] = [[2, "injected"]]
     fails(pair, "lossy model: op 2: injected", lossy=lossy)
+
+
+# G custom from validation salvage: the cancel lands before the custom
+# source moves, so b1 keeps its salvage (seed 5254). Admitted only for the
+# exact G-custom shape; every other trigger still needs a HEALTHY reader.
+
+G_SALVAGE = (5, "cancel", 0)
+
+
+def test_bc2_g_custom_from_validation_salvage_is_claimed():
+    pair, lossy = b1_recorded(5254)
+    assert pair.health_before(G_SALVAGE) == "VALIDATION_SALVAGE"
+    request = bc2_request(pair)
+    assert request is not None and request.trigger == G_SALVAGE
+    assert request.clause == "L1" and request.taken == [0, 0]
+    assert request.lossy is pair.scenario
+    # b1 stays in salvage and drains it: read(3) serves salvage, tell is 3.
+    assert lossy["violations"] == [] and lossy["rebases"] == []
+    assert {h for h in (x[1] for x in lossy["health"][7:])} == {"VALIDATION_SALVAGE"}
+    assert row(pair.ref, 7, "read").outcome == {"ok": {"bytes": "206766"}}
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT") == [
+        repr(("event", key))
+        for key in sorted(
+            [(6, "readinto", 0), (7, "read", 0), (8, "tell", 0), (11, "tell", 0)],
+            key=repr,
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "checkpoint",
+        "native",
+        "read-cancel",
+        "call-extra-field",
+        "rows-differ",
+        "not-cancelled",
+        "broken-before",
+    ],
+)
+def test_bc2_g_custom_from_salvage_needs_the_exact_shape(change):
+    pair, lossy = b1_recorded(5254)
+    scenario = copy.deepcopy(pair.scenario)
+    ref, cand = list(pair.ref), list(pair.cand)
+    cand_info = copy.deepcopy(pair.cand_info)
+    if change == "checkpoint":
+        scenario["source"]["checkpoint"] = True
+    elif change == "native":
+        scenario["source"]["kind"] = "native"
+    elif change == "read-cancel":
+        scenario["ops"][5]["call"] = {"op": "read", "n": -1}
+    elif change == "call-extra-field":
+        scenario["ops"][5]["call"] = {"op": "seek0", "n": 0}
+    elif change == "rows-differ":
+        ref = edit(ref, G_SALVAGE, second={"ok": {"str": "other"}})
+    elif change == "not-cancelled":
+        ref = edit(ref, G_SALVAGE, outcome={"ok": 0})
+        cand = edit(cand, G_SALVAGE, outcome={"ok": 0})
+    elif change == "broken-before":
+        n = pair.cand_order[G_SALVAGE]
+        cand_info["health"][n] = ["BROKEN", "BROKEN"]
+    mutated = Pair(scenario, "b1", cand, ref, cand_info, ENGINE, pair.ref_info)
+    request = bc2_request(mutated)
+    assert request is None or request.trigger != G_SALVAGE, change
+    assert not compare(mutated, lossy).ok
+
+
+# A loss from offset 0 that ends in inter-member padding: b1 resumes in the
+# padding, which is legal only after a completed member (seed 3525).
+
+
+def test_bc2_l1_loss_ending_in_padding_goes_to_the_oracle():
+    pair, lossy = b1_recorded(3525)
+    request = bc2_request(pair)
+    assert request is not None and request.clause == "L1"
+    assert request.trigger == (2, "readlines", 0) and request.taken == [0, 512]
+    wire = unb64(pair.scenario["wire"])
+    assert not any(s <= 512 < e for s, e in pair.scenario["member_spans"])
+    assert set(wire[100:612]) == {0}
+    assert request.lossy["corruption"] == {"kind": "wire"}
+    assert unb64(request.lossy["wire"]) == wire[512:]
+    assert request.lossy["lossy_range"] == [0, 512]
+    assert lossy["violations"] == []
+    assert row(pair.ref, 3, "readlines").outcome["error"] == "BadGzipFile"
+    passes(pair, "BC2-LOST-INPUT", lossy)
+
+
+@pytest.mark.parametrize(
+    "a, b, oracle",
+    [
+        (0, 512, True),  # ends in inter-member padding
+        (0, 100, True),  # ends where the padding starts
+        (0, 612, False),  # ends on a member start
+        (31, 512, False),  # starts after a completed member
+        (0, 826, False),  # ends at the end of the wire
+    ],
+)
+def test_lossy_scenario_routes_only_a_loss_from_0_into_padding_to_the_oracle(
+    a, b, oracle
+):
+    scenario = generate(3525)
+    assert len(unb64(scenario["wire"])) == 826
+    lossy = lossy_scenario(scenario, a, b, ENGINE)
+    if oracle:
+        assert lossy is not None and lossy["corruption"] == {"kind": "wire"}
+        assert unb64(lossy["wire"]) == unb64(scenario["wire"])[b:]
+    else:
+        assert lossy is None or lossy["corruption"] != {"kind": "wire"}
 
 
 # G native: a cancelled native seek0 moved the file without resetting b1's
