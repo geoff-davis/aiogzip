@@ -14,10 +14,13 @@ resource after its owner had released it.
 
 ### Fixed
 
-- Cancelling a file operation whose work is running in an executor thread
-  now waits for that thread to finish before the cancellation propagates.
-  Closing a handle, or shutting down the event loop's executor, can no longer
-  run cleanup while native work on the same handle is still active.
+- Cancelling a compression or decompression step, or a native read, write,
+  flush, seek or open, whose work is running in an executor thread now waits
+  for that thread to finish before the cancellation propagates. Closing a
+  handle, or shutting down the event loop's executor, can no longer run
+  cleanup while that work on the same handle is still active. As in
+  `2.0.0b1`, cancelling `close()` itself does not wait for the underlying
+  file's own native close to finish.
 - A cancelled or failed source read can no longer make a later read silently
   skip compressed input. When a native aiofiles read completes after
   cancellation, the reader keeps its bytes and uses them on the next read.

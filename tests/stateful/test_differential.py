@@ -478,6 +478,33 @@ def test_bc8_w2_rejects_a_binary_writelines():
     fails(make_pair(164, scenario=scenario), "(9, 'writelines', 0)")
 
 
+W2 = (9, "writelines", 0)
+
+
+def test_bc8_w2_rejects_nonempty_parts():
+    scenario = generate(164)
+    scenario["ops"][W2[0]]["parts"] = [{"op": "write", "size": 1, "seed": 0}]
+    fails(make_pair(164, scenario=scenario), str(W2))
+
+
+@pytest.mark.parametrize("latch", [False, None, "missing"])
+def test_bc8_w2_requires_a_writer_already_broken(latch):
+    pair = make_pair(164)
+    n = pair.cand_order[W2]
+    assert pair.cand_info["write_broken"][n][0] is True
+    if latch == "missing":
+        del pair.cand_info["write_broken"]
+    else:
+        pair.cand_info["write_broken"][n][0] = latch
+    fails(pair, str(W2))
+
+
+def test_bc8_w2_rejects_an_unrelated_candidate_error():
+    cand = cand_rows(164)
+    outcome = {"error": "OSError", "message": "unrelated failure"}
+    fails(make_pair(164, cand=edit(cand, W2, outcome=outcome)), str(W2))
+
+
 # BC9: abort of a native rewind.
 
 

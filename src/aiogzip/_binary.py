@@ -1791,7 +1791,8 @@ class AsyncGzipBinaryFile:
         except Exception as e:
             raise OSError(f"Error reading from file: {e}") from e
 
-        self._check_read_call_not_aborted()
+        # Cache before the abort check: the source has consumed this chunk, so
+        # a reader left open by a failed abort close must replay it on rewind.
         if chunk and self._cache_rewindable_reads:
             cap = self._max_rewind_cache_size
             if cap is not None and len(self._compressed_cache) + len(chunk) > cap:
@@ -1799,6 +1800,7 @@ class AsyncGzipBinaryFile:
                 self._cache_rewindable_reads = False
             else:
                 self._compressed_cache.extend(chunk)
+        self._check_read_call_not_aborted()
         return chunk
 
     def _poison_source(self) -> None:
@@ -1873,7 +1875,10 @@ class AsyncGzipBinaryFile:
                 raise cancellation from failure
             else:
                 if method == "read":
-                    if not self._is_closed and self._read_health is _HEALTHY:
+                    # Keep consumed input whatever the read health: an abort
+                    # whose close fails leaves the reader open for recovery.
+                    # Closing clears it.
+                    if not self._is_closed:
                         self._pending_compressed_chunk = result
                 else:
                     # A cancelled rewind cannot leave old codec state aligned

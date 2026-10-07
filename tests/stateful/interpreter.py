@@ -1003,6 +1003,9 @@ class _Indexed:
         self.checkers = checkers
         self.violations: list[list[Any]] = []
         self.health: list[list[str | None]] = []
+        # A writer model's broken latch before and after each event (None
+        # for readers): the BC8 W2 witness.
+        self.write_broken: list[list[bool | None]] = []
         self.positions: list[list[int] | None] = []
         # After each event: the position range (None when unmodeled), eof,
         # a lossy model's view ("true" or "lossy"; None otherwise), and the
@@ -1013,6 +1016,7 @@ class _Indexed:
     def __call__(self, handle, event, context) -> None:
         first = self.checkers[0]
         before = getattr(first, "health", None)
+        broken_before = getattr(first, "broken", None)
         position = getattr(first, "candidates", None)
         self.positions.append(
             [position[0], position[-1]] if position and first.modeled else None
@@ -1039,6 +1043,7 @@ class _Indexed:
             [None if before is None else before.value,
              None if after is None else after.value]
         )  # fmt: skip
+        self.write_broken.append([broken_before, getattr(first, "broken", None)])
 
 
 def recorded_run(
@@ -1088,6 +1093,7 @@ def recorded_run(
     if hooks:
         run_record["violations"] = hook.violations
         run_record["health"] = hook.health
+        run_record["write_broken"] = hook.write_broken
         run_record["positions"] = hook.positions
         run_record["states"] = hook.states
     if check == "lossy":

@@ -272,6 +272,12 @@ class Pair:
         health = self.cand_info.get("health") or []
         return health[n][0] if n is not None and n < len(health) else None
 
+    def write_broken_before(self, key: tuple[int, str, int]) -> bool | None:
+        """The candidate writer model's broken latch before ``key``."""
+        n = self.cand_order.get(key)
+        latch = self.cand_info.get("write_broken") or []
+        return latch[n][0] if n is not None and n < len(latch) else None
+
     def health_after(self, key: tuple[int, str, int]) -> str | None:
         n = self.cand_order.get(key)
         health = self.cand_info.get("health") or []
@@ -542,8 +548,12 @@ def bc8(pair: Pair) -> Claim:
     if pair.mode == "wt":
         for key in pair.diffs:
             c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+            # W2: text writelines([]) on a writer the model already holds
+            # broken.
             if (
                 key[1] == "writelines"
+                and pair.op(key).get("parts") == []
+                and pair.write_broken_before(key) is True
                 and r.outcome == {"ok": None}
                 and is_error(c.outcome, contains=WRITE_BROKEN)
                 and (c.second, c.parked, c.taken) == (r.second, r.parked, r.taken)
