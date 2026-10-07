@@ -7,6 +7,7 @@ reader. b1's cookie here had origin 0 and rewound. The documented recovery is
 ``seek(0)``, after which the saved cookie is an ordinary position again.
 """
 
+import contextlib
 import gzip
 import random
 import zlib
@@ -49,7 +50,14 @@ def _open(path):
     )
 
 
-async def test_saved_cookie_may_be_refused_after_a_validation_failure(path):
+async def test_bc10_cookie_seek_after_failure_is_refused_today(path):
+    """Records the ledgered BC10 behavior; this is not part of the API.
+
+    ``docs/errors.md`` promises only that ``seek(cookie)`` *may* be refused
+    after a failure. If a change makes this seek succeed, that is a
+    deliberate change to recovery behavior: update or retire ledger BC10 and
+    revisit the "may" wording rather than restoring the refusal.
+    """
     async with _open(path) as f:
         lines = await f.readlines(100)
         cookie = await f.tell()
@@ -67,7 +75,8 @@ async def test_seek_zero_recovers_and_the_saved_cookie_then_works(path):
         cookie = await f.tell()
         with pytest.raises(gzip.BadGzipFile):
             await f.read()
-        with pytest.raises(OSError):
+        # The contract allows this attempt to fail or succeed (BC10).
+        with contextlib.suppress(OSError):
             await f.seek(cookie)
         assert await f.seek(0) == 0
         assert await f.seek(cookie) == cookie
