@@ -98,7 +98,7 @@ def _tree_digests(root: Path, relative: str) -> dict[str, str]:
     return {
         path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(base.rglob("*"))
-        if path.is_file() and "__pycache__" not in path.parts
+        if path.is_file()
     }
 
 

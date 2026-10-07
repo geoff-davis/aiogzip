@@ -81,7 +81,6 @@ FILES = {
 def test_packaged_trees_must_match_the_commit(release, tmp_path):
     source = _tree(tmp_path / "source", FILES)
     packaged = _tree(tmp_path / "packaged", FILES)
-    _tree(packaged, {"examples/__pycache__/a.cpython-314.pyc": "ignored"})
     digests = release._require_packaged_trees(packaged, source)
     assert set(digests) == set(FILES)
 
@@ -91,8 +90,12 @@ def test_packaged_trees_must_match_the_commit(release, tmp_path):
     [
         ({"examples/a.py": "stale"}, "changed \\['examples/a.py'\\]"),
         ({"examples/extra.py": "x"}, "extra \\['examples/extra.py'\\]"),
+        (
+            {"examples/__pycache__/a.cpython-314.pyc": "x"},
+            "extra \\['examples/__pycache__/a.cpython-314.pyc'\\]",
+        ),
     ],
-    ids=["changed", "extra"],
+    ids=["changed", "extra", "bytecode-cache"],
 )
 def test_packaged_tree_differences_fail(release, tmp_path, change, message):
     source = _tree(tmp_path / "source", FILES)
