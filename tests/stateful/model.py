@@ -265,7 +265,7 @@ def expectation(scenario: dict[str, Any], engine: str) -> Expectation:
             decoder = codecs.getincrementaldecoder(scenario["text"]["encoding"])()
             try:
                 decoder.decode(output, final=clean)
-            except UnicodeDecodeError as error:
+            except UnicodeError as error:
                 if clean:
                     raise AssertionError(
                         "a clean wire view does not decode as text"
@@ -320,6 +320,16 @@ def salvage(scenario: dict[str, Any], engine: str) -> bytes:
     return before + output[: len(payloads[index])]
 
 
+def is_decode_error(error: BaseException) -> bool:
+    """Whether ``error`` is a text codec's decode failure.
+
+    Before Python 3.13 the UTF-16 and UTF-32 incremental decoders raise a
+    plain ``UnicodeError``, not ``UnicodeDecodeError``, for a stream that does
+    not start with a BOM. aiogzip passes the codec's error through unchanged.
+    """
+    return isinstance(error, UnicodeDecodeError) or type(error) is UnicodeError
+
+
 def incomplete_tail(data: bytes, encoding: str) -> bool:
     """Whether ``data`` decodes as text up to an incomplete final character.
 
@@ -328,7 +338,7 @@ def incomplete_tail(data: bytes, encoding: str) -> bool:
     decoder = codecs.getincrementaldecoder(encoding)()
     try:
         decoder.decode(data, final=False)
-    except UnicodeDecodeError:
+    except UnicodeError:
         return False
     return bool(decoder.getstate()[0])
 
@@ -932,11 +942,11 @@ class Checker(_HandleChecker):
             if self.health is HEALTHY:
                 self.transition("limit_failure")
             return
-        if isinstance(error, UnicodeDecodeError):
+        if is_decode_error(error):
             # Valid by construction unless a direct buffer read split a
             # character, which ends text modeling.
             if self.modeled:
-                self.fail(index, f"{name} raised UnicodeDecodeError on valid text")
+                self.fail(index, f"{name} raised {type(error).__name__} on valid text")
             return
         if isinstance(error, (ValueError, OSError)) and name in SEEK_OPS:
             # Documented refusals such as seeking a text handle to an
@@ -1025,7 +1035,7 @@ def wire_view(
     )
     try:
         Checker(lossy, engine)
-    except (UnicodeDecodeError, ValueError, AssertionError):
+    except (UnicodeError, ValueError, AssertionError):
         return None
     return lossy
 

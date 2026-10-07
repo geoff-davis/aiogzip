@@ -185,7 +185,7 @@ def _text_reference_valid(text, payloads, index, references) -> bool:
         decoder = codecs.getincrementaldecoder(text["encoding"])()
         try:
             decoder.decode(before + reference["output"], final=False)
-        except UnicodeDecodeError:
+        except UnicodeError:
             return False
     return True
 

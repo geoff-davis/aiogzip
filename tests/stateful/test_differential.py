@@ -70,6 +70,10 @@ ENGINE = aiogzip.engine_info().decompression
 DATA = Path(__file__).resolve().parent.parent / "data" / "wp10_c0_traces.json"
 C0 = json.loads(DATA.read_text(encoding="utf-8"))["traces"]
 B1 = json.loads((DATA.parent / "wp10_b1_runs.json").read_text(encoding="utf-8"))["runs"]
+# Descriptor counts need /proc/self/fd; elsewhere runs carry no fd_delta.
+needs_fd_counts = pytest.mark.skipif(
+    interpreter._open_fds() is None, reason="platform does not expose open fds"
+)
 
 
 @cache
@@ -1151,7 +1155,7 @@ def _e_pair(**edits) -> Pair:
         target = row(ref, 7, "read1")
         ref = edit(ref, target.key, outcome={"ok": {"bytes": "00"}})
     if "final" in edits:
-        ref = edit_final(ref, fd_delta=1)
+        ref = edit_final(ref, closed=not ref[-1].outcome["ok"]["closed"])
     if "cand_taken" in edits:
         cand = edit(cand, row(cand, 4, "cancel").key, taken=[147, 150])
     if "second" in edits:
@@ -2310,7 +2314,7 @@ def b1_o2(seed: int) -> list[Row]:
         rows.append(_b1_closed_row(scenario, r))
     final = copy.deepcopy(cand[-1].outcome)
     fields = final["ok"]
-    if source["kind"] == "native":
+    if source["kind"] == "native" and "fd_delta" in fields:
         fields["fd_delta"] += 1
         if writer:
             fields.update(encoded(final_output(b"", False), "final"))
@@ -2375,6 +2379,7 @@ def test_bc3_o1_rejects_another_b1_error():
     fails(make_pair(4137, ref, reference="b1"), "(-1, 'acquire', 0)")
 
 
+@needs_fd_counts
 def test_bc3_o1_rejects_an_fd_delta_difference():
     ref = b1_o1(1996)
     ref = edit_final(ref, fd_delta=ref[-1].outcome["ok"]["fd_delta"] + 1)
@@ -2408,6 +2413,7 @@ def test_bc3_o2_rejects_an_unlisted_one_sided_event():
     fails(make_pair(2002, ref, reference="b1"), "one-sided")
 
 
+@needs_fd_counts
 def test_bc3_o3_claims_no_fd_delta():
     rows = cand_rows(2598)
     ref = edit_final(rows, fd_delta=rows[-1].outcome["ok"]["fd_delta"] + 1)

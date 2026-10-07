@@ -492,13 +492,18 @@ async def test_exceptional_exit_with_active_native_work_breaks_the_reader(
 
                 loop.create_task(finish())
                 raise RuntimeError("body")
-        # The native reservation is released before the abort marks the handle
-        # closed. At C0 that ordering left the closed reader's decoder live;
-        # WP6's abort close now discards it whenever no reservation remains.
+        # The abort settles the native read before closing, but the read()
+        # task resumes on its own: the exit can return before or after that
+        # task releases its reservation (5 of 2,000 local Linux runs, and the
+        # first Windows CI run). A released reservation saw an open handle, so at C0
+        # the closed reader's decoder stayed live; WP6's abort close discards
+        # it. A reservation still active keeps it until release.
         aborted = state(
             after(HEALTHY, "abort"), eof=True, decoder_live=False, closed=True
         )
-        assert snapshot(stream) == aborted
+        exited = snapshot(stream)
+        assert exited["decoder_live"] is exited["active"]
+        assert exited | {"decoder_live": False, "active": False} == aborted
         assert calls == [stream]
         with pytest.raises(OSError, match=ABORTED):
             await reader

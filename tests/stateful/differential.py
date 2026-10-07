@@ -229,6 +229,11 @@ class Pair:
             if k != final and self.cand_by_key[k] != self.ref_by_key[k]
         }
         fields = self.cand_final.keys() | self.ref_final.keys()
+        if "fd_delta" not in self.cand_final:
+            # Only platforms with /proc/self/fd count descriptors. The
+            # references were recorded on one, so a candidate run elsewhere
+            # has no fd_delta to compare against theirs.
+            fields.discard("fd_delta")
         self.final_diffs = {
             f for f in fields if self.cand_final.get(f) != self.ref_final.get(f)
         }
@@ -770,7 +775,7 @@ def _remaining_text(pair: Pair, key) -> tuple[str, bool] | None:
             boundary=True,
         )
         boundary = _ends_on_boundary(text_options["encoding"], data)
-    except UnicodeDecodeError:
+    except UnicodeError:
         return None  # invalid bytes (a wire view's salvage): not a text tail
     if isinstance(consumed, str):
         if not decoded.startswith(consumed):
@@ -839,7 +844,7 @@ def _ends_on_boundary(encoding: str, data: bytes) -> bool:
     decoder = codecs.getincrementaldecoder(encoding)()
     try:
         decoder.decode(data, final=False)
-    except UnicodeDecodeError:
+    except UnicodeError:
         return False
     return decoder.getstate()[0] == b""
 
@@ -1497,7 +1502,7 @@ def lossy_scenario(
         try:
             text_model(whole, text["encoding"], text["newline"], final=True)
             Checker(lossy, engine)
-        except (UnicodeDecodeError, ValueError, AssertionError):
+        except (UnicodeError, ValueError, AssertionError):
             return None
     else:
         try:
