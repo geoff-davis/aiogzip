@@ -253,11 +253,11 @@
         "aiogzip-2.0.0b2/tests/typing/reject_plain_iterator_close.py"
       ],
       "name": "aiogzip-2.0.0b2.tar.gz",
-      "sha256": "32c815ce45f7aa93ec148930d0bbd5912f1a5433f8c6a71e267418dc38e84b8f",
-      "size": 655558
+      "sha256": "e4ac65c2bb3305194e1b69f41a399c3349139d4328fdf6a56687af7b6ed2421a",
+      "size": 656191
     }
   ],
-  "commit": "49f2dc6c8220b98a3d8602d1b8b49d6a8468835d",
+  "commit": "03ccda70a32027c8d4f661edcc991914d3c419d4",
   "reports": [
     "examples-sdist.json",
     "examples-wheel.json",

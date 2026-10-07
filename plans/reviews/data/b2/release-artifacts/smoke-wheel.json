@@ -2,7 +2,7 @@
   "artifact": {
     "file_count": 20,
     "kind": "wheel",
-    "path": "/tmp/claude-1000/-home-geoff-Projects-personal-aiogzip/ed2d880c-00c7-43cd-92df-0341e13ebc8a/scratchpad/b2-release-1/dist/aiogzip-2.0.0b2-py3-none-any.whl",
+    "path": "/tmp/claude-1000/-home-geoff-Projects-personal-aiogzip/ed2d880c-00c7-43cd-92df-0341e13ebc8a/scratchpad/b2-release-5/dist/aiogzip-2.0.0b2-py3-none-any.whl",
     "sha256": "6b5f20719999f802c5ec0996a14d8f81ddb4a3acc2a7db9244df1fe415e79a0e",
     "size": 82484
   },
@@ -11,9 +11,9 @@
     "crc32": "stdlib-zlib",
     "decompression": "stdlib-zlib"
   },
-  "environment_root": "/tmp/aiogzip-release-hmlod80p/venv-wheel",
+  "environment_root": "/tmp/aiogzip-release-plga_79r/venv-wheel",
   "implementation": "CPython",
-  "package_path": "/tmp/aiogzip-release-hmlod80p/venv-wheel/lib/python3.14/site-packages/aiogzip/__init__.py",
+  "package_path": "/tmp/aiogzip-release-plga_79r/venv-wheel/lib/python3.14/site-packages/aiogzip/__init__.py",
   "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
   "python": "3.14.2",
   "requirements": [
@@ -42,5 +42,5 @@
     "aiofiles": "25.1.0",
     "zlib-ng": null
   },
-  "working_directory": "/tmp/aiogzip-release-hmlod80p/run-wheel"
+  "working_directory": "/tmp/aiogzip-release-plga_79r/run-wheel"
 }

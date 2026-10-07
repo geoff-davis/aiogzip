@@ -2,18 +2,18 @@
   "artifact": {
     "file_count": 222,
     "kind": "sdist",
-    "path": "/tmp/claude-1000/-home-geoff-Projects-personal-aiogzip/ed2d880c-00c7-43cd-92df-0341e13ebc8a/scratchpad/b2-release-1/dist/aiogzip-2.0.0b2.tar.gz",
-    "sha256": "32c815ce45f7aa93ec148930d0bbd5912f1a5433f8c6a71e267418dc38e84b8f",
-    "size": 655558
+    "path": "/tmp/claude-1000/-home-geoff-Projects-personal-aiogzip/ed2d880c-00c7-43cd-92df-0341e13ebc8a/scratchpad/b2-release-5/dist/aiogzip-2.0.0b2.tar.gz",
+    "sha256": "e4ac65c2bb3305194e1b69f41a399c3349139d4328fdf6a56687af7b6ed2421a",
+    "size": 656191
   },
   "engine": {
     "compression": "stdlib-zlib",
     "crc32": "stdlib-zlib",
     "decompression": "stdlib-zlib"
   },
-  "environment_root": "/tmp/aiogzip-release-hmlod80p/venv-sdist",
+  "environment_root": "/tmp/aiogzip-release-plga_79r/venv-sdist",
   "implementation": "CPython",
-  "package_path": "/tmp/aiogzip-release-hmlod80p/venv-sdist/lib/python3.14/site-packages/aiogzip/__init__.py",
+  "package_path": "/tmp/aiogzip-release-plga_79r/venv-sdist/lib/python3.14/site-packages/aiogzip/__init__.py",
   "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
   "python": "3.14.2",
   "requirements": [
@@ -42,5 +42,5 @@
     "aiofiles": "25.1.0",
     "zlib-ng": null
   },
-  "working_directory": "/tmp/aiogzip-release-hmlod80p/run-sdist"
+  "working_directory": "/tmp/aiogzip-release-plga_79r/run-sdist"
 }
