@@ -117,8 +117,9 @@ The RC hardening program is parked, and no RC plan is committed under
   [WP5 small items](benchmarks/data/b2/wp5-small-item-20260928/README.md),
   [G10](benchmarks/data/b2/wp6-g10/README.md),
   [G11](benchmarks/data/b2/wp7-g11/README.md),
-  [G12](benchmarks/data/b2/wp8-g12/README.md) and
-  [G13](benchmarks/data/b2/wp9-g13/README.md)
+  [G12](benchmarks/data/b2/wp8-g12/README.md),
+  [G13](benchmarks/data/b2/wp9-g13/README.md) and
+  [G17](benchmarks/data/b2/wp10-g17/README.md)
 
 ## Completed plans
 
