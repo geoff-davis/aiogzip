@@ -30,5 +30,19 @@ repository's 1,000 KB limit:
   outputs and logs;
 - `wp0-window.tar.xz`: `results-wp0-20261007-042119/`, complete.
 
+The October 7 investigations registered by amendment 3:
+
+- `inv-ladder.tar.xz`: `investigation-ladder-20261007-075957/` complete
+  (I1: the 216 runner capture JSONs and logs, `captures.tsv`,
+  `foreign.log`, `quiet-gate.log`, `environment.json`, `provenance.txt` and
+  `manifest.json`); the refused first run's records
+  (`investigation-ladder-20261007-071835/`: manifest, provenance, quiet
+  gate, `captures.tsv`, `failures.tsv` and one representative log);
+  `ladder-summary.txt`; and the harness as registered (`harness/`);
+- `inv-order-other.tar.xz`: `investigation-order-20261007-090207/` (I2)
+  without its `g06-longline-timing` outputs, and `order-summary.txt`;
+- `inv-order-g06-timing-<position>.tar.xz`: the four `g06-longline-timing`
+  outputs and logs, by ABBA position (`1A`, `2B`, `3B`, `4A`).
+
 See the [G17 pre-registration](../../../../reviews/v2.0.0b2-g17-preregistration.md)
 and the [G17 record](../../../../reviews/v2.0.0b2-wp10-qualification.md#g17-performance).
