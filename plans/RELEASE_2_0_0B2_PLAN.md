@@ -307,7 +307,7 @@ create competing copies of the same checkboxes in every section.
 * [x] G17 — [Performance](reviews/v2.0.0b2-wp10-qualification.md#g17-performance)
 * [x] G18 — [Documentation and index](reviews/v2.0.0b2-wp10-qualification.md#g18-documentation-and-index)
 * [ ] G19
-* [ ] G20 — [Version, changelog, artifacts and release notes](reviews/v2.0.0b2-release-prep.md) (signed off for `49f2dc6`; reopened by the hosted-CI test corrections, rebuilt from `03ccda7`)
+* [ ] G20 — [Version, changelog, artifacts and release notes](reviews/v2.0.0b2-release-prep.md) (signed off for `49f2dc6`; reopened by the hosted-CI test corrections and the G19 repair, rebuilt from `3c421a1`)
 * [ ] G21
 * [ ] G22
 

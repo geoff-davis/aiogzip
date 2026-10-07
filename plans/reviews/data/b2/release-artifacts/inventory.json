@@ -24,8 +24,8 @@
         "aiogzip/py.typed"
       ],
       "name": "aiogzip-2.0.0b2-py3-none-any.whl",
-      "sha256": "6b5f20719999f802c5ec0996a14d8f81ddb4a3acc2a7db9244df1fe415e79a0e",
-      "size": 82484
+      "sha256": "dd6c63bd718fc609d886e5cc152812ed859d2c5f7ae6b79c6f942b64671c22e3",
+      "size": 82627
     },
     {
       "members": [
@@ -150,6 +150,7 @@
         "aiogzip-2.0.0b2/tests/stateful/test_oracle.py",
         "aiogzip-2.0.0b2/tests/stateful/test_parked_witness.py",
         "aiogzip-2.0.0b2/tests/stateful/test_stateful.py",
+        "aiogzip-2.0.0b2/tests/test_abort_rewind_cache.py",
         "aiogzip-2.0.0b2/tests/test_aiocsv.py",
         "aiogzip-2.0.0b2/tests/test_append_mode.py",
         "aiogzip-2.0.0b2/tests/test_b2_native_io.py",
@@ -253,11 +254,11 @@
         "aiogzip-2.0.0b2/tests/typing/reject_plain_iterator_close.py"
       ],
       "name": "aiogzip-2.0.0b2.tar.gz",
-      "sha256": "e4ac65c2bb3305194e1b69f41a399c3349139d4328fdf6a56687af7b6ed2421a",
-      "size": 656191
+      "sha256": "cd709884e58597497e93878e11f5bd1a73b09030815fe5a3b72d45eb510b0173",
+      "size": 657856
     }
   ],
-  "commit": "03ccda70a32027c8d4f661edcc991914d3c419d4",
+  "commit": "3c421a13a9f31585f3c436d620b40ea721852a35",
   "reports": [
     "examples-sdist.json",
     "examples-wheel.json",
