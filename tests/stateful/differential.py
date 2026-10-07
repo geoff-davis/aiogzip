@@ -45,13 +45,15 @@ sys.path.insert(0, str(HERE))
 from generator import generate, unb64  # noqa: E402
 from interpreter import Event, Outcome, final_output, symbolic  # noqa: E402
 from model import (  # noqa: E402
+    INCOMPLETE_TAIL,
     Checker,
     later_loss_kind,
     loss_witness,
+    salvage,
     text_model,
     wire_view,
 )
-from oracle import engine_modules, raw_reference, wire_reference  # noqa: E402
+from oracle import engine_modules, wire_reference  # noqa: E402
 
 READ_ABORTED = "read aborted because the gzip file was closed while the call was active"
 READ_BROKEN = "read stream is broken"
@@ -323,6 +325,7 @@ def compare(
                     f"expected {expected!r}"
                 )
             claim = bc2_claim(pair, request, lossy, set(owner))
+            failures += _f1a_failures(pair, lossy, owner, claim)
             for item in claim.items():
                 owner.setdefault(item, "BC2-LOST-INPUT")
     differences = (
@@ -336,6 +339,70 @@ def compare(
     for item in sorted(differences & owner.keys(), key=repr):
         claims[owner[item]].append(repr(item))
     return Result(seed, pair.reference, claims, failures)
+
+
+def _f1a_failures(
+    pair: Pair, lossy: dict[str, Any], owner: dict[tuple[str, Any], str], span: Claim
+) -> list[str]:
+    """The lossy model's F1a evidence must name, in trace order and once
+    each, exactly b1's F1a errors at events BC7 claims or BC2's span claims
+    differing, each in the outcome slot that holds the error.
+
+    Only errors the model met while modeled are expected (its recorded
+    position before the event is not None): an unmodeled reader's output
+    is not checked, so its F1a errors are neither accepted nor recorded.
+    """
+    record = lossy.get("f1a")
+    if type(record) is not list:
+        return [f"lossy model f1a evidence {record!r} is malformed"]
+    positions = lossy.get("positions")
+    if parse(lossy["trace"]) != pair.ref or not (
+        type(positions) is list and len(positions) == len(pair.ref)
+    ):
+        return ["lossy model f1a evidence is not bound to b1's trace"]
+    found = []
+    for entry in record:
+        if not (
+            type(entry) is list
+            and len(entry) == 2
+            and type(entry[0]) is list
+            and len(entry[0]) == 3
+            and type(entry[0][0]) is int
+            and type(entry[0][1]) is str
+            and type(entry[0][2]) is int
+            and entry[1] in ("outcome", "second")
+        ):
+            return [f"lossy model f1a evidence {record!r} is malformed"]
+        found.append((tuple(entry[0]), entry[1]))
+    expected = []
+    for row, position in zip(pair.ref, positions, strict=True):
+        key = row.key
+        slot = _f1a_slot(pair, row)
+        if slot is None or key not in pair.diffs or position is None:
+            continue
+        if owner.get(("event", key)) == "BC7-TEXT-SALVAGE" or key in span.events:
+            expected.append((key, slot))
+    if found != expected:
+        return [f"lossy model f1a evidence {found!r}, expected {expected!r}"]
+    return []
+
+
+def _f1a_slot(pair: Pair, row: Row) -> str | None:
+    """The slot of b1's row holding an F1a error of an unbounded read."""
+    op = pair.op(row.key)
+    slot, outcome = "outcome", row.outcome
+    if op["op"] in ("overlap", "close_during", "cancel"):
+        op = op["call"]
+    elif op["op"] == "abort":
+        op, slot, outcome = op["call"], "second", row.second
+    size = op.get("n", -1)
+    if op["op"] != "read" or not (size is None or size < 0):
+        return None
+    if is_error(outcome, "UnicodeDecodeError") and str(outcome.get("message")).endswith(
+        INCOMPLETE_TAIL
+    ):
+        return slot
+    return None
 
 
 # BC9
@@ -464,12 +531,6 @@ def _w1(pair: Pair, key: tuple[int, str, int]) -> Claim | None:
 
 # BC7
 
-# An incomplete trailing character, as each supported codec reports it.
-INCOMPLETE_TAIL = (
-    "unexpected end of data",
-    "truncated data",
-    "incomplete multibyte sequence",
-)
 TEXT_READS = {"read", "readline", "readlines", "next"}
 
 
@@ -587,21 +648,6 @@ def _f_clause(pair: Pair, key, op, c, r) -> tuple[str, Any, str] | None:
     if r == {"ok": {"str": ""}} and is_error(c, contains=READ_BROKEN):
         return "F2", r, ""
     return None
-
-
-def salvage(scenario: dict[str, Any], engine: str) -> bytes:
-    """Exactly the bytes a reader drains before a validation failure."""
-    expect = Checker(scenario, engine).expect
-    corruption = scenario["corruption"]
-    if corruption["kind"] != "truncate":
-        return expect.upper
-    index = corruption["member"]
-    payloads = [unb64(p) for p in scenario["payloads"]]
-    before = b"".join(payloads[:index])
-    body_start = scenario["member_spans"][index][0] + 10
-    body = unb64(scenario["wire"])[body_start : corruption["cut"]]
-    output = raw_reference(engine_modules()[engine], body)["output"]
-    return before + output[: len(payloads[index])]
 
 
 def _remaining_text(pair: Pair, key) -> tuple[str, bool] | None:

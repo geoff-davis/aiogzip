@@ -177,6 +177,12 @@ def health_after(health: Health, event: str) -> Health:
 
 
 BROKEN_MESSAGE = "read stream is broken"
+# An incomplete trailing character, as each supported codec reports it.
+INCOMPLETE_TAIL = (
+    "unexpected end of data",
+    "truncated data",
+    "incomplete multibyte sequence",
+)
 ABORTED_MESSAGE = "read aborted because the gzip file was closed"
 CLOSED_MESSAGE = "I/O operation on closed file"
 INJECTED_NO_EFFECT = "injected source failure without effect"
@@ -287,6 +293,44 @@ def expectation(scenario: dict[str, Any], engine: str) -> Expectation:
         raise AssertionError("body corruption scenario has no engine error")
     upper = whole[:start] + reference["output"]
     return Expectation(upper, start, False, "validation", reference)
+
+
+def salvage(scenario: dict[str, Any], engine: str) -> bytes:
+    """Exactly the bytes a reader drains before a validation failure.
+
+    A truncated member drains the engine's output for the body it has; a
+    wire view drains the whole oracle output, including any bytes that do
+    not decode as text (``expectation`` stops the text bound before them).
+    """
+    expect = expectation(scenario, engine)
+    corruption = scenario["corruption"]
+    if corruption["kind"] == "wire":
+        assert expect.reference is not None
+        if expect.failure != "validation":
+            return expect.upper
+        return expect.reference["output"]
+    if corruption["kind"] != "truncate":
+        return expect.upper
+    index = corruption["member"]
+    payloads = [base64.b64decode(p) for p in scenario["payloads"]]
+    before = b"".join(payloads[:index])
+    body_start = scenario["member_spans"][index][0] + 10
+    body = base64.b64decode(scenario["wire"])[body_start : corruption["cut"]]
+    output = raw_reference(engine_modules()[engine], body)["output"]
+    return before + output[: len(payloads[index])]
+
+
+def incomplete_tail(data: bytes, encoding: str) -> bool:
+    """Whether ``data`` decodes as text up to an incomplete final character.
+
+    Invalid bytes anywhere do not qualify; only a held, incomplete tail does.
+    """
+    decoder = codecs.getincrementaldecoder(encoding)()
+    try:
+        decoder.decode(data, final=False)
+    except UnicodeDecodeError:
+        return False
+    return bool(decoder.getstate()[0])
 
 
 OPEN_FAULT_ERRORS: dict[str, tuple[type[BaseException], ...]] = {
@@ -1087,6 +1131,17 @@ class LossyChecker(Checker):
     (only "O1"); its contender outcome then takes b1's lifecycle transition
     (OPENING stays OPENING) instead of the candidate's error check, and the
     event index is recorded in ``normalized``.
+
+    F1a (BC7 inside a lossy run): b1 can answer an unbounded text ``read()``
+    in VALIDATION_SALVAGE with the codec's UnicodeDecodeError for an
+    incomplete final character instead of the salvage text. The model
+    accepts that only when its position is certain, the error names an
+    incomplete tail (``INCOMPLETE_TAIL``) and the view's actual salvage
+    bytes decode up to a held incomplete character. Health stays SALVAGE;
+    a separate terminal flag then admits only the same error again or b1's
+    exact broken refusal for reads, until a successful rewind clears it.
+    Each accepted error is recorded in ``f1a`` as its trace key and outcome
+    slot.
     """
 
     NO_EFFECT = {
@@ -1127,6 +1182,14 @@ class LossyChecker(Checker):
         self.index: int | None = None
         self.event: Any = None
         self.lossy = types.SimpleNamespace(**{n: getattr(self, n) for n in self.VIEW})
+        self.lossy.scenario = lossy
+        # F1a: accepted errors as [trace key, outcome slot]; the first one's
+        # message while the terminal flag is set.
+        self.f1a: list[list[Any]] = []
+        self.f1a_error: str | None = None
+        self.key: list[Any] | None = None
+        self._keys: dict[tuple[int, str], int] = {}
+        self._rewound = False
         self._use(self.true)
         self.lost = False  # whether the trigger has been reached
         self.state = "true"  # the view in force: "true" or "lossy"
@@ -1148,6 +1211,7 @@ class LossyChecker(Checker):
     def _use(self, view: Any) -> None:
         for name in self.VIEW:
             setattr(self, name, getattr(view, name))
+        self.view_scenario = view.scenario
 
     @property
     def view(self) -> str:
@@ -1171,6 +1235,10 @@ class LossyChecker(Checker):
     def observe(self, event) -> None:
         self.index = event.index
         self.event = event
+        at = (event.index, event.op["op"])
+        count = self._keys.get(at, 0)
+        self._keys[at] = count + 1
+        self.key = [event.index, event.op["op"], count]
         if not self.lost and event.index >= self.trigger:
             self._use(self.lossy)
             self.lost = True
@@ -1244,7 +1312,85 @@ class LossyChecker(Checker):
             return
         self._use(Checker(scenario, self.engine))
 
+    def handle_call(self, index: int, op: dict[str, Any], outcome) -> None:
+        if self.f1a_error is not None:
+            self.f1a_terminal(index, op, outcome)
+            return
+        if self.accept_f1a(op, outcome):
+            self.lifecycle_event("call_starts")
+            self.f1a_error = str(outcome.error)
+            return
+        super().handle_call(index, op, outcome)
+
+    def slot(self, outcome) -> str | None:
+        """Which of the event's outcome slots ``outcome`` is."""
+        if self.event is None:
+            return None
+        if outcome is self.event.outcome:
+            return "outcome"
+        if outcome is self.event.second:
+            return "second"
+        return None
+
+    def accept_f1a(self, op: dict[str, Any], outcome) -> bool:
+        """Accept and record b1's F1a error for this call, if it is one."""
+        size = op.get("n", -1)
+        error = outcome.error if outcome.kind == "error" else None
+        if not (
+            self.text
+            and self.modeled
+            and self.certain
+            and self.health is SALVAGE
+            and op["op"] == "read"
+            and (size is None or size < 0)
+            and type(error) is UnicodeDecodeError
+            and str(error).endswith(INCOMPLETE_TAIL)
+        ):
+            return False
+        slot = self.slot(outcome)
+        if slot is None or not incomplete_tail(
+            salvage(self.view_scenario, self.engine),
+            self.scenario["text"]["encoding"],
+        ):
+            return False
+        self.f1a.append([self.key, slot])
+        return True
+
+    def f1a_terminal(self, index: int, op: dict[str, Any], outcome) -> None:
+        """After F1a: reads repeat it or are refused; a rewind clears it."""
+        name = op["op"]
+        if name in SEEK_OPS:
+            self._rewound = False
+            super().handle_call(index, op, outcome)
+            if self._rewound and outcome.kind == "ok":
+                self.f1a_error = None
+            return
+        self.lifecycle_event("call_starts")
+        error = outcome.error if outcome.kind == "error" else None
+        size = op.get("n", -1)
+        slot = self.slot(outcome)
+        if (
+            name == "read"
+            and (size is None or size < 0)
+            and type(error) is UnicodeDecodeError
+            and str(error) == self.f1a_error
+            and slot is not None
+        ):
+            self.f1a.append([self.key, slot])
+            return
+        recovery = (
+            "seek to 0 to recover, or close and reopen the gzip file"
+            if self.seekable
+            else "close and reopen the gzip file"
+        )
+        broken = f"{BROKEN_MESSAGE} after failed or cancelled decompression; {recovery}"
+        if name in READ_OPS and type(error) is OSError and str(error) == broken:
+            return
+        self.fail(index, f"{name} after an F1a error: {describe(outcome)}")
+
     def transition(self, event: str) -> None:
+        if event == "rewind_ok":
+            self._rewound = True
         if self.index == self.trigger:
             event = self.NO_EFFECT.get(event, event)
         else:

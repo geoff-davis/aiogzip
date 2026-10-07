@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import interpreter
+import model
 import pytest
 from differential import (
     B1_READ_BROKEN_SEEK0,
@@ -793,6 +794,8 @@ def test_bc2_fails_a_lossy_violation_with_no_differences():
         "violations": [],
         "rebased_at": None,
         "normalized": [],
+        "f1a": [],
+        "positions": [None] * len(run["trace"]),
     }
     assert compare(pair, lossy).ok
     lossy["violations"] = [[0, "injected"]]
@@ -3123,3 +3126,313 @@ def test_bc2_missing_states_claim_nothing():
     request = bc2_request(pair)
     del lossy["states"]
     assert bc2_claim(pair, request, lossy, set()).events == set()
+
+
+# F1a inside a lossy run (seeds 1404, 1833): b1 answers an unbounded text
+# read in salvage with the codec's incomplete-tail UnicodeDecodeError. The
+# lossy model accepts it under exact conditions, keeps health SALVAGE, and
+# then admits only the same error or b1's exact broken refusal until a
+# successful rewind; compare binds each recorded error to a BC7 or BC2 claim.
+
+F1A_SEEDS = {
+    # BC7's own F1a event, before BC2's later trigger (op 9).
+    1404: [[[3, "read", 0], "outcome"]],
+    # The call of an abort that finished before parking, in BC2's span.
+    1833: [[[8, "abort", 0], "second"]],
+}
+
+
+@pytest.mark.parametrize("seed", sorted(F1A_SEEDS))
+def test_bc2_lossy_run_accepts_b1s_f1a_error(seed):
+    pair, lossy = b1_recorded(seed)
+    assert bc2_request(pair) is not None
+    assert lossy["violations"] == [] and lossy["f1a"] == F1A_SEEDS[seed]
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    ((key, slot),) = F1A_SEEDS[seed]
+    owner = "BC7-TEXT-SALVAGE" if seed == 1404 else "BC2-LOST-INPUT"
+    assert repr(("event", tuple(key))) in claims(result, owner)
+
+
+def test_bc2_f1a_1404_is_refused_until_the_cookie_rewind():
+    pair, lossy = b1_recorded(1404)
+    assert [
+        row(pair.ref, i, n).outcome["message"]
+        for i, n in [(4, "buffer_read"), (5, "readlines"), (6, "buffer_read")]
+    ] == [B1_READ_BROKEN_SEEK0["message"]] * 3
+    # The seek_mark at op 7 rewinds; health leaves salvage only there.
+    assert [h for h in lossy["health"][4:8]] == [["VALIDATION_SALVAGE"] * 2] * 4
+    assert lossy["health"][8] == ["VALIDATION_SALVAGE", "HEALTHY"]
+
+
+def _f1a_mutated(seed: int, change: str) -> tuple[Pair, dict[str, Any]]:
+    pair, lossy = b1_recorded(seed)
+    ((key, slot),) = F1A_SEEDS[seed]
+    entry = [list(key), slot]
+    ref = list(pair.ref)
+    if change == "missing":
+        lossy["f1a"] = []
+    elif change == "absent":
+        del lossy["f1a"]
+    elif change == "duplicate":
+        lossy["f1a"] = [entry, copy.deepcopy(entry)]
+    elif change == "extra":
+        lossy["f1a"] = [[[-1, "acquire", 0], "outcome"], entry]
+    elif change == "wrong-slot":
+        lossy["f1a"] = [[entry[0], "second" if slot == "outcome" else "outcome"]]
+    elif change == "wrong-count":
+        lossy["f1a"] = [[[key[0], key[1], 1], slot]]
+    elif change == "bool-count":
+        lossy["f1a"] = [[[key[0], key[1], False], slot]]
+    elif change == "tuple-entry":
+        lossy["f1a"] = [(entry[0], slot)]
+    elif change == "not-a-list":
+        lossy["f1a"] = {"f1a": entry}
+    elif change == "altered-suffix":
+        r = pair.ref_by_key[tuple(key)]
+        field = "outcome" if slot == "outcome" else "second"
+        outcome = dict(getattr(r, field))
+        outcome["message"] = outcome["message"].replace(
+            "truncated data", "illegal encoding"
+        )
+        ref = edit(ref, tuple(key), **{field: outcome})
+    mutated = Pair(
+        pair.scenario, "b1", pair.cand, ref, pair.cand_info, ENGINE, pair.ref_info
+    )
+    return mutated, lossy
+
+
+F1A_NEAR_MISSES = [
+    "missing",
+    "absent",
+    "duplicate",
+    "extra",
+    "wrong-slot",
+    "wrong-count",
+    "bool-count",
+    "tuple-entry",
+    "not-a-list",
+    "altered-suffix",
+]
+
+
+@pytest.mark.parametrize("change", F1A_NEAR_MISSES)
+@pytest.mark.parametrize("seed", sorted(F1A_SEEDS))
+def test_bc2_f1a_evidence_must_match_the_claims_exactly(seed, change):
+    pair, lossy = _f1a_mutated(seed, change)
+    fails(pair, "f1a evidence", lossy=lossy)
+
+
+def test_bc2_f1a_evidence_needs_b1s_trace_and_positions():
+    for change in ("trace", "positions-short", "positions-absent"):
+        pair, lossy = b1_recorded(1404)
+        if change == "trace":
+            lossy["trace"] = lossy["trace"][:-1]
+        elif change == "positions-short":
+            lossy["positions"] = lossy["positions"][:-1]
+        else:
+            del lossy["positions"]
+        fails(pair, "f1a evidence is not bound", lossy=lossy)
+
+
+# Seed 3152: b1's F1a (op 6) comes after a text buffer_read (op 3) ended the
+# lossy model's tracking, so the model checks nothing there and records no
+# F1a; BC7 still owns the difference.
+
+
+def test_bc2_unmodeled_f1a_is_not_expected_in_the_evidence():
+    pair, lossy = b1_recorded(3152)
+    key = (6, "overlap", 0)
+    assert row(pair.ref, 6, "overlap").outcome["error"] == "UnicodeDecodeError"
+    assert lossy["positions"][pair.ref.index(pair.ref_by_key[key])] is None
+    assert lossy["f1a"] == [] and lossy["violations"] == []
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert repr(("event", key)) in claims(result, "BC7-TEXT-SALVAGE")
+    lossy["f1a"] = [[list(key), "outcome"]]
+    fails(pair, "f1a evidence", lossy=lossy)
+
+
+# The lossy model's F1a acceptance, driven directly over seed 1404's view.
+
+F1A_ERROR = UnicodeDecodeError("utf-16-le", b"a", 0, 1, "truncated data")
+F1A_READ = {"op": "read", "n": -1}
+
+
+def _f1a_checker(**state) -> LossyChecker:
+    scenario = generate(1404)
+    checker = LossyChecker(scenario, scenario, ENGINE, 99, False, 0)
+    checker.lifecycle = model.OPEN
+    checker.health = model.SALVAGE
+    checker.position = 2
+    for name, value in state.items():
+        setattr(checker, name, value)
+    return checker
+
+
+def _error(error: BaseException) -> Outcome:
+    return Outcome("error", error=error)
+
+
+def test_lossy_checker_accepts_an_exact_f1a_error():
+    checker = _f1a_checker()
+    checker.observe(Event(3, F1A_READ, _error(F1A_ERROR)))
+    assert checker.violations == []
+    assert checker.f1a == [[[3, "read", 0], "outcome"]]
+    assert checker.health is model.SALVAGE
+
+
+def test_lossy_checker_records_an_unparked_aborts_f1a_in_its_second_slot():
+    checker = _f1a_checker()
+    event = Event(
+        3,
+        {"op": "abort", "call": F1A_READ},
+        _error(RuntimeError("abort at 3")),
+        second=_error(F1A_ERROR),
+        note="unparked",
+    )
+    checker.observe(event)
+    assert checker.violations == []
+    assert checker.f1a == [[[3, "abort", 0], "second"]]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "sized-read",
+        "readline",
+        "healthy",
+        "broken",
+        "uncertain",
+        "unmodeled",
+        "altered-suffix",
+        "not-unicode",
+        "complete-salvage",
+        "invalid-salvage",
+    ],
+)
+def test_lossy_checker_rejects_an_f1a_near_miss(change, monkeypatch):
+    state: dict[str, Any] = {}
+    op, error = dict(F1A_READ), F1A_ERROR
+    if change == "sized-read":
+        op["n"] = 5
+    elif change == "readline":
+        op = {"op": "readline"}
+    elif change == "healthy":
+        state["health"] = model.HEALTHY
+    elif change == "broken":
+        state["health"] = model.BROKEN
+    elif change == "uncertain":
+        state["candidates"] = [2, 3]
+    elif change == "unmodeled":
+        state["modeled"] = False
+    elif change == "altered-suffix":
+        error = UnicodeDecodeError("utf-16-le", b"a", 0, 1, "truncated data!")
+    elif change == "not-unicode":
+        error = ValueError("truncated data")
+    elif change == "complete-salvage":
+        monkeypatch.setattr(model, "salvage", lambda *_: b"\xff\xfea\x00")
+    elif change == "invalid-salvage":
+        monkeypatch.setattr(model, "salvage", lambda *_: b"\xff\xfe\x00\xd8a\x00b")
+    checker = _f1a_checker(**state)
+    checker.observe(Event(3, op, _error(error)))
+    assert checker.f1a == []
+    if change != "unmodeled":
+        assert checker.violations, change
+
+
+def test_lossy_checker_salvage_controls_hold_an_incomplete_tail(monkeypatch):
+    monkeypatch.setattr(model, "salvage", lambda *_: b"\xff\xfea\x00b")
+    checker = _f1a_checker()
+    checker.observe(Event(3, F1A_READ, _error(F1A_ERROR)))
+    assert checker.f1a and checker.violations == []
+
+
+BROKEN_SEEKABLE = OSError(B1_READ_BROKEN_SEEK0["message"])
+
+
+def _after_f1a(*events: Event) -> LossyChecker:
+    checker = _f1a_checker()
+    checker.observe(Event(3, F1A_READ, _error(F1A_ERROR)))
+    for event in events:
+        checker.observe(event)
+    return checker
+
+
+def test_lossy_checker_admits_only_f1a_or_the_broken_refusal_until_a_rewind():
+    checker = _after_f1a(
+        Event(4, {"op": "buffer_read", "n": 4}, _error(BROKEN_SEEKABLE)),
+        Event(5, {"op": "readline"}, _error(BROKEN_SEEKABLE)),
+        Event(6, F1A_READ, _error(F1A_ERROR)),
+        Event(7, {"op": "seek0"}, Outcome("ok", 0)),
+        Event(8, {"op": "read", "n": 2}, Outcome("ok", " α")),
+    )
+    assert checker.f1a == [[[3, "read", 0], "outcome"], [[6, "read", 0], "outcome"]]
+    assert checker.violations == []
+    assert checker.f1a_error is None
+    assert checker.health is model.HEALTHY
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        Event(4, F1A_READ, Outcome("ok", " α \r")),
+        Event(4, {"op": "read", "n": 1}, Outcome("ok", " ")),
+        Event(4, {"op": "read", "n": 5}, _error(F1A_ERROR)),
+        Event(
+            4,
+            F1A_READ,
+            _error(UnicodeDecodeError("utf-16-le", b"b", 0, 1, "truncated data")),
+        ),
+        Event(4, F1A_READ, _error(ValueError(str(F1A_ERROR)))),
+        Event(4, F1A_READ, _error(OSError("read stream is broken"))),
+        Event(
+            4,
+            F1A_READ,
+            _error(
+                OSError(
+                    "read stream is broken after failed or cancelled "
+                    "decompression; close and reopen the gzip file"
+                )
+            ),
+        ),
+        Event(4, F1A_READ, _error(ValueError(B1_READ_BROKEN_SEEK0["message"]))),
+        Event(4, {"op": "tell"}, Outcome("ok", 2)),
+    ],
+    ids=[
+        "served-data",
+        "sized-data",
+        "sized-f1a",
+        "other-f1a",
+        "f1a-type",
+        "short-broken",
+        "unseekable-broken",
+        "broken-type",
+        "tell",
+    ],
+)
+def test_lossy_checker_rejects_other_outcomes_after_f1a(event):
+    checker = _after_f1a(event)
+    assert any("after an F1a error" in m for m in checker.violations)
+    assert checker.f1a == [[[3, "read", 0], "outcome"]]
+
+
+@pytest.mark.parametrize(
+    "rewind",
+    [
+        Event(4, {"op": "seek0"}, _error(gzip.BadGzipFile("replay failed"))),
+        Event(4, {"op": "seek0"}, _error(BROKEN_SEEKABLE)),
+        Event(
+            4,
+            {"op": "cancel", "call": {"op": "seek0"}},
+            Outcome("cancelled"),
+            second=Outcome("ok", "cancel requested"),
+        ),
+    ],
+    ids=["failed", "refused", "cancelled"],
+)
+def test_lossy_checker_keeps_f1a_terminal_without_a_successful_rewind(rewind):
+    checker = _after_f1a(rewind)
+    assert checker.f1a_error is not None
+    checker.observe(Event(5, F1A_READ, Outcome("ok", " α \r")))
+    assert any("after an F1a error" in m for m in checker.violations)
