@@ -44,5 +44,11 @@ The October 7 investigations registered by amendment 3:
 - `inv-order-g06-timing-<position>.tar.xz`: the four `g06-longline-timing`
   outputs and logs, by ABBA position (`1A`, `2B`, `3B`, `4A`).
 
+`confirm-evidence.tar.xz` holds the October 7 confirmations registered by
+amendment 4: `confirm-20261007-101139/` complete (64 capture JSONs and
+logs, `captures.tsv`, `foreign.log`, `quiet-gate.log`, `environment.json`,
+`provenance.txt` and `manifest.json`), `confirm-summary.txt`, and the
+harness as registered (`harness/`).
+
 See the [G17 pre-registration](../../../../reviews/v2.0.0b2-g17-preregistration.md)
 and the [G17 record](../../../../reviews/v2.0.0b2-wp10-qualification.md#g17-performance).
