@@ -1,3 +1,10 @@
 {
-  "aa-evidence.tar.xz": "6f3497c2fd88183a99786f5519831e26f887ea32354ba1e444dcca1ad1558633"
+  "aa-evidence.tar.xz": "6f3497c2fd88183a99786f5519831e26f887ea32354ba1e444dcca1ad1558633",
+  "c0-captures.tar.xz": "06ca483adfa0598dad2d239a3a695920e4e095416ca77482c4d9a51336faa5ed",
+  "c0-g06-timing-stdlib-A.tar.xz": "4625ba885755fdca99aca479bd427e2e5515a150425ce587de6a6933dc580ec5",
+  "c0-g06-timing-stdlib-B.tar.xz": "79d2a0064ea26e365e7d339a7fba622a8f8b9a8648ff326dc1177056f8b4485a",
+  "c0-g06-timing-zlib-ng-A.tar.xz": "19de782626a985d8d9bfce36c572c1f27f8e700321dc497f4829281129494218",
+  "c0-g06-timing-zlib-ng-B.tar.xz": "3eff1ebb8e3e1cb82c2301d064d1f8ed975f0ab2e7c9ccd846c00bbac3e11fc9",
+  "c0-structural-other.tar.xz": "1f3620056a18b281d16f0d6c70c933e8c55275d644127ed77fcdb932a4043736",
+  "wp0-window.tar.xz": "1a07680252b1dd5f4d15872f5c825d0ba887e7b76dc00bb44d65cde961af49da"
 }
