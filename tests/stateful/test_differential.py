@@ -652,6 +652,7 @@ BC2_SEEDS = {
     3958: "rt fail_consumed with a checkpoint, member range",
     1065: "rt seekable: a rewind with no source call keeps the lossy view",
     277: "rb seekable: a G-custom cancel from salvage, rebased by a later rewind",
+    824: "rb seekable: a rewind with no source call keeps the lossy view",
     430: "rt seekable: a physical rewind, but the models never converge",
     2969: "rb seekable: b1 spends an armed failure the candidate keeps",
     2361: "rt seekable: the span ends where the models converge",
@@ -688,8 +689,12 @@ def test_bc2_cases_cover_each_trigger_kind():
             name = armed[-1]
         seen.add((scenario["mode"], name, lost))
         pair, lossy = b1_emulated(seed)
-        if seed == 1065:
+        if seed in (1065, 824):
             assert request.rebase and lossy["rebased_at"] is None
+        if seed == 824:
+            # seek0 at decompressed position 0 succeeds without a source seek.
+            assert row(pair.ref, 3, "seek0").outcome == {"ok": 0}
+            assert lossy["seeks"] == []
         if seed == 277:
             # Validation salvage admits the exact G-custom trigger (op 5),
             # ahead of the HEALTHY read cancel at op 10.
