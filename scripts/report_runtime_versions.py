@@ -96,6 +96,11 @@ def report(
         "decompression engine mismatch: "
         f"{engine.decompression!r} != {expected_engine!r}",
     )
+    # zlib-ng compression is opt-in per call; the default is stdlib everywhere.
+    _require(
+        engine.compression == "stdlib-zlib",
+        f"compression engine mismatch: {engine.compression!r} != 'stdlib-zlib'",
+    )
     if mode == "fast-forced-stdlib":
         _require(
             os.environ.get("AIOGZIP_ENGINE", "").strip().lower() == "stdlib",

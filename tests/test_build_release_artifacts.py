@@ -61,3 +61,51 @@ def test_wheel_without_generator_fails(release, tmp_path):
 def test_evidence_inside_repository_is_refused(release):
     with pytest.raises(RuntimeError, match="inside the repository"):
         release.main(["--evidence-dir", str(release.REPOSITORY / "evidence")])
+
+
+def _tree(root, files):
+    for name, text in files.items():
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+    return root
+
+
+FILES = {
+    "examples/a.py": "a",
+    "examples/README.md": "r",
+    "tests/integration/test_a.py": "t",
+}
+
+
+def test_packaged_trees_must_match_the_commit(release, tmp_path):
+    source = _tree(tmp_path / "source", FILES)
+    packaged = _tree(tmp_path / "packaged", FILES)
+    _tree(packaged, {"examples/__pycache__/a.cpython-314.pyc": "ignored"})
+    digests = release._require_packaged_trees(packaged, source)
+    assert set(digests) == set(FILES)
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"examples/a.py": "stale"}, "changed \\['examples/a.py'\\]"),
+        ({"examples/extra.py": "x"}, "extra \\['examples/extra.py'\\]"),
+    ],
+    ids=["changed", "extra"],
+)
+def test_packaged_tree_differences_fail(release, tmp_path, change, message):
+    source = _tree(tmp_path / "source", FILES)
+    packaged = _tree(tmp_path / "packaged", {**FILES, **change})
+    with pytest.raises(RuntimeError, match=message):
+        release._require_packaged_trees(packaged, source)
+
+
+def test_missing_packaged_file_fails(release, tmp_path):
+    source = _tree(tmp_path / "source", FILES)
+    packaged = _tree(
+        tmp_path / "packaged",
+        {k: v for k, v in FILES.items() if k != "tests/integration/test_a.py"},
+    )
+    with pytest.raises(RuntimeError, match="missing"):
+        release._require_packaged_trees(packaged, source)

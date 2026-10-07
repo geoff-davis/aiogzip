@@ -10,7 +10,11 @@ artifact, the reports of ``smoke_installed_artifact.py`` and
 ``run_maintained_examples.py`` run from a fresh venv outside the repository.
 Those scripts assert that ``aiogzip`` imports from that venv, then run the
 manifest check, the codec, file, streaming, inspect, verify, CLI and aiocsv
-smokes, and both maintained examples with their integration tests.
+smokes, and both maintained examples with their integration tests. For the
+sdist, the examples and integration tests run from the extracted sdist,
+after its packaged ``examples/`` and ``tests/integration/`` are checked to
+match the commit byte for byte; the wheel ships no examples, so its run
+uses the worktree copies.
 
 Requires ``uv`` on PATH and network access to install the latest runtime
 dependencies and twine.
@@ -34,6 +38,8 @@ from pathlib import Path
 REPOSITORY = Path(__file__).resolve().parents[1]
 RUNTIME = ("aiofiles", "aiocsv")
 TEST_TOOLS = ("pytest", "pytest-asyncio", "pytest-timeout")
+# Packaged application code the sdist must carry unchanged.
+PACKAGED_TREES = ("examples", "tests/integration")
 
 
 def _run(
@@ -76,6 +82,43 @@ def _inventory_entry(artifact: Path) -> dict[str, object]:
     }
 
 
+def _extract_sdist(sdist: Path, destination: Path) -> Path:
+    """Extract the sdist and return its single top-level directory."""
+    with tarfile.open(sdist) as archive:
+        if sys.version_info >= (3, 12):
+            archive.extractall(destination, filter="data")
+        else:
+            archive.extractall(destination)
+    (root,) = [path for path in destination.iterdir() if path.is_dir()]
+    return root
+
+
+def _tree_digests(root: Path, relative: str) -> dict[str, str]:
+    base = root / relative
+    return {
+        path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(base.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts
+    }
+
+
+def _require_packaged_trees(packaged: Path, source: Path) -> dict[str, str]:
+    """The sdist's examples and integration tests equal the commit's."""
+    expected: dict[str, str] = {}
+    for relative in PACKAGED_TREES:
+        want = _tree_digests(source, relative)
+        got = _tree_digests(packaged, relative)
+        if not want or got != want:
+            raise RuntimeError(
+                f"sdist {relative}/ differs from the commit: "
+                f"missing {sorted(want.keys() - got.keys())}, "
+                f"extra {sorted(got.keys() - want.keys())}, "
+                f"changed {sorted(k for k in want.keys() & got.keys() if want[k] != got[k])}"
+            )
+        expected.update(want)
+    return expected
+
+
 def _venv_python(root: Path) -> Path:
     if sys.platform == "win32":
         return root / "Scripts" / "python.exe"
@@ -87,12 +130,14 @@ def _smoke(
     kind: str,
     *,
     source: Path,
+    examples_root: Path,
     version: str,
     python: str,
     scratch: Path,
     evidence: Path,
 ) -> None:
-    """Install one artifact into a fresh venv and run both smoke scripts."""
+    """Install one artifact into a fresh venv and run both smoke scripts;
+    the maintained examples run from ``examples_root``."""
     environment = scratch / f"venv-{kind}"
     _run(["uv", "venv", "--python", python, str(environment)], cwd=scratch)
     interpreter = str(_venv_python(environment))
@@ -135,7 +180,7 @@ def _smoke(
             interpreter,
             str(source / "scripts" / "run_maintained_examples.py"),
             "--repository-root",
-            str(source),
+            str(examples_root),
             "--report-output",
             str(evidence / f"examples-{kind}.json"),
         ],
@@ -182,11 +227,17 @@ def build(ref: str, evidence: Path, python: str) -> dict[str, object]:
                 ],
                 cwd=source,
             )
-            for artifact, kind in ((wheels[0], "wheel"), (sdists[0], "sdist")):
+            packaged = _extract_sdist(sdists[0], scratch / "sdist")
+            packaged_digests = _require_packaged_trees(packaged, source)
+            for artifact, kind, examples_root in (
+                (wheels[0], "wheel", source),
+                (sdists[0], "sdist", packaged),
+            ):
                 _smoke(
                     artifact,
                     kind,
                     source=source,
+                    examples_root=examples_root,
                     version=version,
                     python=python,
                     scratch=scratch,
@@ -205,6 +256,7 @@ def build(ref: str, evidence: Path, python: str) -> dict[str, object]:
                     "platform": platform.platform(),
                 },
                 "artifacts": [_inventory_entry(wheels[0]), _inventory_entry(sdists[0])],
+                "sdist_packaged_files": packaged_digests,
                 "reports": sorted(
                     path.name for path in evidence.glob("*.json") if path.is_file()
                 ),

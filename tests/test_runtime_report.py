@@ -12,6 +12,12 @@ import aiogzip
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "report_runtime_versions.py"
 
 
+def _engine(compression="stdlib-zlib", decompression="stdlib-zlib"):
+    return aiogzip.EngineInfo(
+        compression=compression, decompression=decompression, crc32="stdlib-zlib"
+    )
+
+
 @pytest.fixture
 def runtime_report(monkeypatch):
     spec = importlib.util.spec_from_file_location("report_runtime_versions", SCRIPT)
@@ -21,13 +27,7 @@ def runtime_report(monkeypatch):
     spec.loader.exec_module(module)
     installed = {"aiogzip": aiogzip.__version__}
     monkeypatch.setattr(module, "_version", installed.get)
-    monkeypatch.setattr(
-        aiogzip,
-        "engine_info",
-        lambda: aiogzip.EngineInfo(
-            compression="stdlib-zlib", decompression="stdlib-zlib", crc32="stdlib-zlib"
-        ),
-    )
+    monkeypatch.setattr(aiogzip, "engine_info", _engine)
     return module, installed
 
 
@@ -74,3 +74,12 @@ def test_latest_still_checks_the_engine(runtime_report):
     installed.update({"aiofiles": "99.0", "zlib-ng": "1.0"})
     with pytest.raises(RuntimeError, match="decompression engine mismatch"):
         module.report("fast", require_installed_artifact=False, latest=True)
+
+
+@pytest.mark.parametrize("latest", [False, True])
+def test_default_compression_engine_is_enforced(runtime_report, monkeypatch, latest):
+    module, installed = runtime_report
+    installed.update({"aiofiles": "23.2.1", "zlib-ng": "0.4.0"})
+    monkeypatch.setattr(aiogzip, "engine_info", lambda: _engine("zlib-ng", "zlib-ng"))
+    with pytest.raises(RuntimeError, match="compression engine mismatch"):
+        module.report("fast", require_installed_artifact=False, latest=latest)
