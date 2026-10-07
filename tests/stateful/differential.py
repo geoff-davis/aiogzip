@@ -358,8 +358,10 @@ def _f1a_failures(
     if type(record) is not list:
         return [f"lossy model f1a evidence {record!r} is malformed"]
     positions = lossy.get("positions")
-    if parse(lossy["trace"]) != pair.ref or not (
-        type(positions) is list and len(positions) == len(pair.ref)
+    if _safe_parse(lossy.get("trace")) != pair.ref or not (
+        type(positions) is list
+        and len(positions) == len(pair.ref)
+        and all(p is None or _position_range(p) for p in positions)
     ):
         return ["lossy model f1a evidence is not bound to b1's trace"]
     found = []
@@ -382,11 +384,32 @@ def _f1a_failures(
         slot = _f1a_slot(pair, row)
         if slot is None or key not in pair.diffs or position is None:
             continue
+        if position[0] != position[1]:
+            # The model accepts F1a only at a certain position.
+            return [f"lossy model f1a at {key!r} from uncertain position {position}"]
         if owner.get(("event", key)) == "BC7-TEXT-SALVAGE" or key in span.events:
             expected.append((key, slot))
     if found != expected:
         return [f"lossy model f1a evidence {found!r}, expected {expected!r}"]
     return []
+
+
+def _safe_parse(trace: Any) -> list[Row] | None:
+    """``parse(trace)``, or None when the trace is not a list of rows."""
+    if type(trace) is not list or not all(
+        type(raw) is list and len(raw) >= 3 for raw in trace
+    ):
+        return None
+    try:
+        return parse(trace)
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _position_range(position: Any) -> bool:
+    """Whether ``position`` is a recorded [low, high] range of offsets."""
+    position = _exact_ints(position, 2)
+    return position is not None and 0 <= position[0] <= position[1]
 
 
 def _f1a_slot(pair: Pair, row: Row) -> str | None:
@@ -736,16 +759,24 @@ def _remaining_text(pair: Pair, key) -> tuple[str, bool] | None:
             kept.append(data[at:start])
             at = end
         data = b"".join(kept) + data[at:]
-    decoded = text_model(
-        data, text_options["encoding"], text_options["newline"], False, boundary=True
-    )
+    try:
+        decoded = text_model(
+            data,
+            text_options["encoding"],
+            text_options["newline"],
+            False,
+            boundary=True,
+        )
+        boundary = _ends_on_boundary(text_options["encoding"], data)
+    except UnicodeDecodeError:
+        return None  # invalid bytes (a wire view's salvage): not a text tail
     if isinstance(consumed, str):
         if not decoded.startswith(consumed):
             return None
         consumed = len(consumed)
     if consumed > len(decoded):
         return None
-    return decoded[consumed:], not _ends_on_boundary(text_options["encoding"], data)
+    return decoded[consumed:], not boundary
 
 
 def _replay_consumed(pair: Pair, key) -> tuple[str, list[list[int]]] | None:
@@ -1494,7 +1525,7 @@ def bc2_claim(
 ) -> Claim:
     """Claim the residual differing events in the span the lossy run accepts."""
     claim = Claim()
-    if parse(lossy["trace"]) != pair.ref:
+    if _safe_parse(lossy.get("trace")) != pair.ref:
         return claim  # b1's replay was not reproduced; claim nothing
     if not _convergence_ok(pair, lossy):
         return claim  # convergence evidence is malformed; claim nothing

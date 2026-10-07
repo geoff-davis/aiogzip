@@ -35,6 +35,7 @@ from differential import (
     Row,
     _converged,
     _losses,
+    _remaining_text,
     _wire_scenario,
     bc2_claim,
     bc2_request,
@@ -58,6 +59,7 @@ from model import (
     Checker,
     LossyChecker,
     later_loss_kind,
+    salvage,
     wire_view,
 )
 from oracle import engine_modules, wire_reference
@@ -3224,16 +3226,65 @@ def test_bc2_f1a_evidence_must_match_the_claims_exactly(seed, change):
     fails(pair, "f1a evidence", lossy=lossy)
 
 
-def test_bc2_f1a_evidence_needs_b1s_trace_and_positions():
-    for change in ("trace", "positions-short", "positions-absent"):
-        pair, lossy = b1_recorded(1404)
-        if change == "trace":
-            lossy["trace"] = lossy["trace"][:-1]
-        elif change == "positions-short":
-            lossy["positions"] = lossy["positions"][:-1]
-        else:
-            del lossy["positions"]
-        fails(pair, "f1a evidence is not bound", lossy=lossy)
+F1A_UNBOUND = {
+    "trace": lambda lossy: lossy["trace"][:-1],
+    "trace-none": lambda lossy: None,
+    "trace-row-none": lambda lossy: [None, *lossy["trace"][1:]],
+    "trace-row-short": lambda lossy: [lossy["trace"][0][:2], *lossy["trace"][1:]],
+}
+F1A_BAD_POSITIONS = {
+    "positions-short": lambda positions, n: positions[:-1],
+    "positions-tuple": lambda positions, n: tuple(positions),
+    "position-tuple": lambda positions, n: _with_position(positions, n, (0, 0)),
+    "position-bool": lambda positions, n: _with_position(positions, n, [False, False]),
+    "position-float": lambda positions, n: _with_position(positions, n, [0.0, 0.0]),
+    "position-negative": lambda positions, n: _with_position(positions, n, [-1, -1]),
+    "position-reversed": lambda positions, n: _with_position(positions, n, [1, 0]),
+    "position-triple": lambda positions, n: _with_position(positions, n, [0, 0, 0]),
+    "position-scalar": lambda positions, n: _with_position(positions, n, 0),
+}
+
+
+def _with_position(positions: list[Any], n: int, value: Any) -> list[Any]:
+    return [value if i == n else p for i, p in enumerate(positions)]
+
+
+def _f1a_index(pair: Pair, seed: int) -> int:
+    ((key, _),) = F1A_SEEDS[seed]
+    return pair.ref.index(pair.ref_by_key[tuple(key)])
+
+
+@pytest.mark.parametrize("change", [*F1A_UNBOUND, *F1A_BAD_POSITIONS, "absent"])
+def test_bc2_f1a_evidence_needs_b1s_trace_and_positions(change):
+    pair, lossy = b1_recorded(1404)
+    if change in F1A_UNBOUND:
+        lossy["trace"] = F1A_UNBOUND[change](lossy)
+    elif change in F1A_BAD_POSITIONS:
+        n = _f1a_index(pair, 1404)
+        lossy["positions"] = F1A_BAD_POSITIONS[change](lossy["positions"], n)
+    else:
+        del lossy["positions"]
+    fails(pair, "f1a evidence is not bound", lossy=lossy)
+
+
+def test_bc2_f1a_evidence_needs_a_certain_position():
+    pair, lossy = b1_recorded(1404)
+    n = _f1a_index(pair, 1404)
+    assert lossy["positions"][n] == [0, 0]
+    lossy["positions"] = _with_position(lossy["positions"], n, [0, 1])
+    fails(pair, "f1a at (3, 'read', 0) from uncertain position [0, 1]", lossy=lossy)
+
+
+def test_f1a_remaining_text_of_an_undecodable_wire_view_is_unknown():
+    # A wire view's salvage is its oracle output, which need not be text.
+    scenario = synthetic([b"abcd", b"\xff"], damaged=b"\xffz")
+    view = _wire_scenario(scenario, unb64(scenario["wire"]), ENGINE, lossy_range=[0, 0])
+    assert salvage(view, ENGINE) == b"abcd\xffz"
+    pair, _ = b1_recorded(1404)
+    ((key, _),) = F1A_SEEDS[1404]
+    pair = Pair(view, "b1", pair.cand, pair.ref, pair.cand_info, ENGINE, pair.ref_info)
+    assert pair.cand_info["positions"][pair.cand_order[tuple(key)]] == [0, 0]
+    assert _remaining_text(pair, tuple(key)) is None
 
 
 # Seed 3152: b1's F1a (op 6) comes after a text buffer_read (op 3) ended the

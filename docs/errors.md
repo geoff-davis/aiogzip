@@ -159,10 +159,11 @@ Close and recreate a non-rewindable source. Decompression-limit failures,
 cancellation, and unexpected internal failures poison the reader without
 automatically enabling the integrity-failure salvage path.
 
-For text readers, only a literal `seek(0)` is a recovery. A cookie saved
-with `tell()` before the failure is not a recovery point: `seek(cookie)` may
-raise the same terminal `OSError` instead of rewinding. Call `seek(0)` first;
-once the reader has recovered, a saved cookie is an ordinary position again.
+For text readers, the only guaranteed recovery is calling `seek(0)` directly.
+A cookie saved with `tell()` before the failure is not a recovery point:
+`seek(cookie)` may raise the same terminal `OSError` instead of rewinding. Call
+`seek(0)` first; once the reader has recovered, a saved cookie is an ordinary
+position again.
 
 ## Codec finalization and operation abandonment
 
