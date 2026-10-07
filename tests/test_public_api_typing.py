@@ -1,27 +1,17 @@
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+from _typing_contract import expected, reported, version
 
 ROOT = Path(__file__).parents[1]
 POSITIVE = ROOT / "tests" / "typing" / "public_api_positive.py"
 NEGATIVE = ROOT / "tests" / "typing" / "public_api_negative.py"
 POSITIVE_ARGUMENT = str(POSITIVE.relative_to(ROOT))
 NEGATIVE_ARGUMENT = str(NEGATIVE.relative_to(ROOT))
-
-
-def _expected_error_lines() -> set[int]:
-    return {
-        number
-        for number, line in enumerate(
-            NEGATIVE.read_text(encoding="utf-8").splitlines(), start=1
-        )
-        if "EXPECT_ERROR" in line
-    }
 
 
 def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
@@ -92,8 +82,7 @@ def test_negative_public_api_typing(name: str, command: list[str]):
     result = _run(command)
     output = result.stdout + result.stderr
     assert result.returncode != 0, f"{name} unexpectedly accepted negative fixture"
-    reported_path = NEGATIVE_ARGUMENT
-    for line in _expected_error_lines():
-        assert re.search(rf"{re.escape(reported_path)}:{line}(?::|\b)", output), (
-            f"{name} did not report expected line {line}:\n{output}"
-        )
+    want = expected(NEGATIVE, name)
+    assert len(want) == 7
+    got = reported(output, name, NEGATIVE_ARGUMENT)
+    assert got == want, f"{version(name)}:\n{output}"

@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from _typing_contract import expected, reported, version
 
 TYPING_DIR = Path(__file__).parent / "typing"
 CHECK_FILE = TYPING_DIR / "check_codec_operation.py"
@@ -38,7 +39,10 @@ def test_codec_operation_mypy_contract(check_file, expected_returncode):
     )
     assert result.returncode == expected_returncode, result.stdout + result.stderr
     if expected_returncode:
-        assert "close" in result.stdout
+        got = reported(result.stdout, "mypy", str(check_file))
+        assert got == expected(check_file, "mypy"), (
+            f"{version('mypy')}:\n{result.stdout}"
+        )
 
 
 @pytest.mark.skipif(TY is None, reason="ty is not installed")
@@ -49,10 +53,11 @@ def test_codec_operation_mypy_contract(check_file, expected_returncode):
 def test_codec_operation_ty_contract(check_file, expected_returncode):
     assert TY is not None
     result = subprocess.run(
-        [TY, "check", str(check_file)],
+        [TY, "check", "--output-format", "concise", "--no-progress", str(check_file)],
         capture_output=True,
         text=True,
     )
     assert result.returncode == expected_returncode, result.stdout + result.stderr
     if expected_returncode:
-        assert "close" in result.stdout
+        got = reported(result.stdout, "ty", str(check_file))
+        assert got == expected(check_file, "ty"), f"{version('ty')}:\n{result.stdout}"
