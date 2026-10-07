@@ -24,6 +24,11 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      # tests/test_build_release_artifacts.py drives the release build script,
+      # which requires uv on PATH.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+
       - name: Verify tag matches package version
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
