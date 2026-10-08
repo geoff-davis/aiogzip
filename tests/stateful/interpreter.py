@@ -599,11 +599,23 @@ async def _parked(handle, op, gate: Gate, partner, text: dict[str, Any] | None):
         return await task, Outcome("skipped", "call did not reach the source")
     second = await partner(task)
     await settle_then_release(gate, task)
-    try:
-        first = await task
-    except asyncio.CancelledError:
-        first = Outcome("cancelled")
+    first = await _parked_outcome(task)
     return first, second
+
+
+async def _parked_outcome(task: asyncio.Task) -> Outcome:
+    """The parked call's outcome; its cancellation is ``cancelled``.
+
+    A cancellation of the awaiting scenario itself (its deadline) propagates:
+    recording it as the call's outcome would let an overdue run finish.
+    """
+    try:
+        return await task
+    except asyncio.CancelledError:
+        current = asyncio.current_task()
+        if current is not None and current.cancelling():
+            raise
+        return Outcome("cancelled")
 
 
 async def _cancel_partner(task):
@@ -868,10 +880,7 @@ async def run(
             else:
                 second = await _call(handle.close())
             await settle_then_release(gate, task)
-            try:
-                first = await task
-            except asyncio.CancelledError:
-                first = Outcome("cancelled")
+            first = await _parked_outcome(task)
         land(Event(-1, op, first, second))
         if first.kind == "cancelled":
             first = await _call(handle.open())
@@ -883,10 +892,7 @@ async def run(
         note = None
         pending = abort.pending  # type: ignore[attr-defined]
         if pending is not None:
-            try:
-                second = await pending
-            except asyncio.CancelledError:
-                second = Outcome("cancelled")
+            second = await _parked_outcome(pending)
         elif abort.first is not None:  # type: ignore[attr-defined]
             second = abort.first  # type: ignore[attr-defined]
             note = "unparked"
@@ -941,13 +947,20 @@ async def run(
     # a parked native call to settle (BC1), that call runs only once released,
     # and an op still running past the deadline may park another.
     deadline = asyncio.get_running_loop().call_later(SCENARIO_TIMEOUT, gate.expire)
+    scope = asyncio.timeout(SCENARIO_TIMEOUT)
     try:
-        async with asyncio.timeout(SCENARIO_TIMEOUT):
-            await drive()
-    except TimeoutError:
-        gate.release()
-        cleanup = await _settle_after_timeout(handle)
-        land(Event(len(ops) + 1, {"op": "timeout"}, Outcome("error"), cleanup))
+        try:
+            async with scope:
+                await drive()
+        except TimeoutError:
+            if not scope.expired():
+                raise
+        # An op that records the deadline's cancellation as its own outcome
+        # can let the body finish; an expired deadline still fails the run.
+        if scope.expired():
+            gate.release()
+            cleanup = await _settle_after_timeout(handle)
+            land(Event(len(ops) + 1, {"op": "timeout"}, Outcome("error"), cleanup))
     finally:
         deadline.cancel()
         gate.release()

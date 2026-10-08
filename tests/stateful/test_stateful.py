@@ -154,3 +154,32 @@ def test_expired_gate_releases_every_later_arming():
     assert gate.release_thread.is_set() and gate.release_async.is_set()
     gate.arm()
     assert gate.release_thread.is_set() and gate.release_async.is_set()
+
+
+def test_deadline_landing_on_a_parked_call_await_is_recorded(monkeypatch):
+    # Seed 36 parks a native read1 (op 1). With the partner's cancel and the
+    # release both withheld, the scenario waits at _parked()'s final await
+    # until the deadline, whose cancellation lands there. It must surface as
+    # the scenario's timeout, never as the parked call's "cancelled" outcome.
+    settle = interpreter.settle_then_release
+    calls = 0
+
+    async def withhold_first_release(gate, task):
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            await settle(gate, task)
+
+    async def no_cancel(task):
+        return interpreter.Outcome("ok", "cancel withheld")
+
+    monkeypatch.setattr(interpreter, "SCENARIO_TIMEOUT", 0.3)
+    monkeypatch.setattr(interpreter, "settle_then_release", withhold_first_release)
+    monkeypatch.setattr(interpreter, "_cancel_partner", no_cancel)
+    events, _trace = replay(aiogzip, generate(36))
+    assert calls >= 1
+    (timeout,) = [event for event in events if event.op["op"] == "timeout"]
+    assert timeout.second == interpreter.Outcome("ok", "closed")
+    assert events[-1].outcome.value["closed"] is True
+    # The parked call (op 1) never lands with the deadline as its outcome.
+    assert not [event for event in events if event.index == 1]
