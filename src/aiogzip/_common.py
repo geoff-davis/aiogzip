@@ -32,9 +32,9 @@ _MAX_GZIP_MTIME = 0xFFFFFFFF
 # Safety cap for chunk_size and peek() arguments (128 MiB). Prevents a caller
 # from accidentally allocating gigabytes when passing an unsanitized integer
 # from user input. It is also the default max_rewind_cache_size. read(size) and
-# readinto() are not capped: readinto() buffers up to len(b) internally before
-# copying (so a failed refill leaves the stream intact), bounded by the
-# caller's own allocation.
+# readinto() are not capped: readinto() keeps filling the internal buffer
+# until at least len(b) bytes are available (the last fill can overshoot) and
+# only then copies, so a failed refill leaves the stream intact.
 _MAX_CHUNK_SIZE = 128 * 1024 * 1024
 
 # Type alias for zlib compression/decompression objects

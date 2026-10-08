@@ -97,20 +97,24 @@ async def _abort_during(stream, entered: asyncio.Event, call):
     observed: dict[str, object] = {}
 
     async def owner():
+        # The timeout encloses the aborted call. A stale cancellation count
+        # left by the abort makes its own expiry look like an outside
+        # cancellation, so CancelledError escapes instead of TimeoutError.
         try:
-            await call()
-        except Exception as error:  # the aborted call's own outcome
-            observed["error"] = error
-        observed["cancelling"] = asyncio.current_task().cancelling()
-        # An enclosing timeout must still classify its own expiry.
-        try:
-            async with asyncio.timeout(0.01):
-                await asyncio.sleep(5)
+            async with asyncio.timeout(0.5):
+                try:
+                    await call()
+                except Exception as error:  # the aborted call's own outcome
+                    observed["error"] = error
+                observed["cancelling"] = asyncio.current_task().cancelling()
+                await asyncio.sleep(10)
         except TimeoutError:
             observed["timeout"] = "TimeoutError"
         except asyncio.CancelledError:
             observed["timeout"] = "CancelledError"
-            asyncio.current_task().uncancel()
+            current = asyncio.current_task()
+            while current.cancelling():
+                current.uncancel()
 
     task = None
     with pytest.raises(RuntimeError, match="body"):
@@ -239,3 +243,56 @@ class TestContextExitCleanupNotes:
         assert getattr(raised[0], "__notes__", []) == [NOTE]
         assert reader is not None
         await asyncio.gather(reader, return_exceptions=True)
+
+
+class TestRepeatedCancellationDuringCleanup:
+    """A cancelled clean exit whose abort cleanup is cancelled again."""
+
+    async def _cancelled_clean_exit(self, monkeypatch, repeated):
+        async def abort(self):
+            raise repeated
+
+        monkeypatch.setattr(AsyncGzipBinaryFile, "_abort_active_call_on_exit", abort)
+        source = _SwallowingSource("propagate")
+        stream = _reader(source, False)
+        reader = None
+        exiting = asyncio.Event()
+        raised: list[BaseException] = []
+
+        async def owner():
+            nonlocal reader
+            try:
+                async with stream:
+                    reader = asyncio.create_task(stream.read())
+                    await source.entered.wait()
+                    exiting.set()
+            except asyncio.CancelledError as cancellation:
+                raised.append(cancellation)
+                raise
+
+        task = asyncio.create_task(owner())
+        await asyncio.wait_for(exiting.wait(), 5)
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, 5)
+        assert reader is not None
+        reader.cancel()
+        await asyncio.gather(reader, return_exceptions=True)
+        assert len(raised) == 1
+        assert raised[0] is not repeated
+        return raised[0]
+
+    async def test_a_failure_carried_by_the_repeated_cancellation_is_noted(
+        self, monkeypatch
+    ):
+        repeated = asyncio.CancelledError()
+        repeated.__cause__ = OSError("close failed")
+        cancellation = await self._cancelled_clean_exit(monkeypatch, repeated)
+        assert getattr(cancellation, "__notes__", []) == [NOTE]
+
+    async def test_a_pure_repeated_cancellation_adds_no_note(self, monkeypatch):
+        cancellation = await self._cancelled_clean_exit(
+            monkeypatch, asyncio.CancelledError()
+        )
+        assert not getattr(cancellation, "__notes__", [])

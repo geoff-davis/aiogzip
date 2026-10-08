@@ -310,7 +310,7 @@ fill capped: `readinto()` fills up to `len(b)` before copying so a failed
 refill leaves the stream intact, and a piecewise fill would change that.
 Unexpected CLI failures exit with status 2, argparse's usage status, keeping 1
 for stream failures. A repeated cancellation during context-exit cleanup is
-not noted as a cleanup failure.
+not noted as a cleanup failure unless it carries one as its cause.
 
 ### R10: documentation
 

@@ -1543,9 +1543,16 @@ class AsyncGzipBinaryFile:
                 # cancellation so timeout/TaskGroup exit cannot leak it.
                 try:
                     await self._abort_active_call_on_exit()
-                except asyncio.CancelledError:
-                    # A repeated cancellation is not a cleanup failure.
-                    pass
+                except asyncio.CancelledError as repeated:
+                    # A repeated cancellation is not a cleanup failure, but
+                    # settlement may raise it from one (a failed native close).
+                    failure = repeated.__cause__
+                    if failure is not None and not isinstance(
+                        failure, asyncio.CancelledError
+                    ):
+                        cancellation.add_note(
+                            f"Context-exit cleanup also failed: {failure!r}"
+                        )
                 except BaseException as cleanup:
                     # The cancellation keeps precedence; record what failed.
                     cancellation.add_note(
