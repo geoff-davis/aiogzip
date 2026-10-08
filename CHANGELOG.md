@@ -55,6 +55,17 @@ All notable changes to this project will be documented in this file.
   bytes, so offsets are measured from the true end, still after trailer
   validation and within `max_decompressed_size`.
 
+### Documentation
+
+- Documented behavior that differs from what callers might assume: `async
+  for` over a closed handle ends rather than raising, `flush()` on an
+  unopened write handle returns, `write()` and `flush()` report custom-sink
+  errors differently, read-mode negative seeks raise `OSError` where stdlib
+  gzip clamps, a text read must not be retried after `UnicodeDecodeError`,
+  and `inspect()` memory grows with the member count and header fields.
+  Also documented the end-relative seek and context-exit cleanup fixes in
+  this release.
+
 ## [2.0.0b2] - 2026-10-07
 
 This beta keeps the 2.0 public API frozen: every public signature, type and

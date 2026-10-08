@@ -335,6 +335,28 @@ collection grows with the member count, and each header's FNAME, FCOMMENT
 and FEXTRA fields are buffered whole (up to 128 MiB each); and the BC11–BC13
 behavior.
 
+*As implemented (`docs/rc1-r10`).* Every item was rechecked against the code
+before it was written down:
+
+- `docs/errors.md`: a "Closed and unopened handles" section (closed-handle
+  iteration ends; `flush()` on an unopened write handle returns), a
+  "Custom sink errors" section (`write()` propagates the sink's exception;
+  `flush()` wraps a non-`OSError` as `OSError` with the original as
+  `__cause__`), the `UnicodeDecodeError` retry warning, and BC15's cleanup
+  note and consumed abort cancellation.
+- `docs/api.md`: `inspect()` memory and header buffering.
+- `docs/recipes.md`: BC12's `SEEK_END` and the negative-seek difference from
+  stdlib gzip.
+- BC11, BC13 and BC14 were already documented, in `docs/errors.md` and
+  `docs/api.md`.
+
+Two corrections to the item list above. The 128 MiB limit applies to each
+whole gzip header, not to each field: FEXTRA is at most 64 KiB by the format,
+and FNAME and FCOMMENT are buffered whole (only when member metadata is
+collected) and bounded by the header limit. A retry after
+`UnicodeDecodeError` skips the rest of the decoded chunk, not only the
+undecodable bytes (about 24,000 of 60,001 lines in a 60,001-line check).
+
 ### R15: cancelled `close()` leaks a queued native close
 
 **Defect (found by the R02 forced-timeout sweep, 2026-10-08; reproduced on
