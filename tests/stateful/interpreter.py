@@ -1032,6 +1032,11 @@ def symbolic(events: list[Event], workdir: str | None = None) -> list[Any]:
     def value(item: Any, op: str) -> Any:
         if op in ("tell_mark", "seek_mark") and isinstance(item, int):
             return symbols.setdefault(item, f"C{len(symbols) + 1}")
+        if op == "seek_end" and isinstance(item, int) and item < 0:
+            # A text SEEK_END returns a cookie; binary positions are never
+            # negative. Cookies carry a per-handle nonce, so only their
+            # identity is comparable across runs.
+            return symbols.setdefault(item, f"C{len(symbols) + 1}")
         if isinstance(item, (bytes, bytearray)):
             if len(item) <= INLINE_LIMIT:
                 return {"bytes": bytes(item).hex()}

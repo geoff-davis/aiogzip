@@ -36,6 +36,7 @@ from differential import (
     _converged,
     _losses,
     _remaining_text,
+    _text_of,
     _wire_scenario,
     bc2_claim,
     bc2_request,
@@ -3917,3 +3918,312 @@ def test_r3_5218_replays_nothing_outside_healthy():
     assert claims(result, "BC2-LOST-INPUT")
     lossy["replays"] = [[3, 14]]
     assert bc2_claim(pair, bc2_request(pair), lossy, set()).events == set()
+
+
+# Recorded 2.0.0rc1 references (tests/data/rc1_reference_runs.json): BC11,
+# BC12, BC7 through a text SEEK_END, and F2 through an aborted SEEK_END.
+
+RC1 = json.loads((DATA.parent / "rc1_reference_runs.json").read_text(encoding="utf-8"))[
+    "runs"
+]
+
+
+def rc1_pair(reference: str, seed: int) -> Pair:
+    """The live candidate against a recorded reference run; with a recorded
+    BC12-fixed run, the pair compares against it as ``run()`` does."""
+    record = copy.deepcopy(RC1[f"{reference}/{seed}"])
+    run = record["fixed"] or record["reference"]
+    pair = make_pair(seed, parse(run["trace"]), reference=reference, ref_info=run)
+    if record["fixed"]:
+        pair = dataclasses.replace(pair, original=parse(record["reference"]["trace"]))
+    return pair
+
+
+def rc1_lossy(reference: str, seed: int) -> dict[str, Any] | None:
+    return copy.deepcopy(RC1[f"{reference}/{seed}"]["lossy"])
+
+
+def test_rc1_fixture_covers_exactly_the_listed_seeds():
+    listed = {f"b2/{seed}" for seed in (225, 1000193) + BC12_SEEDS}
+    listed |= {"b1/1000089", "b1/1000132", "b1/1000196"}
+    assert set(RC1) == listed
+
+
+def test_seek_end_cookies_are_symbols_and_positions_stay_ints():
+    events = [
+        Event(0, {"op": "seek_end"}, Outcome("ok", -(10**40))),
+        Event(1, {"op": "tell_mark", "label": "m"}, Outcome("ok", -(10**40))),
+        Event(2, {"op": "seek_end"}, Outcome("ok", 7)),
+        Event(3, {"op": "seek_end"}, Outcome("ok", -5)),
+    ]
+    assert [row[2] for row in interpreter.symbolic(events)] == [
+        {"ok": "C1"},
+        {"ok": "C1"},
+        {"ok": 7},
+        {"ok": "C2"},
+    ]
+
+
+# BC11
+
+
+@pytest.mark.parametrize("seed", [225, 1000193])
+def test_bc11_recorded_b2_difference_is_claimed(seed):
+    pair = rc1_pair("b2", seed)
+    passes(pair, "BC11-TEXT-SEEK-FAILURE")
+    assert compare(pair).claims.keys() == {
+        "BC11-TEXT-SEEK-FAILURE",
+        "BC12-SEEK-END",
+    }
+
+
+def test_bc11_applies_to_b1():
+    record = RC1["b2/225"]["reference"]
+    passes(
+        make_pair(225, parse(record["trace"]), reference="b1", ref_info=record),
+        "BC11-TEXT-SEEK-FAILURE",
+    )
+
+
+def _bc11_225(**changes) -> Pair:
+    pair = rc1_pair("b2", 225)
+    for name, value in changes.items():
+        setattr(pair, name, value)
+    return pair
+
+
+def test_bc11_needs_the_reference_cursor_witness():
+    pair = rc1_pair("b2", 225)
+    pair.ref_info["cursor_moved"] = [[5, False]]
+    fails(pair, "(7, 'buffer_read', 0)", "(8, 'read', 0)", "(9, 'read', 0)")
+
+
+def test_bc11_needs_the_candidate_cursor_witness():
+    pair = rc1_pair("b2", 225)
+    pair.cand_info["cursor_moved"] = []
+    fails(pair, "(7, 'buffer_read', 0)")
+
+
+def test_bc11_rejects_a_witness_listed_twice():
+    pair = rc1_pair("b2", 225)
+    pair.ref_info["cursor_moved"] = [[5, True], [5, True]]
+    fails(pair, "(7, 'buffer_read', 0)")
+
+
+def test_bc11_needs_the_candidate_broken_after_the_seek():
+    pair = rc1_pair("b2", 225)
+    n = pair.cand_order[(5, "seek_mark", 0)]
+    pair.cand_info["health"][n][1] = "VALIDATION_SALVAGE"
+    fails(pair, "(7, 'buffer_read', 0)")
+
+
+def test_bc11_span_ends_when_the_candidate_leaves_broken():
+    pair = rc1_pair("b2", 225)
+    n = pair.cand_order[(8, "read", 0)]
+    pair.cand_info["health"][n][1] = "HEALTHY"
+    result = compare(pair)
+    assert result.failures == ["unclaimed difference ('event', (9, 'read', 0))"]
+
+
+def test_bc11_rejects_a_seek_whose_outcomes_differ():
+    record = copy.deepcopy(RC1["b2/225"]["reference"])
+    ref = parse(record["trace"])
+    ref = edit(ref, (5, "seek_mark", 0), outcome={"ok": "C2"})
+    fails(
+        make_pair(225, ref, reference="b2", ref_info=record),
+        "(5, 'seek_mark', 0)",
+        "(7, 'buffer_read', 0)",
+    )
+
+
+def test_bc11_rejects_a_reference_error():
+    record = copy.deepcopy(RC1["b2/225"]["reference"])
+    ref = edit(
+        parse(record["trace"]),
+        (8, "read", 0),
+        outcome={"error": "OSError", "message": "boom"},
+    )
+    fails(make_pair(225, ref, reference="b2", ref_info=record), "(8, 'read', 0)")
+
+
+def test_bc11_rejects_another_candidate_error():
+    pair = rc1_pair("b2", 225)
+    cand = edit(
+        pair.cand, (8, "read", 0), outcome={"error": "OSError", "message": "boom"}
+    )
+    pair = dataclasses.replace(pair, cand=cand)
+    fails(pair, "(8, 'read', 0)")
+
+
+def test_bc11_rejects_a_binary_reader():
+    pair = rc1_pair("b2", 225)
+    pair.scenario["mode"] = "rb"
+    fails(pair, "(7, 'buffer_read', 0)")
+
+
+# BC12
+
+BC12_SEEDS = (1000008, 1000093, 1000189, 1000196)
+
+
+@pytest.mark.parametrize("seed", BC12_SEEDS)
+def test_bc12_recorded_b2_difference_is_claimed(seed):
+    pair = rc1_pair("b2", seed)
+    assert pair.original is not None and pair.ref != pair.original
+    assert pair.diffs == set()  # the fixed run is the candidate's
+    passes(pair, "BC12-SEEK-END")
+
+
+def test_bc12_b1_composes_with_bc2():
+    # b1's cancelled custom-source read loses input only once BC12 makes the
+    # seek drain the peeked output: BC2 claims against the fixed run.
+    pair = rc1_pair("b1", 1000196)
+    result = compare(pair, rc1_lossy("b1", 1000196))
+    assert result.ok, result.failures
+    assert claims(result, "BC12-SEEK-END") and claims(result, "BC2-LOST-INPUT")
+
+
+def test_bc12_b1_without_the_lossy_run_leaves_bc2s_part_unclaimed():
+    fails(rc1_pair("b1", 1000196), "(4, 'peek', 0)")
+
+
+def test_bc12_leaves_a_difference_from_the_fixed_run_unclaimed():
+    pair = rc1_pair("b2", 1000008)
+    key = (6, "peek", 0)
+    pair = dataclasses.replace(
+        pair, ref=edit(pair.ref, key, outcome={"ok": {"bytes": "0d"}})
+    )
+    fails(pair, f"('event', {key!r})")
+
+
+def test_bc12_fixed_run_must_match_the_reference_before_its_seek_end():
+    pair = rc1_pair("b2", 1000008)
+    key = (1, "tell", 0)
+    pair = dataclasses.replace(
+        pair, original=edit(pair.original, key, outcome={"ok": 9})
+    )
+    fails(pair, "differs from the reference before its seek_end")
+
+
+def test_bc12_without_a_fixed_run_claims_nothing():
+    record = RC1["b2/1000008"]["reference"]
+    fails(
+        make_pair(1000008, parse(record["trace"]), reference="b2", ref_info=record),
+        "(5, 'seek_end', 0)",
+    )
+
+
+def test_bc12_fixed_root_patches_exactly_the_seek_end_loop(tmp_path):
+    import differential
+
+    root = tmp_path / "ref"
+    (root / "src" / "aiogzip").mkdir(parents=True)
+    binary = root / "src" / "aiogzip" / "_binary.py"
+    binary.write_text("head\n" + differential.BC12_BEFORE + "tail\n")
+    fixed = differential.fixed_root(root, tmp_path / "work")
+    patched = (fixed / "src" / "aiogzip" / "_binary.py").read_text()
+    assert patched == "head\n" + differential.BC12_AFTER + "tail\n"
+    binary.write_text("head\n" + differential.BC12_BEFORE * 2)
+    with pytest.raises(SystemExit):
+        differential.fixed_root(root, tmp_path / "again")
+
+
+def test_bc12_fixed_loop_is_the_candidates():
+    import differential
+
+    source = (Path(aiogzip.__file__).parent / "_binary.py").read_text()
+    code = "".join(
+        line
+        for line in source.splitlines(keepends=True)
+        if not line.lstrip().startswith("#")
+    )
+    assert code.count(differential.BC12_AFTER) == 1
+
+
+def test_bc12_runs_only_for_binary_seek_end_scenarios():
+    import differential
+
+    assert differential.wants_fixed(generate(1000008))
+    assert not differential.wants_fixed(generate(1000132))  # text
+    assert not differential.wants_fixed(generate(124))  # no seek_end
+
+
+# BC7 through a text SEEK_END
+
+
+@cache
+def _seek_end_shadow_run(seed: int) -> str:
+    import differential
+
+    shadow = differential.seek_end_shadow(rc1_pair("b1", seed))
+    assert shadow is not None
+    return json.dumps(recorded_run(aiogzip, shadow, ENGINE, "observe"))
+
+
+def bc7_seek_end(seed: int = 1000132) -> Pair:
+    pair = rc1_pair("b1", seed)
+    pair.seek_end_shadow = json.loads(_seek_end_shadow_run(seed))
+    return pair
+
+
+def test_bc7_f1a_through_seek_end_is_claimed():
+    pair = bc7_seek_end()
+    shadow = parse(pair.seek_end_shadow["trace"])
+    assert len(_text_of(row(shadow, 7, "read").outcome)) == 101
+    passes(pair, "BC7-TEXT-SALVAGE")
+
+
+def test_bc7_seek_end_needs_its_shadow():
+    pair = bc7_seek_end()
+    pair.seek_end_shadow = None
+    fails(pair, "(7, 'seek_end', 0)")
+
+
+def test_bc7_seek_end_rejects_a_shadow_violation():
+    pair = bc7_seek_end()
+    pair.seek_end_shadow["violations"] = [[7, "injected"]]
+    fails(pair, "(7, 'seek_end', 0)")
+
+
+def test_bc7_seek_end_rejects_a_tail_the_salvage_cannot_hold():
+    # Five bytes after the shadow's text would complete the emoji. (A
+    # shorter tail stays consistent: a salvage ending a byte earlier.)
+    pair = bc7_seek_end()
+    key = (7, "seek_end", 0)
+    message = pair.ref_by_key[key].outcome["message"].replace("0-2", "0-4")
+    pair = dataclasses.replace(
+        pair,
+        ref=edit(
+            pair.ref, key, outcome={"error": "UnicodeDecodeError", "message": message}
+        ),
+    )
+    pair.seek_end_shadow = json.loads(_seek_end_shadow_run(1000132))
+    fails(pair, "(7, 'seek_end', 0)")
+
+
+def test_bc7_seek_end_rejects_shadow_text_that_is_not_the_salvage():
+    pair = bc7_seek_end()
+    trace = pair.seek_end_shadow["trace"]
+    (read,) = [r for r in trace if r[0] == 7]
+    read[2] = {"ok": {"str": "\nzz"}}
+    fails(pair, "(7, 'seek_end', 0)")
+
+
+def test_bc7_seek_end_rejects_a_healthy_reader():
+    pair = bc7_seek_end()
+    n = pair.cand_order[(7, "seek_end", 0)]
+    pair.cand_info["health"][n][0] = "HEALTHY"
+    fails(pair, "(7, 'seek_end', 0)")
+
+
+# F2 through an aborted SEEK_END
+
+
+def test_bc2_f2_claims_an_aborted_seek_end():
+    pair = rc1_pair("b1", 1000089)
+    shadow = shadow_scenario(pair)
+    assert shadow is not None and shadow["ops"][-1]["op"] == "seek_end"
+    shadow_run = recorded_run(aiogzip, shadow, ENGINE, "observe")
+    result = compare(pair, None, json.loads(json.dumps(shadow_run)))
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT")

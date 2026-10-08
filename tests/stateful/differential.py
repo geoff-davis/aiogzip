@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""C0 and b1 differential comparison for the WP10 stateful harness.
+"""C0, b1 and b2 differential comparison for the stateful harness.
 
-The candidate, C0 and b1 each replay the same scenario JSON in their own
+The candidate, C0, b1 and b2 each replay the same scenario JSON in their own
 subprocess (``interpreter.py``), importing aiogzip from a clean source root.
 This module compares the symbolic traces event by event. Every difference
 must be claimed by exactly one predicate named for a ledger exception;
@@ -13,10 +13,17 @@ plans/design/v2.0.0b2-wp10-qualification.md, which this implements:
   a one-sided event that only ``BC3-OPENING`` clause O2 may claim;
 - event-specific predicates claim first (``BC3-OPENING``,
   ``BC7-TEXT-SALVAGE``, ``BC8-WRITER-ABORT``, ``BC9-REWIND-ABORT``,
-  ``BC10-TEXT-COOKIE-RECOVERY``), and an item two of them claim fails the
-  seed;
+  ``BC10-TEXT-COOKIE-RECOVERY``, ``BC11-TEXT-SEEK-FAILURE``), and an item
+  two of them claim fails the seed;
 - ``BC2-LOST-INPUT`` then claims the remaining differing events in its span,
-  subject to the lossy model run over b1's replay (a second subprocess).
+  subject to the lossy model run over b1's replay (a second subprocess);
+- against b1 and b2, a binary scenario with a ``seek_end`` is judged against
+  the reference with only the BC12 change applied, and ``BC12-SEEK-END``
+  claims each difference from the reference's own trace that the fixed run
+  does not have (the 2.0.0rc1 plan, R11).
+
+Against b2, which already carries BC1-BC10, only ``BC11-TEXT-SEEK-FAILURE``
+and ``BC12-SEEK-END`` apply.
 
 ``C0-WP8-FAILED-ABORT`` has no predicate: it needs an abort whose underlying
 close fails, which the generator never produces, so any such difference
@@ -34,6 +41,8 @@ import dataclasses
 import json
 import math
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -54,6 +63,7 @@ from interpreter import (  # noqa: E402
 from model import (  # noqa: E402
     INCOMPLETE_TAIL,
     NATIVE_SEEK,
+    SEEK_OPS,
     Checker,
     later_loss_kind,
     loss_witness,
@@ -107,10 +117,19 @@ PREDICATES = (
     "BC8-WRITER-ABORT",
     "BC9-REWIND-ABORT",
     "BC10-TEXT-COOKIE-RECOVERY",
+    "BC11-TEXT-SEEK-FAILURE",
+    "BC12-SEEK-END",
 )
 APPLIES = {
-    "c0": ("BC7-TEXT-SALVAGE", "BC8-WRITER-ABORT", "BC9-REWIND-ABORT"),
+    "c0": (
+        "BC7-TEXT-SALVAGE",
+        "BC8-WRITER-ABORT",
+        "BC9-REWIND-ABORT",
+        "BC11-TEXT-SEEK-FAILURE",
+    ),
     "b1": PREDICATES,
+    # b2 carries BC1-BC10; only the 2.0.0rc1 exceptions remain.
+    "b2": ("BC11-TEXT-SEEK-FAILURE", "BC12-SEEK-END"),
 }
 
 
@@ -210,13 +229,18 @@ class Pair:
     """One seed's candidate and reference traces, and the candidate's model."""
 
     scenario: dict[str, Any]
-    reference: str  # "c0" or "b1"
+    reference: str  # "c0", "b1" or "b2"
     cand: list[Row]
     ref: list[Row]
     cand_info: dict[str, Any]
     engine: str
     # The reference run record's evidence (``seeks``, ``origins``), if any.
     ref_info: dict[str, Any] = dataclasses.field(default_factory=dict)
+    # When ``ref`` is the BC12-fixed reference run (see ``bc12``), the
+    # reference's own trace.
+    original: list[Row] | None = None
+    # The candidate's F1a ``seek_end`` shadow run, if any.
+    seek_end_shadow: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         self.cand_by_key = {row.key: row for row in self.cand}
@@ -352,17 +376,28 @@ def compare(
             failures += _f1a_failures(pair, lossy, owner, claim)
             for item in claim.items():
                 owner.setdefault(item, "BC2-LOST-INPUT")
-    differences = (
-        {("event", k) for k in pair.diffs}
-        | {("final", f) for f in pair.final_diffs}
-        | {("one-sided", k) for k in pair.cand_only | pair.ref_only}
-    )
+    differences = _differences(pair)
     for item in sorted(differences - owner.keys(), key=repr):
         failures.append(f"unclaimed difference {item}")
+    if pair.original is not None:
+        # Every claim so far is against the BC12-fixed run; report the
+        # differences from the reference's own trace.
+        failures += bc12(pair, owner)
+        differences = _differences(
+            dataclasses.replace(pair, ref=pair.original, original=None)
+        )
     claims: dict[str, list[str]] = {name: [] for name in applies}
     for item in sorted(differences & owner.keys(), key=repr):
         claims[owner[item]].append(repr(item))
     return Result(seed, pair.reference, claims, failures)
+
+
+def _differences(pair: Pair) -> set[tuple[str, Any]]:
+    return (
+        {("event", k) for k in pair.diffs}
+        | {("final", f) for f in pair.final_diffs}
+        | {("one-sided", k) for k in pair.cand_only | pair.ref_only}
+    )
 
 
 def _f1a_failures(
@@ -647,6 +682,9 @@ def bc7(pair: Pair) -> Claim:
     f_event: tuple[str, Any, str] | None = None  # clause, reference outcome, F text
     served = ""  # text the reference went on to serve after an F1a event
     for key in keys:
+        if f_event is None and _f1a_seek_end(pair, key):
+            claim.events.add(key)
+            continue
         call = _read_call(pair, key)
         if call is None:
             continue
@@ -681,6 +719,106 @@ def bc7(pair: Pair) -> Claim:
         ):
             claim.events.add(key)
     return claim
+
+
+def _f1a_seek_end_key(pair: Pair) -> tuple[int, str, int] | None:
+    """The first differing text ``seek(0, SEEK_END)`` where the reference
+    raises an incomplete-tail ``UnicodeDecodeError`` from a salvaging reader
+    at text position 0, and the candidate returns a cookie."""
+    if pair.mode != "rt":
+        return None
+    for key in sorted(pair.diffs, key=lambda k: pair.cand_order[k]):
+        if key[1] != "seek_end" or pair.op(key) != {"op": "seek_end", "offset": 0}:
+            continue
+        n = pair.cand_order[key]
+        position = (pair.cand_info.get("positions") or [None] * (n + 1))[n]
+        if pair.health_before(key) != "VALIDATION_SALVAGE" or position != [0, 0]:
+            continue
+        c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+        if (c.second, c.parked, c.taken, c.pulled) != (None, None, None, None):
+            continue
+        if (r.second, r.parked, r.taken, r.pulled) != (None, None, None, None):
+            continue
+        if _tail_length(r.outcome) is None:
+            continue
+        if (
+            isinstance(c.outcome, dict)
+            and c.outcome.keys() == {"ok"}
+            and isinstance(c.outcome["ok"], str)  # a symbolized cookie
+        ):
+            return key
+    return None
+
+
+def _tail_length(outcome: Any) -> int | None:
+    """Bytes a final decode held as an incomplete character, from the
+    reference's ``UnicodeDecodeError``, when they start the decode call."""
+    if not is_error(outcome, "UnicodeDecodeError"):
+        return None
+    message = outcome["message"]
+    if not message.endswith(INCOMPLETE_TAIL):
+        return None
+    found = re.search(r"in position 0(?:-(\d+))?: ", message)
+    if found is None:
+        return None
+    return int(found.group(1)) + 1 if found.group(1) else 1
+
+
+def seek_end_shadow(pair: Pair) -> dict[str, Any] | None:
+    """The F1a ``seek_end`` shadow: ``ops[:i] + [read(-1)]`` on the candidate,
+    the read the reference's text ``SEEK_END`` performs."""
+    key = _f1a_seek_end_key(pair)
+    if key is None:
+        return None
+    shadow = copy.deepcopy(pair.scenario)
+    shadow["ops"] = shadow["ops"][: key[0]] + [{"op": "read", "n": -1}]
+    return shadow
+
+
+def _f1a_seek_end(pair: Pair, key) -> bool:
+    """F1a through a text ``seek(0, SEEK_END)``, which reads to the end.
+
+    The reference finalizes the decoder over an incomplete salvaged tail of
+    k bytes and raises ``UnicodeDecodeError``; the candidate holds the tail
+    and returns a cookie. The shadow run, with no model violation and the
+    candidate's trace before the seek, reads text T from position 0
+    instead. Some prefix of the salvage bound decodes to exactly T, and
+    the k bytes after it complete no character. Only this event is
+    claimed: a later difference opens no span and stays unclaimed.
+    """
+    if key != _f1a_seek_end_key(pair):
+        return False
+    shadow = pair.seek_end_shadow
+    if shadow is None or shadow.get("violations") != []:
+        return False
+    rows = parse(shadow["trace"])
+    if [x for x in rows if x.index < key[0]] != [
+        x for x in pair.cand if x.index < key[0]
+    ]:
+        return False
+    read = [x for x in rows if x.index == key[0]]
+    if len(read) != 1 or read[0].key != (key[0], "read", 0):
+        return False
+    text = _text_of(read[0].outcome)
+    if text is None or (read[0].second, read[0].parked) != (None, None):
+        return False
+    tail = _tail_length(pair.ref_by_key[key].outcome)
+    assert tail is not None
+    options = pair.scenario["text"]
+    data = salvage(pair.scenario, pair.engine)
+
+    def decoded(n: int) -> str | None:
+        try:
+            return text_model(
+                data[:n], options["encoding"], options["newline"], False, True
+            )
+        except UnicodeError:
+            return None
+
+    return any(
+        decoded(n) == text and decoded(n + tail) == text
+        for n in range(len(data) - tail + 1)
+    )
 
 
 def _read_call(pair: Pair, key) -> tuple[dict[str, Any], Any, Any] | None:
@@ -993,12 +1131,157 @@ def _claim_output(pair: Pair, data: bytes, claim: Claim) -> None:
             return
 
 
+# BC11
+
+
+def _moved(info: dict[str, Any], index: int) -> bool | None:
+    witnesses = [
+        moved
+        for at, moved in info.get("cursor_moved") or []
+        if at == index and isinstance(moved, bool)
+    ]
+    return witnesses[0] if len(witnesses) == 1 else None
+
+
+def bc11(pair: Pair) -> Claim:
+    """A failed text seek that moved the binary cursor makes the candidate
+    terminal; the reference keeps serving its old text over the moved
+    position.
+
+    The seek event is identical on both sides and fails, both runs record
+    the cursor as moved by it, and the candidate model has the reader
+    BROKEN after it. Later differing reads are claimed while the candidate
+    stays BROKEN: the candidate refuses with the broken-stream error and
+    the reference returns data. A recovery ends the span.
+    """
+    claim = Claim()
+    if pair.mode != "rt":
+        return claim
+    span = False
+    for row in pair.cand:
+        key = row.key
+        if key[1] in SEEK_OPS:
+            r = pair.ref_by_key.get(key)
+            if (
+                r == row
+                and is_error(row.outcome)
+                and _moved(pair.cand_info, key[0]) is True
+                and _moved(pair.ref_info, key[0]) is True
+                and pair.health_after(key) == "BROKEN"
+            ):
+                span = True
+                continue
+        if not span:
+            continue
+        if pair.health_before(key) != "BROKEN":
+            span = False
+            continue
+        if key in pair.diffs and key[1] in TEXT_READS | {"buffer_read"}:
+            r = pair.ref_by_key[key]
+            if (
+                is_error(row.outcome, "OSError", READ_BROKEN)
+                and (row.second, row.parked, row.taken, row.pulled)
+                == (None, None, None, None)
+                and r.parked is None
+                and r.taken is None
+                and isinstance(r.outcome, dict)
+                and r.outcome.keys() & {"ok", "stop"}
+            ):
+                claim.events.add(key)
+        if pair.health_after(key) != "BROKEN":
+            span = False
+    return claim
+
+
+# BC12
+
+
+BC12_BEFORE = """\
+                elif whence == os.SEEK_END:
+                    while not self._eof:
+                        await self._fill_buffer()
+                        buffered = len(self._buffer) - self._buffer_offset
+                        if buffered > 0:
+                            self._buffer_offset = len(self._buffer)
+                            self._position += buffered
+                            del self._buffer[:]
+                            self._buffer_offset = 0
+"""
+BC12_AFTER = """\
+                elif whence == os.SEEK_END:
+                    while True:
+                        buffered = len(self._buffer) - self._buffer_offset
+                        if buffered > 0:
+                            self._position += buffered
+                            del self._buffer[:]
+                            self._buffer_offset = 0
+                        if self._eof:
+                            break
+                        await self._fill_buffer()
+"""
+
+
+def fixed_root(reference_root: Path, workdir: Path) -> Path:
+    """A copy of the reference's ``src`` with only the BC12 change applied.
+
+    The reference's binary ``SEEK_END`` loop must match ``BC12_BEFORE``
+    exactly once (b1 and b2 share it); anything else raises.
+    """
+    root = workdir / "bc12-fixed"
+    shutil.copytree(reference_root / "src", root / "src")
+    target = root / "src" / "aiogzip" / "_binary.py"
+    source = target.read_text(encoding="utf-8")
+    if source.count(BC12_BEFORE) != 1:
+        raise SystemExit("the reference's SEEK_END loop is not the b1/b2 loop")
+    target.write_text(source.replace(BC12_BEFORE, BC12_AFTER), encoding="utf-8")
+    return root
+
+
+def wants_fixed(scenario: dict[str, Any]) -> bool:
+    """A binary read scenario with a ``seek_end``, direct or as a call."""
+    return scenario["mode"] == "rb" and any(
+        op["op"] == "seek_end" or op.get("call", {}).get("op") == "seek_end"
+        for op in scenario["ops"]
+    )
+
+
+def bc12(pair: Pair, owner: dict[tuple[str, Any], str]) -> list[str]:
+    """Claim the differences from the reference that the BC12 change alone
+    explains; return failures.
+
+    A metamorphic check over the reference's own code. For a binary scenario
+    with a ``seek_end``, every predicate judges the candidate against the
+    fixed run: the reference source with only its ``SEEK_END`` loop replaced
+    by the candidate's, on the same scenario and engine. The fixed run must
+    agree with the reference's own trace before the first ``seek_end``. A
+    difference from the reference's trace that the candidate does not have
+    against the fixed run is the fix's, and BC12 claims it. One the
+    candidate also has against the fixed run keeps that predicate's claim,
+    or stays unclaimed.
+    """
+    assert pair.original is not None
+    first = min(
+        index
+        for index, op in enumerate(pair.ops)
+        if op["op"] == "seek_end" or op.get("call", {}).get("op") == "seek_end"
+    )
+    if [x for x in pair.ref if x.index < first] != [
+        x for x in pair.original if x.index < first
+    ]:
+        return ["the BC12-fixed run differs from the reference before its seek_end"]
+    original = dataclasses.replace(pair, ref=pair.original, original=None)
+    for item in _differences(original) - _differences(pair):
+        owner[item] = "BC12-SEEK-END"
+    return []
+
+
 SPECIFIC = (
     ("BC3-OPENING", bc3),
     ("BC7-TEXT-SALVAGE", bc7),
     ("BC8-WRITER-ABORT", bc8),
     ("BC9-REWIND-ABORT", bc9),
     ("BC10-TEXT-COOKIE-RECOVERY", bc10),
+    ("BC11-TEXT-SEEK-FAILURE", bc11),
 )
 
 
@@ -1270,7 +1553,7 @@ def _f2_abort(pair: Pair) -> tuple[int, str, int] | None:
         injected = {"error": "InjectedAbort", "message": f"abort at {key[0]}"}
         call = pair.op(key).get("call", {}).get("op")
         if (
-            call in READ_CALLS | {"buffer_read"}
+            call in READ_CALLS | {"buffer_read", "seek_end"}
             and c.outcome == r.outcome == injected
             and c.second == {"error": "OSError", "message": READ_ABORTED}
             and c.parked is None
@@ -1835,24 +2118,40 @@ def run(
     if len(decompression) != 1:
         raise SystemExit(f"candidate and reference engines differ: {records}")
     (inflater,) = decompression
-    pairs = {
-        seed: Pair(
+    fixed_runs: dict[str, Any] = {}
+    fixed: Path | None = None
+    wanted = [seed for seed in seeds if wants_fixed(scenarios[seed])]
+    if reference in ("b1", "b2") and wanted:
+        fixed = fixed_root(reference_root, workdir)
+        path = workdir / "bc12-fixed.jsonl"
+        with path.open("w", encoding="utf-8") as lines:
+            for seed in wanted:
+                lines.write(json.dumps(scenarios[seed]) + "\n")
+        fixed_runs = _run_root(fixed, engine, path, workdir / "bc12-fixed.json")["runs"]
+    pairs = {}
+    for seed in seeds:
+        ref_run = fixed_runs.get(str(seed)) or ref_runs[str(seed)]
+        pairs[seed] = Pair(
             scenarios[seed],
             reference,
             parse(cand_runs[str(seed)]["trace"]),
-            parse(ref_runs[str(seed)]["trace"]),
+            parse(ref_run["trace"]),
             cand_runs[str(seed)],
             inflater,
-            ref_runs[str(seed)],
+            ref_run,
+            original=parse(ref_runs[str(seed)]["trace"])
+            if str(seed) in fixed_runs
+            else None,
         )
-        for seed in seeds
-    }
-    requests = {}
+    requests: dict[Path, dict[int, Bc2Request]] = {}
     if reference == "b1":
         for seed, pair in pairs.items():
             request = bc2_request(pair)
             if request is not None:
-                requests[seed] = request
+                # The lossy model replays the run its pair compares against.
+                root = fixed if pair.original is not None else reference_root
+                assert root is not None
+                requests.setdefault(root, {})[seed] = request
     lossy_runs: dict[str, Any] = {}
     shadows = {}
     if reference == "b1":
@@ -1869,14 +2168,31 @@ def run(
         shadow_runs = _run_root(
             candidate_root, engine, path, workdir / "shadow.json", "--observe"
         )["runs"]
-    if requests:
-        path = workdir / "lossy.jsonl"
+    seek_end_shadows = {}
+    for seed, pair in pairs.items():
+        shadow = seek_end_shadow(pair)
+        if shadow is not None:
+            seek_end_shadows[seed] = shadow
+    if seek_end_shadows:
+        path = workdir / "seek-end-shadow.jsonl"
         with path.open("w", encoding="utf-8") as lines:
-            for seed, request in requests.items():
-                lines.write(json.dumps(request.line(scenarios[seed])) + "\n")
-        lossy_runs = _run_root(
-            reference_root, engine, path, workdir / "lossy.json", "--lossy"
+            for shadow in seek_end_shadows.values():
+                lines.write(json.dumps(shadow) + "\n")
+        runs = _run_root(
+            candidate_root, engine, path, workdir / "seek-end-shadow.json", "--observe"
         )["runs"]
+        for seed in seek_end_shadows:
+            pairs[seed].seek_end_shadow = runs.get(str(seed))
+    for n, (root, by_seed) in enumerate(requests.items()):
+        path = workdir / f"lossy-{n}.jsonl"
+        with path.open("w", encoding="utf-8") as lines:
+            for seed, request in by_seed.items():
+                lines.write(json.dumps(request.line(scenarios[seed])) + "\n")
+        lossy_runs.update(
+            _run_root(root, engine, path, workdir / f"lossy-{n}.json", "--lossy")[
+                "runs"
+            ]
+        )
     results = [
         compare(pairs[s], lossy_runs.get(str(s)), shadow_runs.get(str(s)))
         for s in seeds
@@ -1896,6 +2212,8 @@ def run(
                     "reference": ref_runs[str(seed)],
                     "lossy": lossy_runs.get(str(seed)),
                     "shadow": shadow_runs.get(str(seed)),
+                    "fixed": fixed_runs.get(str(seed)),
+                    "seek_end_shadow": pairs[seed].seek_end_shadow,
                     "claims": result.claims,
                     "failures": result.failures,
                 }
@@ -1913,7 +2231,7 @@ def run(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--reference", choices=("c0", "b1"), required=True)
+    parser.add_argument("--reference", choices=("c0", "b1", "b2"), required=True)
     parser.add_argument("--reference-root", type=Path, required=True)
     parser.add_argument("--candidate-root", type=Path, required=True)
     parser.add_argument("--engine", choices=("stdlib", "zlib-ng"), required=True)
