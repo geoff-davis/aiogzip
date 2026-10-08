@@ -85,6 +85,16 @@ B1_READ_BROKEN_SEEK0 = {
     "message": "read stream is broken after failed or cancelled decompression; "
     "seek to 0 to recover, or close and reopen the gzip file",
 }
+# The candidate's complete broken-stream refusals, for a seekable source
+# and for one that cannot rewind.
+BROKEN_REFUSALS = (
+    B1_READ_BROKEN_SEEK0,
+    {
+        "error": "OSError",
+        "message": "read stream is broken after failed or cancelled "
+        "decompression; close and reopen the gzip file",
+    },
+)
 WRITE_BROKEN = "write stream is broken"
 # Whether this platform counts open descriptors (it needs /proc/self/fd).
 FD_COUNTS = _open_fds() is not None
@@ -1154,34 +1164,70 @@ def _moved(info: dict[str, Any], index: int) -> bool | None:
     return witnesses[0] if len(witnesses) == 1 else None
 
 
+def _length(value: Any) -> bool:
+    return type(value) is int and value >= 0
+
+
+def _hex(value: Any, length: int | None = None) -> bool:
+    if not isinstance(value, str) or len(value) % 2:
+        return False
+    if length is not None and len(value) != length:
+        return False
+    return all(c in "0123456789abcdef" for c in value)
+
+
+def _symbolic_bytes(value: Any) -> int | None:
+    """The length of an interpreter-encoded bytes value, or None."""
+    if isinstance(value, dict) and value.keys() == {"bytes"} and _hex(value["bytes"]):
+        return len(value["bytes"]) // 2
+    if (
+        isinstance(value, dict)
+        and value.keys() == {"bytes_len", "sha256"}
+        and _length(value["bytes_len"])
+        and _hex(value["sha256"], 16)
+    ):
+        return value["bytes_len"]
+    return None
+
+
+def _symbolic_text(value: Any) -> bool:
+    if isinstance(value, dict) and value.keys() == {"str"}:
+        return isinstance(value["str"], str)
+    return (
+        isinstance(value, dict)
+        and value.keys() == {"str_len", "sha256"}
+        and _length(value["str_len"])
+        and _hex(value["sha256"], 16)
+    )
+
+
 def _served(name: str, row: Row) -> bool:
     """The reference row is a read that returned data, in the exact shape
     the interpreter records for ``name``, with no other field."""
     if (row.second, row.parked, row.taken) != (None, None, None):
         return False
     outcome = row.outcome
-    if name == "next" and outcome == {"stop": True}:
-        return row.pulled is None
-    if not (isinstance(outcome, dict) and outcome.keys() == {"ok"}):
+    if not isinstance(outcome, dict):
+        return False
+    if name == "next" and outcome.keys() == {"stop"}:
+        return outcome["stop"] is True and row.pulled is None
+    if outcome.keys() != {"ok"}:
         return False
     value = outcome["ok"]
     if name == "buffer_read":
-        if isinstance(value, dict) and value.keys() == {"bytes"}:
-            length = len(value["bytes"]) // 2
-        elif isinstance(value, dict) and value.keys() == {"bytes_len", "sha256"}:
-            length = value["bytes_len"]
-        else:
-            return False
+        length = _symbolic_bytes(value)
         pulled = _exact_ints(row.pulled, 2)
-        return pulled is not None and 0 <= pulled[0] and pulled[1] - pulled[0] == length
+        return (
+            length is not None
+            and pulled is not None
+            and 0 <= pulled[0]
+            and pulled[1] - pulled[0] == length
+        )
     if row.pulled is not None:
         return False
-    items = value if name == "readlines" and isinstance(value, list) else [value]
-    return all(
-        isinstance(item, dict)
-        and (item.keys() == {"str"} or item.keys() == {"str_len", "sha256"})
-        for item in items
-    ) and (name == "readlines") == isinstance(value, list)
+    if name == "readlines":
+        return isinstance(value, list) and all(_symbolic_text(v) for v in value)
+    return _symbolic_text(value)
 
 
 def bc11(pair: Pair) -> Claim:
@@ -1220,8 +1266,7 @@ def bc11(pair: Pair) -> Claim:
         if key in pair.diffs and key[1] in TEXT_READS | {"buffer_read"}:
             r = pair.ref_by_key[key]
             if (
-                is_error(row.outcome, "OSError", READ_BROKEN)
-                and row.outcome.keys() == {"error", "message"}
+                row.outcome in BROKEN_REFUSALS
                 and (row.second, row.parked, row.taken, row.pulled)
                 == (None, None, None, None)
                 and _served(key[1], r)

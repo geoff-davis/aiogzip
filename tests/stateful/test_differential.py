@@ -4070,10 +4070,51 @@ def _ref_edit(seed: int, key, **fields) -> Pair:
         {"pulled": [0, 1]},
         {"outcome": {"ok": {"bytes": "e697a5"}}},  # bytes from a text read
         {"outcome": {"ok": {"str": "x"}, "extra": 1}},
+        {"outcome": {"ok": {"str": 42}}},
+        {"outcome": {"ok": {"str_len": False, "sha256": "0" * 16}}},
+        {"outcome": {"ok": {"str_len": 3, "sha256": "not-a-hash"}}},
+        {"outcome": {"ok": [{"str": "x"}]}},  # a list from read()
     ],
 )
 def test_bc11_rejects_a_reference_read_with_another_shape(fields):
     fails(_ref_edit(225, (8, "read", 0), **fields), "(8, 'read', 0)")
+
+
+@pytest.mark.parametrize(
+    "value", [{"bytes": "z"}, {"bytes": "62a"}, {"bytes_len": True, "sha256": "0" * 16}]
+)
+def test_bc11_rejects_a_buffer_read_with_malformed_bytes(value):
+    fails(
+        _ref_edit(1000193, (9, "buffer_read", 0), outcome={"ok": value}),
+        "(9, 'buffer_read', 0)",
+    )
+
+
+def test_bc11_served_shapes():
+    from differential import _served
+
+    key = (0, "next", 0)
+    assert _served("next", Row(key, {"stop": True}))
+    assert not _served("next", Row(key, {"stop": 1}))
+    assert not _served("read", Row(key, {"stop": True}))
+    assert _served("next", Row(key, {"ok": {"str": "x"}}))
+    assert _served("readlines", Row(key, {"ok": [{"str": "x"}]}))
+    assert not _served("readlines", Row(key, {"ok": {"str": "x"}}))
+    assert _served("buffer_read", Row(key, {"ok": {"bytes": "6263"}}, pulled=[3, 5]))
+    assert not _served(
+        "buffer_read", Row(key, {"ok": {"bytes": "6263"}}, pulled=[3, 4])
+    )
+    assert not _served("read", Row(key, {"ok": {"str": "x"}}, pulled=[0, 1]))
+
+
+def test_bc11_requires_a_complete_candidate_refusal():
+    pair = rc1_pair("b2", 225)
+    cand = edit(
+        pair.cand,
+        (8, "read", 0),
+        outcome={"error": "OSError", "message": "read stream is broken, sort of"},
+    )
+    fails(dataclasses.replace(pair, cand=cand), "(8, 'read', 0)")
 
 
 @pytest.mark.parametrize(
