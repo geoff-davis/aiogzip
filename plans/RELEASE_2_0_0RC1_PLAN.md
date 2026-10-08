@@ -38,8 +38,9 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 - **Benchmarks are deferred.** The maintainer's machine is not quiet. No
   timing run happens until the maintainer says it is, and then only with
   authorization and a Codex-confirmed pre-registration, as in b2. Repairs
-  that touch a measured path (R03, R04, R08) record their timing check as
-  pending; R12 collects them.
+  that touch a measured path (R01's text seek, R03, R04, R08, and R09 if it
+  changes `readinto`) record their timing check as pending; R12 collects
+  them.
 - **Each repair merges as its own PR** with both engines' full suites green
   locally and the hosted matrix green.
 
@@ -58,7 +59,7 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 | R09 | Small repairs | Cancellation-count leak, recorded secondary errors, CLI errors, `readinto` comment |
 | R10 | Documentation | Error-wrapping asymmetry, closed-handle iteration, negative seeks, decode-error retry, `inspect()` memory |
 | R11 | Differential rerun | Stateful and differential sweeps against b2 and b1 pass, with every new difference claimed by a ledger row |
-| R12 | Performance | Deferred timing checks for R03, R04 and R08 run in a quiet window; no unexplained cost above 5% |
+| R12 | Performance | Deferred timing checks for R01, R03, R04, R08 and any R09 `readinto` change run in a quiet window; no unexplained cost above 5% |
 | R13 | RC review and approval | Cross review of the exact RC candidate; hosted CI at that SHA; the maintainer's explicit approval |
 | R14 | Publication | Release preparation, exact-artifact publication and post-release record, as for b2 |
 
@@ -107,16 +108,31 @@ and the next read returns wrong text with no error. Reproductions:
 
 It is not a b2 regression; b1 and 1.11.0 behave the same.
 
-**Repair.** On any `BaseException` that escapes the binary seek or the
-replay, before re-raising: clear the text buffer and any pending lines, reset
-the decoder, and leave the handle refusing text reads until a successful
-`seek(0)` (or another successful seek). Preferred mechanism, to be confirmed
-in Codex's design review: poison the binary reader through its existing
-poison path, so the established BC2/BC10 recovery (`seek(0)`) applies and the
-binary health stays the single authority (G12). The alternative,
-re-anchoring the text origin at the binary position with a fresh decoder, is
-rejected unless shown safe: that position need not be a character boundary.
-Also clear the buffer before `_seek_to_plain_position` starts replaying.
+**Repair.** Two phases, so that a seek rejected before it starts changes
+nothing (Codex plan review):
+
+1. *Rejection preserves state.* Whence and cookie validation, the text
+   reservation, and the binary rejections that happen before anything moves
+   (an active binary call, such as a `text.buffer.read()` in another task, or
+   a nonzero cookie origin on an unhealthy reader) raise exactly as today,
+   with health, decoder, buffer and continuation unchanged. The binary checks
+   run synchronously before the first mutation, so nothing can start between
+   check and seek.
+2. *Failure after the transaction begins invalidates.* On any
+   `BaseException` that escapes the binary seek or the replay once it has
+   started, after the owned work has settled and before re-raising: clear the
+   text buffer and reset the decoder, and make the binary reader terminal
+   (`BROKEN`, also from validation salvage, since the salvage position is
+   unknown) so text and binary reads refuse until `seek(0)`. Binary health
+   stays the single authority (G12) and recovery is the established BC2/BC10
+   path. The decoder is not discarded at that point: a rewind replaces it,
+   and an interleaved buffer read may still be using it.
+
+Re-anchoring the text origin at the binary position with a fresh decoder is
+rejected: even a character boundary is not enough for stateful encodings and
+newline state. Recovery depends on a physical rewind or an intact replay
+cache, and configured limits still apply; a non-rewindable source has to be
+reopened.
 
 **Behavior change.** BC11: after a failed or cancelled text seek, reads raise
 until recovery instead of returning wrong text. Add the ledger row, a
@@ -127,18 +143,23 @@ file-state model row for "text seek fails or is cancelled", and a
 consumed-input failure, cancellation at several points (including a native
 file opened by path), and a decompression-limit failure. Assert that the next
 read either returns exactly the right continuation or raises, never wrong
-text, and that `seek(0)` then recovers everything. Mutation check: removing
-the invalidation must fail the tests.
+text, and that `seek(0)` then recovers where the source can rewind. A
+rejection test with an active binary read asserts unchanged health, decoder
+and continuation. Mutation check: removing the invalidation must fail the
+tests.
 
 ### R02: stateful model and harness
 
 - **Timeout cleanup.** `tests/stateful/interpreter.py` abandons `drive()`
   when `SCENARIO_TIMEOUT` (30 s) fires and never closes the handle, so on
-  Windows `TemporaryDirectory` cleanup fails with `WinError 32`. Close the
-  handle (bounded, ignoring its errors) before leaving the run, and record
-  the timeout as the scenario's outcome so it still fails visibly. Then
-  either lighten seed 734 (a 7-byte `chunk_size` over about 330 KB) or give
-  the scenario more time on slow runners; do not hide a real hang.
+  Windows `TemporaryDirectory` cleanup fails with `WinError 32`. After a
+  timeout: release the gate, let the scenario's own tasks settle (cancelling
+  them after a grace period), then close the handle, all bounded. Record the
+  cleanup outcome beside the timeout event, which still fails the scenario.
+  A worker stuck past the bound is left to the `faulthandler_timeout`
+  watchdog; cleanup cannot safely release a file a worker still uses. Seed
+  734 is fixed by the generator, so give scenarios more time on slow runners
+  rather than lightening it; do not hide a real hang.
 - **Failed text seeks.** `model.handle_error` widens the model after a
   failed text seek instead of requiring refusal or exact content
   ([`tests/stateful/model.py`](../tests/stateful/model.py)). Tighten it to
@@ -152,7 +173,7 @@ the invalidation must fail the tests.
 ### R03: inspection and verification settlement
 
 **Defect (both reviewers; Codex reproduced with a controlled executor).**
-`_scan_source` in `src/aiogzip/_inspection.py` awaits `aiofiles.open()` and
+`_scan_gzip` in `src/aiogzip/_inspection.py` awaits `aiofiles.open()` and
 native `read()` directly. A cancelled open can leave a late-opened file with
 no owner, and a cancelled read lets cleanup close the source while the worker
 is still reading it, which then raises `ValueError`. b2 fixed these classes
@@ -182,7 +203,10 @@ true end; ledger row.
 
 **Tests.** Offsets zero, negative and positive, after an oversized `peek()`
 and after partial consumption, on physical and cached-rewind sources, binary
-and text (`seek(0, SEEK_END)` on text reads to the end first).
+and text (`seek(0, SEEK_END)` on text reads to the end first). Drain unread
+output without double-counting it. Controls with a corrupt trailer and with
+`max_decompressed_size` show that seeking to the end cannot bypass
+validation or limits.
 
 ### R05–R07: workflows
 
@@ -211,6 +235,11 @@ semantics (BOM handling for UTF-16 and UTF-32). **Tests:** long empty runs,
 mixed inputs, iterator failure, BOM encodings, and a direct item-count bound.
 Timing check deferred to R12.
 
+Both reviewers' categories are in the archived reports. R09 and R10 promote
+several of Opus's nice-to-have findings (RC1-06, RC1-07, RC1-09, RC1-10 and
+RC1-13) into required gates; that is this plan's decision, not the
+reviewers' categorization.
+
 ### R09: small repairs (no behavior change beyond the noted ones)
 
 - Cancellation count: when an abort cancels a custom source or sink call that
@@ -230,8 +259,11 @@ In `docs/errors.md`, `docs/api.md` and `docs/recipes.md` as fitting:
 `write()` and `flush()` wrap custom-sink errors differently (unifying is a
 b3 candidate); iterating a closed handle ends iteration rather than raising
 `ValueError`; read-mode negative seeks raise `OSError` where stdlib gzip
-clamps; do not retry after a `UnicodeDecodeError`, use `seek(0)`; `inspect()`
-member collection grows with the member count; and the BC11/BC12 behavior.
+clamps; do not retry after a `UnicodeDecodeError`, use `seek(0)`; `flush()`
+on an unopened write handle returns without error; `inspect()` member
+collection grows with the member count, and each header's FNAME, FCOMMENT
+and FEXTRA fields are buffered whole (up to 128 MiB each); and the BC11/BC12
+behavior.
 
 ## 5. Deferred past RC1
 
