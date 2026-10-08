@@ -816,6 +816,8 @@ class Checker(_HandleChecker):
                 self.marks[op["label"]] = self.position if known else -1
                 if self.modeled and not self.certain:
                     self.uncertain_marks[op["label"]] = list(self.candidates)
+                else:
+                    self.uncertain_marks.pop(op["label"], None)
             return
         if name in SEEK_OPS:
             self.handle_seek(index, op, value)

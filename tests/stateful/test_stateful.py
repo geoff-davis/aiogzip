@@ -352,6 +352,14 @@ def test_cookie_recovery_from_an_uncertain_position_accepts_payload_text():
     assert not checker.violations, checker.violations
 
 
+def test_a_reused_mark_label_drops_its_old_uncertainty():
+    checker = _recovered_by_an_uncertain_cookie()
+    checker.handle_call(3, {"op": "seek0"}, Outcome("ok", 0))
+    checker.handle_call(4, {"op": "tell_mark", "label": "m1"}, Outcome("ok", 0))
+    checker.handle_call(5, {"op": "seek_mark", "label": "m1"}, Outcome("ok", 0))
+    assert checker.certain and checker.position == 0, checker.candidates
+
+
 def test_text_seek_end_from_broken_is_a_violation():
     checker = _text_checker_at(Health.BROKEN)
     checker.handle_call(0, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
