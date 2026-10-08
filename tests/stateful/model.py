@@ -520,6 +520,10 @@ class Checker(_HandleChecker):
         self.candidates: list[int] = [0]
         self.modeled = True  # False after a direct buffer read in text mode
         self.marks: dict[str, int] = {}
+        # A mark taken at an uncertain but modeled position (-1 in
+        # ``marks``): the offsets it may name. Seeking to it restores them,
+        # so content stays checked after a cookie recovers a BROKEN reader.
+        self.uncertain_marks: dict[str, list[int]] = {}
         # A text seek_end from VALIDATION_SALVAGE drained every retained byte:
         # until a rewind, every nonzero read must refuse.
         self.salvage_drained = False
@@ -810,6 +814,8 @@ class Checker(_HandleChecker):
             if name == "tell_mark":
                 known = self.modeled and self.certain
                 self.marks[op["label"]] = self.position if known else -1
+                if self.modeled and not self.certain:
+                    self.uncertain_marks[op["label"]] = list(self.candidates)
             return
         if name in SEEK_OPS:
             self.handle_seek(index, op, value)
@@ -920,6 +926,9 @@ class Checker(_HandleChecker):
             # A text cookie seek is a rewind plus a forward replay.
             self.transition("rewind_ok")
             target = self.marks.get(op["label"], -1)
+            if op["label"] in self.uncertain_marks:
+                self.candidates = list(self.uncertain_marks[op["label"]])
+                return
             if target < 0:
                 self.modeled = False
                 return

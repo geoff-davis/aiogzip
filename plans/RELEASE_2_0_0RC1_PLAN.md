@@ -196,7 +196,9 @@ tests.
   position as certain, so a cookie taken on the BROKEN reader named the
   wrong place once a seek to it recovered the reader. Such a reader may
   now stand at any offset (seeds 2000322 and 2001408 join the regression
-  seeds). Seeds 2,000,200–2,001,999 pass the model too. R11's sweeps
+  seeds), and a cookie taken at an uncertain position keeps its set of
+  offsets, which a seek to it restores, so the text after that recovery is
+  still checked against the payload. Seeds 2,000,200–2,001,999 pass the model too. R11's sweeps
   (0–5999 and the R04 block against b2 and b1, 0–5999 against c0) give
   the same results as before.)*
 - **Differential on the seek-cancel block (open).** The differential does

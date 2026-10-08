@@ -313,6 +313,45 @@ def _text_checker_at(health):
     return checker
 
 
+def _recovered_by_an_uncertain_cookie():
+    # A cancelled cookie seek moves the cursor (BC11); a cookie taken on the
+    # BROKEN reader then names an unknown offset, and seeking to it recovers.
+    checker = _text_checker_at(Health.HEALTHY)
+    cancel = interpreter.Event(
+        0,
+        {"op": "cancel", "call": {"op": "seek_mark", "label": "m0"}},
+        Outcome("cancelled"),
+        Outcome("ok", "cancel requested"),
+    )
+    cancel.cursor_moved = True
+    checker.observe(cancel)
+    assert checker.health is Health.BROKEN
+    checker.observe(
+        interpreter.Event(1, {"op": "tell_mark", "label": "m1"}, Outcome("ok", -5))
+    )
+    checker.observe(
+        interpreter.Event(2, {"op": "seek_mark", "label": "m1"}, Outcome("ok", -5))
+    )
+    assert not checker.violations, checker.violations
+    assert checker.health is Health.HEALTHY
+    assert checker.modeled and not checker.certain
+    return checker
+
+
+def test_cookie_recovery_from_an_uncertain_position_keeps_checking_content():
+    checker = _recovered_by_an_uncertain_cookie()
+    read = {"op": "read", "n": 3}
+    checker.observe(interpreter.Event(3, read, Outcome("ok", "\0" * 3)))
+    assert any("matches no allowed offset" in v for v in checker.violations)
+
+
+def test_cookie_recovery_from_an_uncertain_position_accepts_payload_text():
+    checker = _recovered_by_an_uncertain_cookie()
+    text = checker.upper[5:8]
+    checker.observe(interpreter.Event(3, {"op": "read", "n": 3}, Outcome("ok", text)))
+    assert not checker.violations, checker.violations
+
+
 def test_text_seek_end_from_broken_is_a_violation():
     checker = _text_checker_at(Health.BROKEN)
     checker.handle_call(0, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))

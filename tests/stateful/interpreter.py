@@ -47,8 +47,10 @@ CLEANUP_TIMEOUT = 10.0
 # call no exit or close could ever settle.
 PARK_TIMEOUT = SCENARIO_TIMEOUT + CLEANUP_TIMEOUT
 INLINE_LIMIT = 64
-# Text payloads are at most a few thousand characters, so text stays inline:
-# the differential compares returned text exactly, not by digest.
+# Below the R02 seek-cancel block, text payloads are at most a few thousand
+# characters, so their text stays inline and the differential compares it
+# exactly. The block's larger payloads can return longer text, recorded by
+# length and digest.
 TEXT_INLINE_LIMIT = 8192
 # Text seeks, which BC11 makes transactional: a failure either changes nothing
 # or makes the reader terminal.
