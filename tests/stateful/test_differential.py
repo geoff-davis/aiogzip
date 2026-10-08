@@ -63,6 +63,7 @@ from model import (
     wire_view,
 )
 from oracle import engine_modules, wire_reference
+from recorded_wires import REPRODUCED
 
 import aiogzip
 
@@ -70,6 +71,15 @@ ENGINE = aiogzip.engine_info().decompression
 DATA = Path(__file__).resolve().parent.parent / "data" / "wp10_c0_traces.json"
 C0 = json.loads(DATA.read_text(encoding="utf-8"))["traces"]
 B1 = json.loads((DATA.parent / "wp10_b1_runs.json").read_text(encoding="utf-8"))["runs"]
+# Every comparison here replays recorded traces or pinned wire offsets, which
+# hold only where the generator reproduces the recorded wire bytes (see
+# recorded_wires.py). Elsewhere the whole module is skipped rather than
+# partially run; test_recorded_wires.py keeps Linux and macOS from skipping.
+pytestmark = pytest.mark.skipif(
+    not REPRODUCED,
+    reason="this platform's zlib does not reproduce the recorded wire bytes",
+)
+
 # Descriptor counts need /proc/self/fd; elsewhere runs carry no fd_delta.
 needs_fd_counts = pytest.mark.skipif(
     interpreter._open_fds() is None, reason="platform does not expose open fds"

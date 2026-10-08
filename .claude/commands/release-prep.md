@@ -59,6 +59,22 @@ Prepare a new release of aiogzip. This skill handles changelog generation, versi
 - Create branch `release/v<version>` from `origin/main`.
 - Stage `CHANGELOG.md`, `src/aiogzip/__init__.py`, and `CLAUDE.md`.
 - Commit with message: `Prepare release v<version>`
+- Record the release artifacts. The publish workflow uploads only files whose
+  SHA-256 matches `plans/releases/v<version>.sha256`, and fails without it.
+  `plans/` is not packaged, so adding the record does not change the hashes:
+  - Match the publish workflow's build job exactly, or the hashes will not
+    match: uv `0.9.22` (`uv --version`; the version is pinned in
+    `.github/workflows/publish.yml`), Python 3.14 (`uv run python --version`;
+    a different project venv interpreter means stop and fix the venv), and
+    `export SOURCE_DATE_EPOCH="$(TZ=UTC date -d <changelog release date> +%s)"`.
+  - Build that commit: `uv run python scripts/build_release_artifacts.py
+    --ref HEAD --evidence-dir <new directory outside the repository>`. It
+    builds with the tools pinned in
+    `scripts/release-constraints.txt`, runs `twine check` and smokes both
+    installed artifacts.
+  - Write the record: `uv run python scripts/verify_release_artifacts.py
+    <evidence>/dist plans/releases/v<version>.sha256 --write`, then commit it
+    with message `Record release artifacts for v<version>`.
 - Push the branch.
 - Create a PR with title `Prepare release v<version>` and body summarizing the changelog entries.
 - Report the PR URL to the user.

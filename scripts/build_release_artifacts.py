@@ -16,8 +16,9 @@ after its packaged ``examples/`` and ``tests/integration/`` are checked to
 match the commit byte for byte; the wheel ships no examples, so its run
 uses the worktree copies.
 
-Requires ``uv`` on PATH and network access to install the latest runtime
-dependencies and twine.
+The build backend and twine are pinned by ``scripts/release-constraints.txt``
+in the commit being built. Requires ``uv`` on PATH and network access to
+install the latest runtime dependencies and the pinned tools.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ import argparse
 import hashlib
 import json
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -36,6 +38,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 REPOSITORY = Path(__file__).resolve().parents[1]
+# Exact build backend and twine versions, read from the commit being built.
+CONSTRAINTS = Path("scripts") / "release-constraints.txt"
 RUNTIME = ("aiofiles", "aiocsv")
 TEST_TOOLS = ("pytest", "pytest-asyncio", "pytest-timeout")
 # Packaged application code the sdist must carry unchanged.
@@ -53,6 +57,21 @@ def _run(
 
 def _output(command: Sequence[str], *, cwd: Path) -> str:
     return _run(command, cwd=cwd, capture=True).stdout.strip()
+
+
+def _source_version(source: Path) -> str:
+    """Read ``__version__`` from the source tree without importing the package.
+
+    Importing ``aiogzip`` needs its runtime dependencies, which the release
+    build environment deliberately does not install.
+    """
+    init = source / "src" / "aiogzip" / "__init__.py"
+    match = re.search(
+        r'^__version__ = "([^"]+)"$', init.read_text(encoding="utf-8"), re.MULTILINE
+    )
+    if match is None:
+        raise SystemExit(f"no __version__ assignment in {init}")
+    return match.group(1)
 
 
 def _members(artifact: Path) -> list[str]:
@@ -203,8 +222,20 @@ def build(ref: str, evidence: Path, python: str) -> dict[str, object]:
         )
         try:
             _require_clean(source)
+            constraints = source / CONSTRAINTS
+            if not constraints.is_file():
+                raise RuntimeError(f"release build needs {CONSTRAINTS} at {commit}")
             _run(
-                ["uv", "build", "--wheel", "--sdist", "--out-dir", str(dist)],
+                [
+                    "uv",
+                    "build",
+                    "--wheel",
+                    "--sdist",
+                    "--build-constraints",
+                    str(constraints),
+                    "--out-dir",
+                    str(dist),
+                ],
                 cwd=source,
             )
             wheels = sorted(dist.glob("*.whl"))
@@ -213,20 +244,21 @@ def build(ref: str, evidence: Path, python: str) -> dict[str, object]:
                 raise RuntimeError(
                     f"expected one wheel and one sdist: {wheels + sdists}"
                 )
-            twine = ["uv", "tool", "run", "--from", "twine", "twine"]
+            twine = [
+                "uv",
+                "tool",
+                "run",
+                "--constraints",
+                str(constraints),
+                "--from",
+                "twine",
+                "twine",
+            ]
             _run(
                 [*twine, "check", "--strict", str(wheels[0]), str(sdists[0])],
                 cwd=scratch,
             )
-            version = _output(
-                [
-                    python,
-                    "-c",
-                    "import sys; sys.path.insert(0, 'src'); "
-                    "import aiogzip; print(aiogzip.__version__)",
-                ],
-                cwd=source,
-            )
+            version = _source_version(source)
             packaged = _extract_sdist(sdists[0], scratch / "sdist")
             packaged_digests = _require_packaged_trees(packaged, source)
             for artifact, kind, examples_root in (

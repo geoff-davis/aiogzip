@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import io
+import subprocess
+import sys
 import tarfile
 import zipfile
 from pathlib import Path
@@ -112,3 +114,42 @@ def test_missing_packaged_file_fails(release, tmp_path):
     )
     with pytest.raises(RuntimeError, match="missing"):
         release._require_packaged_trees(packaged, source)
+
+
+def test_source_version_is_read_without_importing(release, tmp_path):
+    package = tmp_path / "src" / "aiogzip"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text(
+        'raise ImportError("must not be imported")\n__version__ = "9.9.9rc1"\n',
+        encoding="utf-8",
+    )
+    assert release._source_version(tmp_path) == "9.9.9rc1"
+
+
+def test_source_version_without_assignment_fails(release, tmp_path):
+    package = tmp_path / "src" / "aiogzip"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("VERSION = '1'\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="no __version__"):
+        release._source_version(tmp_path)
+
+
+def test_source_version_needs_no_site_packages():
+    # The publish build job installs neither aiogzip nor its dependencies, so
+    # reading the version must work in an interpreter without site-packages.
+    root = SCRIPT.parents[1]
+    code = (
+        "import importlib.util, sys; "
+        f"spec = importlib.util.spec_from_file_location('b', {str(SCRIPT)!r}); "
+        "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); "
+        f"print(m._source_version(__import__('pathlib').Path({str(root)!r}))); "
+        "assert 'aiofiles' not in sys.modules and 'aiogzip' not in sys.modules"
+    )
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    init = (root / "src" / "aiogzip" / "__init__.py").read_text(encoding="utf-8")
+    assert f'__version__ = "{result.stdout.strip()}"' in init

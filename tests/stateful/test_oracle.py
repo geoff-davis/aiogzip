@@ -9,9 +9,11 @@ and the file API, across chunk sizes, is always a prefix of that reference.
 
 import base64
 import gzip
+import hashlib
 import io
 import random
 import zlib
+from pathlib import Path
 
 import pytest
 from oracle import (
@@ -39,6 +41,23 @@ def _payload() -> bytes:
     return " ".join(rng.choices(words, k=60_000)).encode()
 
 
+# gzip.compress(_payload(), mtime=0) under zlib 1.3.1, committed because the
+# compressed bytes depend on the platform's zlib: a zlib-ng-backed stdlib (for
+# example CPython 3.14 on Windows) emits a different stream in which the
+# pinned corruption below goes undetected.
+WIRE_FIXTURE = (
+    Path(__file__).resolve().parents[1] / "data" / "oracle_late_corruption.gz"
+)
+WIRE_SHA256 = "34594219ed4c602b531df98c0ef7291e033e79a19e417d54584876167be60af3"
+
+
+def _clean_wire() -> bytes:
+    wire = WIRE_FIXTURE.read_bytes()
+    assert hashlib.sha256(wire).hexdigest() == WIRE_SHA256
+    assert gzip.decompress(wire) == _payload()
+    return wire
+
+
 # The first corruption, scanning body offsets from two thirds in and flips
 # 0xFF, 0x55, 0x0F, that every engine detects more than LATE bytes of output
 # in. Pinned rather than searched at import: the search costs ~18 s.
@@ -46,7 +65,7 @@ OFFSET, FLIP = 81_433, 0x55
 
 
 def _late_corruption():
-    wire = gzip.compress(_payload(), mtime=0)
+    wire = _clean_wire()
     corrupt = bytearray(wire[HEADER:-TRAILER])
     corrupt[OFFSET] ^= FLIP
     references = {
@@ -74,7 +93,7 @@ def test_one_shot_decompress_raises_where_the_schedule_captures_output(engine):
     # Everything inflatable from the body before the flipped byte is the
     # payload, and the reference reproduces all of it. What the engine
     # inflates from the corrupt region before detecting it is unconstrained.
-    clean_body = gzip.compress(_payload(), mtime=0)[HEADER:-TRAILER]
+    clean_body = _clean_wire()[HEADER:-TRAILER]
     before = module.decompressobj(-15).decompress(clean_body[:OFFSET])
     assert len(before) > LATE
     assert _payload().startswith(before)
