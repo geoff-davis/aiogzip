@@ -1537,14 +1537,27 @@ class AsyncGzipBinaryFile:
                     except ConcurrentOperationError:
                         if not await self._wait_for_active_call():
                             raise
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as cancellation:
                 # Cancellation can land while the clean exit is waiting for an
                 # active call. Abort that call's handle before preserving the
                 # cancellation so timeout/TaskGroup exit cannot leak it.
                 try:
                     await self._abort_active_call_on_exit()
-                except BaseException:
-                    pass
+                except asyncio.CancelledError as repeated:
+                    # A repeated cancellation is not a cleanup failure, but
+                    # settlement may raise it from one (a failed native close).
+                    failure = repeated.__cause__
+                    if failure is not None and not isinstance(
+                        failure, asyncio.CancelledError
+                    ):
+                        cancellation.add_note(
+                            f"Context-exit cleanup also failed: {failure!r}"
+                        )
+                except BaseException as cleanup:
+                    # The cancellation keeps precedence; record what failed.
+                    cancellation.add_note(
+                        f"Context-exit cleanup also failed: {cleanup!r}"
+                    )
                 raise
 
         try:
@@ -1559,10 +1572,14 @@ class AsyncGzipBinaryFile:
                 # Cancellation delivered during cleanup is the current task's
                 # control flow (timeout/TaskGroup), not a secondary close error.
                 raise
-            except Exception:
+            except Exception as cleanup:
                 # As in close()'s failed-write path, the primary exception wins
-                # after the underlying close has at least been attempted.
-                pass
+                # after the underlying close has at least been attempted; the
+                # cleanup failure is kept as a note on it.
+                if body_error is not None:
+                    body_error.add_note(
+                        f"Context-exit cleanup also failed: {cleanup!r}"
+                    )
 
     def _check_write_call_available(self) -> None:
         """Reject overlapping writer calls before they mutate codec state."""
@@ -1855,20 +1872,22 @@ class AsyncGzipBinaryFile:
             if method == "read" or hasattr(result, "__await__"):
                 result = await result
             return result
-        except BaseException as error:
+        except BaseException:
             if before is None or _source_position(source) != before:
                 self._poison_source()
             if self._source_abort_requested:
-                if isinstance(error, asyncio.CancelledError):
-                    # Context exit owns one cancellation, converted below to
-                    # "read aborted". Consume only that request; any outside
-                    # cancellation counts must remain with the caller.
-                    owner = self._source_owner
-                    if owner is not None:
-                        owner.uncancel()
                 self._check_read_call_not_aborted()
             raise
         finally:
+            if self._source_abort_requested:
+                # Context exit requested exactly one cancellation of this task
+                # (converted above to "read aborted"). Consume that request
+                # however the call ended, even if the source swallowed the
+                # cancellation, so asyncio.timeout() and TaskGroup still
+                # classify correctly; outside counts remain with the caller.
+                owner = self._source_owner
+                if owner is not None:
+                    owner.uncancel()
             self._source_owner = None
             # Allocate a completion notification only when exceptional context
             # exit actually needs one; ordinary custom reads need no Future.
@@ -1939,17 +1958,17 @@ class AsyncGzipBinaryFile:
             if method == "write" or hasattr(result, "__await__"):
                 result = await result
             return result
-        except BaseException as error:
+        except BaseException:
             if self._source_abort_requested:
-                if isinstance(error, asyncio.CancelledError):
-                    # Context exit owns exactly one cancellation; converted
-                    # below. Outside cancellation counts stay with the caller.
-                    owner = self._source_owner
-                    if owner is not None:
-                        owner.uncancel()
                 self._raise_write_call_aborted(call)
             raise
         finally:
+            if self._source_abort_requested:
+                # Context exit requested exactly one cancellation; consume it
+                # however the call ended (see _call_custom_source).
+                owner = self._source_owner
+                if owner is not None:
+                    owner.uncancel()
             self._source_owner = None
             waiter = self._source_work
             self._source_work = None

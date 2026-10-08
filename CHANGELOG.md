@@ -20,6 +20,18 @@ All notable changes to this project will be documented in this file.
   stored, so the batch stays within `chunk_size` items as documented. The
   bytes written are unchanged, including the byte-order mark an empty write
   emits for UTF-16 and UTF-32.
+- An exceptional context exit that aborted a custom source or sink call whose
+  code swallowed the cancellation left the calling task's cancellation count
+  raised, so an enclosing `asyncio.timeout()` could report its own expiry as
+  `CancelledError` instead of `TimeoutError`. The abort's cancellation is now
+  consumed however the call ends.
+- A failure while a context exit aborted and closed the file (for example the
+  source's `close()` raising) was silently dropped. It is now attached to the
+  propagating exception as a note; exception types and precedence are
+  unchanged.
+- `python -m aiogzip` printed a traceback for failures other than gzip, I/O
+  and EOF errors, which broke `--json` output. Such failures are now reported
+  in the same form with exit status 2.
 - Cancelling `inspect()` or `verify()` while a native open or read was in a
   worker thread could leave a late-opened file unclosed, or close the source
   while the worker was still reading it. The scan now waits for the native
