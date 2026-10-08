@@ -523,6 +523,9 @@ class Checker(_HandleChecker):
         # A text seek_end from VALIDATION_SALVAGE drained every retained byte:
         # until a rewind, every nonzero read must refuse.
         self.salvage_drained = False
+        # BC11: a failed text seek moved the cursor. Until the reader leaves
+        # BROKEN, every nonzero read must refuse.
+        self.seek_broken = False
 
     @property
     def position(self) -> int:
@@ -549,6 +552,8 @@ class Checker(_HandleChecker):
         self.coverage.add(("health", f"{before.value}->{event}"))
         if self.health is not SALVAGE:
             self.salvage_drained = False
+        if self.health is not BROKEN:
+            self.seek_broken = False
         if self.health is not HEALTHY:
             self.eof = True
 
@@ -584,6 +589,18 @@ class Checker(_HandleChecker):
         limit = min(limit, len(self.upper))
         if limit > self.candidates[-1]:
             self.candidates = list(range(self.candidates[0], limit + 1))
+
+    def text_seek_moved(self) -> None:
+        """BC11: a failed text seek moved the cursor; the reader is terminal."""
+        self.transition("text_seek_failed")
+        self.seek_broken = self.health is BROKEN
+        self.lose_position()
+
+    def lose_position(self) -> None:
+        """A failed text seek that moved the cursor stopped somewhere in its
+        rewind and replay: the reader may stand at any offset, before or
+        after the old one, so a cookie taken now names no known position."""
+        self.candidates = list(range(len(self.upper) + 1))
 
     def at_validated_eof(self) -> bool:
         return self.expect.clean and self.position == len(self.upper)
@@ -736,7 +753,7 @@ class Checker(_HandleChecker):
             else:
                 self.transition("cancel_uncertain")
             if moved:
-                self.transition("text_seek_failed")
+                self.text_seek_moved()
             call = op["call"]
             if call["op"] == "seek_end" and not self.text and self.modeled:
                 # A cancelled end-relative seek stops anywhere in its drain,
@@ -758,6 +775,16 @@ class Checker(_HandleChecker):
             and op.get("limit", -1) != 0
         ):
             self.fail(index, f"{name} returned after seek_end drained the salvage")
+        if (
+            self.seek_broken
+            and name in READ_OPS
+            and outcome.kind in ("ok", "stop")
+            and op.get("n", -1) != 0
+            and op.get("limit", -1) != 0
+        ):
+            self.fail(
+                index, f"{name} returned after a failed text seek moved the cursor"
+            )
         self.lifecycle_event("call_starts")
         if name == "buffer_read":
             self.modeled = False
@@ -1012,7 +1039,7 @@ class Checker(_HandleChecker):
             # and the rewind restored health before the failure.
             self.transition("rewind_ok")
             self.classify_error(index, op, error)
-            self.transition("text_seek_failed")
+            self.text_seek_moved()
             return
         self.classify_error(index, op, error)
         if self.health is BROKEN and before is not BROKEN:

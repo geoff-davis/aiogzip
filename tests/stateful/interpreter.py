@@ -69,6 +69,9 @@ class Gate:
     def __init__(self) -> None:
         self.armed = False
         self.expired = False
+        # Source accesses an armed gate lets through before it parks one, so
+        # a cancellation can land partway through a replay.
+        self.skip = 0
         # What the call that parked was sending: set at park, taken by the
         # next landed event.
         self.parked: dict[str, Any] | None = None
@@ -97,8 +100,9 @@ class Gate:
                 if origin is not None:
                     self.origins.append([origin, target])
 
-    def arm(self) -> None:
+    def arm(self, skip: int = 0) -> None:
         self.armed = True
+        self.skip = skip
         self.parked = None
         self.entered = asyncio.Event()
         self.release_async = asyncio.Event()
@@ -109,6 +113,13 @@ class Gate:
             # outlives the timeout must never wait for a release already spent.
             self.release_async.set()
             self.release_thread.set()
+
+    def passes(self) -> bool:
+        """True if this access passes an armed gate (its skip count allows)."""
+        if self.armed and self.skip:
+            self.skip -= 1
+            return True
+        return False
 
     def release(self) -> None:
         self.armed = False
@@ -154,7 +165,7 @@ class GatedExecutor(concurrent.futures.ThreadPoolExecutor):
 
     def submit(self, fn, /, *args, **kwargs):  # type: ignore[override]
         gate = self.gate
-        if not gate.armed:
+        if not gate.armed or gate.passes():
             with gate.busy_lock:
                 gate.busy += 1
                 gate.idle.clear()  # submissions come from the loop's thread
@@ -386,7 +397,7 @@ class Sink:
         if self.closes:
             self.calls_after_close += 1
         parked = None
-        if self.gate.armed:
+        if self.gate.armed and not self.gate.skip:
             # "resumed" and "accepted" stay unset unless the parked call
             # resumes (rather than being cancelled) and stores bytes.
             parked = {
@@ -423,7 +434,7 @@ class Sink:
 
 async def _park(gate: Gate) -> bool:
     """Park the calling coroutine if the gate is armed; True if it parked."""
-    if gate.armed:
+    if gate.armed and not gate.passes():
         gate.armed = False
         release = gate.release_async
         gate.entered.set()
@@ -585,6 +596,8 @@ def _surface(handle, op: dict[str, Any], text: dict[str, Any] | None):
         return handle.seek(0)
     if name == "seek_end":
         return handle.seek(op["offset"], os.SEEK_END)
+    if name == "seek_mark":
+        return handle.seek(op["cookie"])  # resolved by the caller
     if name == "buffer_read":
         return handle.buffer.read(op.get("n", -1))
     if name == "close":
@@ -595,8 +608,11 @@ def _surface(handle, op: dict[str, Any], text: dict[str, Any] | None):
 
 
 async def _parked(handle, op, gate: Gate, partner, text: dict[str, Any] | None):
-    """Park ``op['call']`` inside a source read, then run ``partner``."""
-    gate.arm()
+    """Park ``op['call']`` inside a source read, then run ``partner``.
+
+    With ``op['after']``, that many source accesses pass the gate first.
+    """
+    gate.arm(op.get("after", 0))
     task = asyncio.create_task(_call(_surface(handle, op["call"], text)))
     waiter = asyncio.create_task(gate.entered.wait())
     done, _ = await asyncio.wait({task, waiter}, return_when=asyncio.FIRST_COMPLETED)
@@ -822,8 +838,15 @@ async def run(
             land(Event(index, op, first, second))
             return
         if name == "cancel":
+            parked = op
+            if op["call"]["op"] == "seek_mark":
+                label = op["call"]["label"]
+                if label not in cookies:
+                    land(Event(index, op, Outcome("skipped", "no cookie")))
+                    return
+                parked = {**op, "call": {**op["call"], "cookie": cookies[label]}}
             first, second = await _parked(
-                handle, op, gate, _cancel_partner, text_options
+                handle, parked, gate, _cancel_partner, text_options
             )
             land(witness_seek(Event(index, op, first, second), op, before))
             return
