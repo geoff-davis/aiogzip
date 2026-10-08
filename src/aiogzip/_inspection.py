@@ -60,13 +60,14 @@ async def _scan_gzip(
         source = fileobj
     should_close = owns_source or validated_closefd is True
 
-    decoder = GzipDecoder(
-        max_decompressed_size=max_decompressed_size,
-        output_chunk_size=chunk_size,
-        collect_member_info=collect_members,
-    )
-    scan_failed = False
+    decoder: Optional[GzipDecoder] = None
+    failure: Optional[BaseException] = None
     try:
+        decoder = GzipDecoder(
+            max_decompressed_size=max_decompressed_size,
+            output_chunk_size=chunk_size,
+            collect_member_info=collect_members,
+        )
         while True:
             try:
                 if _is_native_source(source, "read"):
@@ -102,11 +103,12 @@ async def _scan_gzip(
             compressed_size=decoder.compressed_size,
             uncompressed_size=decoder.uncompressed_size,
         )
-    except BaseException:
-        scan_failed = True
+    except BaseException as error:
+        failure = error
         raise
     finally:
-        decoder.discard()
+        if decoder is not None:
+            decoder.discard()
         if should_close:
             close_method = getattr(source, "close", None)
             if callable(close_method):
@@ -118,6 +120,16 @@ async def _scan_gzip(
                         result = close_method()
                         if hasattr(result, "__await__"):
                             await result
-                except BaseException:
-                    if not scan_failed:
+                except BaseException as cleanup:
+                    if failure is None:
                         raise
+                    # An outside cancellation or interrupt outranks an ordinary
+                    # scan failure, which stays its context; otherwise the
+                    # primary failure is kept and the cleanup failure noted.
+                    if isinstance(failure, Exception) and not isinstance(
+                        cleanup, Exception
+                    ):
+                        if cleanup.__context__ is None:
+                            cleanup.__context__ = failure
+                        raise
+                    failure.add_note(f"Source cleanup also failed: {cleanup!r}")

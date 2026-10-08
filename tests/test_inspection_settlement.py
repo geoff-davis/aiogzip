@@ -28,7 +28,8 @@ class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
 
     Every submission is logged by name and target, with its start, end and
     error, so tests can check that cleanup waited for the worker's last
-    access.
+    access. ``fail`` makes the next submission of a name raise instead of
+    running.
     """
 
     def __init__(self, loop):
@@ -41,6 +42,7 @@ class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
         self.log: list[tuple[str, str, object]] = []
         self.idle = threading.Condition(self.lock)
         self.running = 0
+        self.fail: dict[str, BaseException] = {}
 
     def _record(self, *entry):
         with self.lock:
@@ -53,6 +55,7 @@ class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
         park = self.gate == name
         if park:
             self.gate = None
+        injected = self.fail.pop(name, None)
 
         def run():
             with self.lock:
@@ -64,6 +67,8 @@ class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
                         raise TimeoutError("gate never released")
                 self._record("start", name, owner)
                 try:
+                    if injected is not None:
+                        raise injected
                     result = fn(*args, **kwargs)
                 except BaseException as error:
                     self._record("error", name, error)
@@ -103,7 +108,17 @@ def path(tmp_path):
 
 
 async def _cancel_parked(gated, coroutine, cancels):
-    task = asyncio.create_task(coroutine)
+    """Cancel a scan parked in the executor; return the exception it raised."""
+    raised = []
+
+    async def scan():
+        try:
+            return await coroutine
+        except BaseException as error:
+            raised.append(error)
+            raise
+
+    task = asyncio.create_task(scan())
     await asyncio.wait_for(gated.entered.wait(), 10)
     for _ in range(cancels):
         task.cancel()
@@ -113,7 +128,8 @@ async def _cancel_parked(gated, coroutine, cancels):
     gated.release.set()
     with pytest.raises(asyncio.CancelledError):
         await task
-    return task
+    (error,) = raised
+    return error
 
 
 def _closed_after_last_read(gated, source):
@@ -161,8 +177,8 @@ async def test_cancelled_close_finishes_before_the_caller_resumes(
     path, gated, operation
 ):
     gated.gate = "close"
-    task = await _cancel_parked(gated, operation(path), 1)
-    assert task.cancelled()
+    error = await _cancel_parked(gated, operation(path), 1)
+    assert isinstance(error, asyncio.CancelledError)
     (raw,) = gated.entries("end", "open")
     # The caller resumed only after the native close returned.
     assert gated.entries("end", "close") == [raw]
@@ -197,3 +213,123 @@ async def test_uncancelled_scan_still_succeeds(path, gated, operation):
     (raw,) = gated.entries("end", "open")
     assert raw.closed
     _closed_after_last_read(gated, raw)
+
+
+@pytest.fixture
+def corrupt(tmp_path):
+    target = tmp_path / "corrupt.gz"
+    data = bytearray(gzip.compress(PAYLOAD, mtime=0))
+    data[-8] ^= 0xFF  # CRC mismatch, detected only at the end of the scan
+    target.write_bytes(bytes(data))
+    return target
+
+
+def _only_close(gated):
+    (raw,) = gated.entries("end", "open")
+    assert gated.entries("start", "close") == [raw]
+    return raw
+
+
+class TestCleanupPrecedence:
+    """An outside cancellation outranks an ordinary scan failure (BC14)."""
+
+    @pytest.mark.parametrize("operation", OPERATIONS)
+    @pytest.mark.parametrize("cancels", [1, 3])
+    async def test_cancelled_close_after_corruption_propagates_cancellation(
+        self, corrupt, gated, operation, cancels
+    ):
+        gated.gate = "close"
+        error = await _cancel_parked(gated, operation(corrupt), cancels)
+        assert isinstance(error, asyncio.CancelledError)
+        assert isinstance(error.__context__, gzip.BadGzipFile)
+        gated.wait_idle()
+        assert _only_close(gated).closed
+
+    @pytest.mark.parametrize("operation", OPERATIONS)
+    async def test_cancelled_close_after_a_read_failure_propagates_cancellation(
+        self, path, gated, operation
+    ):
+        failure = OSError("injected read failure")
+        gated.fail["read"] = failure
+        gated.gate = "close"
+        error = await _cancel_parked(gated, operation(path), 1)
+        assert isinstance(error, asyncio.CancelledError)
+        assert error.__context__ is failure
+        gated.wait_idle()
+        assert _only_close(gated).closed
+
+    @pytest.mark.parametrize("operation", OPERATIONS)
+    async def test_failing_close_after_corruption_keeps_the_corruption(
+        self, corrupt, gated, operation
+    ):
+        gated.fail["close"] = OSError("injected close failure")
+        with pytest.raises(gzip.BadGzipFile) as caught:
+            await operation(corrupt)
+        notes = getattr(caught.value, "__notes__", [])
+        assert any("injected close failure" in note for note in notes), notes
+        gated.wait_idle()
+        _only_close(gated).close()
+
+    @pytest.mark.parametrize("operation", OPERATIONS)
+    async def test_failing_close_after_a_clean_scan_raises(
+        self, path, gated, operation
+    ):
+        failure = OSError("injected close failure")
+        gated.fail["close"] = failure
+        with pytest.raises(OSError) as caught:
+            await operation(path)
+        assert caught.value is failure
+        gated.wait_idle()
+        _only_close(gated).close()
+
+    @pytest.mark.parametrize("operation", OPERATIONS)
+    async def test_cancelled_read_keeps_cancellation_when_close_fails(
+        self, path, gated, operation
+    ):
+        gated.fail["close"] = OSError("injected close failure")
+        gated.gate = "read"
+        error = await _cancel_parked(gated, operation(path), 1)
+        notes = getattr(error, "__notes__", [])
+        assert any("injected close failure" in note for note in notes), notes
+        gated.wait_idle()
+        _only_close(gated).close()
+
+    @pytest.mark.parametrize("operation", OPERATIONS)
+    @pytest.mark.parametrize("cancels", [1, 3])
+    async def test_cancelled_close_whose_worker_fails(
+        self, path, gated, operation, cancels
+    ):
+        failure = OSError("injected close failure")
+        gated.fail["close"] = failure
+        gated.gate = "close"
+        error = await _cancel_parked(gated, operation(path), cancels)
+        # The cancellation propagates, caused by the settled worker failure.
+        assert isinstance(error, asyncio.CancelledError)
+        assert error.__cause__ is failure
+        gated.wait_idle()
+        _only_close(gated).close()
+
+
+async def _open_in_another_loop(target):
+    return await aiofiles.open(target, "rb")
+
+
+@pytest.mark.parametrize("operation", OPERATIONS)
+@pytest.mark.parametrize("closefd", [False, True])
+async def test_borrowed_source_from_another_loop_is_refused(
+    path, gated, operation, closefd
+):
+    source = await asyncio.to_thread(asyncio.run, _open_in_another_loop(path))
+    try:
+        with pytest.raises(OSError, match="Error reading from file") as caught:
+            await operation(None, fileobj=source, closefd=closefd)
+        assert isinstance(caught.value.__cause__, RuntimeError)
+        if closefd:
+            # The refused close is noted; the loop check is never bypassed.
+            notes = getattr(caught.value, "__notes__", [])
+            assert any("different event loop" in note for note in notes), notes
+        gated.wait_idle()
+        assert gated.entries("start", "read") == []
+        assert gated.entries("start", "close") == []
+    finally:
+        source._file.close()

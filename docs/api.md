@@ -185,8 +185,15 @@ other trailing data is treated as a malformed next member.
 
 Cancelling `inspect()` or `verify()` waits for any native open, read or close
 already handed to a worker thread to finish before the cancellation
-propagates. A file opened by path is always closed, and only after its last
-read. A borrowed `fileobj` is closed only when `closefd=True`.
+propagates. A file opened by path is closed once, and only after its last
+read; if that close itself fails, the failure is reported as below. A
+borrowed `fileobj` is closed only when `closefd=True`.
+
+If the scan fails and closing the source then fails too, the scan's error is
+raised with the close failure attached as a note. A cancellation or interrupt
+that arrives during that close outranks an ordinary scan error and
+propagates, with the scan error as its context. If the scan succeeded, a
+close failure is raised as before.
 
 ## Async-iterable decompression
 
