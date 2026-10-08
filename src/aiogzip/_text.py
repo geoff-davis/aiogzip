@@ -592,8 +592,10 @@ class AsyncGzipTextFile:
                 ) = self._decode_cookie(offset)
             # A failed seek either changes nothing or makes the reader
             # terminal (BC11). With the binary read cursor in place no input
-            # was consumed, so text state is restored, as after a no-effect
-            # source failure (BC2); otherwise text is at an unknown position.
+            # was consumed, so text state is restored if binary health still
+            # allows it, as after a no-effect source failure (BC2); a failure
+            # that poisoned the binary reader keeps that policy. A moved
+            # cursor leaves text at an unknown position.
             cursor = binary_file._read_cursor()
             saved = self._seek_rollback_state()
             try:

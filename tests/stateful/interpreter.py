@@ -766,8 +766,12 @@ async def run(
     releasers: list[asyncio.Task] = []
 
     def cursor():
+        # Raw attributes every reference has (b1, b2, candidate), not the
+        # candidate-only cursor helper, so baseline replays record it too.
         binary = getattr(handle, "_binary_file", None)
-        return None if binary is None else binary._read_cursor()
+        if binary is None:
+            return None
+        return getattr(binary, "_position", None), getattr(binary, "_decoder", None)
 
     def witness_seek(event: Event, op: dict[str, Any], before) -> Event:
         """Record whether a text seek that did not succeed moved the cursor."""
@@ -1183,6 +1187,9 @@ def recorded_run(
     run_record["origins"] = [[e.index, e.origins] for e in events if e.origins]
     run_record["source_reads"] = [
         [e.index, e.source_read] for e in events if e.source_read
+    ]
+    run_record["cursor_moved"] = [
+        [e.index, e.cursor_moved] for e in events if e.cursor_moved is not None
     ]
     if hooks:
         run_record["violations"] = hook.violations
