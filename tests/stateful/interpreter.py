@@ -16,7 +16,6 @@ import argparse
 import asyncio
 import base64
 import concurrent.futures
-import contextlib
 import dataclasses
 import gc
 import hashlib
@@ -36,7 +35,10 @@ from generator import write_payload
 # Windows runner. Stays below pyproject's faulthandler_timeout, so the
 # scenario records its own timeout before pytest dumps stacks.
 SCENARIO_TIMEOUT = 90.0
-# Bounds the close of a handle a timed-out scenario abandoned.
+# After a timeout, the scenario's own tasks get CLEANUP_GRACE to settle once
+# the gate opens before they are cancelled; CLEANUP_TIMEOUT bounds the whole
+# cleanup, including the handle's close.
+CLEANUP_GRACE = 2.0
 CLEANUP_TIMEOUT = 10.0
 INLINE_LIMIT = 64
 # Text payloads are at most a few thousand characters, so text stays inline:
@@ -592,6 +594,32 @@ async def _cancel_partner(task):
     return Outcome("ok", "cancel requested")
 
 
+async def _settle_after_timeout(handle) -> Outcome:
+    """Settle a timed-out scenario's own tasks, then close its handle.
+
+    Windows cannot remove a file that is still open, so an abandoned handle
+    would hide the timeout behind a temporary-directory cleanup error. Closing
+    before the scenario's tasks settle could meet a reservation one of them
+    still holds. A worker stuck past the bound is left to the faulthandler
+    watchdog; the returned outcome records the cleanup failure.
+    """
+    current = asyncio.current_task()
+    tasks = {task for task in asyncio.all_tasks() if task is not current}
+    try:
+        async with asyncio.timeout(CLEANUP_TIMEOUT):
+            if tasks:
+                _done, pending = await asyncio.wait(tasks, timeout=CLEANUP_GRACE)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    await asyncio.wait(pending)
+            if not handle.closed:
+                await handle.close()
+    except Exception as error:  # noqa: BLE001 - recorded, not raised
+        return Outcome("error", error=error)
+    return Outcome("ok", "closed" if handle.closed else "open")
+
+
 PARKED_OPEN_FAULTS = ("cancel_open", "overlap_open", "overlap_close")
 
 
@@ -896,14 +924,8 @@ async def run(
             await drive()
     except TimeoutError:
         gate.release()
-        land(Event(len(ops) + 1, {"op": "timeout"}, Outcome("error")))
-        # Close the abandoned handle: Windows cannot remove a file that is
-        # still open, so the temporary directory's cleanup would fail and
-        # hide the timeout behind an unrelated error.
-        if not handle.closed:
-            with contextlib.suppress(Exception):
-                async with asyncio.timeout(CLEANUP_TIMEOUT):
-                    await handle.close()
+        cleanup = await _settle_after_timeout(handle)
+        land(Event(len(ops) + 1, {"op": "timeout"}, Outcome("error"), cleanup))
     finally:
         gate.release()
     final: dict[str, Any] = {"closed": handle.closed}

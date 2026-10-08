@@ -103,7 +103,9 @@ def test_timed_out_scenario_closes_its_handle(monkeypatch):
     # an unrelated cleanup error. Seed 734 reads a native file by path.
     monkeypatch.setattr(interpreter, "SCENARIO_TIMEOUT", 0.05)
     events, _trace = replay(aiogzip, generate(734))
-    assert any(event.op["op"] == "timeout" for event in events)
+    (timeout,) = [event for event in events if event.op["op"] == "timeout"]
+    # The cleanup outcome is recorded beside the timeout, which still fails.
+    assert timeout.second == interpreter.Outcome("ok", "closed")
     final = events[-1]
     assert final.op["op"] == "final"
     assert final.outcome.value["closed"] is True
