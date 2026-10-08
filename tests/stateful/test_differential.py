@@ -4055,6 +4055,51 @@ def test_bc11_rejects_another_candidate_error():
     fails(pair, "(8, 'read', 0)")
 
 
+def _ref_edit(seed: int, key, **fields) -> Pair:
+    record = copy.deepcopy(RC1[f"b2/{seed}"]["reference"])
+    ref = edit(parse(record["trace"]), key, **fields)
+    return make_pair(seed, ref, reference="b2", ref_info=record)
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"second": {"error": "RuntimeError", "message": "unrelated"}},
+        {"taken": [0, 1]},
+        {"parked": {"via": "native", "method": "read", "bytes": None}},
+        {"pulled": [0, 1]},
+        {"outcome": {"ok": {"bytes": "e697a5"}}},  # bytes from a text read
+        {"outcome": {"ok": {"str": "x"}, "extra": 1}},
+    ],
+)
+def test_bc11_rejects_a_reference_read_with_another_shape(fields):
+    fails(_ref_edit(225, (8, "read", 0), **fields), "(8, 'read', 0)")
+
+
+@pytest.mark.parametrize(
+    "pulled", [None, [0, 2], [-1, 0], [0.0, 0.0], [False, False], [0, 0, 0]]
+)
+def test_bc11_rejects_a_buffer_read_without_its_exact_pulled_witness(pulled):
+    fails(_ref_edit(225, (7, "buffer_read", 0), pulled=pulled), "(7, 'buffer_read', 0)")
+
+
+@pytest.mark.parametrize(
+    "records",
+    [
+        [[5.0, True]],
+        [[True, True]],
+        [[5, 1]],
+        [[5, True, None]],
+        [[5, True], "x"],
+        {"5": True},
+    ],
+)
+def test_bc11_rejects_malformed_cursor_witnesses(records):
+    pair = rc1_pair("b2", 225)
+    pair.ref_info["cursor_moved"] = records
+    fails(pair, "(7, 'buffer_read', 0)")
+
+
 def test_bc11_rejects_a_binary_reader():
     pair = rc1_pair("b2", 225)
     pair.scenario["mode"] = "rb"
@@ -4103,6 +4148,15 @@ def test_bc12_fixed_run_must_match_the_reference_before_its_seek_end():
         pair, original=edit(pair.original, key, outcome={"ok": 9})
     )
     fails(pair, "differs from the reference before its seek_end")
+
+
+def test_bc12_rejects_a_reference_out_of_order_after_its_seek_end():
+    pair = rc1_pair("b2", 1000008)
+    original = list(pair.original)
+    i = original.index(row(original, 5, "seek_end"))
+    original[i], original[i + 1] = original[i + 1], original[i]
+    pair = dataclasses.replace(pair, original=original)
+    fails(pair, "the reference's shared event keys are out of order")
 
 
 def test_bc12_without_a_fixed_run_claims_nothing():

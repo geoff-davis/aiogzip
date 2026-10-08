@@ -1135,12 +1135,53 @@ def _claim_output(pair: Pair, data: bytes, claim: Claim) -> None:
 
 
 def _moved(info: dict[str, Any], index: int) -> bool | None:
-    witnesses = [
-        moved
-        for at, moved in info.get("cursor_moved") or []
-        if at == index and isinstance(moved, bool)
-    ]
+    """The run record's one ``cursor_moved`` witness for event ``index``;
+    None when it is absent, repeated, or any record is malformed."""
+    records = info.get("cursor_moved")
+    if not isinstance(records, list):
+        return None
+    witnesses = []
+    for record in records:
+        if not (
+            isinstance(record, list)
+            and len(record) == 2
+            and type(record[0]) is int
+            and type(record[1]) is bool
+        ):
+            return None
+        if record[0] == index:
+            witnesses.append(record[1])
     return witnesses[0] if len(witnesses) == 1 else None
+
+
+def _served(name: str, row: Row) -> bool:
+    """The reference row is a read that returned data, in the exact shape
+    the interpreter records for ``name``, with no other field."""
+    if (row.second, row.parked, row.taken) != (None, None, None):
+        return False
+    outcome = row.outcome
+    if name == "next" and outcome == {"stop": True}:
+        return row.pulled is None
+    if not (isinstance(outcome, dict) and outcome.keys() == {"ok"}):
+        return False
+    value = outcome["ok"]
+    if name == "buffer_read":
+        if isinstance(value, dict) and value.keys() == {"bytes"}:
+            length = len(value["bytes"]) // 2
+        elif isinstance(value, dict) and value.keys() == {"bytes_len", "sha256"}:
+            length = value["bytes_len"]
+        else:
+            return False
+        pulled = _exact_ints(row.pulled, 2)
+        return pulled is not None and 0 <= pulled[0] and pulled[1] - pulled[0] == length
+    if row.pulled is not None:
+        return False
+    items = value if name == "readlines" and isinstance(value, list) else [value]
+    return all(
+        isinstance(item, dict)
+        and (item.keys() == {"str"} or item.keys() == {"str_len", "sha256"})
+        for item in items
+    ) and (name == "readlines") == isinstance(value, list)
 
 
 def bc11(pair: Pair) -> Claim:
@@ -1180,12 +1221,10 @@ def bc11(pair: Pair) -> Claim:
             r = pair.ref_by_key[key]
             if (
                 is_error(row.outcome, "OSError", READ_BROKEN)
+                and row.outcome.keys() == {"error", "message"}
                 and (row.second, row.parked, row.taken, row.pulled)
                 == (None, None, None, None)
-                and r.parked is None
-                and r.taken is None
-                and isinstance(r.outcome, dict)
-                and r.outcome.keys() & {"ok", "stop"}
+                and _served(key[1], r)
             ):
                 claim.events.add(key)
         if pair.health_after(key) != "BROKEN":
@@ -1270,6 +1309,8 @@ def bc12(pair: Pair, owner: dict[tuple[str, Any], str]) -> list[str]:
     ]:
         return ["the BC12-fixed run differs from the reference before its seek_end"]
     original = dataclasses.replace(pair, ref=pair.original, original=None)
+    if not original.order_ok:
+        return ["the reference's shared event keys are out of order"]
     for item in _differences(original) - _differences(pair):
         owner[item] = "BC12-SEEK-END"
     return []
