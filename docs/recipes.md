@@ -191,6 +191,19 @@ access index. Prefer sequential processing when possible. If repeated replay
 is expensive, reopening can make lifecycle intent clearer but does not avoid
 the decompression cost required to reach a later uncompressed offset.
 
+A binary reader's `seek(offset, SEEK_END)` decompresses the rest of the stream
+(validating every trailer) to find the end, then moves to `end + offset`,
+clamped to the range from zero to the end. Output already buffered by a
+`peek()` or partial read counts exactly once, so the result is the same
+whether or not the reader had already reached EOF.
+
+A read-mode `seek()` whose target is negative, such as `seek(-5)` or a
+`SEEK_CUR` offset that goes before the start, raises `OSError("Negative seek
+in read mode")`. The stdlib `gzip.GzipFile` instead clamps it and returns 0.
+Clamp the target yourself if you depend on that behavior. In text mode a
+negative argument is a `tell()` cookie, not an offset (see
+[`seek()` and `tell()` in text mode](api.md#seek-and-tell-in-text-mode)).
+
 ## Cancellation
 
 Large compression and decompression calls may run in an executor. A worker

@@ -183,6 +183,17 @@ Zero-byte input is valid and returns zero members and zero sizes. NUL padding
 after a valid member is accepted and included in the aggregate compressed size;
 other trailing data is treated as a malformed next member.
 
+`inspect()` holds every member's record until it returns, so its memory grows
+with the number of members; `verify()` keeps only running totals. While it
+parses a header, `inspect()` (like `GzipDecoder` with
+`collect_member_info=True`) buffers each `FNAME`, `FCOMMENT` and `FEXTRA` field
+whole and keeps it in the member's record. `FEXTRA` is at most 64 KiB by the
+format, but `FNAME` and `FCOMMENT` are bounded only by the header limit: any
+single gzip header larger than 128 MiB raises `gzip.BadGzipFile`.
+`max_decompressed_size` does not count header bytes. Scanning untrusted input
+with many members or very large header fields can therefore use substantial
+memory; prefer `verify()` when per-member metadata is not needed.
+
 Cancelling `inspect()` or `verify()` waits for any native open, read or close
 already handed to a worker thread to finish before the cancellation
 propagates. A file opened by path is closed once, and only after its last

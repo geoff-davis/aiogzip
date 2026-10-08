@@ -23,7 +23,7 @@ system text may vary.
 | Codec operation still active | `RuntimeError` | Exhaust the returned iterator before starting another operation. |
 | Codec abandoned or partially closed | `OSError` on later use | The instance is unusable; call `discard()` and create a new codec. |
 | Codec used after successful decoder finalization | `ValueError` | `feed()` and repeated `finish()` are terminal-state misuse. |
-| Operations on a closed file | `ValueError` | Matches `io` module conventions. |
+| Operations on a closed file | `ValueError` | Matches `io` module conventions, except that `async for` over a closed handle ends without raising (see below). |
 | Reading a write-mode file (or vice versa) | `OSError` | e.g. `"File not open for reading"`. |
 
 `gzip.BadGzipFile` subclasses `OSError`, so order your handlers from specific
@@ -41,6 +41,32 @@ except gzip.BadGzipFile:
 except OSError as exc:
     ...  # I/O failure, or the decompression cap tripped (see below)
 ```
+
+## Closed and unopened handles
+
+Reads, writes and seeks on a closed handle raise `ValueError`. Iteration is
+the exception: `async for` over a closed binary or text handle yields nothing
+and ends, as if at end of file, instead of raising. Check `closed` first if a
+loop must distinguish a closed handle from an empty stream.
+
+`flush()` on a write handle that has not been opened yet (constructed but not
+entered with `async with`) returns without error: no gzip member has started,
+so there is nothing to flush.
+
+## Custom sink errors in `write()` and `flush()`
+
+When a custom `fileobj`'s `write()` raises, the two calls report it
+differently:
+
+- `write()` lets the sink's exception propagate unchanged, whatever its type.
+- `flush()` passes an `OSError` through unchanged, but wraps any other
+  exception as `OSError("Unexpected error during flush: ...")`, with the
+  original as `__cause__`.
+
+Either way the writer is broken afterwards: discard the incomplete output and
+create a new writer. Code that catches a sink's own exception type around
+`flush()` should inspect `__cause__`. Unifying the two is a candidate for a
+later release because it changes an exception type.
 
 ## Same-handle concurrency
 
@@ -97,6 +123,18 @@ cancelled cooperatively, as before.
 
 Cancellation while a clean context exit is waiting for an active call also
 attempts abortive owned-resource cleanup before the cancellation propagates.
+
+If that abortive cleanup fails, for example because a custom source's
+`close()` raises, the failure is attached to the propagating exception (the
+context body's exception, or the cancellation) as a note beginning
+`Context-exit cleanup also failed:`. Exception types and precedence are
+unchanged.
+
+To abort an active read or write on a custom file object, the exit cancels
+the task running that call once, and consumes that request however the call
+ends, even if the custom object swallows the cancellation. An enclosing
+`asyncio.timeout()` in that task therefore still reports its own expiry as
+`TimeoutError`, and a separate outside cancellation of the task is kept.
 
 The maintained examples avoid same-handle overlap entirely: each shard task
 owns a separate file handle, and each transport codec operation is exhausted
@@ -199,6 +237,14 @@ where it was or makes it terminal: if the seek had already moved the
 underlying binary reader, later reads raise the same terminal `OSError` until
 `seek(0)` succeeds. A failed text seek is never followed by text from the wrong
 position.
+
+Do not retry a text read that raised `UnicodeDecodeError`. The reader does
+not become terminal, but the failed read has already consumed the whole chunk
+of decompressed bytes it was decoding, so the next read resumes after that
+chunk and silently skips text, possibly far more than the undecodable bytes
+themselves. Call `seek(0)` to
+start again from the beginning, or reopen the file with a different `encoding`
+or an `errors` handler such as `"replace"`.
 
 ## Codec finalization and operation abandonment
 
