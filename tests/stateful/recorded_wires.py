@@ -3,11 +3,16 @@
 The recorded C0 and b1 traces (``tests/data/wp10_c0_traces.json`` and
 ``tests/data/wp10_b1_runs.json``), and the wire offsets that
 ``test_differential.py`` pins, hold only for the exact bytes they were
-recorded from. The generator builds every wire with ``gzip.compress()``,
-whose output depends on the platform's zlib: a zlib-ng-backed stdlib (the
-Windows Python 3.14 CI leg) emits different streams. ``REPRODUCED`` compares
-one SHA-256 over the generated wire of every recorded seed and of every seed
-that test pins directly with the value from zlib.
+recorded from. The generator builds every member with ``gzip.compress()``,
+whose DEFLATE stream depends on the platform's zlib: a zlib-ng-backed stdlib
+(the Windows Python 3.14 CI leg) emits different streams. ``REPRODUCED``
+compares one SHA-256 over every member the generator compresses for the
+recorded seeds and the seeds that test pins directly with the value from
+zlib.
+
+The header's OS byte is excluded: Python 3.13 changed it from zlib's value
+(3 on Unix) to 255, so it varies with the Python version while the replays,
+which pass on every supported version, do not depend on it.
 """
 
 from __future__ import annotations
@@ -16,7 +21,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from generator import generate, unb64
+import generator
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 
@@ -27,7 +32,10 @@ PINNED_SEEDS = frozenset(
     | {2512, 2969, 3525, 4819}
 )
 
-WIRES_SHA256 = "f5ff0056843cf57c36d75826d63ae227c70a3ab6770581b50a55b98c9253491f"
+# The gzip header byte that names the OS; see the module docstring.
+OS_BYTE = 9
+
+WIRES_SHA256 = "5f5470e6869e2b171063debaa3a53a14c9c16e883b91e13052c1a994df665ac8"
 
 
 def recorded_seeds() -> set[int]:
@@ -37,13 +45,23 @@ def recorded_seeds() -> set[int]:
 
 
 def wires_digest() -> str:
-    """SHA-256 over the generated wire of every recorded and pinned seed."""
+    """SHA-256 over every member compressed for the recorded and pinned seeds."""
     digest = hashlib.sha256()
-    for seed in sorted(recorded_seeds() | PINNED_SEEDS):
-        scenario = generate(seed)
-        if "wire" in scenario:
-            digest.update(b"%d:" % seed)
-            digest.update(unb64(scenario["wire"]))
+    compress = generator._member
+
+    def recording(rng, payload):
+        member = compress(rng, payload)
+        digest.update(b"%d:" % len(member))
+        digest.update(member[:OS_BYTE] + b"\xff" + member[OS_BYTE + 1 :])
+        return member
+
+    generator._member = recording
+    try:
+        for seed in sorted(recorded_seeds() | PINNED_SEEDS):
+            digest.update(b"seed %d;" % seed)
+            generator.generate(seed)
+    finally:
+        generator._member = compress
     return digest.hexdigest()
 
 
