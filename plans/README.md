@@ -29,11 +29,14 @@ Durable invariants (start here):
   every approved difference from b1 (BC1–BC10).
 - [Findings and evidence limitations](reviews/v2.0.0b2-findings.md)
 
-### Parked RC plan
+### RC1 plan
 
-The RC hardening program is parked, and no RC plan is committed under
-`plans/`. Plan §17 says how to rebase it on the verified b2 (gate G22), and
-§18 lists the deferred work.
+The [2.0.0rc1 plan](RELEASE_2_0_0RC1_PLAN.md) (gates R01–R14) starts from the
+b2 baselines in plan §17. It was drawn from two read-only reviews of
+`v2.0.0b2` that used the same [brief](reviews/data/rc1/rc1-review-prompt.txt):
+[Claude Opus 5.5](reviews/data/rc1/opus-review.md.txt) and
+[Codex](reviews/data/rc1/codex-review.md.txt). Plan §18 still lists the
+deferred work.
 
 ### b2 design records
 
