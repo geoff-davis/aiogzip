@@ -127,3 +127,49 @@ class TestUsage:
         )
         assert proc.returncode == 0
         assert proc.stdout.startswith("OK: ")
+
+
+class TestUnexpectedFailures:
+    """RC1 R09: non-OSError failures keep the output form, with exit 2."""
+
+    @pytest.fixture(params=["verify", "inspect"])
+    def failing(self, request, monkeypatch):
+        async def boom(*args, **kwargs):
+            raise RuntimeError("internal failure")
+
+        monkeypatch.setattr(f"aiogzip.__main__.{request.param}", boom)
+        return request.param
+
+    def test_json_stays_json(self, failing, good_gz, capsys):
+        assert main([failing, "--json", str(good_gz)]) == 2
+        captured = capsys.readouterr()
+        assert json.loads(captured.out) == {
+            "ok": False,
+            "error": "RuntimeError: internal failure",
+        }
+        assert "Traceback" not in captured.err
+
+    def test_human_output_has_no_traceback(self, failing, good_gz, capsys):
+        assert main([failing, str(good_gz)]) == 2
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err == f"ERROR: {good_gz}: RuntimeError: internal failure\n"
+
+    def test_oserror_keeps_exit_one(self, monkeypatch, good_gz, capsys):
+        async def unreadable(*args, **kwargs):
+            raise OSError("unreadable")
+
+        monkeypatch.setattr("aiogzip.__main__.verify", unreadable)
+        assert main(["verify", "--json", str(good_gz)]) == 1
+        assert json.loads(capsys.readouterr().out) == {
+            "ok": False,
+            "error": "unreadable",
+        }
+
+    def test_interrupt_is_not_reported(self, monkeypatch, good_gz):
+        async def interrupted(*args, **kwargs):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr("aiogzip.__main__.verify", interrupted)
+        with pytest.raises(KeyboardInterrupt):
+            main(["verify", str(good_gz)])

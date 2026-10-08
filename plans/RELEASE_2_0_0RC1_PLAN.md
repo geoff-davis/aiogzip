@@ -305,6 +305,13 @@ reviewers' categorization.
 - `_common.py` claims `_MAX_CHUNK_SIZE` caps `readinto`; correct the comment
   or cap the internal fill without changing results (Opus RC1-09).
 
+*Implemented as ledger row BC15.* The comment was corrected rather than the
+fill capped: `readinto()` fills up to `len(b)` before copying so a failed
+refill leaves the stream intact, and a piecewise fill would change that.
+Unexpected CLI failures exit with status 2, argparse's usage status, keeping 1
+for stream failures. A repeated cancellation during context-exit cleanup is
+not noted as a cleanup failure.
+
 ### R10: documentation
 
 In `docs/errors.md`, `docs/api.md` and `docs/recipes.md` as fitting:

@@ -2,7 +2,8 @@
 
 Thin argparse wrapper over the public :func:`aiogzip.inspect` and
 :func:`aiogzip.verify` APIs. Exit codes: 0 on success, 1 when the stream is
-invalid (or unreadable), 2 for usage errors (argparse's convention).
+invalid (or unreadable), 2 for usage errors (argparse's convention) and for
+any other failure, which is reported in the same form (``--json`` stays JSON).
 """
 
 import argparse
@@ -81,6 +82,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         else:
             print(f"FAILED: {args.path}: {exc}", file=sys.stderr)
         return 1
+    except Exception as exc:
+        # Anything else (an invalid limit, an internal error) is reported in
+        # the same form, so --json output stays parseable, with usage status.
+        error = f"{type(exc).__name__}: {exc}"
+        if args.json:
+            print(json.dumps({"ok": False, "error": error}))
+        else:
+            print(f"ERROR: {args.path}: {error}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
