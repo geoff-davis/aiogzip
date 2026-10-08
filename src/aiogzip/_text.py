@@ -2209,7 +2209,9 @@ class AsyncGzipTextFile:
                         pending_chars = 0
                         pending_empty = False
                     await self._write_batch_reserved(line)
-                elif not length:
+                elif not length and type(line) is str:
+                    # Only an exact str is known to be empty from its length;
+                    # a subclass may override __len__, so it is stored as before.
                     pending_empty = True
                 else:
                     if pending and pending_chars + length > self._chunk_size:

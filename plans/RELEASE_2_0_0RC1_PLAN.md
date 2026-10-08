@@ -271,8 +271,10 @@ semantics (BOM handling for UTF-16 and UTF-32). **Tests:** long empty runs,
 mixed inputs, iterator failure, BOM encodings, and a direct item-count bound.
 Timing check deferred to R12.
 
-**Repair (as implemented).** Empty strings are no longer stored; a
-`pending_empty` flag records that one joined the current batch, and every
+**Repair (as implemented).** Empty strings (exact `str` only: a subclass may
+override `__len__`, so it is stored as before; Codex review of `b7c971b`) are
+no longer stored; a `pending_empty` flag records that one joined the current
+batch, and every
 flush condition tests `pending or pending_empty`. The batches handed to the
 encoder path, and so the output bytes, are exactly those of the b2 algorithm:
 an all-empty batch is still written (an empty UTF-16/32 write emits the BOM),
@@ -282,7 +284,8 @@ compares every batch with a reference model of the b2 algorithm
 (parametrized and Hypothesis-generated inputs) and reads the live `pending`
 list during 200,000 empty inputs (always 0) and a mixed run (at most
 `chunk_size`). On the b2 source only the two bound tests fail; dropping empty
-strings without the flag fails 19 of 28.
+strings without the flag fails 19 of 28; trusting a subclass's zero length
+fails the 5 subclass regressions that depend on it.
 
 Both reviewers' categories are in the archived reports. R09 and R10 promote
 several of Opus's nice-to-have findings (RC1-06, RC1-07, RC1-09, RC1-10 and

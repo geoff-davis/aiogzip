@@ -197,3 +197,40 @@ class TestWritelinesEmptyInputs:
                     await f.writelines(["", "", b"bytes"])  # type: ignore[list-item]
         assert batches == ["", b"bytes"]
         assert gzip.decompress(path.read_bytes()) == "".encode("utf-16")
+
+
+class _ZeroLength(str):
+    """A str subclass whose length understates its content."""
+
+    def __len__(self):
+        return 0
+
+
+class _Plain(str):
+    pass
+
+
+class TestWritelinesStrSubclasses:
+    @pytest.mark.parametrize(
+        "lines",
+        [
+            [_ZeroLength("abc")],
+            ["", _ZeroLength("abc"), ""],
+            ["ab", _ZeroLength("cd"), "ef"],
+            [_Plain(""), "", _Plain("xy")],
+            [_ZeroLength("z")] * 3 + ["x" * CHUNK],
+        ],
+    )
+    async def test_subclass_batches_match_the_b2_algorithm(self, tmp_path, lines):
+        path = tmp_path / "out.gz"
+        with _recorded_batches() as batches:
+            async with AsyncGzipTextFile(path, "wt", chunk_size=CHUNK, newline="") as f:
+                await f.writelines(lines)
+        assert batches == _reference_batches(lines, CHUNK)
+        assert gzip.decompress(path.read_bytes()).decode() == "".join(lines)
+
+    async def test_zero_length_subclass_text_is_written(self, tmp_path):
+        path = tmp_path / "out.gz"
+        async with AsyncGzipTextFile(path, "wt") as f:
+            await f.writelines([_ZeroLength("abc")])
+        assert gzip.decompress(path.read_bytes()) == b"abc"
