@@ -9,13 +9,14 @@ see "Seeds, minimization and CI" in plans/design/v2.0.0b2-wp10-qualification.md.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from functools import cache
 from pathlib import Path
 
 import interpreter
 import pytest
-from generator import SEEK_END_BASE, generate
+from generator import CHUNK_SIZES, SEEK_CANCEL_BASE, SEEK_END_BASE, generate
 from interpreter import Outcome, replay
 from model import (
     BROKEN_MESSAGE,
@@ -33,16 +34,20 @@ import aiogzip
 # plus 5767, the only seed below 6000 that aborts a BROKEN reader (943, also
 # such a seed, is inside the base range), and 1671 and 2344, the first seeds
 # whose failed text seek moves the cursor of a BROKEN and a HEALTHY reader
-# (BC11).
+# (BC11), and 2000322 and 2001408, whose cookie taken on a reader a cancelled
+# cookie seek left BROKEN named a position the model had kept as certain.
 REGRESSION_SEEDS = (
     1062, 1071, 1149, 1494, 1506, 1530, 1671, 1726,
     1737, 1754, 1787, 1818, 2105, 2254, 2344, 5767,
+    2000322, 2001408,
 )  # fmt: skip
 assert not set(REGRESSION_SEEDS) & set(range(1000))
 # End-relative seeks (BC12) live in their own block so lower seeds keep
 # their operations.
 SEEK_END_SEEDS = tuple(range(SEEK_END_BASE, SEEK_END_BASE + 200))
-PR_SEEDS = tuple(range(1000)) + REGRESSION_SEEDS + SEEK_END_SEEDS
+# Cancellations partway through a text cookie seek's replay (R02).
+SEEK_CANCEL_SEEDS = tuple(range(SEEK_CANCEL_BASE, SEEK_CANCEL_BASE + 200))
+PR_SEEDS = tuple(range(1000)) + REGRESSION_SEEDS + SEEK_END_SEEDS + SEEK_CANCEL_SEEDS
 
 # Table rows the generator cannot reach, each with the focused test that
 # covers it instead (path, test function).
@@ -224,6 +229,79 @@ def test_only_the_seek_end_block_issues_end_relative_seeks():
     )
 
 
+def test_only_the_seek_cancel_block_cancels_a_cookie_seek():
+    def cancelled_cookie_seeks(scenario):
+        return [
+            op
+            for op in scenario.get("ops", [])
+            if op["op"] == "cancel" and op["call"]["op"] == "seek_mark"
+        ]
+
+    lower = range(0, SEEK_END_BASE + 200, 997)
+    assert not any(cancelled_cookie_seeks(generate(seed)) for seed in lower)
+    block = [generate(seed) for seed in SEEK_CANCEL_SEEDS]
+    assert all(s["mode"] == "rt" for s in block)
+    # Payloads span many source chunks, and some cancels land after the
+    # gate has let source accesses through, partway into the replay.
+    assert max(s["payload_size"] for s in block) > 2 * max(CHUNK_SIZES)
+    ops = [op for s in block for op in cancelled_cookie_seeks(s)]
+    assert any(op["after"] > 0 for op in ops)
+
+
+async def test_armed_gate_lets_its_skip_count_through_first():
+    gate = interpreter.Gate()
+    config = {"seekable": True, "checkpoint": False, "frames": []}
+    source = interpreter.Source(bytes(range(20)), config, gate)
+    gate.arm(2)
+    # Bounded: a gate that parked these would otherwise hang the test.
+    assert await asyncio.wait_for(source.read(3), 5) == bytes(range(3))
+    assert await asyncio.wait_for(source.seek(1), 5) == 1  # an access too
+    task = asyncio.create_task(source.read(2))
+    await asyncio.wait_for(gate.entered.wait(), 5)
+    assert not task.done()
+    gate.release()
+    assert await task == bytes([1, 2])
+    assert not gate.armed and gate.skip == 0
+
+
+async def test_gated_executor_lets_its_skip_count_through_first():
+    loop = asyncio.get_running_loop()
+    gate = interpreter.Gate()
+    executor = interpreter.GatedExecutor(gate, loop)
+    try:
+        gate.arm(1)
+        passed = loop.run_in_executor(executor, int, "7")
+        assert await asyncio.wait_for(passed, 5) == 7
+        parked = loop.run_in_executor(executor, int, "8")
+        await asyncio.wait_for(gate.entered.wait(), 5)
+        assert not parked.done()
+        gate.release()
+        assert await parked == 8
+    finally:
+        executor.shutdown()
+
+
+@pytest.mark.parametrize("seed", [2000137, 2000160])
+def test_cancel_partway_through_a_cookie_seek_replay_refuses_reads(seed):
+    # R02: the cancel lets source accesses through (a custom source for
+    # 2000137, a native file for 2000160), so it lands after the replay
+    # has moved the cursor. The next read must refuse, never return the
+    # old text over the moved position (R01, BC11).
+    events, _trace = replay(aiogzip, generate(seed))
+    index = next(
+        i
+        for i, event in enumerate(events)
+        if event.op["op"] == "cancel" and event.op["call"]["op"] == "seek_mark"
+    )
+    cancel = events[index]
+    assert cancel.op["after"] > 0
+    assert cancel.outcome.kind == "cancelled"
+    assert cancel.cursor_moved is True
+    following = events[index + 1]
+    assert following.outcome.kind == "error"
+    assert BROKEN_MESSAGE in str(following.outcome.error)
+
+
 def _text_checker_at(health):
     # Seed 39: text with a CRC failure, so salvage is reachable.
     scenario = generate(39)
@@ -233,6 +311,100 @@ def _text_checker_at(health):
     checker.lifecycle = Lifecycle.OPEN
     checker.health = health
     return checker
+
+
+def _recovered_by_an_uncertain_cookie():
+    # A cancelled cookie seek moves the cursor (BC11); a cookie taken on the
+    # BROKEN reader then names an unknown offset, and seeking to it recovers.
+    checker = _text_checker_at(Health.HEALTHY)
+    cancel = interpreter.Event(
+        0,
+        {"op": "cancel", "call": {"op": "seek_mark", "label": "m0"}},
+        Outcome("cancelled"),
+        Outcome("ok", "cancel requested"),
+    )
+    cancel.cursor_moved = True
+    checker.observe(cancel)
+    assert checker.health is Health.BROKEN
+    checker.observe(
+        interpreter.Event(1, {"op": "tell_mark", "label": "m1"}, Outcome("ok", -5))
+    )
+    checker.observe(
+        interpreter.Event(2, {"op": "seek_mark", "label": "m1"}, Outcome("ok", -5))
+    )
+    assert not checker.violations, checker.violations
+    assert checker.health is Health.HEALTHY
+    assert checker.modeled and not checker.certain
+    return checker
+
+
+def test_cookie_recovery_from_an_uncertain_position_keeps_checking_content():
+    checker = _recovered_by_an_uncertain_cookie()
+    read = {"op": "read", "n": 3}
+    checker.observe(interpreter.Event(3, read, Outcome("ok", "\0" * 3)))
+    assert any("matches no allowed offset" in v for v in checker.violations)
+
+
+def test_cookie_recovery_from_an_uncertain_position_accepts_payload_text():
+    checker = _recovered_by_an_uncertain_cookie()
+    text = checker.upper[5:8]
+    checker.observe(interpreter.Event(3, {"op": "read", "n": 3}, Outcome("ok", text)))
+    assert not checker.violations, checker.violations
+
+
+def test_a_reused_mark_label_drops_its_old_uncertainty():
+    checker = _recovered_by_an_uncertain_cookie()
+    checker.handle_call(3, {"op": "seek0"}, Outcome("ok", 0))
+    checker.handle_call(4, {"op": "tell_mark", "label": "m1"}, Outcome("ok", 0))
+    checker.handle_call(5, {"op": "seek_mark", "label": "m1"}, Outcome("ok", 0))
+    assert checker.certain and checker.position == 0, checker.candidates
+
+
+def _after_a_cancelled_read_breaks_the_reader():
+    # Seed 2000012 on a zlib-ng wire (Windows 3.14): a cancel lands inside
+    # read(-1) on a custom source without a checkpoint. The read consumed an
+    # unknown amount, so a cookie taken on the BROKEN reader names wherever
+    # the reader stopped, not where the read began.
+    scenario = generate(2000012)
+    source = scenario["source"]
+    assert source["kind"] == "custom" and not source["checkpoint"]
+    checker = make_checker(scenario, aiogzip.engine_info().decompression)
+    checker.lifecycle = Lifecycle.OPEN
+    upper = checker.upper
+    events = [
+        interpreter.Event(0, {"op": "read", "n": 2}, Outcome("ok", upper[:2])),
+        interpreter.Event(
+            1,
+            {"op": "cancel", "call": {"op": "read", "n": -1}, "after": 1},
+            Outcome("cancelled"),
+            Outcome("ok", "cancel requested"),
+        ),
+        interpreter.Event(2, {"op": "tell_mark", "label": "m0"}, Outcome("ok", 7)),
+        interpreter.Event(3, {"op": "seek0"}, Outcome("ok", 0)),
+        interpreter.Event(4, {"op": "seek_mark", "label": "m0"}, Outcome("ok", 7)),
+    ]
+    for event in events:
+        checker.observe(event)
+    assert not checker.violations, checker.violations
+    assert checker.health is Health.HEALTHY
+    return checker
+
+
+def test_a_cookie_after_a_cancelled_read_may_name_a_later_offset():
+    checker = _after_a_cancelled_read_breaks_the_reader()
+    text = checker.upper[4:7]
+    readline = {"op": "readline", "limit": 3}
+    checker.observe(interpreter.Event(5, readline, Outcome("ok", text)))
+    assert not checker.violations, checker.violations
+
+
+def test_a_cookie_after_a_cancelled_read_keeps_checking_content():
+    checker = _after_a_cancelled_read_breaks_the_reader()
+    # The read began at 2, so the cookie names no earlier offset.
+    assert checker.candidates[0] == 2, checker.candidates[:4]
+    readline = {"op": "readline", "limit": 3}
+    checker.observe(interpreter.Event(5, readline, Outcome("ok", "\0" * 3)))
+    assert any("matches no allowed offset" in v for v in checker.violations)
 
 
 def test_text_seek_end_from_broken_is_a_violation():

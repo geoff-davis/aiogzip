@@ -520,9 +520,16 @@ class Checker(_HandleChecker):
         self.candidates: list[int] = [0]
         self.modeled = True  # False after a direct buffer read in text mode
         self.marks: dict[str, int] = {}
+        # A mark taken at an uncertain but modeled position (-1 in
+        # ``marks``): the offsets it may name. Seeking to it restores them,
+        # so content stays checked after a cookie recovers a BROKEN reader.
+        self.uncertain_marks: dict[str, list[int]] = {}
         # A text seek_end from VALIDATION_SALVAGE drained every retained byte:
         # until a rewind, every nonzero read must refuse.
         self.salvage_drained = False
+        # BC11: a failed text seek moved the cursor. Until the reader leaves
+        # BROKEN, every nonzero read must refuse.
+        self.seek_broken = False
 
     @property
     def position(self) -> int:
@@ -549,6 +556,8 @@ class Checker(_HandleChecker):
         self.coverage.add(("health", f"{before.value}->{event}"))
         if self.health is not SALVAGE:
             self.salvage_drained = False
+        if self.health is not BROKEN:
+            self.seek_broken = False
         if self.health is not HEALTHY:
             self.eof = True
 
@@ -584,6 +593,18 @@ class Checker(_HandleChecker):
         limit = min(limit, len(self.upper))
         if limit > self.candidates[-1]:
             self.candidates = list(range(self.candidates[0], limit + 1))
+
+    def text_seek_moved(self) -> None:
+        """BC11: a failed text seek moved the cursor; the reader is terminal."""
+        self.transition("text_seek_failed")
+        self.seek_broken = self.health is BROKEN
+        self.lose_position()
+
+    def lose_position(self) -> None:
+        """A failed text seek that moved the cursor stopped somewhere in its
+        rewind and replay: the reader may stand at any offset, before or
+        after the old one, so a cookie taken now names no known position."""
+        self.candidates = list(range(len(self.upper) + 1))
 
     def at_validated_eof(self) -> bool:
         return self.expect.clean and self.position == len(self.upper)
@@ -726,6 +747,7 @@ class Checker(_HandleChecker):
                 # Cancellation lost the race with completion of the call.
                 self.handle_call(index, op["call"], first)
                 return
+            before = self.health
             moved = self.text and self.cursor_moved
             if moved:
                 # Only a rewind moves the cursor of a reader that is not
@@ -735,8 +757,12 @@ class Checker(_HandleChecker):
                 self.transition("cancel_no_effect")
             else:
                 self.transition("cancel_uncertain")
+            if self.health is BROKEN and before is not BROKEN:
+                # The cancelled call consumed an unknown amount, as for a
+                # failure that breaks the reader; tell() reports where.
+                self.widen(len(self.upper))
             if moved:
-                self.transition("text_seek_failed")
+                self.text_seek_moved()
             call = op["call"]
             if call["op"] == "seek_end" and not self.text and self.modeled:
                 # A cancelled end-relative seek stops anywhere in its drain,
@@ -758,6 +784,16 @@ class Checker(_HandleChecker):
             and op.get("limit", -1) != 0
         ):
             self.fail(index, f"{name} returned after seek_end drained the salvage")
+        if (
+            self.seek_broken
+            and name in READ_OPS
+            and outcome.kind in ("ok", "stop")
+            and op.get("n", -1) != 0
+            and op.get("limit", -1) != 0
+        ):
+            self.fail(
+                index, f"{name} returned after a failed text seek moved the cursor"
+            )
         self.lifecycle_event("call_starts")
         if name == "buffer_read":
             self.modeled = False
@@ -783,6 +819,10 @@ class Checker(_HandleChecker):
             if name == "tell_mark":
                 known = self.modeled and self.certain
                 self.marks[op["label"]] = self.position if known else -1
+                if self.modeled and not self.certain:
+                    self.uncertain_marks[op["label"]] = list(self.candidates)
+                else:
+                    self.uncertain_marks.pop(op["label"], None)
             return
         if name in SEEK_OPS:
             self.handle_seek(index, op, value)
@@ -893,6 +933,9 @@ class Checker(_HandleChecker):
             # A text cookie seek is a rewind plus a forward replay.
             self.transition("rewind_ok")
             target = self.marks.get(op["label"], -1)
+            if op["label"] in self.uncertain_marks:
+                self.candidates = list(self.uncertain_marks[op["label"]])
+                return
             if target < 0:
                 self.modeled = False
                 return
@@ -1012,7 +1055,7 @@ class Checker(_HandleChecker):
             # and the rewind restored health before the failure.
             self.transition("rewind_ok")
             self.classify_error(index, op, error)
-            self.transition("text_seek_failed")
+            self.text_seek_moved()
             return
         self.classify_error(index, op, error)
         if self.health is BROKEN and before is not BROKEN:

@@ -41,6 +41,12 @@ MAX_BODY_REROLLS = 400
 # including after a peek() that reaches EOF. A separate block keeps every
 # lower seed's operations, and the records pinned to them, unchanged.
 SEEK_END_BASE = 1_000_000
+# Seeds from here up (R02) are text scenarios with payloads spanning many
+# source chunks, whose cancellations can hit a cookie seek partway through its
+# replay: the gate lets a chosen number of source accesses through first.
+SEEK_CANCEL_BASE = 2_000_000
+SEEK_CANCEL_CHARS = (3000, 20_000, 60_000)
+SEEK_CANCEL_AFTER = (0, 1, 2, 5, 20, 100)
 
 
 def b64(data: bytes) -> str:
@@ -284,6 +290,7 @@ def _operations(rng: random.Random, config: dict[str, Any]) -> list[dict[str, An
     total = config["payload_size"]
     sizes = (-1, 0, 1, 2, 3, 7, 64, 1000, max(1, total // 3))
     seek_end = config["seed"] >= SEEK_END_BASE
+    seek_cancel = text and config["seed"] >= SEEK_CANCEL_BASE
     if text:
         names = ["read", "readline", "readlines", "next", "tell_mark", "seek_mark"]
         names += ["seek0", "buffer_read"]
@@ -298,8 +305,14 @@ def _operations(rng: random.Random, config: dict[str, Any]) -> list[dict[str, An
         events += ["fail_no_effect", "fail_consumed"]
     ops: list[dict[str, Any]] = []
     marks = 0
+    if seek_cancel and rng.random() < 0.7:
+        ops += [
+            {"op": "read", "n": rng.choice(sizes)},
+            {"op": "tell_mark", "label": "m0"},
+        ]
+        marks = 1
     for _ in range(rng.randrange(1, 14)):
-        if rng.random() < 0.15 and (custom or native):
+        if rng.random() < (0.3 if seek_cancel else 0.15) and (custom or native):
             name = rng.choice(events)
         elif rng.random() < 0.03:
             name = "open"  # already open: ValueError, no state change
@@ -336,6 +349,13 @@ def _operations(rng: random.Random, config: dict[str, Any]) -> list[dict[str, An
             op["call"] = _blocking_call(rng, text, rewindable, seek_end)
             if name == "overlap":
                 op["second"] = _blocking_call(rng, text)
+            elif name == "cancel" and seek_cancel:
+                if marks and rng.random() < 0.6:
+                    op["call"] = {
+                        "op": "seek_mark",
+                        "label": f"m{rng.randrange(marks)}",
+                    }
+                op["after"] = rng.choice(SEEK_CANCEL_AFTER)
         ops.append(op)
     end = rng.random()
     if (
@@ -388,14 +408,16 @@ def _blocking_call(
 
 def generate(seed: int) -> dict[str, Any]:
     rng = random.Random(seed)
-    if rng.random() < WRITE_SHARE:
+    if rng.random() < WRITE_SHARE and seed < SEEK_CANCEL_BASE:
         return _generate_write(rng, seed)
-    text_mode = rng.random() < 0.4
+    seek_cancel = seed >= SEEK_CANCEL_BASE
+    text_mode = rng.random() < 0.4 or seek_cancel
     text = None
     if text_mode:
         encoding = rng.choice(ENCODINGS)
         newline = rng.choice(NEWLINES)
-        source_text = _text_payload(rng, encoding, rng.choice((0, 5, 200, 3000)))
+        chars = SEEK_CANCEL_CHARS if seek_cancel else (0, 5, 200, 3000)
+        source_text = _text_payload(rng, encoding, rng.choice(chars))
         whole = source_text.encode(encoding)
         text = {"encoding": encoding, "newline": newline}
     else:

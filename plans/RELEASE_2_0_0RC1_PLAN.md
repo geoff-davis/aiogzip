@@ -179,7 +179,52 @@ tests.
   the R01 rule, and add a cancel-during-seek event with payloads larger than
   one chunk. Text payloads are currently at most 3,000 characters. *(The
   model now treats a failed text seek as `BROKEN`, merged with R01 in PR
-  #114; the larger-payload cancel-during-seek event remains.)*
+  #114. The cancel-during-seek event followed, test-only: seeds from
+  2,000,000 are text scenarios of 3,000, 20,000 or 60,000 characters (up
+  to about 150 KB, more than twice the largest source chunk), and their
+  `cancel` events can park a cookie seek (`seek_mark`). The gate takes a
+  skip count (`after`): it lets that many source accesses (reads, seeks,
+  native executor jobs) through before it parks one, so the cancel can
+  land after the replay has moved the cursor. 200 block seeds join the PR
+  set; in 7 of them a cancelled cookie seek has moved the cursor, and
+  without the skip none does. The model now fails any nonzero read that
+  returns after a failed text seek moved the cursor, until the reader
+  leaves BROKEN. Reverting R01's invalidation (restoring the old text over
+  the moved cursor) fails 9 of the 200 seeds, 6 of them on public reads,
+  and the pinned seeds 2000137 and 2000160. The block also found a model
+  gap: after a failed text seek moved the cursor, the model kept its last
+  position as certain, so a cookie taken on the BROKEN reader named the
+  wrong place once a seek to it recovered the reader. Such a reader may
+  now stand at any offset (seeds 2000322 and 2001408 join the regression
+  seeds), and a cookie taken at an uncertain position keeps its set of
+  offsets, which a seek to it restores, so the text after that recovery is
+  still checked against the payload. A second gap failed seed 2000012 on
+  Windows 3.14 CI only. The stateful test compresses its wires at run time,
+  and compressing this one with zlib-ng reproduces the failure locally,
+  consistent with Windows 3.14's bundled zlib-ng. On that wire a cancel
+  lands inside `read(-1)` on a custom source without a checkpoint. The read
+  consumed an unknown amount before the cancel broke the reader, but the
+  model kept the read's start as certain, so a cookie taken on the BROKEN
+  reader named a later offset than the model allowed. A cancel that breaks
+  the reader now lets the position drift forward, as a failure that breaks
+  it already did; two model tests pin the trace. With zlib-ng wires, seeds
+  0–1,999, 1,000,000–1,000,399 and 2,000,000–2,001,999 pass the model;
+  before the change only 2000012 failed. Seeds 2,000,200–2,001,999 pass the
+  model with stdlib wires too. R11's sweeps
+  (0–5999 and the R04 block against b2 and b1, 0–5999 against c0) give
+  the same results as before.)*
+- **Differential on the seek-cancel block (open).** The differential does
+  not yet claim this block: against b2, b1 and c0, 19, 18 and 19 of its
+  first 200 seeds have unclaimed differences. In 14 of b2's 19 the only
+  one is a harness artifact: a cookie seek that won its race with the
+  cancel returns a cookie, which the trace does not symbolize inside a
+  `cancel` row. The rest are BC11 consequences the R11 predicate
+  does not cover by design (a refused call inside a parked event, a
+  reference that errors rather than serving data, divergence after a
+  `tell()` on the BROKEN reader) and, against b1 and c0 only,
+  `UnicodeDecodeError`s from their text paths on these larger payloads.
+  Claiming them needs predicate and ledger changes, so it waits for the
+  maintainer's direction.
 - **`SEEK_END`.** The generator never issues end-relative seeks. Add them,
   including after an oversized `peek()`, to catch R04-class defects.
   *(Done with R04: a separate seed block from 1,000,000, so lower seeds are
