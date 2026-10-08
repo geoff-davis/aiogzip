@@ -183,6 +183,11 @@ Zero-byte input is valid and returns zero members and zero sizes. NUL padding
 after a valid member is accepted and included in the aggregate compressed size;
 other trailing data is treated as a malformed next member.
 
+Cancelling `inspect()` or `verify()` waits for any native open, read or close
+already handed to a worker thread to finish before the cancellation
+propagates. A file opened by path is always closed, and only after its last
+read. A borrowed `fileobj` is closed only when `closefd=True`.
+
 ## Async-iterable decompression
 
 `decompress_chunks()` accepts only an asynchronous iterable of `bytes` and

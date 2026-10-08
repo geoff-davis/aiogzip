@@ -205,6 +205,8 @@ and `verify()`, with single and repeated cancellation and borrowed sources:
 a late acquisition is closed exactly once, and cleanup runs only after the
 worker's last access. Performance: settlement added 5–9% per call on the
 file paths in b2 (G17 D1–D4); the timing check is deferred to R12.
+*(Implemented on `fix/rc1-inspection-settlement`; ledger BC14, since BC13 is
+reserved for R15.)*
 
 ### R04: `SEEK_END` with known EOF
 

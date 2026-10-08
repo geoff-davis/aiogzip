@@ -17,6 +17,8 @@ from ._common import (
     _validate_optional_positive_int,
 )
 from ._metadata import GzipInfo, GzipMemberInfo, VerificationResult
+from ._opening import _acquire_path, _initial_call
+from ._source_io import _is_native_source
 from .codec import GzipDecoder, _AsyncDrivableOperation, _snapshot_bytes_input
 
 __all__ = ["GzipInfo", "GzipMemberInfo", "VerificationResult"]
@@ -52,7 +54,8 @@ async def _scan_gzip(
     owns_source = fileobj is None
     if fileobj is None:
         assert filename is not None
-        source = await aiofiles.open(filename, "rb")
+        # A cancelled native open settles and closes a late file (as BC3).
+        source = await _acquire_path(filename, "rb", aiofiles.open)
     else:
         source = fileobj
     should_close = owns_source or validated_closefd is True
@@ -66,7 +69,12 @@ async def _scan_gzip(
     try:
         while True:
             try:
-                chunk = await source.read(chunk_size)
+                if _is_native_source(source, "read"):
+                    # Settle the worker's read before cancellation propagates,
+                    # so cleanup never closes a source still being read.
+                    chunk = await _initial_call(source, "read", chunk_size)
+                else:
+                    chunk = await source.read(chunk_size)
             except OSError:
                 raise
             except asyncio.CancelledError:
@@ -103,9 +111,13 @@ async def _scan_gzip(
             close_method = getattr(source, "close", None)
             if callable(close_method):
                 try:
-                    result = close_method()
-                    if hasattr(result, "__await__"):
-                        await result
+                    if _is_native_source(source, "close"):
+                        # A cancelled native close still runs and settles.
+                        await _initial_call(source, "close")
+                    else:
+                        result = close_method()
+                        if hasattr(result, "__await__"):
+                            await result
                 except BaseException:
                     if not scan_failed:
                         raise

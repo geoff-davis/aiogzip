@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Cancelling `inspect()` or `verify()` while a native open or read was in a
+  worker thread could leave a late-opened file unclosed, or close the source
+  while the worker was still reading it. The scan now waits for the native
+  open, read and close to settle before cancellation propagates, as the file
+  handles do; borrowed sources keep their ownership rules.
 - A text `seek()` that failed or was cancelled after it had moved the
   underlying binary reader could leave the reader healthy over the old
   buffered text, so the next read returned text from the wrong position
