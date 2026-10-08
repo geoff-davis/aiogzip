@@ -4600,6 +4600,16 @@ validation without retaining per-member metadata:</p>
 Zero-byte input is valid and returns zero members and zero sizes. NUL padding
 after a valid member is accepted and included in the aggregate compressed size;
 other trailing data is treated as a malformed next member.</p>
+<p>Cancelling <code>inspect()</code> or <code>verify()</code> waits for any native open, read or close
+already handed to a worker thread to finish before the cancellation
+propagates. A file opened by path is closed once, and only after its last
+read; if that close itself fails, the failure is reported as below. A
+borrowed <code>fileobj</code> is closed only when <code>closefd=True</code>.</p>
+<p>If the scan fails and closing the source then fails too, the scan's error is
+raised with the close failure attached as a note. A cancellation or interrupt
+that arrives during that close outranks an ordinary scan error and
+propagates, with the scan error as its context. If the scan succeeded, a
+close failure is raised as before.</p>
 <h2 id="async-iterable-decompression">Async-iterable decompression</h2>
 <p><code>decompress_chunks()</code> accepts only an asynchronous iterable of <code>bytes</code> and
 returns an <code>AsyncIterator[bytes]</code>. Empty source chunks are ignored, yielded
