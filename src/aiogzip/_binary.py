@@ -1648,6 +1648,33 @@ class AsyncGzipBinaryFile:
         if observer is not None:
             observer(False)
 
+    def _read_cursor(self) -> tuple[int, Optional[GzipDecoder]]:
+        """Return what a text handle's state is anchored to: position and decoder.
+
+        A rewind replaces the decoder, so an unchanged cursor means no bytes
+        were consumed and no rewind happened.
+        """
+        return self._position, self._decoder
+
+    def _break_read_after_failed_text_seek(self) -> None:
+        """Make the reader terminal after a text seek moved the read cursor.
+
+        The owning text handle's position is unknown, so neither layer may
+        read on until a rewind, which also ends validation salvage. Text
+        suspends only inside binary calls, so no read call is active when its
+        seek fails; the decoder is discarded unless one somehow is. Health and
+        EOF are committed before the text observer runs.
+        """
+        self._read_health = _BROKEN
+        self._eof = True
+        try:
+            observer = self._read_poison_observer
+            if observer is not None:
+                observer(False)
+        finally:
+            if not self._read_call_active and self._decoder is not None:
+                self._decoder.discard()
+
     @staticmethod
     def _raise_write_call_aborted(call: str) -> NoReturn:
         """Raise the error for a write or flush aborted by context exit."""

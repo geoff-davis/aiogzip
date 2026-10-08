@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- A text `seek()` that failed or was cancelled after it had moved the
+  underlying binary reader could leave the reader healthy over the old
+  buffered text, so the next read returned text from the wrong position
+  without an error. Such a reader now raises the terminal broken-stream
+  `OSError` until `seek(0)` succeeds; a seek that failed before moving the
+  binary reader leaves the text reader exactly as it was.
+
 ## [2.0.0b2] - 2026-10-07
 
 This beta keeps the 2.0 public API frozen: every public signature, type and

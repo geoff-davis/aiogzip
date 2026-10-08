@@ -50,6 +50,9 @@ INLINE_LIMIT = 64
 # Text payloads are at most a few thousand characters, so text stays inline:
 # the differential compares returned text exactly, not by digest.
 TEXT_INLINE_LIMIT = 8192
+# Text seeks, which BC11 makes transactional: a failure either changes nothing
+# or makes the reader terminal.
+TEXT_SEEK_OPS = frozenset({"seek_abs", "seek_rel", "seek_back", "seek0", "seek_mark"})
 
 
 class InjectedAbort(Exception):
@@ -491,6 +494,9 @@ class Event:
     # The uncompressed range a text handle's buffer_read took from under the
     # text layer (BC7 witness): the binary tell before the read, plus its size.
     pulled: list[int] | None = None
+    # Whether a text seek that failed or was cancelled moved the binary read
+    # cursor, its position or decoder (BC11 witness; raw only).
+    cursor_moved: bool | None = None
     # Absolute source seeks completed during the event (BC2 witness; raw
     # only, never in the trace).
     seeks: list[int] | None = None
@@ -759,8 +765,24 @@ async def run(
     cookies: dict[str, Any] = {}
     releasers: list[asyncio.Task] = []
 
+    def cursor():
+        binary = getattr(handle, "_binary_file", None)
+        return None if binary is None else binary._read_cursor()
+
+    def witness_seek(event: Event, op: dict[str, Any], before) -> Event:
+        """Record whether a text seek that did not succeed moved the cursor."""
+        call = op.get("call", op)
+        failed = event.outcome is not None and event.outcome.kind in (
+            "error",
+            "cancelled",
+        )
+        if text and call["op"] in TEXT_SEEK_OPS and failed and before is not None:
+            event.cursor_moved = cursor() != before
+        return event
+
     async def step(index: int, op: dict[str, Any]) -> None:
         name = op["op"]
+        before = cursor() if text else None
         if name in ("fail_no_effect", "fail_consumed"):
             source.fail = name[len("fail_") :]
             land(Event(index, op, Outcome("ok", "armed")))
@@ -774,7 +796,7 @@ async def run(
                 land(Event(index, op, Outcome("skipped", "no cookie")))
                 return
             outcome = await _call(handle.seek(cookies[op["label"]]))
-            land(Event(index, op, outcome))
+            land(witness_seek(Event(index, op, outcome), op, before))
             return
         if name == "overlap":
             second_op = op["second"]
@@ -783,7 +805,7 @@ async def run(
                 return await _call(_surface(handle, second_op, text_options))
 
             first, second = await _parked(handle, op, gate, partner, text_options)
-            land(Event(index, op, first, second))
+            land(witness_seek(Event(index, op, first, second), op, before))
             return
         if name == "close_during":
 
@@ -797,7 +819,7 @@ async def run(
             first, second = await _parked(
                 handle, op, gate, _cancel_partner, text_options
             )
-            land(Event(index, op, first, second))
+            land(witness_seek(Event(index, op, first, second), op, before))
             return
         if name == "abort":
             gate.arm()
@@ -840,7 +862,7 @@ async def run(
         outcome = await _call(_surface(handle, op, text_options))
         if name == "tell_mark" and outcome.kind == "ok":
             cookies[op["label"]] = outcome.value
-        event = Event(index, op, outcome)
+        event = witness_seek(Event(index, op, outcome), op, before)
         if pulled is not None and outcome.kind == "ok":
             event.pulled = [pulled, pulled + len(outcome.value)]
         land(event)

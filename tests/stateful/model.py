@@ -142,6 +142,9 @@ for _health in Health:
     READ_HEALTH[(_health, "abort")] = BROKEN
     READ_HEALTH[(_health, "close")] = _health
     READ_HEALTH[(_health, "overlap_rejected")] = _health
+    # BC11: a text seek that failed or was cancelled after it moved the binary
+    # read cursor leaves text at an unknown position.
+    READ_HEALTH[(_health, "text_seek_failed")] = BROKEN
 READ_HEALTH.update(
     {
         (HEALTHY, "no_effect_failure"): HEALTHY,
@@ -632,6 +635,7 @@ class Checker(_HandleChecker):
         name = op["op"]
         outcome = event.outcome
         index = event.index
+        self.cursor_moved = getattr(event, "cursor_moved", None)
         self.check_work(index, event.work)
         if name == "acquire":
             self.handle_acquire(index, op, outcome, event.second)
@@ -717,10 +721,17 @@ class Checker(_HandleChecker):
                 # Cancellation lost the race with completion of the call.
                 self.handle_call(index, op["call"], first)
                 return
+            moved = self.text and self.cursor_moved
+            if moved:
+                # Only a rewind moves the cursor of a reader that is not
+                # healthy, and the rewind restored health first.
+                self.transition("rewind_ok")
             if self.native or self.checkpoint:
                 self.transition("cancel_no_effect")
             else:
                 self.transition("cancel_uncertain")
+            if moved:
+                self.transition("text_seek_failed")
 
     def handle_call(self, index: int, op: dict[str, Any], outcome) -> None:
         name = op["op"]
@@ -878,6 +889,9 @@ class Checker(_HandleChecker):
         before = self.health
         message = str(error)
         refused = BROKEN_MESSAGE in message or NOT_SEEKABLE in message
+        if op["op"] in SEEK_OPS and self.text and self.cursor_moved is not None:
+            self.handle_text_seek_failure(index, op, error)
+            return
         if op["op"] in SEEK_OPS and not refused:
             target = self.seek_target(op) if self.modeled else None
             # A text cookie seek always replays from a rewind.
@@ -893,6 +907,29 @@ class Checker(_HandleChecker):
                 self.position = 0
             self.classify_error(index, op, error)
             self.widen(len(self.upper) if target is None else target)
+            return
+        self.classify_error(index, op, error)
+        if self.health is BROKEN and before is not BROKEN:
+            self.widen(len(self.upper))
+
+    def handle_text_seek_failure(
+        self, index: int, op: dict[str, Any], error: BaseException
+    ) -> None:
+        """BC11: a failed text seek changes nothing or makes the reader terminal.
+
+        The interpreter's witness says whether the seek moved the binary read
+        cursor. If it did, text is at an unknown position and every read must
+        refuse until ``seek(0)``. If not, no input was consumed: health follows
+        the failure as for any call, and an exact read continues from the
+        position before the seek, with no drift allowed.
+        """
+        before = self.health
+        if self.cursor_moved:
+            # Only a rewind moves the cursor of a reader that is not healthy,
+            # and the rewind restored health before the failure.
+            self.transition("rewind_ok")
+            self.classify_error(index, op, error)
+            self.transition("text_seek_failed")
             return
         self.classify_error(index, op, error)
         if self.health is BROKEN and before is not BROKEN:
