@@ -2175,8 +2175,14 @@ class AsyncGzipTextFile:
         # Like binary writelines(), refuse a torn member even when there is
         # nothing to write.
         self._binary_file._check_write_usable()
+        # ``pending`` holds only non-empty strings, so its size is bounded by
+        # the chunk size however many empty strings arrive. ``pending_empty``
+        # records that an empty string joined the current batch, so the batch
+        # is still written (an empty write emits a UTF-16/32 BOM, for example)
+        # exactly when a stored empty string would have produced it.
         pending: List[str] = []
         pending_chars = 0
+        pending_empty = False
         iterator = iter(lines)
         with self._write_call:
             while True:
@@ -2185,32 +2191,36 @@ class AsyncGzipTextFile:
                 except StopIteration:
                     break
                 except BaseException:
-                    if pending:
+                    if pending or pending_empty:
                         await self._write_batch_reserved("".join(pending))
                     raise
 
                 if not isinstance(line, str):
-                    if pending:
+                    if pending or pending_empty:
                         await self._write_batch_reserved("".join(pending))
                     await self._write_batch_reserved(line)
                     continue
 
                 length = len(line)
                 if length >= self._chunk_size:
-                    if pending:
+                    if pending or pending_empty:
                         await self._write_batch_reserved("".join(pending))
                         pending = []
                         pending_chars = 0
+                        pending_empty = False
                     await self._write_batch_reserved(line)
+                elif not length:
+                    pending_empty = True
                 else:
                     if pending and pending_chars + length > self._chunk_size:
                         await self._write_batch_reserved("".join(pending))
                         pending = []
                         pending_chars = 0
+                        pending_empty = False
                     pending.append(line)
                     pending_chars += length
 
-            if pending:
+            if pending or pending_empty:
                 await self._write_batch_reserved("".join(pending))
 
     async def flush(self) -> None:

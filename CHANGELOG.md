@@ -14,6 +14,12 @@ All notable changes to this project will be documented in this file.
   failure as its cause. If an exceptional exit's close returns normally this
   way, the handle is closed rather than left open for a retry. Borrowed files
   and custom `close()` methods are unchanged.
+- Text `writelines()` stored every empty string it received in its pending
+  batch, whose flush threshold counts characters, so a long run of empty
+  strings grew memory with the number of inputs. Empty strings are no longer
+  stored, so the batch stays within `chunk_size` items as documented. The
+  bytes written are unchanged, including the byte-order mark an empty write
+  emits for UTF-16 and UTF-32.
 - Cancelling `inspect()` or `verify()` while a native open or read was in a
   worker thread could leave a late-opened file unclosed, or close the source
   while the worker was still reading it. The scan now waits for the native
