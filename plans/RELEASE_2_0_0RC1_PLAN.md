@@ -65,20 +65,20 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 | R15 | Cancelled close | A cancelled `close()` or context exit settles the owned native close; no handle reports closed over an open file |
 
 - [x] R01
-- [ ] R02
-- [ ] R03
-- [ ] R04
-- [ ] R05
-- [ ] R06
-- [ ] R07
-- [ ] R08
-- [ ] R09
-- [ ] R10
-- [ ] R11
+- [x] R02
+- [x] R03
+- [x] R04
+- [x] R05
+- [x] R06
+- [x] R07
+- [x] R08
+- [x] R09
+- [x] R10
+- [x] R11
 - [ ] R12
 - [ ] R13
 - [ ] R14
-- [ ] R15
+- [x] R15
 
 ## 3. Order
 
@@ -232,6 +232,8 @@ tests.
 - Re-record the b1 reference runs (`tests/data/wp10_b1_runs.json`) if the run
   records change, as in b2.
 
+*Closed 2026-10-08: Codex approved, maintainer signed off, merged in PRs #113, #114 and #125; the differential on the seek-cancel block is a follow-up.*
+
 ### R03: inspection and verification settlement
 
 **Defect (both reviewers; Codex reproduced with a controlled executor).**
@@ -253,6 +255,8 @@ file paths in b2 (G17 D1–D4); the timing check is deferred to R12.
 *(Implemented on `fix/rc1-inspection-settlement`; ledger BC14, since BC13 is
 reserved for R15.)*
 
+*Closed 2026-10-07: Codex approved, maintainer signed off, merged in PR #116.*
+
 ### R04: `SEEK_END` with known EOF
 
 **Defect (Codex, reproduced).** The binary `SEEK_END` branch drains buffered
@@ -271,6 +275,8 @@ and text (`seek(0, SEEK_END)` on text reads to the end first). Drain unread
 output without double-counting it. Controls with a corrupt trailer and with
 `max_decompressed_size` show that seeking to the end cannot bypass
 validation or limits. *(Implemented on `fix/rc1-seek-end`.)*
+
+*Closed 2026-10-07: Codex approved, maintainer signed off, merged in PR #115.*
 
 ### R05–R07: workflows
 
@@ -314,6 +320,8 @@ validation or limits. *(Implemented on `fix/rc1-seek-end`.)*
   `fast-engine (macos-latest)` leave branch protection before that change
   merges, since no job reports them afterwards.
 
+*Closed 2026-10-08: Codex approved, maintainer signed off, merged in PR #118. PR #121 later cut the macOS jobs to two per run.*
+
 ### R08: text `writelines()` with empty inputs
 
 **Defect (Codex; confirmed in code).** Each empty string is appended to
@@ -348,6 +356,8 @@ several of Opus's nice-to-have findings (RC1-06, RC1-07, RC1-09, RC1-10 and
 RC1-13) into required gates; that is this plan's decision, not the
 reviewers' categorization.
 
+*Closed 2026-10-08: Codex approved, maintainer signed off, merged in PR #119.*
+
 ### R09: small repairs (no behavior change beyond the noted ones)
 
 - Cancellation count: when an abort cancels a custom source or sink call that
@@ -367,6 +377,8 @@ refill leaves the stream intact, and a piecewise fill would change that.
 Unexpected CLI failures exit with status 2, argparse's usage status, keeping 1
 for stream failures. A repeated cancellation during context-exit cleanup is
 not noted as a cleanup failure unless it carries one as its cause.
+
+*Closed 2026-10-08: Codex approved, maintainer signed off, merged in PR #120.*
 
 ### R10: documentation
 
@@ -401,6 +413,8 @@ and FNAME and FCOMMENT are buffered whole (only when member metadata is
 collected) and bounded by the header limit. A retry after
 `UnicodeDecodeError` skips the rest of the decoded chunk, not only the
 undecodable bytes (about 24,000 of 60,001 lines in a 60,001-line check).
+
+*Closed 2026-10-08: Codex approved, maintainer signed off, merged in PR #122.*
 
 ### R15: cancelled `close()` leaks a queued native close
 
@@ -451,6 +465,8 @@ Timing check deferred to R12. *(Implemented on `fix/rc1-cancelled-close`;
 ledger BC13. Reverting to aiofiles' `close()` fails 124 of the original 159
 tests in `tests/test_cancelled_close.py`, including every queued case.)*
 
+*Closed 2026-10-08: Codex approved, maintainer signed off, merged in PR #117.*
+
 ### R11: differential rerun
 
 The b2 harness compared the candidate with c0 and b1 only, on seeds below
@@ -500,6 +516,8 @@ in the block BC2 26, BC3 10, BC7 2, BC8 8, BC9 1, BC11 1, BC12 4). Against
 c0, seeds 0–5999 pass on both engines with BC11 claiming seed 225. The recorded references
 for the new claims are in `tests/data/rc1_reference_runs.json`, whose seeds
 join the recorded-wire digest (the same on Python 3.12 and 3.14).
+
+*Closed 2026-10-08: Codex approved, maintainer signed off, merged in PR #123.*
 
 ## 5. Deferred past RC1
 
