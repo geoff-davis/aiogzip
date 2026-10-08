@@ -16,8 +16,8 @@ from pathlib import Path
 import interpreter
 import pytest
 from generator import SEEK_END_BASE, generate
-from interpreter import replay
-from model import LIFECYCLE, READ_HEALTH, make_checker
+from interpreter import Outcome, replay
+from model import LIFECYCLE, READ_HEALTH, Health, Lifecycle, make_checker
 from observer import Observer
 
 import aiogzip
@@ -215,3 +215,33 @@ def test_only_the_seek_end_block_issues_end_relative_seeks():
         for s in block
         for op in s.get("ops", [])
     )
+
+
+def _text_checker_at(health):
+    # Seed 39: text with a CRC failure, so salvage is reachable.
+    scenario = generate(39)
+    assert scenario["mode"] == "rt"
+    assert scenario["corruption"]["kind"] == "crc"
+    checker = make_checker(scenario, aiogzip.engine_info().decompression)
+    checker.lifecycle = Lifecycle.OPEN
+    checker.health = health
+    return checker
+
+
+def test_text_seek_end_from_broken_is_a_violation():
+    checker = _text_checker_at(Health.BROKEN)
+    checker.handle_call(0, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
+    assert any("BROKEN" in v for v in checker.violations), checker.violations
+
+
+def test_text_seek_end_from_salvage_keeps_checking_content():
+    checker = _text_checker_at(Health.VALIDATION_SALVAGE)
+    checker.lower = 10  # guaranteed salvage short of the end
+    checker.handle_call(0, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
+    assert not checker.violations, checker.violations
+    assert checker.modeled
+    end = len(checker.upper)
+    assert checker.candidates == list(range(10, end + 1))
+    # Data that matches no allowed offset is still caught.
+    checker.accept_data(1, "\0" * 3)
+    assert checker.violations

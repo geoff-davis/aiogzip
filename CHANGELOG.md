@@ -16,8 +16,8 @@ All notable changes to this project will be documented in this file.
   reached the end of the data ignored the peeked bytes, so it returned a
   position short of the end (0 on a fresh file) and later reads returned
   data that should have been skipped. End-relative seeks now count those
-  bytes and land on the true end, still after trailer validation and within
-  `max_decompressed_size`.
+  bytes, so offsets are measured from the true end, still after trailer
+  validation and within `max_decompressed_size`.
 
 ## [2.0.0b2] - 2026-10-07
 

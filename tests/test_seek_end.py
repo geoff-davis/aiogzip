@@ -42,6 +42,13 @@ def _open(kind, compressed, tmp_path, **kwargs):
     )
 
 
+def _bad_crc(payload):
+    compressed = bytearray(gzip.compress(payload))
+    crc = struct.unpack("<I", compressed[-8:-4])[0]
+    compressed[-8:-4] = struct.pack("<I", crc ^ 1)
+    return bytes(compressed)
+
+
 def _expected(size, offset):
     return min(max(size + offset, 0), size)
 
@@ -81,27 +88,46 @@ class TestHighPriorityEdgeCases:
             assert await f.read() == b"ond"
 
     @pytest.mark.parametrize("kind", ["path", "cached"])
-    @pytest.mark.parametrize("peek", [1, 100])
-    async def test_seek_end_never_skips_trailer_validation(self, kind, peek, tmp_path):
-        compressed = bytearray(gzip.compress(SMALL))
-        crc = struct.unpack("<I", compressed[-8:-4])[0]
-        compressed[-8:-4] = struct.pack("<I", crc ^ 1)
-        async with _open(kind, bytes(compressed), tmp_path) as f:
+    async def test_seek_end_drain_raises_a_later_trailer_failure(self, kind, tmp_path):
+        # peek() succeeds from the first chunks and leaves unread output; the
+        # bad CRC is reached only by the seek's own drain.
+        async with _open(kind, _bad_crc(LARGE), tmp_path, chunk_size=64) as f:
+            peeked = await f.peek(1)
+            assert peeked and LARGE.startswith(peeked)
             with pytest.raises(gzip.BadGzipFile):
-                await f.peek(peek)
                 await f.seek(0, os.SEEK_END)
-            with pytest.raises(OSError):
+            with pytest.raises(OSError, match="broken"):
                 await f.seek(0, os.SEEK_END)
 
     @pytest.mark.parametrize("kind", ["path", "cached"])
-    @pytest.mark.parametrize("peek", [1, 100])
-    async def test_seek_end_never_skips_the_decompression_limit(
-        self, kind, peek, tmp_path
-    ):
+    async def test_seek_end_drain_raises_a_later_limit_failure(self, kind, tmp_path):
+        compressed = gzip.compress(LARGE)
+        async with _open(
+            kind, compressed, tmp_path, chunk_size=64, max_decompressed_size=100_000
+        ) as f:
+            peeked = await f.peek(1)
+            assert peeked and LARGE.startswith(peeked)
+            with pytest.raises(OSError, match="max_decompressed_size"):
+                await f.seek(0, os.SEEK_END)
+            with pytest.raises(OSError, match="broken"):
+                await f.seek(0, os.SEEK_END)
+
+    @pytest.mark.parametrize("kind", ["path", "cached"])
+    async def test_seek_end_after_a_peek_hit_the_trailer_failure(self, kind, tmp_path):
+        # Control: the failure lands in peek(); the poisoned reader refuses.
+        async with _open(kind, _bad_crc(SMALL), tmp_path) as f:
+            with pytest.raises(gzip.BadGzipFile):
+                await f.peek(100)
+            with pytest.raises(OSError, match="broken"):
+                await f.seek(0, os.SEEK_END)
+
+    @pytest.mark.parametrize("kind", ["path", "cached"])
+    async def test_seek_end_after_a_peek_hit_the_limit(self, kind, tmp_path):
         compressed = gzip.compress(b"0" * 4096)
         async with _open(kind, compressed, tmp_path, max_decompressed_size=1024) as f:
             with pytest.raises(OSError, match="max_decompressed_size"):
-                await f.peek(peek)
+                await f.peek(100)
+            with pytest.raises(OSError, match="broken"):
                 await f.seek(0, os.SEEK_END)
 
     async def test_text_seek_end_reports_the_true_end(self, tmp_path):

@@ -844,11 +844,17 @@ class Checker(_HandleChecker):
             self.handle_call(index, {"op": "read", "n": -1}, outcome)
             return
         self.lifecycle_event("call_starts")
+        if self.health is BROKEN:
+            # A BROKEN reader refuses the read, so the seek cannot succeed.
+            self.fail(index, "seek_end succeeded on a BROKEN reader")
+            return
         if not self.modeled:
             return
-        if self.health is not HEALTHY:
-            # Retained salvage is served before the refusal; the end is unknown.
-            self.modeled = False
+        if self.health is SALVAGE:
+            # read() served the retained salvage, at least the guaranteed
+            # part, and the data stays unseen; later reads must still match.
+            self.position = max(self.position, min(self.lower, len(self.upper)))
+            self.widen(len(self.upper))
             return
         self.position = len(self.upper)
         self.require_eof(index, "seek_end")
