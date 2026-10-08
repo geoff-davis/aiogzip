@@ -406,6 +406,56 @@ Timing check deferred to R12. *(Implemented on `fix/rc1-cancelled-close`;
 ledger BC13. Reverting to aiofiles' `close()` fails 124 of the original 159
 tests in `tests/test_cancelled_close.py`, including every queued case.)*
 
+### R11: differential rerun
+
+The b2 harness compared the candidate with c0 and b1 only, on seeds below
+1,000,000. R11 adds b2 as a reference and claims the rc1 differences.
+*(As implemented, test-only; no `src/` change.)*
+
+- **References.** `differential.py --reference b2` against the clean
+  v2.0.0b2 worktree (`962bfe4`). b2 already carries BC1–BC10, so only
+  BC11 and BC12 apply to it; b1 gets both as well, and c0 gets BC11
+  (BC11 and BC12 are present in every earlier release).
+- **Cookies.** A text `seek(0, SEEK_END)` returns a cookie with a random
+  per-handle nonce, so the trace now symbolizes negative `seek_end`
+  results as it already did `tell_mark` cookies. Binary positions are never
+  negative, and no seed below 1,000,000 has a `seek_end`, so no recorded
+  trace changes.
+- **`BC11-TEXT-SEEK-FAILURE`.** After a text seek event that is identical
+  on both sides, is an error, has a `cursor_moved` witness of `True` in both
+  run records and leaves the candidate model BROKEN, each later differing
+  read (text reads and `buffer_read`) where the candidate refuses with the
+  broken-stream `OSError` and the reference returns data is claimed, until
+  the candidate model leaves BROKEN.
+- **`BC12-SEEK-END`.** For a binary scenario with a `seek_end` (direct or
+  as a parked call), the runner also runs the reference with only the BC12
+  loop change applied (`fixed_root`, which refuses a reference whose loop is
+  not exactly the b1/b2 loop). That fixed run must agree with the reference
+  before the first `seek_end`. Every predicate then judges the candidate
+  against the fixed run, including BC2's lossy run, which replays on the
+  fixed root, and BC12 claims each difference from the reference's own
+  trace that the fixed run removes. A difference that remains against the
+  fixed run needs its own claim.
+- **BC7 through `seek_end`.** b1's text `seek(0, SEEK_END)` is `read()`
+  then `tell()`, so a salvage ending inside a character raises BC7's F1a
+  `UnicodeDecodeError` from the seek (seed 1000132). For a reader at text
+  position 0, a shadow run of the candidate with `read(-1)` in place of the
+  seek must have no violation and match the candidate's trace before it.
+  Its text T must decode from some prefix of the model's salvage bound, and
+  the k bytes after that prefix, k taken from b1's error, must complete no
+  character. Only the seek is claimed.
+- **F2 through `seek_end`.** BC2's F2 (an aborted custom-source call that b1
+  let finish) now includes `seek_end` among the calls, which drain the
+  source like reads (seed 1000089). The shadow rule is unchanged.
+
+Sweeps on `3f595ee` plus this harness, seeds 0–5999 and 1,000,000–1,000,199,
+both engines with identical results: 0 failed against b2 (BC11 1 + 1 seeds,
+BC12 4) and against b1 (as b2's release record below 1,000,000, BC11 1;
+in the block BC2 26, BC3 10, BC7 2, BC8 8, BC9 1, BC11 1, BC12 4). Against
+c0, seeds 0–5999 pass on both engines with BC11 claiming seed 225. The recorded references
+for the new claims are in `tests/data/rc1_reference_runs.json`, whose seeds
+join the recorded-wire digest (the same on Python 3.12 and 3.14).
+
 ## 5. Deferred past RC1
 
 Not RC1 work unless the maintainer pulls one in:

@@ -1,7 +1,8 @@
 """Whether this platform reproduces the wires the recorded traces assume.
 
-The recorded C0 and b1 traces (``tests/data/wp10_c0_traces.json`` and
-``tests/data/wp10_b1_runs.json``), and the wire offsets that
+The recorded C0, b1 and b2 traces (``tests/data/wp10_c0_traces.json``,
+``tests/data/wp10_b1_runs.json`` and ``tests/data/rc1_reference_runs.json``),
+and the wire offsets that
 ``test_differential.py`` pins, hold only for the exact bytes they were
 recorded from. The generator builds every member with ``gzip.compress()``,
 whose DEFLATE stream depends on the platform's zlib: a zlib-ng-backed stdlib
@@ -35,13 +36,18 @@ PINNED_SEEDS = frozenset(
 # The gzip header byte that names the OS; see the module docstring.
 OS_BYTE = 9
 
-WIRES_SHA256 = "014daf1f6e2433b3516a2ffde679ce8d4509413532914980ac11df25c8697f22"
+WIRES_SHA256 = "124e9930fd7e740325076a8ef234107f627220d30d7beb4462bbf3f30f2ce77a"
 
 
 def recorded_seeds() -> set[int]:
     c0 = json.loads((DATA / "wp10_c0_traces.json").read_text(encoding="utf-8"))
     b1 = json.loads((DATA / "wp10_b1_runs.json").read_text(encoding="utf-8"))
-    return {int(seed) for seed in c0["traces"]} | {int(seed) for seed in b1["runs"]}
+    rc1 = json.loads((DATA / "rc1_reference_runs.json").read_text(encoding="utf-8"))
+    return (
+        {int(seed) for seed in c0["traces"]}
+        | {int(seed) for seed in b1["runs"]}
+        | {int(key.split("/")[1]) for key in rc1["runs"]}
+    )
 
 
 def wires_digest() -> str:
