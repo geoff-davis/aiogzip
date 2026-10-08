@@ -12,14 +12,18 @@ from ._source_io import _is_native_source
 _STANDARD_OPEN = aiofiles.open
 
 
+def _submit_native(file: Any, method: str, *args: Any) -> "asyncio.Future[Any]":
+    """Submit a supported native call with aiofiles' own loop and executor."""
+    loop = asyncio.get_running_loop()
+    if file._loop is not loop:
+        raise RuntimeError("aiofiles source belongs to a different event loop")
+    return loop.run_in_executor(file._executor, getattr(file._file, method), *args)
+
+
 async def _initial_call(file: Any, method: str, *args: Any) -> Any:
     """Settle supported native initialization/cleanup before releasing its owner."""
     if _is_native_source(file, method):
-        loop = asyncio.get_running_loop()
-        if file._loop is not loop:
-            raise RuntimeError("aiofiles source belongs to a different event loop")
-        work = loop.run_in_executor(file._executor, getattr(file._file, method), *args)
-        return await _settle_before_cancel(work)
+        return await _settle_before_cancel(_submit_native(file, method, *args))
     result = getattr(file, method)(*args)
     if method == "write" or hasattr(result, "__await__"):
         return await result

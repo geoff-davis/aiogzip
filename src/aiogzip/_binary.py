@@ -49,6 +49,7 @@ from ._opening import (
     _acquire_path,
     _initial_call,
     _initial_seekable,
+    _submit_native,
     _write_initial_header,
 )
 from ._source_io import _is_native_source, _NativeSourceCall, _source_position
@@ -2216,17 +2217,18 @@ class AsyncGzipBinaryFile:
             # A failure, or a cancellation not proven to follow a successful
             # close, leaves the broken handle reportably open so an explicit
             # close() can retry the underlying close.
-            try:
+            if _is_native_source(close_file, "close"):
+                work = _submit_native(close_file, "close")
+                try:
+                    await _settle_before_cancel(work)
+                except asyncio.CancelledError as cancellation:
+                    # The native close has settled. Latch closure only on
+                    # proof that it returned normally, then propagate (BC13).
+                    if work.cancelled() or work.exception() is not None:
+                        raise
+                    cancelled_after_close = cancellation
+            else:
                 await self._close_underlying(close_file)
-            except asyncio.CancelledError as cancellation:
-                # A native close is settled before cancellation propagates;
-                # with no cause it succeeded, so the resource is released.
-                # Latch closure, then propagate (BC13).
-                if cancellation.__cause__ is not None or not _is_native_source(
-                    close_file, "close"
-                ):
-                    raise
-                cancelled_after_close = cancellation
         try:
             self._mark_closed()
         except BaseException as observer_error:
@@ -2253,7 +2255,7 @@ class AsyncGzipBinaryFile:
             # aiofiles' close() is a cancellable executor job: cancelling it
             # while queued meant the file was never closed. Settle the native
             # close before cancellation propagates (BC13).
-            await _initial_call(file, "close")
+            await _settle_before_cancel(_submit_native(file, "close"))
             return
         close_method = getattr(file, "close", None)
         if callable(close_method):

@@ -84,13 +84,16 @@ can no longer receive its trailer. Cancellation delivered during cleanup still
 propagates, and a failed abortive underlying close leaves the handle reportably
 open so `close()` can be retried.
 
-Cancelling `close()` or a context exit never abandons the close of a file the
-handle owns. When that file is an aiofiles file (a path, or a file object
-passed with `closefd=True`), its native close runs to completion before the
-cancellation propagates, and a close failure becomes the cancellation's
-`__cause__`. If that close succeeded during an abortive exit, the handle is
-closed and a later `close()` does nothing. Custom file objects' async
-`close()` methods are cancelled cooperatively, as before.
+Once a handle has submitted the native close of an aiofiles file it owns (a
+path, or a file object passed with `closefd=True`), cancellation cannot
+abandon that close: it runs to completion before the cancellation propagates,
+and a close failure becomes the cancellation's `__cause__`. During an
+abortive exit, the handle is closed only if that close returned normally;
+otherwise it stays reportably open and `close()` retries. A cancellation that
+arrives before the close is submitted, for example while the exit is still
+waiting for an active call to settle, propagates first and also leaves the
+handle open for `close()`. Custom file objects' async `close()` methods are
+cancelled cooperatively, as before.
 
 Cancellation while a clean context exit is waiting for an active call also
 attempts abortive owned-resource cleanup before the cancellation propagates.

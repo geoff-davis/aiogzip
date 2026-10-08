@@ -45,7 +45,8 @@ class _CloseExecutor(concurrent.futures.ThreadPoolExecutor):
     cancellation may still prevent it (an aiofiles close is never prevented).
     Every call
     is logged by name and target; ``fail`` injects a one-shot failure (a close
-    still runs first, as a buffered close that fails on flush does).
+    still runs first, as a buffered close that fails on flush does), and
+    ``fail_before`` raises without running the call, leaving a file open.
     """
 
     def __init__(self, loop):
@@ -54,6 +55,7 @@ class _CloseExecutor(concurrent.futures.ThreadPoolExecutor):
         self.gates: dict[str, _Gate] = {}
         self.armed: list[_Gate] = []
         self.fail: dict[str, BaseException] = {}
+        self.fail_before: dict[str, BaseException] = {}
         self.lock = threading.Lock()
         self.idle = threading.Condition(self.lock)
         self.running = 0
@@ -92,6 +94,7 @@ class _CloseExecutor(concurrent.futures.ThreadPoolExecutor):
             owner = getattr(target, "__self__", None)
         gate = self.gates.pop(name, None)
         failure = self.fail.pop(name, None)
+        early = self.fail_before.pop(name, None)
         if gate is not None and gate.stage == "queued":
             super().submit(self._tracked(functools.partial(self._hold, gate)))
 
@@ -101,6 +104,8 @@ class _CloseExecutor(concurrent.futures.ThreadPoolExecutor):
             with self.lock:
                 self.log.append(("start", name, owner))
             try:
+                if early is not None:
+                    raise early
                 if failure is not None and name != "close":
                     raise failure
                 result = fn(*args, **kwargs)
@@ -426,7 +431,10 @@ class TestAbortClose:
         )
         error = await _cancel_held(exiting, gate, 1)
         assert isinstance(error, asyncio.CancelledError)
-        await _outcome(active)
+        written = await _outcome(active)
+        assert isinstance(written, OSError)
+        assert "write aborted" in str(written)
+        assert opened.binary._write_broken
         executor.wait_idle()
         write_end = executor.index("end", "write")
         close_start = executor.index("start", "close")
@@ -531,3 +539,98 @@ async def test_failed_opening_with_a_cancelled_cleanup_close(
     assert raw.closed
     assert executor.entries("start", "close") == [raw]
     assert not handle.closed
+
+
+class TestCloseThatLeavesTheFileOpen:
+    """A native close that raises before releasing the file proves nothing."""
+
+    @pytest.mark.parametrize("kind", KINDS)
+    @pytest.mark.parametrize("raised", ["cancelled", "oserror"])
+    async def test_abort_close_failing_before_release_stays_open(
+        self, path, executor, kind, raised
+    ):
+        opened = await _open(kind, "r", "path", path)
+        # The raw close itself raises, with no outside cancellation.
+        failure = (
+            asyncio.CancelledError() if raised == "cancelled" else OSError("early")
+        )
+        executor.fail_before["close"] = failure
+        active, exiting, gate = await _start_abort(
+            opened, executor, "read", opened.handle.read()
+        )
+        gate.release.set()
+        outcome = await _outcome(exiting)
+        if raised == "cancelled":
+            assert outcome is failure
+        await _outcome(active)
+        executor.wait_idle()
+        assert not opened.raw.closed
+        assert not opened.handle.closed
+        # The retry performs the close that never happened.
+        await opened.handle.close()
+        executor.wait_idle()
+        assert executor.entries("end", "close") == [opened.raw]
+        assert opened.raw.closed
+        assert opened.handle.closed
+
+    @pytest.mark.parametrize("kind", KINDS)
+    async def test_cancelled_abort_close_failing_before_release_stays_open(
+        self, path, executor, kind
+    ):
+        opened = await _open(kind, "r", "path", path)
+        failure = OSError("early")
+        executor.fail_before["close"] = failure
+        active, exiting, gate = await _start_abort(
+            opened, executor, "read", opened.handle.read()
+        )
+        error = await _cancel_held(exiting, gate, 1)
+        assert isinstance(error, asyncio.CancelledError)
+        assert error.__cause__ is failure
+        await _outcome(active)
+        executor.wait_idle()
+        assert not opened.raw.closed
+        assert not opened.handle.closed
+        await opened.handle.close()
+        executor.wait_idle()
+        assert opened.raw.closed
+        assert opened.handle.closed
+
+    @pytest.mark.parametrize("kind", KINDS)
+    async def test_normal_close_failing_before_release_is_unchanged(
+        self, path, executor, kind
+    ):
+        # Unchanged from b2: close() latches closed before finalizing, so a
+        # native close that fails without releasing the file raises its
+        # error from a closed handle.
+        opened = await _open(kind, "r", "path", path)
+        failure = OSError("early")
+        executor.fail_before["close"] = failure
+        with pytest.raises(OSError) as caught:
+            await opened.handle.close()
+        assert caught.value is failure
+        executor.wait_idle()
+        assert opened.handle.closed
+        assert not opened.raw.closed
+        opened.raw.close()
+
+
+async def _open_in_another_loop(target):
+    return await aiofiles.open(target, "rb")
+
+
+@pytest.mark.parametrize("kind", KINDS)
+async def test_close_of_a_source_from_another_loop_is_refused(path, executor, kind):
+    source = await asyncio.to_thread(asyncio.run, _open_in_another_loop(path))
+    try:
+        cls = AsyncGzipBinaryFile if kind == "binary" else AsyncGzipTextFile
+        mode = "rb" if kind == "binary" else "rt"
+        handle = cls(None, mode, fileobj=source, closefd=True)
+        await handle.__aenter__()
+        with pytest.raises(RuntimeError, match="different event loop"):
+            await handle.close()
+        executor.wait_idle()
+        # Refused before submission: nothing touched the file.
+        assert executor.entries("start", "close") == []
+        assert not source._file.closed
+    finally:
+        source._file.close()
