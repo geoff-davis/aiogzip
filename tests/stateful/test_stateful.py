@@ -360,6 +360,53 @@ def test_a_reused_mark_label_drops_its_old_uncertainty():
     assert checker.certain and checker.position == 0, checker.candidates
 
 
+def _after_a_cancelled_read_breaks_the_reader():
+    # Seed 2000012 on a zlib-ng wire (Windows 3.14): a cancel lands inside
+    # read(-1) on a custom source without a checkpoint. The read consumed an
+    # unknown amount, so a cookie taken on the BROKEN reader names wherever
+    # the reader stopped, not where the read began.
+    scenario = generate(2000012)
+    source = scenario["source"]
+    assert source["kind"] == "custom" and not source["checkpoint"]
+    checker = make_checker(scenario, aiogzip.engine_info().decompression)
+    checker.lifecycle = Lifecycle.OPEN
+    upper = checker.upper
+    events = [
+        interpreter.Event(0, {"op": "read", "n": 2}, Outcome("ok", upper[:2])),
+        interpreter.Event(
+            1,
+            {"op": "cancel", "call": {"op": "read", "n": -1}, "after": 1},
+            Outcome("cancelled"),
+            Outcome("ok", "cancel requested"),
+        ),
+        interpreter.Event(2, {"op": "tell_mark", "label": "m0"}, Outcome("ok", 7)),
+        interpreter.Event(3, {"op": "seek0"}, Outcome("ok", 0)),
+        interpreter.Event(4, {"op": "seek_mark", "label": "m0"}, Outcome("ok", 7)),
+    ]
+    for event in events:
+        checker.observe(event)
+    assert not checker.violations, checker.violations
+    assert checker.health is Health.HEALTHY
+    return checker
+
+
+def test_a_cookie_after_a_cancelled_read_may_name_a_later_offset():
+    checker = _after_a_cancelled_read_breaks_the_reader()
+    text = checker.upper[4:7]
+    readline = {"op": "readline", "limit": 3}
+    checker.observe(interpreter.Event(5, readline, Outcome("ok", text)))
+    assert not checker.violations, checker.violations
+
+
+def test_a_cookie_after_a_cancelled_read_keeps_checking_content():
+    checker = _after_a_cancelled_read_breaks_the_reader()
+    # The read began at 2, so the cookie names no earlier offset.
+    assert checker.candidates[0] == 2, checker.candidates[:4]
+    readline = {"op": "readline", "limit": 3}
+    checker.observe(interpreter.Event(5, readline, Outcome("ok", "\0" * 3)))
+    assert any("matches no allowed offset" in v for v in checker.violations)
+
+
 def test_text_seek_end_from_broken_is_a_violation():
     checker = _text_checker_at(Health.BROKEN)
     checker.handle_call(0, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))

@@ -747,6 +747,7 @@ class Checker(_HandleChecker):
                 # Cancellation lost the race with completion of the call.
                 self.handle_call(index, op["call"], first)
                 return
+            before = self.health
             moved = self.text and self.cursor_moved
             if moved:
                 # Only a rewind moves the cursor of a reader that is not
@@ -756,6 +757,10 @@ class Checker(_HandleChecker):
                 self.transition("cancel_no_effect")
             else:
                 self.transition("cancel_uncertain")
+            if self.health is BROKEN and before is not BROKEN:
+                # The cancelled call consumed an unknown amount, as for a
+                # failure that breaks the reader; tell() reports where.
+                self.widen(len(self.upper))
             if moved:
                 self.text_seek_moved()
             call = op["call"]

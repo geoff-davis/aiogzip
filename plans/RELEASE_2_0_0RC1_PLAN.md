@@ -198,7 +198,19 @@ tests.
   now stand at any offset (seeds 2000322 and 2001408 join the regression
   seeds), and a cookie taken at an uncertain position keeps its set of
   offsets, which a seek to it restores, so the text after that recovery is
-  still checked against the payload. Seeds 2,000,200–2,001,999 pass the model too. R11's sweeps
+  still checked against the payload. A second gap failed seed 2000012 on
+  Windows 3.14 CI only. The stateful test compresses its wires at run time,
+  and compressing this one with zlib-ng reproduces the failure locally,
+  consistent with Windows 3.14's bundled zlib-ng. On that wire a cancel
+  lands inside `read(-1)` on a custom source without a checkpoint. The read
+  consumed an unknown amount before the cancel broke the reader, but the
+  model kept the read's start as certain, so a cookie taken on the BROKEN
+  reader named a later offset than the model allowed. A cancel that breaks
+  the reader now lets the position drift forward, as a failure that breaks
+  it already did; two model tests pin the trace. With zlib-ng wires, seeds
+  0–1,999, 1,000,000–1,000,399 and 2,000,000–2,001,999 pass the model;
+  before the change only 2000012 failed. Seeds 2,000,200–2,001,999 pass the
+  model with stdlib wires too. R11's sweeps
   (0–5999 and the R04 block against b2 and b1, 0–5999 against c0) give
   the same results as before.)*
 - **Differential on the seek-cancel block (open).** The differential does
