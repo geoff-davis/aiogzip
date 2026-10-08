@@ -4268,7 +4268,13 @@ SEEK_END_KEY = (7, "seek_end", 0)
 def _inflate_errors_differ(pair: Pair) -> bool:
     """Whether the pair's only differences besides the seek_end are error
     outcomes at the body-damage events; anything else is a failure."""
+    from differential import _tail_length
+
     assert SEEK_END_KEY in pair.diffs, pair.diffs
+    c, r = pair.cand_by_key[SEEK_END_KEY], pair.ref_by_key[SEEK_END_KEY]
+    assert isinstance(c.outcome, dict) and c.outcome.keys() == {"ok"}, c
+    assert isinstance(c.outcome["ok"], str), c  # a cookie symbol
+    assert _tail_length(r.outcome) is not None, r
     extra = pair.diffs - {SEEK_END_KEY}
     if not extra:
         return False
@@ -4280,8 +4286,10 @@ def _inflate_errors_differ(pair: Pair) -> bool:
         assert dataclasses.replace(c, outcome=None) == dataclasses.replace(
             r, outcome=None
         ), key
-        assert is_error(c.outcome) and is_error(r.outcome), key
-        assert c.outcome.keys() == r.outcome.keys() == {"error", "message"}, key
+        for outcome in (c.outcome, r.outcome):
+            assert is_error(outcome, "BadGzipFile"), key
+            assert outcome.keys() == {"error", "message"}, key
+            assert isinstance(outcome["message"], str), key
     return True
 
 
@@ -4321,6 +4329,30 @@ def test_bc7_seek_end_skip_rejects_a_non_error_at_a_damage_event():
     pair = dataclasses.replace(
         pair, ref=edit(pair.ref, (0, "read", 0), outcome={"ok": {"str": "x"}})
     )
+    with pytest.raises(AssertionError):
+        _inflate_errors_differ(pair)
+
+
+def test_bc7_seek_end_skip_rejects_another_error_type():
+    pair = rc1_pair("b1", 1000132)
+    error = {"error": "RuntimeError", "message": "another inflate message"}
+    pair = dataclasses.replace(pair, ref=edit(pair.ref, (0, "read", 0), outcome=error))
+    with pytest.raises(AssertionError):
+        _inflate_errors_differ(pair)
+
+
+def test_bc7_seek_end_skip_rejects_a_failed_candidate_seek_end():
+    pair = rc1_pair("b1", 1000132)
+    error = {"error": "ValueError", "message": "boom"}
+    pair = dataclasses.replace(pair, cand=edit(pair.cand, SEEK_END_KEY, outcome=error))
+    with pytest.raises(AssertionError):
+        _inflate_errors_differ(pair)
+
+
+def test_bc7_seek_end_skip_rejects_another_reference_seek_end_error():
+    pair = rc1_pair("b1", 1000132)
+    error = {"error": "OSError", "message": "boom"}
+    pair = dataclasses.replace(pair, ref=edit(pair.ref, SEEK_END_KEY, outcome=error))
     with pytest.raises(AssertionError):
         _inflate_errors_differ(pair)
 
