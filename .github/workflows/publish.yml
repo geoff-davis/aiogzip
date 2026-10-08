@@ -1,8 +1,13 @@
 name: Publish to PyPI
 
+# A release tag (v<version>) publishes to PyPI. A rehearsal tag
+# (testpypi-v<version>) runs the same test, build and verification steps and
+# publishes to TestPyPI instead. Either way, the files uploaded are exactly
+# the ones built, smoke-tested and hash-checked against the committed release
+# record plans/releases/v<version>.sha256.
 on:
   push:
-    tags: ["v*"]
+    tags: ["v*", "testpypi-v*"]
 
 permissions:
   contents: read
@@ -14,12 +19,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: "3.12"
           cache: "pip"
@@ -30,11 +37,22 @@ jobs:
         uses: astral-sh/setup-uv@v10.0.1
 
       - name: Verify tag matches package version
+        id: version
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${GITHUB_REF_NAME#testpypi-}"
+          TAG_VERSION="${TAG_VERSION#v}"
           PKG_VERSION="$(python -c 'import pathlib, re; m = re.search(r"^__version__ = \"([^\"]+)\"", pathlib.Path("src/aiogzip/__init__.py").read_text(), re.M); print(m.group(1))')"
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "Tag v$TAG_VERSION does not match aiogzip.__version__ $PKG_VERSION" >&2
+            echo "Tag $GITHUB_REF_NAME does not match aiogzip.__version__ $PKG_VERSION" >&2
+            exit 1
+          fi
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Require the committed release record
+        run: |
+          record="plans/releases/v${{ steps.version.outputs.version }}.sha256"
+          if [ ! -f "$record" ]; then
+            echo "Missing release record $record" >&2
             exit 1
           fi
 
@@ -46,21 +64,25 @@ jobs:
       - name: Run tests
         run: pytest --cov --cov-fail-under=85
 
-  publish:
+  # Build once with the pinned tools, smoke the installed artifacts, and
+  # check them against the release record. Only these exact files move on.
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     needs: test
-    environment: pypi
-    permissions:
-      id-token: write  # Required for trusted publishing
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: "0.9.22"
 
       - name: Set reproducible build timestamp
         run: |
@@ -68,17 +90,101 @@ jobs:
           source_date_epoch="$(TZ=UTC date -d "$release_date" +%s)"
           echo "SOURCE_DATE_EPOCH=$source_date_epoch" >> "$GITHUB_ENV"
 
-      - name: Install build tools
-        run: python -m pip install --upgrade pip build twine
+      - name: Build, check and smoke the release artifacts
+        run: >-
+          python scripts/build_release_artifacts.py --ref "$GITHUB_SHA"
+          --evidence-dir "$RUNNER_TEMP/release-evidence"
 
-      - name: Build package
-        run: python -m build
+      - name: Check the artifacts against the release record
+        run: >-
+          python scripts/verify_release_artifacts.py
+          "$RUNNER_TEMP/release-evidence/dist"
+          "plans/releases/v${{ needs.test.outputs.version }}.sha256"
 
-      - name: Check package metadata
-        run: twine check dist/*
+      # Negative control: the same check must refuse a one-byte alteration,
+      # so a changed artifact can never pass the gate before upload.
+      - name: Prove the record check refuses an altered artifact
+        run: |
+          altered="$RUNNER_TEMP/altered-dist"
+          cp -r "$RUNNER_TEMP/release-evidence/dist" "$altered"
+          sdist="$(ls "$altered"/*.tar.gz)"
+          printf '\0' >> "$sdist"
+          if python scripts/verify_release_artifacts.py "$altered" \
+              "plans/releases/v${{ needs.test.outputs.version }}.sha256"; then
+            echo "The release record check accepted an altered artifact" >&2
+            exit 1
+          fi
 
-      - name: Show sdist contents
-        run: tar tzf dist/*.tar.gz
+      - name: Upload the verified artifacts
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: release-dist
+          path: ${{ runner.temp }}/release-evidence/dist/
+          if-no-files-found: error
+
+      - name: Upload the release evidence
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: release-evidence
+          path: |
+            ${{ runner.temp }}/release-evidence/*.json
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [test, build]
+    environment: pypi
+    permissions:
+      id-token: write  # Required for trusted publishing
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Download the verified artifacts
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: release-dist
+          path: dist/
+
+      # Re-check immediately before upload: only the recorded files, with the
+      # recorded hashes, can reach PyPI.
+      - name: Check the artifacts against the release record
+        run: >-
+          python3 scripts/verify_release_artifacts.py dist
+          "plans/releases/v${{ needs.test.outputs.version }}.sha256"
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.14.2
+        with:
+          packages-dir: dist/
+
+  publish-testpypi:
+    if: startsWith(github.ref_name, 'testpypi-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [test, build]
+    environment: testpypi
+    permissions:
+      id-token: write  # Required for trusted publishing
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Download the verified artifacts
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: release-dist
+          path: dist/
+
+      - name: Check the artifacts against the release record
+        run: >-
+          python3 scripts/verify_release_artifacts.py dist
+          "plans/releases/v${{ needs.test.outputs.version }}.sha256"
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/

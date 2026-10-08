@@ -28,6 +28,13 @@ Tag a merged release and publish to PyPI + GitHub Releases. Run this after a `/r
 
 ### 3. Tag and push
 
+- Confirm `plans/releases/v<version>.sha256` exists on `main`; the publish
+  workflow refuses to upload without it.
+- For a first release through a changed publish workflow, rehearse first:
+  push `testpypi-v<version>` on the same commit and confirm the TestPyPI
+  upload succeeds with the recorded hashes (needs the `testpypi` environment
+  and a TestPyPI trusted publisher).
+
 - Create an annotated signed tag on the intended merge commit using the
   maintainer's GitHub-registered signing key. For SSH signing, use
   `git -c gpg.format=ssh tag -s -u <public-key-path> -m "Release aiogzip <version>" v<version>`.

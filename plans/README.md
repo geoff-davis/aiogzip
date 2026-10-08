@@ -38,6 +38,10 @@ b2 baselines in plan §17. It was drawn from two read-only reviews of
 [Codex](reviews/data/rc1/codex-review.md.txt). Plan §18 still lists the
 deferred work.
 
+Each release's artifact hashes are recorded under
+[release artifact records](releases/README.md); the publish workflow uploads
+only the recorded files.
+
 ### b2 design records
 
 - [WP1 native-work settlement](design/v2.0.0b2-native-settlement.md)
