@@ -5,7 +5,10 @@ stay at the paths they were committed under; this index is the way in.
 
 ## Active: 2.0.0b2
 
-The active b2 release plan is [Revision 2](RELEASE_2_0_0B2_PLAN.md). The
+2.0.0b2 was published on 2026-10-07; development continues as
+`2.0.0rc1.dev0`. The [post-release record](reviews/v2.0.0b2-post-release.md)
+covers publication (G21) and the RC handoff (G22). The b2 release plan is
+[Revision 2](RELEASE_2_0_0B2_PLAN.md). The
 G00–G22 register in that plan is authoritative. Reproducing a defect does not
 complete its repair gate, and local tests do not establish release readiness.
 
@@ -66,6 +69,7 @@ The RC hardening program is parked, and no RC plan is committed under
 - [G17 pre-registration: performance windows](reviews/v2.0.0b2-g17-preregistration.md)
 - [WP11 release preparation: G20](reviews/v2.0.0b2-release-prep.md)
 - [WP11 candidate review: G19](reviews/v2.0.0b2-candidate-review.md)
+- [Post-release: G21 and G22](reviews/v2.0.0b2-post-release.md)
 
 ### b2 WP5 working records
 
