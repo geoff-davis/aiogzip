@@ -1039,6 +1039,11 @@ A cookie saved with <code>tell()</code> before the failure is not a recovery poi
 <code>seek(cookie)</code> may raise the same terminal <code>OSError</code> instead of rewinding. Call
 <code>seek(0)</code> first; once the reader has recovered, a saved cookie is an ordinary
 position again.</p>
+<p>A text <code>seek()</code> that fails or is cancelled either leaves the reader exactly
+where it was or makes it terminal: if the seek had already moved the
+underlying binary reader, later reads raise the same terminal <code>OSError</code> until
+<code>seek(0)</code> succeeds. A failed text seek is never followed by text from the wrong
+position.</p>
 <h2 id="codec-finalization-and-operation-abandonment">Codec finalization and operation abandonment</h2>
 <p>Every state-changing <code>GzipEncoder</code> or <code>GzipDecoder</code> call reserves the codec and
 returns a lazy <code>CodecOperation</code>. Engine errors, integrity failures, or closing
