@@ -59,9 +59,10 @@ When a custom `fileobj`'s `write()` raises, the two calls report it
 differently:
 
 - `write()` lets the sink's exception propagate unchanged, whatever its type.
-- `flush()` passes an `OSError` through unchanged, but wraps any other
-  exception as `OSError("Unexpected error during flush: ...")`, with the
-  original as `__cause__`.
+- `flush()` passes the sink's `OSError` through unchanged, but wraps any
+  other `Exception` as `OSError("Unexpected error during flush: ...")`, with
+  the original as `__cause__`. Cancellation and interrupts such as
+  `KeyboardInterrupt` propagate unwrapped.
 
 Either way the writer is broken afterwards: discard the incomplete output and
 create a new writer. Code that catches a sink's own exception type around
@@ -125,10 +126,17 @@ Cancellation while a clean context exit is waiting for an active call also
 attempts abortive owned-resource cleanup before the cancellation propagates.
 
 If that abortive cleanup fails, for example because a custom source's
-`close()` raises, the failure is attached to the propagating exception (the
-context body's exception, or the cancellation) as a note beginning
-`Context-exit cleanup also failed:`. Exception types and precedence are
-unchanged.
+`close()` raises, the failure is recorded as a note beginning
+`Context-exit cleanup also failed:` instead of being dropped. Exception types
+and precedence are unchanged:
+
+- When the context body raised, an ordinary exception from the cleanup is
+  noted on the body's exception. A cancellation or interrupt delivered during
+  the cleanup propagates instead, as before.
+- When a cancellation interrupted a clean exit, the cancellation propagates
+  and any cleanup failure is noted on it, including a failure carried as the
+  cause of a repeated cancellation. A repeated cancellation on its own adds no
+  note.
 
 To abort an active read or write on a custom file object, the exit cancels
 the task running that call once, and consumes that request however the call
