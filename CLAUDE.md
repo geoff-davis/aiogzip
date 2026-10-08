@@ -189,8 +189,11 @@ Notes:
 ## CI/CD Notes
 
 The project uses GitHub Actions which tests against Python 3.11 through 3.14.
-Linux runs the full version sweep; Windows and macOS each run one version to
-guard platform-specific paths (e.g. `os.linesep` newline translation).
+Linux runs the full version sweep; Windows runs 3.12 and 3.14 and macOS runs
+3.14 to guard platform-specific paths (e.g. `os.linesep` newline
+translation). The macOS build leg also reruns the suite with zlib-ng; keep
+macOS jobs to about two per run, because GitHub runs few macOS jobs at a time
+per account and queued ones have been cancelled before starting.
 
 `main` has branch protection requiring every CI job (lint, all build matrix
 legs, fast-engine — not coverage-comment), and repo auto-merge is enabled:

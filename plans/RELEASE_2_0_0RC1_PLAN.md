@@ -258,6 +258,17 @@ validation or limits. *(Implemented on `fix/rc1-seek-end`.)*
   merge (a required context cannot be satisfied before its job exists on
   `main`), verified by a `gh api` read before R07 closes.
 
+  *macOS legs reduced (2026-10-08, maintainer direction).* With four macOS
+  jobs per run, overlapping runs left macOS jobs queued until they were
+  cancelled with no step run (#118, #119 and `main` at `2c9bf3c`), consistent
+  with GitHub's per-account limit on concurrent macOS jobs. The macOS 3.12
+  build leg is dropped, and the separate macOS fast-engine job is folded into
+  the macOS 3.14 build leg, which reruns the suite with the `[fast]` extra and
+  attests zlib-ng active (job timeout 25 minutes). Each run again has two
+  macOS jobs. The contexts `build (macos-latest, 3.12)` and
+  `fast-engine (macos-latest)` leave branch protection before that change
+  merges, since no job reports them afterwards.
+
 ### R08: text `writelines()` with empty inputs
 
 **Defect (Codex; confirmed in code).** Each empty string is appended to

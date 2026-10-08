@@ -83,11 +83,14 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    # The macOS leg also runs the zlib-ng suite (see below).
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 25 || 15 }}
     # Defines a build matrix for your tests. Linux runs the full Python
-    # version sweep; Windows and macOS run the oldest-common (3.12) and newest
-    # (3.14) versions to guard platform-specific paths (e.g. os.linesep newline
+    # version sweep; Windows runs the oldest-common (3.12) and newest (3.14)
+    # versions to guard platform-specific paths (e.g. os.linesep newline
     # translation in text mode, path handling) without the full sweep's cost.
+    # macOS runs 3.14 only: GitHub runs few macOS jobs at a time per account,
+    # and with more macOS legs queued jobs were cancelled before they started.
     strategy:
       fail-fast: false
       matrix:
@@ -98,8 +101,6 @@ jobs:
             python-version: "3.12"
           - os: windows-latest
             python-version: "3.14"
-          - os: macos-latest
-            python-version: "3.12"
           - os: macos-latest
             python-version: "3.14"
 
@@ -145,6 +146,23 @@ jobs:
         run: |
           pytest --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=85
 
+      # macOS zlib-ng wheels are built separately from Linux ones, so the macOS
+      # leg repeats the suite with the [fast] extra installed. This replaces a
+      # separate macOS fast-engine job (see the build matrix comment).
+      - name: Install the fast extra (macOS)
+        if: matrix.os == 'macos-latest'
+        run: uv pip install --system -e ".[test,csv,fast]"
+
+      - name: Attest runtime environment (macOS, zlib-ng active)
+        if: matrix.os == 'macos-latest'
+        run: >-
+          python scripts/report_runtime_versions.py --mode fast --latest
+          --output runtime-fast.json
+
+      - name: Run tests with zlib-ng active (macOS)
+        if: matrix.os == 'macos-latest'
+        run: pytest -q
+
       # The coverage-comment job reuses this leg's coverage data instead of
       # re-running the suite. relative_files = true in [tool.coverage.run]
       # keeps the paths portable across jobs.
@@ -161,24 +179,21 @@ jobs:
         uses: actions/upload-artifact@v7.0.2
         with:
           name: runtime-build-${{ matrix.os }}-${{ matrix.python-version }}
-          path: runtime-report.json
+          path: |
+            runtime-report.json
+            runtime-fast.json
           if-no-files-found: warn
 
   # The main matrix above installs only [test,csv], so it exercises the
   # pure-Python default (stdlib zlib, zlib-ng absent) — the common
   # `pip install aiogzip` install — across the full version/OS sweep. This
   # job adds the [fast] extra so the zlib-ng decompression and opt-in
-  # compression paths are exercised on one representative version, on Linux
-  # and on macOS (whose zlib-ng wheels are built separately). The Linux leg
-  # keeps the plain "fast-engine" check name that branch protection requires.
+  # compression paths are exercised on one representative version. The
+  # macOS build leg covers zlib-ng on macOS, whose wheels are built
+  # separately.
   fast-engine:
-    name: ${{ matrix.os == 'ubuntu-latest' && 'fast-engine' || format('fast-engine ({0})', matrix.os) }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
@@ -217,7 +232,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: runtime-fast-engine-${{ matrix.os }}
+          name: runtime-fast-engine
           path: |
             runtime-fast.json
             runtime-fast-forced-stdlib.json
