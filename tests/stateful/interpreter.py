@@ -40,6 +40,12 @@ SCENARIO_TIMEOUT = 90.0
 # cleanup, including the handle's close.
 CLEANUP_GRACE = 2.0
 CLEANUP_TIMEOUT = 10.0
+# How long a parked executor worker waits for its release. The scenario
+# deadline releases the gate, so this only bounds a worker whose loop has
+# died. Fixed at import: a test that shortens SCENARIO_TIMEOUT must not make a
+# parked worker give up without running its call, which would leave a native
+# call no exit or close could ever settle.
+PARK_TIMEOUT = SCENARIO_TIMEOUT + CLEANUP_TIMEOUT
 INLINE_LIMIT = 64
 # Text payloads are at most a few thousand characters, so text stays inline:
 # the differential compares returned text exactly, not by digest.
@@ -59,6 +65,7 @@ class Gate:
 
     def __init__(self) -> None:
         self.armed = False
+        self.expired = False
         # What the call that parked was sending: set at park, taken by the
         # next landed event.
         self.parked: dict[str, Any] | None = None
@@ -94,11 +101,21 @@ class Gate:
         self.release_async = asyncio.Event()
         self.release_thread = threading.Event()
         self.ran = threading.Event()
+        if self.expired:
+            # Past the deadline every park is released at once: an op that
+            # outlives the timeout must never wait for a release already spent.
+            self.release_async.set()
+            self.release_thread.set()
 
     def release(self) -> None:
         self.armed = False
         self.release_async.set()
         self.release_thread.set()
+
+    def expire(self) -> None:
+        """Release now and every later arming: the scenario deadline passed."""
+        self.expired = True
+        self.release()
 
 
 # Loop turns allowed for a cancellation or abort to settle on-loop before the
@@ -168,7 +185,7 @@ class GatedExecutor(concurrent.futures.ThreadPoolExecutor):
         def parked():
             self.loop.call_soon_threadsafe(entered.set)
             try:
-                if not release.wait(SCENARIO_TIMEOUT):
+                if not release.wait(PARK_TIMEOUT):
                     raise TimeoutError("gated executor was never released")
                 start = _native_offset(fn) if record["method"] == "read" else None
                 origin = _seek_origin(fn) if seek is not None else None
@@ -694,7 +711,7 @@ async def run(
             if gate.parked["via"] == "native" and gate.release_thread.is_set():
                 # Let a released native call finish, so its witness is final
                 # and no worker still touches the file during the next op.
-                gate.ran.wait(SCENARIO_TIMEOUT)
+                gate.ran.wait(PARK_TIMEOUT)
             event.parked, gate.parked = gate.parked, None
             taken = event.parked.pop("taken", None)
             if taken is not None:
@@ -919,6 +936,11 @@ async def run(
         if not handle.closed:
             land(Event(len(ops), {"op": "cleanup_close"}, await _call(handle.close())))
 
+    # Open the gate at the deadline itself, not after the timeout lands, and
+    # keep it open: cancelling the body can run a context exit that waits for
+    # a parked native call to settle (BC1), that call runs only once released,
+    # and an op still running past the deadline may park another.
+    deadline = asyncio.get_running_loop().call_later(SCENARIO_TIMEOUT, gate.expire)
     try:
         async with asyncio.timeout(SCENARIO_TIMEOUT):
             await drive()
@@ -927,6 +949,7 @@ async def run(
         cleanup = await _settle_after_timeout(handle)
         land(Event(len(ops) + 1, {"op": "timeout"}, Outcome("error"), cleanup))
     finally:
+        deadline.cancel()
         gate.release()
     final: dict[str, Any] = {"closed": handle.closed}
     if source is not None:

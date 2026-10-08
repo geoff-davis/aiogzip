@@ -111,3 +111,46 @@ def test_timed_out_scenario_closes_its_handle(monkeypatch):
     assert final.outcome.value["closed"] is True
     if "fd_delta" in final.outcome.value:
         assert final.outcome.value["fd_delta"] == 0
+
+
+def test_timeout_with_a_parked_native_call_opens_the_gate(monkeypatch):
+    # Seed 36's overlap (op 2) parks a native read in a background task.
+    # Holding that read until the deadline makes the timeout land while it is
+    # parked and unprevented: the context exit then waits for the read to run
+    # and settle (BC1), so the deadline itself must open the gate. Before,
+    # the gate opened only after the exit, so the run deadlocked until the
+    # parked worker gave up without running the call, which no exit or close
+    # could then settle.
+    settle = interpreter.settle_then_release
+    calls = 0
+
+    async def hold_overlap_until_deadline(gate, task):
+        nonlocal calls
+        calls += 1
+        if calls == 2:  # the overlap's releaser; the cancel (op 1) settles
+            await gate.release_async.wait()
+        await settle(gate, task)
+
+    monkeypatch.setattr(interpreter, "SCENARIO_TIMEOUT", 0.5)
+    monkeypatch.setattr(interpreter, "settle_then_release", hold_overlap_until_deadline)
+    events, _trace = replay(aiogzip, generate(36))
+    assert calls >= 2
+    (timeout,) = [event for event in events if event.op["op"] == "timeout"]
+    assert timeout.second == interpreter.Outcome("ok", "closed")
+    final = events[-1].outcome.value
+    assert final["closed"] is True
+    if "fd_delta" in final:
+        assert final["fd_delta"] == 0
+
+
+def test_expired_gate_releases_every_later_arming():
+    # Past the deadline an op may still park a call (a body op that records
+    # the timeout's cancellation as its outcome, say); the release it would
+    # wait for has already been spent, so the arming itself must release.
+    gate = interpreter.Gate()
+    gate.arm()
+    assert not gate.release_thread.is_set()
+    gate.expire()
+    assert gate.release_thread.is_set() and gate.release_async.is_set()
+    gate.arm()
+    assert gate.release_thread.is_set() and gate.release_async.is_set()
