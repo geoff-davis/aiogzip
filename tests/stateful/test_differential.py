@@ -18,7 +18,9 @@ import base64
 import copy
 import dataclasses
 import gzip
+import hashlib
 import json
+import sys
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -74,6 +76,39 @@ B1 = json.loads((DATA.parent / "wp10_b1_runs.json").read_text(encoding="utf-8"))
 needs_fd_counts = pytest.mark.skipif(
     interpreter._open_fds() is None, reason="platform does not expose open fds"
 )
+
+
+def _recorded_wires_digest() -> str:
+    """SHA-256 over the generated wire of every recorded seed."""
+    digest = hashlib.sha256()
+    for seed in sorted({int(seed) for seed in C0} | {int(seed) for seed in B1}):
+        scenario = generate(seed)
+        if "wire" in scenario:
+            digest.update(b"%d:" % seed)
+            digest.update(unb64(scenario["wire"]))
+    return digest.hexdigest()
+
+
+# The recorded traces, and the offsets pinned below, hold only for the wire
+# bytes they were recorded from. The generator builds wires with
+# gzip.compress(), whose output depends on the platform's zlib: a
+# zlib-ng-backed stdlib emits different streams (the Windows Python 3.14
+# leg). Those platforms skip the tests that depend on recorded wire bytes and
+# run everything else; test_recorded_wires_are_reproduced keeps Linux and
+# macOS from skipping silently.
+RECORDED_WIRES_SHA256 = (
+    "5f6fdef439f30807c1dfd14d4409055cad3595a1d1bde8856ecfaf4d30c648ae"
+)
+RECORDED_WIRES_REPRODUCED = _recorded_wires_digest() == RECORDED_WIRES_SHA256
+needs_recorded_wires = pytest.mark.skipif(
+    not RECORDED_WIRES_REPRODUCED,
+    reason="this platform's zlib does not reproduce the recorded wire bytes",
+)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows may bundle zlib-ng")
+def test_recorded_wires_are_reproduced():
+    assert RECORDED_WIRES_REPRODUCED
 
 
 @cache
@@ -173,6 +208,7 @@ C0_SEEDS = {
 }
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize(
     ("predicate", "seed"),
     [(name, seed) for name, seeds in C0_SEEDS.items() for seed in seeds],
@@ -245,6 +281,7 @@ def test_buffer_read_records_the_pulled_uncompressed_range():
     assert pulled[0].pulled[0] == pulled[0].pulled[1] == pulled[1].pulled[0]
 
 
+@needs_recorded_wires
 def test_consumed_source_failure_records_the_taken_wire_range():
     rows = cand_rows(3152)
     failed = row(rows, 12, "readline")
@@ -291,6 +328,7 @@ def _set_op(scenario, index, **fields):
     return scenario
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize("size", [None, -5])
 def test_bc7_f1a_normalizes_unbounded_sizes(size):
     scenario = _set_op(generate(4819), 1, n=size)
@@ -1009,6 +1047,7 @@ def b1_recorded(seed: int) -> tuple[Pair, dict[str, Any]]:
     return pair, run["lossy"]
 
 
+@needs_recorded_wires
 def test_bc2_l2_584_stays_lossy_to_the_end():
     # b1's cancelled native read took the whole wire. Its later seek_mark and
     # seek0 stand at decompressed position 0 and make no source call, so b1
@@ -1076,6 +1115,7 @@ def test_bc2_168_span_runs_past_the_rebase_until_convergence():
     assert {6, 7} <= bc2
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize("seed", [20, 271, 2716])
 def test_bc2_o1_acquisition_is_normalized_for_the_lossy_model(seed):
     pair, lossy = b1_recorded(seed)
@@ -1143,6 +1183,7 @@ def test_lossy_checker_normalizes_only_o1():
 # E: an L2 trigger whose one-sided witness is the seed's only difference.
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize("seed", [169, 232])
 def test_bc2_e_mid_member_trigger_goes_to_the_oracle_lossy_run(seed):
     # The oracle makes the mid-member range eligible: b1's recorded lossy
@@ -1160,6 +1201,7 @@ def test_bc2_e_mid_member_trigger_goes_to_the_oracle_lossy_run(seed):
     assert bc2_trigger_only(pair).events == set()
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize("seed", [169, 232])
 def test_bc2_e_trigger_only_is_claimed_without_a_lossy_view(seed):
     # With no view at all (no member spans), the trigger-only clause still
@@ -1222,6 +1264,7 @@ def test_bc2_e_defers_an_eligible_range_to_the_lossy_run():
 # F1: context exit aborts a native read parked in the executor.
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize("seed", [290, 1426])
 def test_bc2_f1_aborted_native_read_is_claimed(seed):
     pair, lossy = b1_recorded(seed)
@@ -1494,6 +1537,7 @@ F2B_SEEDS = {
 F2B_READS = {3645: [0, 0, 3], 4925: [0, 0, 64]}
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize("seed", sorted(F2B_SEEDS))
 def test_bc2_f2b_claims_b1s_broken_readline_refusal(seed):
     pair, shadow = b1_f2(seed)
@@ -1507,6 +1551,7 @@ def test_bc2_f2b_claims_b1s_broken_readline_refusal(seed):
         assert pair.ref_info["source_reads"] == [[key[0], F2B_READS[seed]]]
 
 
+@needs_recorded_wires
 def test_bc2_f2b_4925s_parked_read_decodes_nothing():
     pair, _shadow = b1_f2(4925)
     wire = unb64(pair.scenario["wire"])
@@ -1816,6 +1861,7 @@ def test_bc2_g_custom_from_salvage_needs_the_exact_shape(change):
 # padding, which is legal only after a completed member (seed 3525).
 
 
+@needs_recorded_wires
 def test_bc2_l1_loss_ending_in_padding_goes_to_the_oracle():
     pair, lossy = b1_recorded(3525)
     request = bc2_request(pair)
@@ -1832,6 +1878,7 @@ def test_bc2_l1_loss_ending_in_padding_goes_to_the_oracle():
     passes(pair, "BC2-LOST-INPUT", lossy)
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize(
     "a, b, oracle",
     [
@@ -1859,6 +1906,7 @@ def test_lossy_scenario_routes_only_a_loss_from_0_into_padding_to_the_oracle(
 # decoder, which replays the consumed prefix and then reads from offset 0.
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize("seed, origin", [(1620, 49), (242, 15015)])
 def test_bc2_g_native_cancelled_rewind_is_claimed(seed, origin):
     pair, lossy = b1_recorded(seed)
@@ -2256,6 +2304,7 @@ def _584_lossy_run(**override) -> dict[str, Any]:
     return recorded_run(aiogzip, scenario, ENGINE, "lossy", request)
 
 
+@needs_recorded_wires
 def test_lossy_checker_reads_the_true_wire_before_the_trigger():
     violations = _584_lossy_run()["violations"]
     # Before the trigger the true wire is in force, so op 0's whole-wire
@@ -2266,6 +2315,7 @@ def test_lossy_checker_reads_the_true_wire_before_the_trigger():
     assert violations and min(i for i, _ in violations) == 12
 
 
+@needs_recorded_wires
 def test_lossy_checker_keeps_its_state_across_the_switch():
     # A trigger after every event leaves the true view in force throughout:
     # the run is the candidate's own, so nothing is rejected.
@@ -2535,6 +2585,7 @@ def _expect_without(*ranges: list[int]):
     return Checker(view, ENGINE).expect
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize(
     ("transition", "taken", "expected"),
     [
@@ -2570,6 +2621,7 @@ NATIVE = {"kind": "native"}
 CHECKPOINT = generate(129)["source"] | {"checkpoint": True}
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize(
     ("source", "taken", "expected"),
     [
@@ -2736,6 +2788,7 @@ H_SEEDS = {
 }
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize("seed", sorted(H_SEEDS))
 def test_h_recorded_later_losses_are_claimed(seed):
     pair, lossy = b1_recorded(seed)
@@ -2745,6 +2798,7 @@ def test_h_recorded_later_losses_are_claimed(seed):
     assert claims(result, "BC2-LOST-INPUT")
 
 
+@needs_recorded_wires
 @pytest.mark.parametrize(
     ("seed", "row"),
     [
@@ -3325,6 +3379,7 @@ def test_f1a_remaining_text_of_an_undecodable_wire_view_is_unknown():
 # F1a; BC7 still owns the difference.
 
 
+@needs_recorded_wires
 def test_bc2_unmodeled_f1a_is_not_expected_in_the_evidence():
     pair, lossy = b1_recorded(3152)
     key = (6, "overlap", 0)
@@ -3530,6 +3585,7 @@ def test_lossy_checker_keeps_f1a_terminal_without_a_successful_rewind(rewind):
 BC10_KEY = (4, "seek_mark", 0)
 
 
+@needs_recorded_wires
 def test_bc10_failed_text_cookie_recovery_is_claimed():
     pair, lossy = b1_recorded(899)
     assert pair.diffs == {BC10_KEY}

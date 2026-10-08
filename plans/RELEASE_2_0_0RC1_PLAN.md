@@ -241,6 +241,21 @@ validation or limits. *(Implemented on `fix/rc1-seek-end`.)*
   and update the branch-protection contexts in the same change (CLAUDE.md
   gotcha). Refresh the stale coverage comment in `ci.yml`.
 
+  *As implemented (PR #118).* The first Windows 3.14 run stopped at
+  collection: harness fixtures rebuild gzip wires with `gzip.compress()`,
+  whose bytes depend on the platform's zlib, and that leg's stdlib produced
+  different streams (consistent with a zlib-ng-backed build; reproduced
+  locally by swapping in zlib-ng's compressor). At maintainer direction
+  (2026-10-08, "Pin oracle + gate replays"): `test_oracle.py` now reads its
+  wire from the committed `tests/data/oracle_late_corruption.gz` (SHA-256
+  checked), and the 21 differential tests that depend on recorded wire bytes
+  are skipped where the generator does not reproduce them, decided by one
+  SHA-256 over every recorded seed's wire. `test_recorded_wires_are_reproduced`
+  fails on any non-Windows platform that does not reproduce them, so Linux and
+  macOS cannot skip silently. Branch-protection contexts are added after
+  merge (a required context cannot be satisfied before its job exists on
+  `main`), verified by a `gh api` read before R07 closes.
+
 ### R08: text `writelines()` with empty inputs
 
 **Defect (Codex; confirmed in code).** Each empty string is appended to
