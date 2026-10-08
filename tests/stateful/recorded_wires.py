@@ -36,7 +36,7 @@ PINNED_SEEDS = frozenset(
 # The gzip header byte that names the OS; see the module docstring.
 OS_BYTE = 9
 
-WIRES_SHA256 = "124e9930fd7e740325076a8ef234107f627220d30d7beb4462bbf3f30f2ce77a"
+WIRES_SHA256 = "9b968e0e46d50dd6e5aa65eb770c01006dc3d356550a4629e9f526929eb3322e"
 
 
 def recorded_seeds() -> set[int]:

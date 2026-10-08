@@ -213,18 +213,40 @@ tests.
   model with stdlib wires too. R11's sweeps
   (0–5999 and the R04 block against b2 and b1, 0–5999 against c0) give
   the same results as before.)*
-- **Differential on the seek-cancel block (open).** The differential does
-  not yet claim this block: against b2, b1 and c0, 19, 18 and 19 of its
-  first 200 seeds have unclaimed differences. In 14 of b2's 19 the only
-  one is a harness artifact: a cookie seek that won its race with the
-  cancel returns a cookie, which the trace does not symbolize inside a
-  `cancel` row. The rest are BC11 consequences the R11 predicate
-  does not cover by design (a refused call inside a parked event, a
-  reference that errors rather than serving data, divergence after a
-  `tell()` on the BROKEN reader) and, against b1 and c0 only,
-  `UnicodeDecodeError`s from their text paths on these larger payloads.
-  Claiming them needs predicate and ledger changes, so it waits for the
-  maintainer's direction.
+- **Differential on the seek-cancel block.** Against b2, b1 and c0, 19,
+  18 and 19 of the block's first 200 seeds had unclaimed differences. In
+  14 of b2's 19 the only one was a harness artifact: a cookie seek that won
+  its race with the cancel returned a cookie, which the trace did not
+  symbolize inside a `cancel` row. The rest were BC11 consequences the R11
+  predicate did not cover. *(Done on `test/rc1-r02-differential`. The trace
+  symbolizes a parked event's first outcome as its call's, so the cookie
+  is a symbol, and a closed reader's cancelled `seek_mark` row carries no
+  cookie, as a direct one does (b1/2000039, BC3). BC11 now also triggers
+  on a `cancel` whose seek call is cancelled; against b1 that row may also
+  carry the lost-range `taken` of a native read the cancel stopped (BC2's
+  L2 trigger), which the candidate's row lacks. Against the candidate's
+  refusal it claims a text `seek_end` that returns a position, and a
+  reference that reads on into a `UnicodeDecodeError` or `BadGzipFile`,
+  or into an injected source failure that the scenario armed and the
+  reference had not yet raised, with a `taken` range inside the wire. It
+  also claims an `abort` around such a read when the abort outcome is the
+  same on both sides. The error types are consistent with reading on from
+  the moved cursor; they are not independent evidence of that cause. b1
+  has no BC11, so its lossy model stays healthy over a moved cursor and
+  stops checking content there until a completed `seek(0)`. The lossy run
+  records each such span (`unmodeled`), which must match its own cursor
+  witnesses and b1's `seek(0)` rows exactly, and BC2 claims nothing inside
+  one (b1/2000121, an open span; b1/4533, a span closed by `seek(0)`, after
+  which BC2 claims b1's lost input as before). Seeds 2,000,000–2,000,199
+  then pass against b2 and c0 (BC11 claims 6 each). Against b1 one
+  difference remains, ledgered as unclaimed: in b1/2000100 a cancelled
+  cookie seek stops b1's native read (`taken [0, 7]`) while the reader is
+  in validation salvage, where BC2 admits no trigger; BC11 claims b1's
+  read on into `BadGzipFile` after it. Its disposition is the maintainer's.
+  Eleven runs join `tests/data/rc1_reference_runs.json` (ten block runs and b1/4533),
+  recorded on stdlib and
+  zlib-ng with identical records, and their claims and near misses are
+  pinned in `test_differential.py`. The base sweeps give R11's counts.)*
 - **`SEEK_END`.** The generator never issues end-relative seeks. Add them,
   including after an oversized `peek()`, to catch R04-class defects.
   *(Done with R04: a separate seed block from 1,000,000, so lower seeds are

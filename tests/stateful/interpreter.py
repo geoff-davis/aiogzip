@@ -55,6 +55,8 @@ TEXT_INLINE_LIMIT = 8192
 # Text seeks, which BC11 makes transactional: a failure either changes nothing
 # or makes the reader terminal.
 TEXT_SEEK_OPS = frozenset({"seek_abs", "seek_rel", "seek_back", "seek0", "seek_mark"})
+# Events whose first outcome is the outcome of ``op["call"]``.
+PARKED_EVENTS = frozenset({"overlap", "close_during", "cancel"})
 
 
 class InjectedAbort(Exception):
@@ -1102,7 +1104,10 @@ def symbolic(events: list[Event], workdir: str | None = None) -> list[Any]:
     trace = []
     for event in events:
         name = event.op["op"]
-        row = [event.index, name, outcome(event.outcome, name)]
+        # A parked event's first outcome is its call's: a cookie seek there
+        # returns a cookie like a direct one.
+        first = event.op["call"]["op"] if name in PARKED_EVENTS else name
+        row = [event.index, name, outcome(event.outcome, first)]
         if event.second is not None:
             row.append(outcome(event.second, event.op.get("call", {}).get("op", name)))
         if event.parked is not None:
@@ -1236,6 +1241,9 @@ def recorded_run(
         run_record["losses"] = checker.losses
         run_record["f1a"] = checker.f1a
         run_record["replays"] = checker.replays
+        if checker.unmodeled:
+            # Only when present, so records from before it stay valid.
+            run_record["unmodeled"] = checker.unmodeled
     return run_record
 
 
