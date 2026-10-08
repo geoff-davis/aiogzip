@@ -30,7 +30,22 @@ from typing import Any, Callable
 
 from generator import write_payload
 
-SCENARIO_TIMEOUT = 30.0
+# A hang bound, not a performance bound. Seed 734 (7-byte reads of about
+# 250 KB through a native file) takes about 2 s locally but over 30 s on a slow
+# Windows runner. Stays below pyproject's faulthandler_timeout, so the
+# scenario records its own timeout before pytest dumps stacks.
+SCENARIO_TIMEOUT = 90.0
+# After a timeout, the scenario's own tasks get CLEANUP_GRACE to settle once
+# the gate opens before they are cancelled; CLEANUP_TIMEOUT bounds the whole
+# cleanup, including the handle's close.
+CLEANUP_GRACE = 2.0
+CLEANUP_TIMEOUT = 10.0
+# How long a parked executor worker waits for its release. The scenario
+# deadline releases the gate, so this only bounds a worker whose loop has
+# died. Fixed at import: a test that shortens SCENARIO_TIMEOUT must not make a
+# parked worker give up without running its call, which would leave a native
+# call no exit or close could ever settle.
+PARK_TIMEOUT = SCENARIO_TIMEOUT + CLEANUP_TIMEOUT
 INLINE_LIMIT = 64
 # Text payloads are at most a few thousand characters, so text stays inline:
 # the differential compares returned text exactly, not by digest.
@@ -50,6 +65,7 @@ class Gate:
 
     def __init__(self) -> None:
         self.armed = False
+        self.expired = False
         # What the call that parked was sending: set at park, taken by the
         # next landed event.
         self.parked: dict[str, Any] | None = None
@@ -85,11 +101,21 @@ class Gate:
         self.release_async = asyncio.Event()
         self.release_thread = threading.Event()
         self.ran = threading.Event()
+        if self.expired:
+            # Past the deadline every park is released at once: an op that
+            # outlives the timeout must never wait for a release already spent.
+            self.release_async.set()
+            self.release_thread.set()
 
     def release(self) -> None:
         self.armed = False
         self.release_async.set()
         self.release_thread.set()
+
+    def expire(self) -> None:
+        """Release now and every later arming: the scenario deadline passed."""
+        self.expired = True
+        self.release()
 
 
 # Loop turns allowed for a cancellation or abort to settle on-loop before the
@@ -159,7 +185,7 @@ class GatedExecutor(concurrent.futures.ThreadPoolExecutor):
         def parked():
             self.loop.call_soon_threadsafe(entered.set)
             try:
-                if not release.wait(SCENARIO_TIMEOUT):
+                if not release.wait(PARK_TIMEOUT):
                     raise TimeoutError("gated executor was never released")
                 start = _native_offset(fn) if record["method"] == "read" else None
                 origin = _seek_origin(fn) if seek is not None else None
@@ -573,16 +599,54 @@ async def _parked(handle, op, gate: Gate, partner, text: dict[str, Any] | None):
         return await task, Outcome("skipped", "call did not reach the source")
     second = await partner(task)
     await settle_then_release(gate, task)
-    try:
-        first = await task
-    except asyncio.CancelledError:
-        first = Outcome("cancelled")
+    first = await _parked_outcome(task)
     return first, second
+
+
+async def _parked_outcome(task: asyncio.Task) -> Outcome:
+    """The parked call's outcome; its cancellation is ``cancelled``.
+
+    A cancellation of the awaiting scenario itself (its deadline) propagates:
+    recording it as the call's outcome would let an overdue run finish.
+    """
+    try:
+        return await task
+    except asyncio.CancelledError:
+        current = asyncio.current_task()
+        if current is not None and current.cancelling():
+            raise
+        return Outcome("cancelled")
 
 
 async def _cancel_partner(task):
     task.cancel()
     return Outcome("ok", "cancel requested")
+
+
+async def _settle_after_timeout(handle) -> Outcome:
+    """Settle a timed-out scenario's own tasks, then close its handle.
+
+    Windows cannot remove a file that is still open, so an abandoned handle
+    would hide the timeout behind a temporary-directory cleanup error. Closing
+    before the scenario's tasks settle could meet a reservation one of them
+    still holds. A worker stuck past the bound is left to the faulthandler
+    watchdog; the returned outcome records the cleanup failure.
+    """
+    current = asyncio.current_task()
+    tasks = {task for task in asyncio.all_tasks() if task is not current}
+    try:
+        async with asyncio.timeout(CLEANUP_TIMEOUT):
+            if tasks:
+                _done, pending = await asyncio.wait(tasks, timeout=CLEANUP_GRACE)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    await asyncio.wait(pending)
+            if not handle.closed:
+                await handle.close()
+    except Exception as error:  # noqa: BLE001 - recorded, not raised
+        return Outcome("error", error=error)
+    return Outcome("ok", "closed" if handle.closed else "open")
 
 
 PARKED_OPEN_FAULTS = ("cancel_open", "overlap_open", "overlap_close")
@@ -659,7 +723,7 @@ async def run(
             if gate.parked["via"] == "native" and gate.release_thread.is_set():
                 # Let a released native call finish, so its witness is final
                 # and no worker still touches the file during the next op.
-                gate.ran.wait(SCENARIO_TIMEOUT)
+                gate.ran.wait(PARK_TIMEOUT)
             event.parked, gate.parked = gate.parked, None
             taken = event.parked.pop("taken", None)
             if taken is not None:
@@ -816,10 +880,7 @@ async def run(
             else:
                 second = await _call(handle.close())
             await settle_then_release(gate, task)
-            try:
-                first = await task
-            except asyncio.CancelledError:
-                first = Outcome("cancelled")
+            first = await _parked_outcome(task)
         land(Event(-1, op, first, second))
         if first.kind == "cancelled":
             first = await _call(handle.open())
@@ -831,10 +892,7 @@ async def run(
         note = None
         pending = abort.pending  # type: ignore[attr-defined]
         if pending is not None:
-            try:
-                second = await pending
-            except asyncio.CancelledError:
-                second = Outcome("cancelled")
+            second = await _parked_outcome(pending)
         elif abort.first is not None:  # type: ignore[attr-defined]
             second = abort.first  # type: ignore[attr-defined]
             note = "unparked"
@@ -884,13 +942,27 @@ async def run(
         if not handle.closed:
             land(Event(len(ops), {"op": "cleanup_close"}, await _call(handle.close())))
 
+    # Open the gate at the deadline itself, not after the timeout lands, and
+    # keep it open: cancelling the body can run a context exit that waits for
+    # a parked native call to settle (BC1), that call runs only once released,
+    # and an op still running past the deadline may park another.
+    deadline = asyncio.get_running_loop().call_later(SCENARIO_TIMEOUT, gate.expire)
+    scope = asyncio.timeout(SCENARIO_TIMEOUT)
     try:
-        async with asyncio.timeout(SCENARIO_TIMEOUT):
-            await drive()
-    except TimeoutError:
-        gate.release()
-        land(Event(len(ops) + 1, {"op": "timeout"}, Outcome("error")))
+        try:
+            async with scope:
+                await drive()
+        except TimeoutError:
+            if not scope.expired():
+                raise
+        # An op that records the deadline's cancellation as its own outcome
+        # can let the body finish; an expired deadline still fails the run.
+        if scope.expired():
+            gate.release()
+            cleanup = await _settle_after_timeout(handle)
+            land(Event(len(ops) + 1, {"op": "timeout"}, Outcome("error"), cleanup))
     finally:
+        deadline.cancel()
         gate.release()
     final: dict[str, Any] = {"closed": handle.closed}
     if source is not None:
