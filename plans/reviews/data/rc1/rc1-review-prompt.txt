@@ -1,0 +1,78 @@
+aiogzip RC1 readiness review (read-only)
+
+You are reviewing aiogzip, an asyncio gzip library, as released in
+v2.0.0b2 (tag v2.0.0b2, commit 962bfe4; the repository checkout at
+/home/geoff/Projects/personal/aiogzip). The maintainer wants an independent
+code review that produces a prioritized to-do list for 2.0.0rc1. A second
+reviewer is doing the same review independently; do not coordinate.
+
+Rules
+- Read-only. Do not edit, commit, push, open issues or PRs, change settings,
+  run benchmarks or timing runs, or install anything into the project venv.
+- You may read any file and run fast read-only commands (git, grep, the test
+  suite in focused form if useful). Do not run `uv run` in a different
+  checkout or worktree.
+- Every finding needs concrete evidence: file:line references, and a
+  reproduction or a precise failure scenario where you claim a defect. Say
+  "consistent with" rather than asserting causes you have not shown.
+
+Scope
+- src/aiogzip/ (the whole library: codec.py, _binary.py, _text.py,
+  _source_io.py, _streaming.py, _inspection.py, _opening.py, the factory and
+  public API), plus packaging (pyproject.toml), docs/, the public API
+  manifest tests/data/public_api_2_0.json, CI (.github/workflows/), and the
+  test suite's ability to catch regressions (tests/, tests/stateful/).
+- Treat the 2.0 public API as frozen (docs/stability.md). A finding that
+  needs a public API change must say so and is a candidate for 2.0.0b3, not
+  RC1.
+
+Context to read first
+- CLAUDE.md (architecture, invariants, gotchas)
+- plans/design/v2.0.0b2-file-state-model.md (file-handle state model)
+- plans/reviews/v2.0.0b2-behavior-exceptions.md (approved b1 differences
+  BC1-BC10)
+- plans/reviews/v2.0.0b2-candidate-review.md (G19 findings F1-F3, N1-N3,
+  and remaining limitations)
+- plans/reviews/v2.0.0b2-post-release.md (RC handoff, follow-ups)
+- plans/RELEASE_2_0_0B2_PLAN.md sections 17 and 18 (RC handoff and deferred
+  opportunities)
+
+Already known (do not re-report; you may add new evidence or disagree with a
+disposition, labelled as such):
+- F2: cancelling close() does not wait for the underlying native close.
+- F3: concurrent tell() during readlines() is not a transactional cookie.
+- Windows stateful seed 734 exceeds SCENARIO_TIMEOUT and the harness does
+  not close the handle on timeout.
+- publish.yml uses moving action tags.
+- The plan section 18 deferred opportunities, AnyIO/Trio (#71) and indexed
+  access (#72).
+
+Questions to answer
+1. Correctness: any path that can lose, duplicate, reorder or misreport data,
+   leak or double-close a resource, hang, or leave a handle in a state the
+   file-state model does not allow?
+2. Cancellation and concurrency: does every await point preserve the
+   documented ownership and settlement rules?
+3. Error handling: are errors wrapped and chained as documented (OSError with
+   context, `from e`), with no swallowed exceptions?
+4. Resource limits and hostile input: decompression limits, member/header
+   parsing, memory growth, pathological chunk sizes.
+5. API and documentation: does behavior match docs/ and docstrings; are
+   there contract gaps an RC should close (without API changes)?
+6. Tests and CI: important behavior that no test pins; flaky or
+   platform-sensitive tests; CI gaps for an RC (Python versions, platforms,
+   engines, dependency floors).
+7. Packaging and release: metadata, sdist/wheel contents, release workflow
+   risks.
+8. Maintainability: dead code, duplicated logic that has drifted, private
+   seams that make future fixes risky. Only where it matters for RC.
+
+Output
+A prioritized to-do list. For each item:
+- ID, title, and category: RC1-blocker / should-fix-before-RC1 /
+  nice-to-have / defer-past-2.0 / needs-API-change (b3 candidate).
+- Severity (high / medium / low / note) and confidence.
+- Evidence (file:line, reproduction or failure scenario).
+- Suggested fix and how to test it.
+End with a short overall assessment: is the codebase ready to start RC1 work
+once the list is done, and what are the top three items?

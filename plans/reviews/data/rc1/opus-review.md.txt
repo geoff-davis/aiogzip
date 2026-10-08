@@ -1,0 +1,110 @@
+Reviewer: fresh Claude Opus 5.5 subagent (model claude-opus-5-5), read-only,
+2026-10-08, brief rc1-review-prompt.txt. Its final report follows as relayed
+to the implementing session; the content is the reviewer's, but layout was
+re-entered by hand and may differ slightly in formatting.
+
+## aiogzip v2.0.0b2 — RC1 readiness review (Opus, independent)
+
+Read-only throughout. Scratch repros live in `/tmp/claude-1000/rc1-opus-review/` (`r1_cookie_seek.py`, `r2_plain_seek.py`, `r4_cancel_seek.py`, `r5_native_cancel.py`, `src_mem.py` — a seekable test source whose next read can be made to fail without consuming); all run with the project venv (`.venv/bin/python <script>`).
+
+Note: during the review another session switched the checkout to branch `chore/urllib3-2.8.0` (commit a7d9aff, uv.lock only). `src/` is unchanged from the b2 tag; `__version__` still reads "2.0.0b2". `plans/reviews/v2.0.0b2-post-release.md` no longer exists in the working tree.
+
+---
+
+### RC1-01 — Failed or cancelled text `seek()` leaves stale text over a moved binary position; subsequent reads silently return corrupted data
+- **Category:** RC1-blocker · **Severity:** high · **Confidence:** high (reproduced deterministically)
+- **Evidence:**
+  - `_text.py:557-606`: cookie path awaits `self._binary_file.seek(origin_offset)` (~l.591) and only *afterwards* resets decoder/buffer/origin; no exception/cancellation handling in between.
+  - `_seek_to_plain_position` (`_text.py:948-1009`) replays/decodes and only at the end clears `_text_buffer` and sets the origin (l.1003-1009); a failure/cancel mid-way leaves the old buffer + origin.
+  - Binary layer reports its new position and remains HEALTHY ("Failure after rewind has already occurred: report post-rewind position" — state-model doc row at line 419 covers binary only).
+  - The text-origin transition table (state model l.205-219) has no row for a failed/cancelled text seek — the model is silent.
+- **Repro 1 (cookie seek, transient no-effect source failure — r1):** 400 lines, read 30 lines, `tell()`, read 40 more, make next source read fail, `seek(cookie)` → OSError. Afterwards binary position 0, health HEALTHY; `read()` returns `'lineline 0000\nline 0001...'` instead of `'line 0030\n...'`.
+- **Repro 2 (forward plain seek — r2):** next line returned is a stale fragment `'00003 35bf9a…'` followed by `'00017 …'` — lines 3–16 silently skipped.
+- **Repro 3 (cancellation, ordinary API):** r4 (custom source, cancel `seek(cookie)` after 0.5-2 ms) → `'lineline 0000…'` / `'line0\nline 0011…'`, HEALTHY. r5 (real on-disk file opened by path, native aiofiles, 200k lines, `chunk_size=4096`): read 5 lines, start `seek(40*150000)`, cancel after 0.5–20 ms, `read(8000)` returns the stale buffered lines 5.. then jumps directly to wherever binary stopped — malformed/non-contiguous output, no indication. So `async with asyncio.timeout(...): await f.seek(...)` on an ordinary file can silently lose data.
+- **Not a b2 regression:** identical results on v2.0.0b1 and v1.11.0 for r1/r2.
+- **Why the stateful harness misses it:** `tests/stateful/model.py:875-890` `handle_error` for a failed text seek assumes "rewind_ok → position 0" then calls `widen()`; text payloads are ≤3000 chars (`generator.py:376`) and there is no cancel-during-seek-with-replay event.
+- **Suggested fix (no public API change):** In `AsyncGzipTextFile.seek` wrap the binary seek + replay in `try/except BaseException`: on any exception, invalidate text state before re-raising — clear `_text_buffer`/pending lines, reset decoder, and either (a) mark text poisoned (`_read_poison_seen` / `_read_poisoned`) so reads refuse until `seek(0)` (preferred; matches BC2/BC10 semantics and `seek(0)` recovery is already guaranteed), or (b) re-anchor origin to the binary layer's reported position with a fresh decoder (only valid if that position is a character boundary — riskier). Same in `_seek_to_plain_position`: clear buffer *before* replay, not after. Add a state-model row and a ledger entry (BC11) since post-failure behavior changes from "wrong data" to "refusal until seek(0)".
+- **Test:** parametrize r1/r2/r4 over cookie and plain targets × {no-effect failure, consumed failure, cancellation, decompression limit}; assert the next read either returns the exact correct continuation or raises — never wrong text. Add native-file cancellation test (r5 style). Add a "cancel during seek_mark / seek_abs" event to the stateful generator with payloads > one chunk; tighten `model.handle_error` so a failed text seek demands refusal or exact content instead of `widen()`.
+
+### RC1-02 — `inspect()`/`verify()` open the file themselves, bypassing BC3 open settlement and native-call settlement
+- **Category:** should-fix-before-RC1 · **Severity:** medium · **Confidence:** medium (code path certain; leak not reproduced — timing dependent)
+- **Evidence:** `_inspection.py:55` `source = await aiofiles.open(filename, "rb")` and `_inspection.py:69` `await source.read(chunk_size)` directly — not through `_opening._acquire_path` / BC3's settled open, nor through `_source_io._NativeSourceCall`.
+- **Failure scenario:** cancel `inspect(path)` while aiofiles' executor `open()` is running → the thread's file object is never returned/closed (the BC3/F3 "ownerless resource" class b2 fixed for `AsyncGzipFile`, not here). Cancel during a native `read`: closing the source can run while the executor read is still active (BC1/BC9 class). Existing test (`tests/test_inspection.py:553`) only covers a source that raises CancelledError synchronously.
+- **Fix:** reuse `_acquire_path` (or its settlement helper) for the open, and route reads through the same native-call settlement the binary reader uses.
+- **Test:** gated-executor fixture (as in `tests/stateful/interpreter.py` Gate/GatedExecutor): park the open / a read, cancel, assert no live FD and no close-before-settle.
+
+### RC1-03 — CI action pins in ci.yml and docs.yml are still moving tags
+- **Category:** should-fix-before-RC1 · **Severity:** low · **Confidence:** high
+- **Evidence (new beyond the publish.yml known item):** `.github/workflows/ci.yml:33,36,67,70,106,110,149,157,173,176,207,227,230,283` (`actions/checkout@v7`, `setup-python@v7`, `upload-artifact@v7`, `download-artifact@v8`, coverage-comment `@v3`); `docs.yml` (`checkout@v7`, `setup-python@v7`, `cache@v6`). Only `setup-uv@v10.0.1` is pinned. Global convention requires exact tags.
+- **Fix:** pin exact tags (Dependabot already groups action updates). Same change as the publish.yml fix.
+
+### RC1-04 — PyPI artifacts are rebuilt with a different toolchain than the attested release artifacts
+- **Category:** should-fix-before-RC1 · **Severity:** medium · **Confidence:** medium
+- **Evidence:** release evidence is built with `uv build` in a detached worktree (`scripts/build_release_artifacts.py:207`) and its hashes recorded in `plans/reviews/v2.0.0b2-release-prep.md:80-83`/`:325-332`; `publish.yml` publish job instead runs `python -m build` (resolves `flit_core>=3.11,<5` fresh from PyPI), with SOURCE_DATE_EPOCH from CHANGELOG, then uploads — no hash comparison against the evidence, no smoke install of the built dist. The publish test job runs only Linux 3.12 with unpinned `pip install -e .[dev,csv,fast]` and no retry.
+- **Consequence:** the uploaded files are consistent with matching the evidence only when tool versions and timestamps coincidentally agree; the release-prep doc itself leaves provenance verification as a manual follow-up.
+- **Fix:** in publish.yml build with the same command and pinned tool versions as the evidence and fail the job if SHA-256s differ from a hash file committed with the release record (or run `scripts/smoke_installed_artifact.py` on `dist/*` before upload). Add the git-fetch retry required by conventions.
+- **Test:** dry-run the workflow on a test tag (TestPyPI) comparing hashes.
+
+### RC1-05 — CI matrix gaps for an RC
+- **Category:** should-fix-before-RC1 · **Severity:** low · **Confidence:** high
+- **Evidence:** `ci.yml:94-100`: Windows and macOS run 3.12 only; `ci.yml:366-376` fast-engine only Linux 3.12/3.14 + Windows (no macOS zlib-ng); minimum-dependencies only 3.11 (`ci.yml:232,301`); publish test job only 3.12 (`publish.yml:24`). 3.14 classifier claimed (`pyproject.toml:24`) but never exercised on Windows/macOS, where native-settlement/executor-shutdown paths are most platform-sensitive. The `ci.yml:138` comment says "~91%" vs CLAUDE.md ~93%.
+- **Fix:** add Windows+macOS 3.14 legs (or a nightly/`workflow_dispatch` full matrix before rc1); update branch-protection contexts (CLAUDE.md gotcha). Refresh the coverage comment.
+
+### RC1-06 — Abort-path cancellation count can leak when a custom source does not raise CancelledError
+- **Category:** nice-to-have · **Severity:** low · **Confidence:** medium (code path, not reproduced)
+- **Evidence:** `_finish_abort` calls `owner.cancel()` (`_binary.py:2165`); the matching `owner.uncancel()` is consumed only if the owner's call ends in `CancelledError` (`_binary.py:1829-1836`, likewise sink 1917). A custom source that catches CancelledError and returns data or raises OSError (contract violation) leaves the owner task's `cancelling()` count at 1; an enclosing `asyncio.timeout()`/TaskGroup in that task can then misclassify a later timeout as external cancellation (TimeoutError → CancelledError).
+- **Fix:** in `_call_custom_source`/`_call_custom_sink`, when `_source_abort_requested` is set and the call completes/fails without CancelledError, still `uncancel()` once in `finally`.
+- **Test:** source that swallows cancellation, inside `asyncio.timeout`; assert `current_task().cancelling() == 0` after the context exit.
+
+### RC1-07 — Context-exit abort silently swallows secondary errors
+- **Category:** nice-to-have · **Severity:** low · **Confidence:** high
+- **Evidence:** `_binary.py:1541-1542` `except BaseException: pass` and `_binary.py:1557-1560` `except Exception: pass`. If the abort's close fails (e.g. sink close raises), it vanishes entirely.
+- **Fix:** keep primary-exception precedence but attach the secondary via `add_note(...)` (3.11+), as the codec already does elsewhere; no API change (exception types unchanged).
+- **Test:** sink whose close raises inside a raising body; assert the note.
+
+### RC1-08 — Custom-sink exceptions are inconsistently wrapped between `write()` and `flush()`
+- **Category:** needs-API-change (b3 candidate) or ledger entry · **Severity:** low · **Confidence:** high
+- **Evidence:** `_write_reserved` (`_binary.py:1140-1174`): a non-OSError from a custom sink propagates unwrapped; `_flush_writer` (`_binary.py:2001-2040`) wraps the same failure as `OSError("Unexpected error during flush")`; reads wrap as "Error reading from file". docs/errors.md describes OSError wrapping without noting the asymmetry.
+- **Fix for RC1:** document current behavior in errors.md; unifying changes observable exception types → b3.
+
+### RC1-09 — `readinto()` is not capped as `_common.py` claims
+- **Category:** nice-to-have (doc/comment) · **Severity:** note · **Confidence:** high
+- **Evidence:** `_common.py:32-35` says `_MAX_CHUNK_SIZE` caps "chunk_size/peek/readinto arguments"; only `peek` checks it (`_binary.py:726`). `readinto` (`_binary.py:791-823`) fills an internal buffer up to `len(b)` — a caller-supplied 1 GiB buffer drives ~1 GiB of extra internal buffering. Bounded by the caller's own allocation, so not a hostile-input issue.
+- **Fix:** correct the comment, or fill in ≤`_MAX_CHUNK_SIZE` pieces without changing results.
+- **Test:** `readinto` with a large memoryview + decompressed-size limit; assert peak internal buffer ≤ `_MAX_CHUNK_SIZE`.
+
+### RC1-10 — CLI prints a traceback for non-OSError failures
+- **Category:** nice-to-have · **Severity:** low · **Confidence:** high
+- **Evidence:** `__main__.py:78` catches only `(gzip.BadGzipFile, OSError, EOFError)`; `ValueError` (limits/args), `TypeError`, `RuntimeError` escape as a traceback and `--json` output is no longer JSON.
+- **Fix:** add an `except Exception` branch emitting the same `{"ok": false, ...}` with exit 2.
+- **Test:** CLI `main()` with a monkeypatched `verify` raising RuntimeError.
+
+### RC1-11 — Decoder relies on private aiofiles internals with no upper version bound
+- **Category:** defer-past-2.0 (note for RC) · **Severity:** low · **Confidence:** high
+- **Evidence:** `_opening.py` uses `aiofiles.threadpool.sync_open`/`wrap`; `_binary.py`/`_source_io.py` use `_file`, `_loop`, `_executor`, exact delegate types via `_is_native_source`; `pyproject.toml:31` `aiofiles>=23.2.1`. Unpinned CI mitigates (a breaking aiofiles release would surface in CI).
+- **Fix for RC:** graceful degradation to "custom source" semantics if attributes are missing, tested by monkeypatching attributes away; or document the coupling in contributing.md.
+
+### RC1-12 — `inspect()` member records and buffered header metadata are unbounded
+- **Category:** defer-past-2.0 (plan §18 resource policy) · **Severity:** low · **Confidence:** high
+- **Evidence:** `inspect()` collects one `GzipMemberInfo` per member (`collect_members=True`); a hostile file of many empty members (~20 bytes each) grows memory linearly regardless of `max_decompressed_size`. Each header's FNAME/FCOMMENT/FEXTRA is buffered up to 128 MiB (`_gzip_header.py:99-103`). docs/api.md notes member-count growth only for codec collection.
+- **Fix for RC:** document for `inspect()` too; a limit parameter is an API change (b3/2.1).
+
+### RC1-13 — Small doc/contract notes
+- **Category:** nice-to-have · **Severity:** note
+- (a) `__anext__` on a closed handle raises StopAsyncIteration (`_binary.py:2215`, `_text.py:1729`) while errors.md says closed-file operations raise ValueError — established b1 behavior; document as the exception.
+- (b) `flush()` on an unopened write handle returns silently (`_binary.py:1997`) — document or keep.
+- (c) Read-mode negative-position seek raises OSError whereas stdlib gzip clamps to 0 — pre-existing; document.
+- (d) Retrying after `UnicodeDecodeError` skips the undecodable chunk, identical to stdlib `gzip.open('rt')` (my r3: 275/300 lines both) — add one sentence to errors.md ("do not retry after a decode error; seek(0)").
+
+---
+
+### Disagreement with a known item (labelled)
+On the Windows seed-734 timeout: agree with the disposition, but RC1-01 shows the stateful model's `widen()` after a failed seek (`model.py:875-890`) is too permissive — it doesn't check data-loss outcomes there. Recommend tightening it as part of RC1-01, not separately.
+
+### Overall assessment
+The codec, binary reader, settlement and ownership machinery are careful, well tested, and documented in detail; I found no new defect in `codec.py`, `_codec_async.py`, `_source_io.py`, or the binary health model. The codebase is **ready to start RC1 work once RC1-01 is addressed** — it is a silent data-corruption path reachable with an ordinary on-disk file and `asyncio.timeout` around a text `seek()`. It predates b2, but an RC should not ship with it, and it is privately fixable (poison/re-anchor text state on seek failure plus a ledger entry).
+
+**Top three:**
+1. **RC1-01** — make text seek failure/cancellation invalidate text state; tighten the stateful model to catch it.
+2. **RC1-02** — give `inspect()`/`verify()` the same BC3 open and native-read settlement.
+3. **RC1-04 + RC1-03** — make the published artifacts provably the attested ones and pin all workflow actions exactly (plus the RC1-05 3.14 Windows/macOS legs before tagging rc1).

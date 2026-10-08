@@ -1,0 +1,73 @@
+Reviewer: Codex (pane w7:p1; footer GPT-6.1-Sol medium; self-reported "GPT-6 (Codex)"),
+read-only, 2026-10-08, brief rc1-review-prompt.txt. Final message extracted
+verbatim from the Codex session transcript
+(trailing whitespace stripped by the pre-commit hooks).
+
+Model: GPT-6 (Codex); an exact build/version identifier is not exposed in this session.
+
+Reviewed `v2.0.0b2` at **962bfe479a36d57df28f26cc4395c3f79eb96bc7**. The current branch differs only in tracked `uv.lock` changes updating urllib3; source, tests, docs, packaging and workflows match the tag. Untracked files were left untouched, and I did not consult the other reviewer’s output.
+
+Focused codec, header, export and public-contract tests passed **240 tests, 1 skipped on each engine**. The findings below include three controlled reproductions.
+
+1. **RC1-01 — Settle inspection and verification I/O before releasing ownership**
+
+   **Category:** RC1-blocker
+   **Severity:** high · **Confidence:** high
+
+   **Evidence:** [_inspection.py:55](/home/geoff/Projects/personal/aiogzip/src/aiogzip/_inspection.py:55) awaits `aiofiles.open()` directly, before entering cleanup protection. [_inspection.py:69](/home/geoff/Projects/personal/aiogzip/src/aiogzip/_inspection.py:69) also awaits native reads directly, then closes the source in `finally` without settling the read.
+
+   A controlled executor reproduced both paths for **`inspect()` and `verify()`**:
+
+   - Cancellation during acquisition propagates before completion; a late acquisition receives no explicit close.
+   - Cancellation during a committed read permits cleanup to close the source before the remaining worker access, which then raises `ValueError`.
+
+   Actual descriptor lifetime can depend on garbage collection; the demonstrated defect is missing deterministic ownership and settlement. The real-thread probe could not complete in this sandbox. Existing cancellation coverage uses a cooperative fake reader, so it misses these boundaries ([test_inspection.py:553](/home/geoff/Projects/personal/aiogzip/tests/test_inspection.py:553)).
+
+   **Fix/test:** Reuse settled acquisition and native-call ownership for the scanner. Add gated acquisition and started-read tests for both APIs, including repeated cancellation and borrowed sources. Assert late acquisitions close once and source cleanup occurs only after the worker’s last access.
+
+2. **RC1-02 — Calculate `SEEK_END` correctly when EOF is known but data remains buffered**
+
+   **Category:** RC1-blocker
+   **Severity:** medium · **Confidence:** high
+
+   **Evidence:** [_binary.py:603](/home/geoff/Projects/personal/aiogzip/src/aiogzip/_binary.py:603) drains buffered output only inside `while not self._eof`. A sufficiently large `peek()` can establish EOF while leaving all plaintext unread.
+
+   Reproduced with a valid ten-byte payload:
+
+   ```text
+   peek(100)                 -> b'abcdefghij'
+   seek(0, SEEK_END)          -> 0
+   read()                    -> b'abcdefghij'
+   ```
+
+   After consuming one byte first, the same sequence reports position **1**, rather than **10**. This misreports the endpoint and leaves readable data after an ostensibly successful seek to EOF. The same branch exists in b1. Current endpoint tests start with fresh handles ([test_binary_io.py:339](/home/geoff/Projects/personal/aiogzip/tests/test_binary_io.py:339)); the stateful generator does not exercise `SEEK_END`.
+
+   **Fix/test:** Account for unread buffered output even when `_eof` is already true. Test zero, negative and positive end-relative offsets after oversized `peek()` and partial consumption, on physical and cached rewind sources. Add end-relative seeks to the stateful interpreter/model.
+
+3. **RC1-03 — Bound text `writelines()` storage for empty inputs**
+
+   **Category:** should-fix-before-RC1
+   **Severity:** medium · **Confidence:** high
+
+   **Evidence:** [_text.py:2136](/home/geoff/Projects/personal/aiogzip/src/aiogzip/_text.py:2136) appends each empty string to `pending`, while the flush threshold counts only characters. This contradicts the bounded-memory claim in [docs/api.md:249](/home/geoff/Projects/personal/aiogzip/docs/api.md:249).
+
+   A generator of empty strings with `chunk_size=64` retained **10, 1,000 and 10,000 pending entries** at those respective input counts, while producing zero plaintext. Retention therefore grows with input count rather than batch size. This is inherited from b1.
+
+   **Fix/test:** Bound retained empty entries or coalesce them while preserving empty-write encoder semantics. Test long empty runs, mixed empty/nonempty inputs, iterator failure, and UTF-16/UTF-32 BOM behavior. Pin an item-count bound directly; timing measurements are unnecessary.
+
+4. **RC1-04 — Publish the exact artifacts that passed artifact validation**
+
+   **Category:** should-fix-before-RC1
+   **Severity:** medium · **Confidence:** high for the workflow gap; no artifact discrepancy reproduced
+
+   **Evidence:** [publish.yml:71](/home/geoff/Projects/personal/aiogzip/.github/workflows/publish.yml:71) installs fresh build tools and rebuilds artifacts in the publishing job. Those files receive metadata checks but no installed-artifact smoke or comparison with the approved artifact hashes. The backend range remains broad ([pyproject.toml:2](/home/geoff/Projects/personal/aiogzip/pyproject.toml:2)).
+
+   A backend/tool change can therefore produce uploaded bytes differing from the artifacts previously validated, without failing publication. `SOURCE_DATE_EPOCH` alone does not establish artifact identity.
+
+   **Fix/test:** Build once, validate those wheel/sdist files, then promote the same files to publishing with verified SHA-256 values. Add a negative check proving an altered artifact cannot reach the upload step. This implements the existing §17 handoff requirement without changing package API.
+
+The requested `plans/reviews/v2.0.0b2-post-release.md` is absent from both the tag and checkout. Consequently, this review could not establish the completed public-publication reconciliation from that record; restore it before declaring the RC handoff complete.
+
+**Overall assessment:** The codebase is ready to start focused RC1 repair work, but I would not approve an RC1 candidate with RC1-01 or RC1-02 unresolved. The shared codec, frozen API checks and existing qualification provide a strong base. None of these findings requires a public API change or inherently requires b3.
+
+The top three items are **inspection/verification settlement**, **buffered-EOF `SEEK_END` correctness**, and **empty-input text batching**. After those repairs, rerun the affected focused tests, both-engine differential evidence and hosted matrix, then qualify the exact RC artifacts.
