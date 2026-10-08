@@ -248,11 +248,13 @@ validation or limits. *(Implemented on `fix/rc1-seek-end`.)*
   locally by swapping in zlib-ng's compressor). At maintainer direction
   (2026-10-08, "Pin oracle + gate replays"): `test_oracle.py` now reads its
   wire from the committed `tests/data/oracle_late_corruption.gz` (SHA-256
-  checked), and the 21 differential tests that depend on recorded wire bytes
-  are skipped where the generator does not reproduce them, decided by one
-  SHA-256 over every recorded seed's wire. `test_recorded_wires_are_reproduced`
-  fails on any non-Windows platform that does not reproduce them, so Linux and
-  macOS cannot skip silently. Branch-protection contexts are added after
+  checked), and `test_differential.py`, whose comparisons replay recorded
+  traces or pinned wire offsets, is skipped as a whole where the generator
+  does not reproduce those wires (`recorded_wires.py`: one SHA-256 over the
+  generated wire of every recorded seed and every seed the module pins).
+  Per-test gating was rejected in Codex review of `f8f6c95` as incomplete.
+  `test_recorded_wires_are_reproduced` fails on any non-Windows platform that
+  does not reproduce them, so Linux and macOS cannot skip silently. Branch-protection contexts are added after
   merge (a required context cannot be satisfied before its job exists on
   `main`), verified by a `gh api` read before R07 closes.
 
