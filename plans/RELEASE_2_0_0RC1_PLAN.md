@@ -64,7 +64,7 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 | R14 | Publication | Release preparation, exact-artifact publication and post-release record, as for b2 |
 | R15 | Cancelled close | A cancelled `close()` or context exit settles the owned native close; no handle reports closed over an open file |
 
-- [ ] R01
+- [x] R01
 - [ ] R02
 - [ ] R03
 - [ ] R04
@@ -154,6 +154,8 @@ rejection test with an active binary read asserts unchanged health, decoder
 and continuation. Mutation check: removing the invalidation must fail the
 tests.
 
+*Closed 2026-10-07: Codex approved, maintainer signed off, merged in PR #114.*
+
 ### R02: stateful model and harness
 
 - **Timeout cleanup.** `tests/stateful/interpreter.py` abandons `drive()`
@@ -175,7 +177,9 @@ tests.
   failed text seek instead of requiring refusal or exact content
   ([`tests/stateful/model.py`](../tests/stateful/model.py)). Tighten it to
   the R01 rule, and add a cancel-during-seek event with payloads larger than
-  one chunk. Text payloads are currently at most 3,000 characters.
+  one chunk. Text payloads are currently at most 3,000 characters. *(The
+  model now treats a failed text seek as `BROKEN`, merged with R01 in PR
+  #114; the larger-payload cancel-during-seek event remains.)*
 - **`SEEK_END`.** The generator never issues end-relative seeks. Add them,
   including after an oversized `peek()`, to catch R04-class defects.
 - Re-record the b1 reference runs (`tests/data/wp10_b1_runs.json`) if the run
