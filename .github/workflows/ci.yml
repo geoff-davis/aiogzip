@@ -193,7 +193,9 @@ jobs:
   # separately.
   fast-engine:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Two full suite runs (zlib-ng, then forced stdlib) take about 15
+    # minutes with the R02 seek-cancel block.
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
