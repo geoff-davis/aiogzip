@@ -954,6 +954,16 @@ it never returns a truncated prefix or reports success for a gzip member that
 can no longer receive its trailer. Cancellation delivered during cleanup still
 propagates, and a failed abortive underlying close leaves the handle reportably
 open so <code>close()</code> can be retried.</p>
+<p>Once a handle has submitted the native close of an aiofiles file it owns (a
+path, or a file object passed with <code>closefd=True</code>), cancellation cannot
+abandon that close: it runs to completion before the cancellation propagates,
+and a close failure becomes the cancellation's <code>__cause__</code>. During an
+abortive exit, the handle is closed only if that close returned normally;
+otherwise it stays reportably open and <code>close()</code> retries. A cancellation that
+arrives before the close is submitted, for example while the exit is still
+waiting for an active call to settle, propagates first and also leaves the
+handle open for <code>close()</code>. Custom file objects' async <code>close()</code> methods are
+cancelled cooperatively, as before.</p>
 <p>Cancellation while a clean context exit is waiting for an active call also
 attempts abortive owned-resource cleanup before the cancellation propagates.</p>
 <p>The maintained examples avoid same-handle overlap entirely: each shard task
