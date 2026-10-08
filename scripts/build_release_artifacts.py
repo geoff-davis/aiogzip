@@ -27,6 +27,7 @@ import argparse
 import hashlib
 import json
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -56,6 +57,21 @@ def _run(
 
 def _output(command: Sequence[str], *, cwd: Path) -> str:
     return _run(command, cwd=cwd, capture=True).stdout.strip()
+
+
+def _source_version(source: Path) -> str:
+    """Read ``__version__`` from the source tree without importing the package.
+
+    Importing ``aiogzip`` needs its runtime dependencies, which the release
+    build environment deliberately does not install.
+    """
+    init = source / "src" / "aiogzip" / "__init__.py"
+    match = re.search(
+        r'^__version__ = "([^"]+)"$', init.read_text(encoding="utf-8"), re.MULTILINE
+    )
+    if match is None:
+        raise SystemExit(f"no __version__ assignment in {init}")
+    return match.group(1)
 
 
 def _members(artifact: Path) -> list[str]:
@@ -242,15 +258,7 @@ def build(ref: str, evidence: Path, python: str) -> dict[str, object]:
                 [*twine, "check", "--strict", str(wheels[0]), str(sdists[0])],
                 cwd=scratch,
             )
-            version = _output(
-                [
-                    python,
-                    "-c",
-                    "import sys; sys.path.insert(0, 'src'); "
-                    "import aiogzip; print(aiogzip.__version__)",
-                ],
-                cwd=source,
-            )
+            version = _source_version(source)
             packaged = _extract_sdist(sdists[0], scratch / "sdist")
             packaged_digests = _require_packaged_trees(packaged, source)
             for artifact, kind, examples_root in (
