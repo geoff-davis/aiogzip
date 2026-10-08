@@ -2210,13 +2210,29 @@ class AsyncGzipBinaryFile:
             if self._file is not None and (self._owns_file or self._closefd)
             else None
         )
+        cancelled_after_close: Optional[asyncio.CancelledError] = None
         if close_file is not None:
             # Do not latch closed until resource cleanup actually succeeds.
-            # A failure or cancellation leaves the broken handle reportably
-            # open so an explicit close() can retry the underlying close.
-            await self._close_underlying(close_file)
+            # A failure, or a cancellation not proven to follow a successful
+            # close, leaves the broken handle reportably open so an explicit
+            # close() can retry the underlying close.
+            try:
+                await self._close_underlying(close_file)
+            except asyncio.CancelledError as cancellation:
+                # A native close is settled before cancellation propagates;
+                # with no cause it succeeded, so the resource is released.
+                # Latch closure, then propagate (BC13).
+                if cancellation.__cause__ is not None or not _is_native_source(
+                    close_file, "close"
+                ):
+                    raise
+                cancelled_after_close = cancellation
         try:
             self._mark_closed()
+        except BaseException as observer_error:
+            if cancelled_after_close is None:
+                raise
+            raise _observer_failure_outcome(cancelled_after_close, observer_error)  # noqa: B904
         finally:
             # A reservation released before closure saw an open handle and
             # kept the decoder; one still active discards it on release.
@@ -2227,10 +2243,18 @@ class AsyncGzipBinaryFile:
                 and self._decoder is not None
             ):
                 self._decoder.discard()
+        if cancelled_after_close is not None:
+            raise cancelled_after_close
 
     @staticmethod
     async def _close_underlying(file: Any) -> None:
         """Close an owned underlying object, awaiting async close methods."""
+        if _is_native_source(file, "close"):
+            # aiofiles' close() is a cancellable executor job: cancelling it
+            # while queued meant the file was never closed. Settle the native
+            # close before cancellation propagates (BC13).
+            await _initial_call(file, "close")
+            return
         close_method = getattr(file, "close", None)
         if callable(close_method):
             result = close_method()
