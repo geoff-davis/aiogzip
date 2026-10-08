@@ -203,7 +203,7 @@ READ_OPS = {
     "next",
     "buffer_read",
 }
-SEEK_OPS = {"seek_abs", "seek_rel", "seek_back", "seek0", "seek_mark"}
+SEEK_OPS = {"seek_abs", "seek_rel", "seek_back", "seek0", "seek_mark", "seek_end"}
 
 
 def text_model(
@@ -732,9 +732,19 @@ class Checker(_HandleChecker):
                 self.transition("cancel_uncertain")
             if moved:
                 self.transition("text_seek_failed")
+            call = op["call"]
+            if call["op"] == "seek_end" and not self.text and self.modeled:
+                # A cancelled end-relative seek stops anywhere in its drain,
+                # or, with a negative offset, in the replay after its rewind.
+                if call["offset"] < 0:
+                    self.position = 0
+                self.widen(len(self.upper))
 
     def handle_call(self, index: int, op: dict[str, Any], outcome) -> None:
         name = op["op"]
+        if self.text and name == "seek_end":
+            self.handle_text_seek_end(index, outcome)
+            return
         self.lifecycle_event("call_starts")
         if name == "buffer_read":
             self.modeled = False
@@ -824,6 +834,25 @@ class Checker(_HandleChecker):
                     f"short of the guaranteed {self.lower}",
                 )
 
+    def handle_text_seek_end(self, index: int, outcome) -> None:
+        """Text ``seek(0, SEEK_END)`` is ``read()`` then ``tell()``.
+
+        It is not a transactional text seek: a failure is the read's failure.
+        Success from a healthy reader means validated EOF.
+        """
+        if outcome.kind != "ok":
+            self.handle_call(index, {"op": "read", "n": -1}, outcome)
+            return
+        self.lifecycle_event("call_starts")
+        if not self.modeled:
+            return
+        if self.health is not HEALTHY:
+            # Retained salvage is served before the refusal; the end is unknown.
+            self.modeled = False
+            return
+        self.position = len(self.upper)
+        self.require_eof(index, "seek_end")
+
     def require_eof(self, index: int, name: str) -> None:
         if self.modeled and not self.at_validated_eof():
             self.fail(index, f"{name} ended at {self.position} without validated EOF")
@@ -848,6 +877,9 @@ class Checker(_HandleChecker):
             return
         if not self.modeled:
             return
+        if name == "seek_end":
+            self.handle_binary_seek_end(index, op, value)
+            return
         if name == "seek_abs":
             targets = [op["target"]] * len(self.candidates)
         elif name == "seek_rel":
@@ -866,6 +898,27 @@ class Checker(_HandleChecker):
             self.fail(index, f"{name} returned {value}, allowed {sorted(allowed)[:4]}")
         if value > len(self.upper):
             self.fail(index, f"{name} moved past the allowed data to {value}")
+        self.position = value
+
+    def handle_binary_seek_end(
+        self, index: int, op: dict[str, Any], value: Any
+    ) -> None:
+        """BC12: an end-relative seek reaches validated EOF, then the target.
+
+        The end counts every byte, including output a ``peek()`` buffered
+        before EOF was known. Only a healthy reader of a clean stream can
+        succeed; a target before the end is reached by a rewind.
+        """
+        end = len(self.upper)
+        target = min(max(end + op["offset"], 0), end)
+        if self.health is not HEALTHY:
+            self.fail(index, f"seek_end succeeded on a {self.health.value} reader")
+        elif not self.expect.clean:
+            self.fail(index, f"seek_end returned {value} without validated EOF")
+        if target < end:
+            self.transition("rewind_ok")
+        if value != target:
+            self.fail(index, f"seek_end returned {value}, expected {target}")
         self.position = value
 
     def seek_target(self, op: dict[str, Any]) -> int | None:
@@ -891,6 +944,13 @@ class Checker(_HandleChecker):
         refused = BROKEN_MESSAGE in message or NOT_SEEKABLE in message
         if op["op"] in SEEK_OPS and self.text and self.cursor_moved is not None:
             self.handle_text_seek_failure(index, op, error)
+            return
+        if op["op"] == "seek_end" and NOT_SEEKABLE in message:
+            # The rewind to an end-relative target is refused only after the
+            # drain reached validated EOF, so the reader stands at the end.
+            self.classify_error(index, op, error)
+            if self.modeled:
+                self.position = len(self.upper)
             return
         if op["op"] in SEEK_OPS and not refused:
             target = self.seek_target(op) if self.modeled else None

@@ -37,6 +37,10 @@ SHORT_WRITES = (None, None, None, 1, 7, 4096)
 # Body corruptions most engines never detect inflate to garbage and fail only
 # at the trailer; those are not body-corruption scenarios, so re-roll.
 MAX_BODY_REROLLS = 400
+# Read scenarios from this seed up also issue end-relative seeks (R02/R04),
+# including after a peek() that reaches EOF. A separate block keeps every
+# lower seed's operations, and the records pinned to them, unchanged.
+SEEK_END_BASE = 1_000_000
 
 
 def b64(data: bytes) -> str:
@@ -279,12 +283,16 @@ def _operations(rng: random.Random, config: dict[str, Any]) -> list[dict[str, An
     rewindable = native or config["source"]["seekable"]
     total = config["payload_size"]
     sizes = (-1, 0, 1, 2, 3, 7, 64, 1000, max(1, total // 3))
+    seek_end = config["seed"] >= SEEK_END_BASE
     if text:
         names = ["read", "readline", "readlines", "next", "tell_mark", "seek_mark"]
         names += ["seek0", "buffer_read"]
     else:
         names = ["read", "read1", "readinto", "peek", "readline", "readlines"]
         names += ["next", "tell", "seek_abs", "seek_rel", "seek_back", "seek0"]
+    if seek_end:
+        names.append("seek_end")
+        sizes += (total + 1,)  # a peek() that reaches EOF
     events = ["overlap", "close_during", "cancel"]
     if custom:
         events += ["fail_no_effect", "fail_consumed"]
@@ -312,6 +320,10 @@ def _operations(rng: random.Random, config: dict[str, Any]) -> list[dict[str, An
             op["delta"] = rng.choice((0, 1, 5, 100))
         elif name == "seek_back":
             op["back"] = rng.choice((1, 10, 1000))
+        elif name == "seek_end":
+            op["offset"] = _seek_end_offset(rng, text, total)
+            if not text and rng.random() < 0.5:
+                ops.append({"op": "peek", "n": total + 1})
         elif name == "tell_mark":
             op["label"] = f"m{marks}"
             marks += 1
@@ -321,7 +333,7 @@ def _operations(rng: random.Random, config: dict[str, Any]) -> list[dict[str, An
             else:
                 op["label"] = f"m{rng.randrange(marks)}"
         elif name in ("overlap", "close_during", "cancel"):
-            op["call"] = _blocking_call(rng, text, rewindable)
+            op["call"] = _blocking_call(rng, text, rewindable, seek_end)
             if name == "overlap":
                 op["second"] = _blocking_call(rng, text)
         ops.append(op)
@@ -331,7 +343,9 @@ def _operations(rng: random.Random, config: dict[str, Any]) -> list[dict[str, An
         and end < 0.2
         and (custom or native)
     ):
-        ops.append({"op": "abort", "call": _blocking_call(rng, text, rewindable)})
+        ops.append(
+            {"op": "abort", "call": _blocking_call(rng, text, rewindable, seek_end)}
+        )
     elif config["acquisition"]["enter"] == "async_with" and end < 0.35:
         ops.append({"op": "raise_exit"})
     elif end < 0.7:
@@ -347,9 +361,17 @@ def _operations(rng: random.Random, config: dict[str, Any]) -> list[dict[str, An
     return ops
 
 
+def _seek_end_offset(rng: random.Random, text: bool, total: int) -> int:
+    if text:
+        return 0  # text allows only a zero end-relative offset
+    return rng.choice((0, 0, -1, -3, -(total // 2), 5, -(total + 10)))
+
+
 def _blocking_call(
-    rng: random.Random, text: bool, rewindable: bool = False
+    rng: random.Random, text: bool, rewindable: bool = False, seek_end: bool = False
 ) -> dict[str, Any]:
+    if seek_end and rng.random() < 0.25:
+        return {"op": "seek_end", "offset": _seek_end_offset(rng, text, 0)}
     if rewindable and rng.random() < 0.25:
         return {"op": "seek0"}
     if text:

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import interpreter
 import pytest
-from generator import generate
+from generator import SEEK_END_BASE, generate
 from interpreter import replay
 from model import LIFECYCLE, READ_HEALTH, make_checker
 from observer import Observer
@@ -32,7 +32,10 @@ REGRESSION_SEEDS = (
     1737, 1754, 1787, 1818, 2105, 2254, 2344, 5767,
 )  # fmt: skip
 assert not set(REGRESSION_SEEDS) & set(range(1000))
-PR_SEEDS = tuple(range(1000)) + REGRESSION_SEEDS
+# End-relative seeks (BC12) live in their own block so lower seeds keep
+# their operations.
+SEEK_END_SEEDS = tuple(range(SEEK_END_BASE, SEEK_END_BASE + 200))
+PR_SEEDS = tuple(range(1000)) + REGRESSION_SEEDS + SEEK_END_SEEDS
 
 # Table rows the generator cannot reach, each with the focused test that
 # covers it instead (path, test function).
@@ -185,3 +188,30 @@ def test_deadline_landing_on_a_parked_call_await_is_recorded(monkeypatch):
     assert events[-1].outcome.value["closed"] is True
     # The parked call (op 1) never lands with the deadline as its outcome.
     assert not [event for event in events if event.index == 1]
+
+
+def _seek_end_ops(scenario):
+    ops = scenario.get("ops", [])
+    return [op.get("call", op) for op in ops if op.get("call", op)["op"] == "seek_end"]
+
+
+def test_only_the_seek_end_block_issues_end_relative_seeks():
+    assert not any(_seek_end_ops(generate(seed)) for seed in range(1000))
+    block = [generate(seed) for seed in SEEK_END_SEEDS]
+    binary = [s for s in block if s["mode"] == "rb"]
+    text = [s for s in block if s["mode"] == "rt"]
+    assert any(op["offset"] < 0 for s in binary for op in _seek_end_ops(s))
+    assert all(op["offset"] == 0 for s in text for op in _seek_end_ops(s))
+    # The R04 shape: a peek() that reaches EOF directly before the seek.
+    assert any(
+        first == {"op": "peek", "n": s["payload_size"] + 1}
+        and second["op"] == "seek_end"
+        for s in binary
+        for first, second in zip(s["ops"], s["ops"][1:], strict=False)
+    )
+    parked = {"cancel", "overlap", "close_during", "abort"}
+    assert any(
+        op["op"] in parked and op["call"]["op"] == "seek_end"
+        for s in block
+        for op in s.get("ops", [])
+    )
