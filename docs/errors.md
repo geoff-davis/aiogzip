@@ -59,10 +59,12 @@ When a custom `fileobj`'s `write()` raises, the two calls report it
 differently:
 
 - `write()` lets the sink's exception propagate unchanged, whatever its type.
-- `flush()` passes the sink's `OSError` through unchanged, but wraps any
-  other `Exception` as `OSError("Unexpected error during flush: ...")`, with
-  the original as `__cause__`. Cancellation and interrupts such as
-  `KeyboardInterrupt` propagate unwrapped.
+- `flush()` wraps any `Exception` that is not an `OSError` as
+  `OSError("Unexpected error during flush: ...")`, with the original as
+  `__cause__`. A sink's `OSError` normally propagates as raised (aiogzip
+  rewrites only one whose message begins with its own internal
+  `Unexpected error during compression flush:` prefix). Cancellation and
+  interrupts such as `KeyboardInterrupt` propagate unwrapped.
 
 Either way the writer is broken afterwards: discard the incomplete output and
 create a new writer. Code that catches a sink's own exception type around
