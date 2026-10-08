@@ -861,6 +861,9 @@ class Checker(_HandleChecker):
             # A BROKEN reader refuses the read, so the seek cannot succeed.
             self.fail(index, "seek_end succeeded on a BROKEN reader")
             return
+        if self.salvage_drained:
+            self.fail(index, "seek_end returned after seek_end drained the salvage")
+            return
         if not self.modeled:
             return
         if self.health is SALVAGE:

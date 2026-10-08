@@ -282,3 +282,27 @@ def test_rewind_after_a_salvage_draining_seek_end_restores_reads():
     checker.handle_call(1, {"op": "seek0"}, Outcome("ok", 0))
     checker.handle_call(2, {"op": "read", "n": 3}, Outcome("ok", checker.upper[:3]))
     assert not checker.violations, checker.violations
+
+
+def test_repeated_seek_end_after_a_salvage_drain_must_refuse():
+    checker = _drained_salvage_checker()
+    checker.handle_call(1, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
+    assert any("drained the salvage" in v for v in checker.violations)
+
+
+def test_repeated_seek_end_refusal_after_a_salvage_drain_is_accepted():
+    checker = _drained_salvage_checker()
+    refusal = OSError(f"{BROKEN_MESSAGE} after failed or cancelled decompression")
+    checker.handle_call(
+        1, {"op": "seek_end", "offset": 0}, Outcome("error", error=refusal)
+    )
+    assert not checker.violations, checker.violations
+
+
+def test_rewind_lets_seek_end_drain_again():
+    checker = _drained_salvage_checker()
+    checker.handle_call(1, {"op": "seek0"}, Outcome("ok", 0))
+    assert not checker.salvage_drained
+    checker.health = Health.VALIDATION_SALVAGE  # a new failure after the rewind
+    checker.handle_call(2, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
+    assert not checker.violations, checker.violations
