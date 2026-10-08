@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Cancelling `close()`, or an `async with` exit, while the underlying file's
+  native close was still queued in the executor could cancel that close, so
+  the handle reported closed while the file stayed open until garbage
+  collection. Once submitted, a library-owned aiofiles close now always
+  runs, and the cancellation propagates after it has finished, with a close
+  failure as its cause. If an exceptional exit's close returns normally this
+  way, the handle is closed rather than left open for a retry. Borrowed files
+  and custom `close()` methods are unchanged.
 - Cancelling `inspect()` or `verify()` while a native open or read was in a
   worker thread could leave a late-opened file unclosed, or close the source
   while the worker was still reading it. The scan now waits for the native

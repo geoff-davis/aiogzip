@@ -329,7 +329,9 @@ review):
   completes but its cancellation propagates.
 
 Mutation check: reverting to aiofiles' `close()` must fail the queued case.
-Timing check deferred to R12.
+Timing check deferred to R12. *(Implemented on `fix/rc1-cancelled-close`;
+ledger BC13. Reverting to aiofiles' `close()` fails 124 of the original 159
+tests in `tests/test_cancelled_close.py`, including every queued case.)*
 
 ## 5. Deferred past RC1
 

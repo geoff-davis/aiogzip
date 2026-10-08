@@ -49,6 +49,7 @@ from ._opening import (
     _acquire_path,
     _initial_call,
     _initial_seekable,
+    _submit_native,
     _write_initial_header,
 )
 from ._source_io import _is_native_source, _NativeSourceCall, _source_position
@@ -2210,13 +2211,30 @@ class AsyncGzipBinaryFile:
             if self._file is not None and (self._owns_file or self._closefd)
             else None
         )
+        cancelled_after_close: Optional[asyncio.CancelledError] = None
         if close_file is not None:
             # Do not latch closed until resource cleanup actually succeeds.
-            # A failure or cancellation leaves the broken handle reportably
-            # open so an explicit close() can retry the underlying close.
-            await self._close_underlying(close_file)
+            # A failure, or a cancellation not proven to follow a successful
+            # close, leaves the broken handle reportably open so an explicit
+            # close() can retry the underlying close.
+            if _is_native_source(close_file, "close"):
+                work = _submit_native(close_file, "close")
+                try:
+                    await _settle_before_cancel(work)
+                except asyncio.CancelledError as cancellation:
+                    # The native close has settled. Latch closure only on
+                    # proof that it returned normally, then propagate (BC13).
+                    if work.cancelled() or work.exception() is not None:
+                        raise
+                    cancelled_after_close = cancellation
+            else:
+                await self._close_underlying(close_file)
         try:
             self._mark_closed()
+        except BaseException as observer_error:
+            if cancelled_after_close is None:
+                raise
+            raise _observer_failure_outcome(cancelled_after_close, observer_error)  # noqa: B904
         finally:
             # A reservation released before closure saw an open handle and
             # kept the decoder; one still active discards it on release.
@@ -2227,10 +2245,18 @@ class AsyncGzipBinaryFile:
                 and self._decoder is not None
             ):
                 self._decoder.discard()
+        if cancelled_after_close is not None:
+            raise cancelled_after_close
 
     @staticmethod
     async def _close_underlying(file: Any) -> None:
         """Close an owned underlying object, awaiting async close methods."""
+        if _is_native_source(file, "close"):
+            # aiofiles' close() is a cancellable executor job: cancelling it
+            # while queued meant the file was never closed. Settle the native
+            # close before cancellation propagates (BC13).
+            await _settle_before_cancel(_submit_native(file, "close"))
+            return
         close_method = getattr(file, "close", None)
         if callable(close_method):
             result = close_method()
