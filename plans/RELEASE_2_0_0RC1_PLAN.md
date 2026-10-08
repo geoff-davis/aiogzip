@@ -282,31 +282,46 @@ behavior.
 b1 and b2).** `_close_underlying` awaits aiofiles' `close()`, which is
 `run_in_executor(file.close)`. If `close()` or an exceptional context exit
 is cancelled while that native close is still queued, asyncio cancels the
-queued job, so the file is never closed. The handle has already marked
-itself closed, so a later `close()` is a no-op and the descriptor stays open
-until garbage collection. With one executor worker kept busy, cancelling
+queued job, so the file is never closed. A normal `close()` has already
+latched the handle closed, so a later `close()` is a no-op and the
+descriptor stays open until garbage collection. (Abort cleanup marks the
+handle closed only after its underlying cleanup succeeds.) With one executor worker kept busy, cancelling
 `close()` on a binary or text handle opened by path leaves
 `raw.closed == False`. G19 F2 recorded only that a cancelled `close()` "can
 return before the native close finishes"; a queued close never runs at all.
 
 **Repair.** Run the owned native close through the settlement used for every
 other native call (`_settle_before_cancel` on an executor call the handle
-submits itself, as `_initial_call` does for opening): cancellation waits for
-the native close to finish, then propagates, with a native close failure as
-its cause (BC1 shape). This covers `close()`, context exit, abort cleanup
-and opening cleanup. Custom async `close()` methods keep their cooperative
-contract. **Behavior change:** BC13, a cancelled `close()` waits for the
+submits itself): a queued close must run, never be prevented by the
+cancellation, and cancellation waits for it to finish, then propagates, with
+a native close failure as its cause (BC1 shape). This covers `close()`,
+context exit and abort cleanup; opening cleanup already settles through
+`_initial_call` and keeps that single ownership path. Preserve aiofiles'
+executor and loop policy, `closefd` ownership, and the existing
+primary-error, cause/context and observer-note rules. Custom async `close()`
+methods keep their cooperative contract. **Behavior change:** BC13, a cancelled `close()` waits for the
 owned native close instead of possibly abandoning it. The changelog and
 `docs/errors.md` say so; the b2 records keep their F2 wording, with a
 pointer to R15.
 
 **Tests.** Gated executor with the close queued and with it running, single
 and repeated cancellation, binary and text, read and write modes, context
-exit and explicit `close()`, owned path and `closefd`/borrowed sources
-(borrowed files are never closed). Assert the raw file is closed exactly
-once before cancellation propagates, and no descriptor remains. Mutation
-check: reverting to aiofiles' `close()` must fail the queued case. Timing
-check deferred to R12.
+exit and explicit `close()`, owned path and `closefd`/borrowed sources.
+Assert exactly one close invocation on an owned file, settled before
+cancellation propagates, and actual closure (no remaining descriptor) when
+that invocation succeeds; borrowed files stay open. Also (Codex plan
+review):
+
+- cancellation during the final trailer write or flush, then a settled close;
+- a native close that fails, alone and with simultaneous cancellation;
+- failed opening initialization with cancelled cleanup;
+- active read, write and seek aborts, keeping BC8's settlement order and
+  BC9's rule that no reader revives;
+- the handle's state and `close()` retry behavior after an abortive close
+  completes but its cancellation propagates.
+
+Mutation check: reverting to aiofiles' `close()` must fail the queued case.
+Timing check deferred to R12.
 
 ## 5. Deferred past RC1
 
