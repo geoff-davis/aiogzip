@@ -87,6 +87,13 @@ class _TextBufferOrigin:
 # constructing an object on every readlines() call.
 _OriginFields = Tuple[int, Tuple[Any, int], bool, int, int]
 
+# A failed seek's rollback copy of the text read state: poison latch, decoder
+# state, decoder byte position, trailing CR, newline flags, buffer, buffer
+# offset, pending lines, pending index and origin fields.
+_SeekState = Tuple[
+    bool, Tuple[Any, int], int, bool, int, str, int, List[str], int, _OriginFields
+]
+
 
 class _TextReadReservation:
     """Pair one text-state read reservation across every exit path.
@@ -573,12 +580,9 @@ class AsyncGzipTextFile:
         if whence != os.SEEK_SET:
             raise ValueError("Invalid whence value")
 
+        binary_file = self._binary_file
         with self._read_call:
-            if offset != 0:
-                if offset >= 0:
-                    await self._seek_to_plain_position(offset)
-                    return offset
-
+            if offset < 0:
                 (
                     origin_offset,
                     decoder_state,
@@ -586,24 +590,94 @@ class AsyncGzipTextFile:
                     seen_newlines,
                     chars_to_skip,
                 ) = self._decode_cookie(offset)
-                await self._binary_file.seek(origin_offset)
-                self._read_poison_seen = False
-                self._decoder.setstate(decoder_state)
-                self._decoder_byte_position = origin_offset
-                self._trailing_cr = trailing_cr
-                self._seen_newline_types = seen_newlines
-                self._set_buffer("")
-                self._set_buffer_origin(
-                    origin_offset=origin_offset,
-                    decoder_state=decoder_state,
-                    trailing_cr=trailing_cr,
-                    seen_newlines=seen_newlines,
-                )
-                await self._replay_characters(chars_to_skip, strict=True)
-                return offset
-
-            await self._reset_to_start()
+            # A failed seek either changes nothing or makes the reader
+            # terminal (BC11). With the binary read cursor in place no input
+            # was consumed, so text state is restored if binary health still
+            # allows it, as after a no-effect source failure (BC2); a failure
+            # that poisoned the binary reader keeps that policy. A moved
+            # cursor leaves text at an unknown position.
+            cursor = binary_file._read_cursor()
+            saved = self._seek_rollback_state()
+            try:
+                if offset > 0:
+                    await self._seek_to_plain_position(offset)
+                elif offset < 0:
+                    await binary_file.seek(origin_offset)
+                    self._read_poison_seen = False
+                    self._decoder.setstate(decoder_state)
+                    self._decoder_byte_position = origin_offset
+                    self._trailing_cr = trailing_cr
+                    self._seen_newline_types = seen_newlines
+                    self._set_buffer("")
+                    self._set_buffer_origin(
+                        origin_offset=origin_offset,
+                        decoder_state=decoder_state,
+                        trailing_cr=trailing_cr,
+                        seen_newlines=seen_newlines,
+                    )
+                    await self._replay_characters(chars_to_skip, strict=True)
+                else:
+                    await self._reset_to_start()
+            except BaseException:
+                if binary_file._read_cursor() != cursor:
+                    self._invalidate_failed_seek()
+                elif binary_file._can_restore_failed_read():
+                    self._restore_seek_rollback_state(saved)
+                raise
             return offset
+
+    def _seek_rollback_state(self) -> _SeekState:
+        """Capture the text read state a seek may replace before it consumes input."""
+        origin = self._buffer_origin
+        return (
+            self._read_poison_seen,
+            self._decoder.getstate(),
+            self._decoder_byte_position,
+            self._trailing_cr,
+            self._seen_newline_types,
+            self._text_buffer,
+            self._text_buffer_offset,
+            list(self._pending_lines),
+            self._pending_idx,
+            (
+                origin.byte_offset,
+                origin.decoder_state,
+                origin.trailing_cr,
+                origin.seen_newline_types,
+                origin.chars_to_skip,
+            ),
+        )
+
+    def _restore_seek_rollback_state(self, state: _SeekState) -> None:
+        """Undo a failed seek that consumed no input; keep any poison latch."""
+        (
+            poison_seen,
+            decoder_state,
+            self._decoder_byte_position,
+            self._trailing_cr,
+            self._seen_newline_types,
+            self._text_buffer,
+            self._text_buffer_offset,
+            self._pending_lines,
+            self._pending_idx,
+            origin_fields,
+        ) = state
+        self._read_poison_seen = poison_seen or self._read_poison_seen
+        self._decoder.setstate(decoder_state)
+        self._buffer_origin.restore(origin_fields)
+
+    def _invalidate_failed_seek(self) -> None:
+        """Refuse reads after a seek that failed part way (BC11).
+
+        The buffered text, decoder and binary position no longer agree, and
+        the target was not reached, so no read may continue until ``seek(0)``
+        rewinds. Binary health records that; its observer latches this
+        handle's poison flag and drops the buffered text.
+        """
+        self._set_buffer("")
+        binary_file = self._binary_file
+        if binary_file is not None and not binary_file.closed:
+            binary_file._break_read_after_failed_text_seek()
 
     def fileno(self) -> int:
         if self._binary_file is None:

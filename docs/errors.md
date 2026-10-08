@@ -183,6 +183,12 @@ A cookie saved with `tell()` before the failure is not a recovery point:
 `seek(0)` first; once the reader has recovered, a saved cookie is an ordinary
 position again.
 
+A text `seek()` that fails or is cancelled either leaves the reader exactly
+where it was or makes it terminal: if the seek had already moved the
+underlying binary reader, later reads raise the same terminal `OSError` until
+`seek(0)` succeeds. A failed text seek is never followed by text from the wrong
+position.
+
 ## Codec finalization and operation abandonment
 
 Every state-changing `GzipEncoder` or `GzipDecoder` call reserves the codec and

@@ -34,6 +34,8 @@ ALLOWLIST = {
     "_has_validation_failure",
     "_can_restore_failed_read",
     "_check_read_usable",
+    "_read_cursor",
+    "_break_read_after_failed_text_seek",
     "_validation_salvage_exhausted",
     # positions and buffers; _eof and _position are measured hot-path reads
     "_read_buffer_exhausted",
