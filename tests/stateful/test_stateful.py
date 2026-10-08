@@ -13,6 +13,7 @@ import re
 from functools import cache
 from pathlib import Path
 
+import interpreter
 import pytest
 from generator import generate
 from interpreter import replay
@@ -94,3 +95,17 @@ def test_seed_set_covers_every_table_row():
             rf"assert_lifecycle\(\s*\w+(\.\w+)*,\s*{source_state},\s*\"{event}\"",
             body,
         ), (path, name, row)
+
+
+def test_timed_out_scenario_closes_its_handle(monkeypatch):
+    # A run that hits the hard timeout must still close its handle, or
+    # Windows cannot remove the scenario's file and the timeout surfaces as
+    # an unrelated cleanup error. Seed 734 reads a native file by path.
+    monkeypatch.setattr(interpreter, "SCENARIO_TIMEOUT", 0.05)
+    events, _trace = replay(aiogzip, generate(734))
+    assert any(event.op["op"] == "timeout" for event in events)
+    final = events[-1]
+    assert final.op["op"] == "final"
+    assert final.outcome.value["closed"] is True
+    if "fd_delta" in final.outcome.value:
+        assert final.outcome.value["fd_delta"] == 0

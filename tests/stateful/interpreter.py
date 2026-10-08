@@ -16,6 +16,7 @@ import argparse
 import asyncio
 import base64
 import concurrent.futures
+import contextlib
 import dataclasses
 import gc
 import hashlib
@@ -30,7 +31,13 @@ from typing import Any, Callable
 
 from generator import write_payload
 
-SCENARIO_TIMEOUT = 30.0
+# A hang bound, not a performance bound. Seed 734 (7-byte reads of about
+# 250 KB through a native file) takes about 2 s locally but over 30 s on a slow
+# Windows runner. Stays below pyproject's faulthandler_timeout, so the
+# scenario records its own timeout before pytest dumps stacks.
+SCENARIO_TIMEOUT = 90.0
+# Bounds the close of a handle a timed-out scenario abandoned.
+CLEANUP_TIMEOUT = 10.0
 INLINE_LIMIT = 64
 # Text payloads are at most a few thousand characters, so text stays inline:
 # the differential compares returned text exactly, not by digest.
@@ -890,6 +897,13 @@ async def run(
     except TimeoutError:
         gate.release()
         land(Event(len(ops) + 1, {"op": "timeout"}, Outcome("error")))
+        # Close the abandoned handle: Windows cannot remove a file that is
+        # still open, so the temporary directory's cleanup would fail and
+        # hide the timeout behind an unrelated error.
+        if not handle.closed:
+            with contextlib.suppress(Exception):
+                async with asyncio.timeout(CLEANUP_TIMEOUT):
+                    await handle.close()
     finally:
         gate.release()
     final: dict[str, Any] = {"closed": handle.closed}
