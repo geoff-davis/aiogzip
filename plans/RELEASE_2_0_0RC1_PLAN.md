@@ -38,8 +38,8 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 - **Benchmarks are deferred.** The maintainer's machine is not quiet. No
   timing run happens until the maintainer says it is, and then only with
   authorization and a Codex-confirmed pre-registration, as in b2. Repairs
-  that touch a measured path (R01's text seek, R03, R04, R08, and R09 if it
-  changes `readinto`) record their timing check as pending; R12 collects
+  that touch a measured path (R01's text seek, R03, R04, R08, R15's close, and R09
+  if it changes `readinto`) record their timing check as pending; R12 collects
   them.
 - **Each repair merges as its own PR** with both engines' full suites green
   locally and the hosted matrix green.
@@ -59,9 +59,10 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 | R09 | Small repairs | Cancellation-count leak, recorded secondary errors, CLI errors, `readinto` comment |
 | R10 | Documentation | Error-wrapping asymmetry, closed-handle iteration, negative seeks, decode-error retry, `inspect()` memory |
 | R11 | Differential rerun | Stateful and differential sweeps against b2 and b1 pass, with every new difference claimed by a ledger row |
-| R12 | Performance | Deferred timing checks for R01, R03, R04, R08 and any R09 `readinto` change run in a quiet window; no unexplained cost above 5% |
+| R12 | Performance | Deferred timing checks for R01, R03, R04, R08, R15 and any R09 `readinto` change run in a quiet window; no unexplained cost above 5% |
 | R13 | RC review and approval | Cross review of the exact RC candidate; hosted CI at that SHA; the maintainer's explicit approval |
 | R14 | Publication | Release preparation, exact-artifact publication and post-release record, as for b2 |
+| R15 | Cancelled close | A cancelled `close()` or context exit settles the owned native close; no handle reports closed over an open file |
 
 - [ ] R01
 - [ ] R02
@@ -77,6 +78,7 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 - [ ] R12
 - [ ] R13
 - [ ] R14
+- [ ] R15
 
 ## 3. Order
 
@@ -84,7 +86,7 @@ performance baseline:      v2.0.0b2, with historical continuity rows
    Windows job failing on seed 734 (two of the last four Windows runs).
 2. R01 together with R02's model tightening, since the model change is what
    proves R01 stays fixed.
-3. R04, then R03.
+3. R04, then R03, then R15 (both reuse the native settlement path).
 4. R05–R07 (workflow-only, can run in parallel with the repairs).
 5. R08–R10.
 6. R11, then R12 when the machine is quiet, then R13 and R14.
@@ -108,25 +110,29 @@ and the next read returns wrong text with no error. Reproductions:
 
 It is not a b2 regression; b1 and 1.11.0 behave the same.
 
-**Repair.** Two phases, so that a seek rejected before it starts changes
-nothing (Codex plan review):
+**Repair (as implemented and reviewed, PR #114).** The text seek is a
+transaction over the binary read cursor, the binary reader's logical position
+and decoder identity. At the start of a seek the text handle records that
+cursor and a snapshot of its own read state (decoder state, buffer and offset,
+pending CR, newline record, pending lines, origin and poison latch). On any
+`BaseException`:
 
-1. *Rejection preserves state.* Whence and cookie validation, the text
-   reservation, and the binary rejections that happen before anything moves
-   (an active binary call, such as a `text.buffer.read()` in another task, or
-   a nonzero cookie origin on an unhealthy reader) raise exactly as today,
-   with health, decoder, buffer and continuation unchanged. The binary checks
-   run synchronously before the first mutation, so nothing can start between
-   check and seek.
-2. *Failure after the transaction begins invalidates.* On any
-   `BaseException` that escapes the binary seek or the replay once it has
-   started, after the owned work has settled and before re-raising: clear the
-   text buffer and reset the decoder, and make the binary reader terminal
-   (`BROKEN`, also from validation salvage, since the salvage position is
-   unknown) so text and binary reads refuse until `seek(0)`. Binary health
-   stays the single authority (G12) and recovery is the established BC2/BC10
-   path. The decoder is not discarded at that point: a rewind replaces it,
-   and an interleaved buffer read may still be using it.
+1. *Cursor moved:* the binary reader becomes `BROKEN` with EOF set (also from
+   validation salvage, since the position is unknown), its decoder is
+   discarded when no binary read call is active, and the text poison latch
+   clears the buffer. Text and binary reads refuse until `seek(0)`. Binary
+   health stays the single authority (G12) and recovery is the established
+   BC2/BC10 path.
+2. *Cursor unchanged:* nothing was consumed, so the text snapshot is
+   restored when binary health still permits a no-effect retry (BC2); a
+   failure that set salvage or `BROKEN` without moving the cursor keeps that
+   policy.
+
+Rejections before anything moves (whence and cookie validation, the text
+reservation, an active binary call, an unhealthy cookie origin) therefore
+change nothing without separate pre-checks. An earlier draft's pre-check
+design was replaced because a cookie seek can re-anchor text over a no-op
+binary seek; the snapshot covers that case.
 
 Re-anchoring the text origin at the binary position with a fresh decoder is
 rejected: even a character boundary is not enough for stateful encodings and
@@ -159,7 +165,12 @@ tests.
   A worker stuck past the bound is left to the `faulthandler_timeout`
   watchdog; cleanup cannot safely release a file a worker still uses. Seed
   734 is fixed by the generator, so give scenarios more time on slow runners
-  rather than lightening it; do not hide a real hang.
+  rather than lightening it; do not hide a real hang. *(Done in PR #113:
+  `SCENARIO_TIMEOUT` is 90 s. A forced-timeout sweep then found the harness
+  deadlocking when the timeout landed on a gate-parked native call, since
+  the exit waits for it (BC1) and the gate opened only after the exit; the
+  deadline now expires the gate, releasing every later arming too. The same
+  sweep found R15.)*
 - **Failed text seeks.** `model.handle_error` widens the model after a
   failed text seek instead of requiring refusal or exact content
   ([`tests/stateful/model.py`](../tests/stateful/model.py)). Tighten it to
@@ -262,16 +273,48 @@ b3 candidate); iterating a closed handle ends iteration rather than raising
 clamps; do not retry after a `UnicodeDecodeError`, use `seek(0)`; `flush()`
 on an unopened write handle returns without error; `inspect()` member
 collection grows with the member count, and each header's FNAME, FCOMMENT
-and FEXTRA fields are buffered whole (up to 128 MiB each); and the BC11/BC12
+and FEXTRA fields are buffered whole (up to 128 MiB each); and the BC11–BC13
 behavior.
+
+### R15: cancelled `close()` leaks a queued native close
+
+**Defect (found by the R02 forced-timeout sweep, 2026-10-08; reproduced on
+b1 and b2).** `_close_underlying` awaits aiofiles' `close()`, which is
+`run_in_executor(file.close)`. If `close()` or an exceptional context exit
+is cancelled while that native close is still queued, asyncio cancels the
+queued job, so the file is never closed. The handle has already marked
+itself closed, so a later `close()` is a no-op and the descriptor stays open
+until garbage collection. With one executor worker kept busy, cancelling
+`close()` on a binary or text handle opened by path leaves
+`raw.closed == False`. G19 F2 recorded only that a cancelled `close()` "can
+return before the native close finishes"; a queued close never runs at all.
+
+**Repair.** Run the owned native close through the settlement used for every
+other native call (`_settle_before_cancel` on an executor call the handle
+submits itself, as `_initial_call` does for opening): cancellation waits for
+the native close to finish, then propagates, with a native close failure as
+its cause (BC1 shape). This covers `close()`, context exit, abort cleanup
+and opening cleanup. Custom async `close()` methods keep their cooperative
+contract. **Behavior change:** BC13, a cancelled `close()` waits for the
+owned native close instead of possibly abandoning it. The changelog and
+`docs/errors.md` say so; the b2 records keep their F2 wording, with a
+pointer to R15.
+
+**Tests.** Gated executor with the close queued and with it running, single
+and repeated cancellation, binary and text, read and write modes, context
+exit and explicit `close()`, owned path and `closefd`/borrowed sources
+(borrowed files are never closed). Assert the raw file is closed exactly
+once before cancellation propagates, and no descriptor remains. Mutation
+check: reverting to aiofiles' `close()` must fail the queued case. Timing
+check deferred to R12.
 
 ## 5. Deferred past RC1
 
 Not RC1 work unless the maintainer pulls one in:
 
-- F2 (cancelled `close()` does not wait for the native close) and F3
-  (`tell()` during `readlines()`), from the
-  [G19 review](reviews/v2.0.0b2-candidate-review.md).
+- F3 (`tell()` during `readlines()`), from the
+  [G19 review](reviews/v2.0.0b2-candidate-review.md). F2 moved into RC1 as
+  R15 at the maintainer's direction (2026-10-08).
 - Unifying custom-sink error wrapping (needs an exception-type change; b3).
 - Graceful fallback if `aiofiles` private internals change (Opus RC1-11);
   unpinned CI already exercises new `aiofiles` releases.
