@@ -17,7 +17,10 @@ def _submit_native(file: Any, method: str, *args: Any) -> "asyncio.Future[Any]":
     loop = asyncio.get_running_loop()
     if file._loop is not loop:
         raise RuntimeError("aiofiles source belongs to a different event loop")
-    return loop.run_in_executor(file._executor, getattr(file._file, method), *args)
+    work: asyncio.Future[Any] = loop.run_in_executor(
+        file._executor, getattr(file._file, method), *args
+    )
+    return work
 
 
 async def _initial_call(file: Any, method: str, *args: Any) -> Any:
