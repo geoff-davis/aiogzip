@@ -17,7 +17,14 @@ import interpreter
 import pytest
 from generator import SEEK_END_BASE, generate
 from interpreter import Outcome, replay
-from model import LIFECYCLE, READ_HEALTH, Health, Lifecycle, make_checker
+from model import (
+    BROKEN_MESSAGE,
+    LIFECYCLE,
+    READ_HEALTH,
+    Health,
+    Lifecycle,
+    make_checker,
+)
 from observer import Observer
 
 import aiogzip
@@ -245,3 +252,33 @@ def test_text_seek_end_from_salvage_keeps_checking_content():
     # Data that matches no allowed offset is still caught.
     checker.accept_data(1, "\0" * 3)
     assert checker.violations
+
+
+def _drained_salvage_checker():
+    checker = _text_checker_at(Health.VALIDATION_SALVAGE)
+    checker.lower = 10
+    checker.handle_call(0, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
+    assert not checker.violations, checker.violations
+    return checker
+
+
+def test_read_after_a_salvage_draining_seek_end_must_refuse():
+    checker = _drained_salvage_checker()
+    # A matching suffix is still wrong: the seek drained all salvage.
+    suffix = checker.upper[-3:]
+    checker.handle_call(1, {"op": "read", "n": 3}, Outcome("ok", suffix))
+    assert any("drained the salvage" in v for v in checker.violations)
+
+
+def test_refusal_after_a_salvage_draining_seek_end_is_accepted():
+    checker = _drained_salvage_checker()
+    refusal = OSError(f"{BROKEN_MESSAGE} after failed or cancelled decompression")
+    checker.handle_call(1, {"op": "read", "n": 3}, Outcome("error", error=refusal))
+    assert not checker.violations, checker.violations
+
+
+def test_rewind_after_a_salvage_draining_seek_end_restores_reads():
+    checker = _drained_salvage_checker()
+    checker.handle_call(1, {"op": "seek0"}, Outcome("ok", 0))
+    checker.handle_call(2, {"op": "read", "n": 3}, Outcome("ok", checker.upper[:3]))
+    assert not checker.violations, checker.violations

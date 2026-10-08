@@ -520,6 +520,9 @@ class Checker(_HandleChecker):
         self.candidates: list[int] = [0]
         self.modeled = True  # False after a direct buffer read in text mode
         self.marks: dict[str, int] = {}
+        # A text seek_end from VALIDATION_SALVAGE drained every retained byte:
+        # until a rewind, every nonzero read must refuse.
+        self.salvage_drained = False
 
     @property
     def position(self) -> int:
@@ -544,6 +547,8 @@ class Checker(_HandleChecker):
             return
         self.health = health_after(before, event)
         self.coverage.add(("health", f"{before.value}->{event}"))
+        if self.health is not SALVAGE:
+            self.salvage_drained = False
         if self.health is not HEALTHY:
             self.eof = True
 
@@ -745,6 +750,14 @@ class Checker(_HandleChecker):
         if self.text and name == "seek_end":
             self.handle_text_seek_end(index, outcome)
             return
+        if (
+            self.salvage_drained
+            and name in READ_OPS
+            and outcome.kind in ("ok", "stop")
+            and op.get("n", -1) != 0
+            and op.get("limit", -1) != 0
+        ):
+            self.fail(index, f"{name} returned after seek_end drained the salvage")
         self.lifecycle_event("call_starts")
         if name == "buffer_read":
             self.modeled = False
@@ -855,6 +868,7 @@ class Checker(_HandleChecker):
             # part, and the data stays unseen; later reads must still match.
             self.position = max(self.position, min(self.lower, len(self.upper)))
             self.widen(len(self.upper))
+            self.salvage_drained = True
             return
         self.position = len(self.upper)
         self.require_eof(index, "seek_end")
