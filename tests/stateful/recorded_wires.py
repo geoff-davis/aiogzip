@@ -35,7 +35,7 @@ PINNED_SEEDS = frozenset(
 # The gzip header byte that names the OS; see the module docstring.
 OS_BYTE = 9
 
-WIRES_SHA256 = "5f5470e6869e2b171063debaa3a53a14c9c16e883b91e13052c1a994df665ac8"
+WIRES_SHA256 = "014daf1f6e2433b3516a2ffde679ce8d4509413532914980ac11df25c8697f22"
 
 
 def recorded_seeds() -> set[int]:
@@ -45,21 +45,29 @@ def recorded_seeds() -> set[int]:
 
 
 def wires_digest() -> str:
-    """SHA-256 over every member compressed for the recorded and pinned seeds."""
+    """SHA-256 over the members and final wires of the recorded and pinned seeds.
+
+    Each scenario is generated from OS-byte-normalized members, so the final
+    wire (with its corruption, truncation and padding) is hashed as it is
+    built on Python 3.13 and newer, whatever the running version.
+    """
     digest = hashlib.sha256()
     compress = generator._member
 
-    def recording(rng, payload):
+    def normalized(rng, payload):
         member = compress(rng, payload)
-        digest.update(b"%d:" % len(member))
-        digest.update(member[:OS_BYTE] + b"\xff" + member[OS_BYTE + 1 :])
+        member = member[:OS_BYTE] + b"\xff" + member[OS_BYTE + 1 :]
+        digest.update(b"member %d:" % len(member))
+        digest.update(member)
         return member
 
-    generator._member = recording
+    generator._member = normalized
     try:
         for seed in sorted(recorded_seeds() | PINNED_SEEDS):
-            digest.update(b"seed %d;" % seed)
-            generator.generate(seed)
+            scenario = generator.generate(seed)
+            wire = generator.unb64(scenario["wire"]) if "wire" in scenario else b""
+            digest.update(b"seed %d wire %d:" % (seed, len(wire)))
+            digest.update(wire)
     finally:
         generator._member = compress
     return digest.hexdigest()
