@@ -46,6 +46,7 @@ from differential import (
     bc10,
     compare,
     encoded,
+    is_error,
     lossy_scenario,
     parse,
     raw_bytes,
@@ -4256,16 +4257,79 @@ def _seek_end_shadow_run(seed: int) -> str:
     return json.dumps(recorded_run(aiogzip, shadow, ENGINE, "observe"))
 
 
+# Seed 1000132's body-damage error events. On CI's macOS stdlib-zlib leg the
+# live candidate's outcomes there differ from the ones recorded on Linux,
+# consistent with the system zlib reporting the damage differently.
+INFLATE_ERROR_EVENTS = {(0, "read", 0), (2, "next", 0), (6, "readline", 0)}
+INFLATE_ERROR_EVENTS |= {(10, "readline", 0)}
+SEEK_END_KEY = (7, "seek_end", 0)
+
+
+def _inflate_errors_differ(pair: Pair) -> bool:
+    """Whether the pair's only differences besides the seek_end are error
+    outcomes at the body-damage events; anything else is a failure."""
+    assert SEEK_END_KEY in pair.diffs, pair.diffs
+    extra = pair.diffs - {SEEK_END_KEY}
+    if not extra:
+        return False
+    assert extra <= INFLATE_ERROR_EVENTS, extra
+    assert pair.order_ok and not (pair.final_diffs or pair.cand_only or pair.ref_only)
+    assert pair.cand_info["violations"] == []
+    for key in extra:
+        c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+        assert dataclasses.replace(c, outcome=None) == dataclasses.replace(
+            r, outcome=None
+        ), key
+        assert is_error(c.outcome) and is_error(r.outcome), key
+        assert c.outcome.keys() == r.outcome.keys() == {"error", "message"}, key
+    return True
+
+
 def bc7_seek_end(seed: int = 1000132) -> Pair:
     pair = rc1_pair("b1", seed)
-    if pair.diffs != {(7, "seek_end", 0)} and not sys.platform.startswith("linux"):
-        # On CI's macOS stdlib-zlib leg the live candidate's error events
-        # for seed 1000132's body damage differ from the recorded ones,
-        # consistent with the system zlib reporting it differently. Linux,
-        # where the reference was recorded, must reproduce them.
+    if _inflate_errors_differ(pair):
+        # Linux, where the reference was recorded, must reproduce it.
+        assert not sys.platform.startswith("linux"), pair.diffs
         pytest.skip("the live run does not reproduce the recorded inflate errors")
     pair.seek_end_shadow = json.loads(_seek_end_shadow_run(seed))
     return pair
+
+
+def test_bc7_seek_end_skip_needs_the_seek_end_difference():
+    pair = rc1_pair("b1", 1000132)
+    pair = dataclasses.replace(
+        pair,
+        ref=edit(
+            pair.ref, SEEK_END_KEY, outcome=pair.cand_by_key[SEEK_END_KEY].outcome
+        ),
+    )
+    with pytest.raises(AssertionError):
+        _inflate_errors_differ(pair)
+
+
+def test_bc7_seek_end_skip_rejects_an_unrelated_difference():
+    pair = rc1_pair("b1", 1000132)
+    pair = dataclasses.replace(
+        pair, ref=edit(pair.ref, (3, "tell_mark", 0), outcome={"ok": "C9"})
+    )
+    with pytest.raises(AssertionError):
+        _inflate_errors_differ(pair)
+
+
+def test_bc7_seek_end_skip_rejects_a_non_error_at_a_damage_event():
+    pair = rc1_pair("b1", 1000132)
+    pair = dataclasses.replace(
+        pair, ref=edit(pair.ref, (0, "read", 0), outcome={"ok": {"str": "x"}})
+    )
+    with pytest.raises(AssertionError):
+        _inflate_errors_differ(pair)
+
+
+def test_bc7_seek_end_skip_accepts_only_error_message_differences():
+    pair = rc1_pair("b1", 1000132)
+    error = {"error": "BadGzipFile", "message": "another inflate message"}
+    pair = dataclasses.replace(pair, ref=edit(pair.ref, (0, "read", 0), outcome=error))
+    assert _inflate_errors_differ(pair)
 
 
 def test_bc7_f1a_through_seek_end_is_claimed():
