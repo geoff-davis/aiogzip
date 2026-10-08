@@ -15,9 +15,16 @@ from pathlib import Path
 
 import interpreter
 import pytest
-from generator import generate
-from interpreter import replay
-from model import LIFECYCLE, READ_HEALTH, make_checker
+from generator import SEEK_END_BASE, generate
+from interpreter import Outcome, replay
+from model import (
+    BROKEN_MESSAGE,
+    LIFECYCLE,
+    READ_HEALTH,
+    Health,
+    Lifecycle,
+    make_checker,
+)
 from observer import Observer
 
 import aiogzip
@@ -32,7 +39,10 @@ REGRESSION_SEEDS = (
     1737, 1754, 1787, 1818, 2105, 2254, 2344, 5767,
 )  # fmt: skip
 assert not set(REGRESSION_SEEDS) & set(range(1000))
-PR_SEEDS = tuple(range(1000)) + REGRESSION_SEEDS
+# End-relative seeks (BC12) live in their own block so lower seeds keep
+# their operations.
+SEEK_END_SEEDS = tuple(range(SEEK_END_BASE, SEEK_END_BASE + 200))
+PR_SEEDS = tuple(range(1000)) + REGRESSION_SEEDS + SEEK_END_SEEDS
 
 # Table rows the generator cannot reach, each with the focused test that
 # covers it instead (path, test function).
@@ -185,3 +195,114 @@ def test_deadline_landing_on_a_parked_call_await_is_recorded(monkeypatch):
     assert events[-1].outcome.value["closed"] is True
     # The parked call (op 1) never lands with the deadline as its outcome.
     assert not [event for event in events if event.index == 1]
+
+
+def _seek_end_ops(scenario):
+    ops = scenario.get("ops", [])
+    return [op.get("call", op) for op in ops if op.get("call", op)["op"] == "seek_end"]
+
+
+def test_only_the_seek_end_block_issues_end_relative_seeks():
+    assert not any(_seek_end_ops(generate(seed)) for seed in range(1000))
+    block = [generate(seed) for seed in SEEK_END_SEEDS]
+    binary = [s for s in block if s["mode"] == "rb"]
+    text = [s for s in block if s["mode"] == "rt"]
+    assert any(op["offset"] < 0 for s in binary for op in _seek_end_ops(s))
+    assert all(op["offset"] == 0 for s in text for op in _seek_end_ops(s))
+    # The R04 shape: a peek() that reaches EOF directly before the seek.
+    assert any(
+        first == {"op": "peek", "n": s["payload_size"] + 1}
+        and second["op"] == "seek_end"
+        for s in binary
+        for first, second in zip(s["ops"], s["ops"][1:], strict=False)
+    )
+    parked = {"cancel", "overlap", "close_during", "abort"}
+    assert any(
+        op["op"] in parked and op["call"]["op"] == "seek_end"
+        for s in block
+        for op in s.get("ops", [])
+    )
+
+
+def _text_checker_at(health):
+    # Seed 39: text with a CRC failure, so salvage is reachable.
+    scenario = generate(39)
+    assert scenario["mode"] == "rt"
+    assert scenario["corruption"]["kind"] == "crc"
+    checker = make_checker(scenario, aiogzip.engine_info().decompression)
+    checker.lifecycle = Lifecycle.OPEN
+    checker.health = health
+    return checker
+
+
+def test_text_seek_end_from_broken_is_a_violation():
+    checker = _text_checker_at(Health.BROKEN)
+    checker.handle_call(0, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
+    assert any("BROKEN" in v for v in checker.violations), checker.violations
+
+
+def test_text_seek_end_from_salvage_keeps_checking_content():
+    checker = _text_checker_at(Health.VALIDATION_SALVAGE)
+    checker.lower = 10  # guaranteed salvage short of the end
+    checker.handle_call(0, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
+    assert not checker.violations, checker.violations
+    assert checker.modeled
+    end = len(checker.upper)
+    assert checker.candidates == list(range(10, end + 1))
+    # Data that matches no allowed offset is still caught.
+    checker.accept_data(1, "\0" * 3)
+    assert checker.violations
+
+
+def _drained_salvage_checker():
+    checker = _text_checker_at(Health.VALIDATION_SALVAGE)
+    checker.lower = 10
+    checker.handle_call(0, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
+    assert not checker.violations, checker.violations
+    return checker
+
+
+def test_read_after_a_salvage_draining_seek_end_must_refuse():
+    checker = _drained_salvage_checker()
+    # A matching suffix is still wrong: the seek drained all salvage.
+    suffix = checker.upper[-3:]
+    checker.handle_call(1, {"op": "read", "n": 3}, Outcome("ok", suffix))
+    assert any("drained the salvage" in v for v in checker.violations)
+
+
+def test_refusal_after_a_salvage_draining_seek_end_is_accepted():
+    checker = _drained_salvage_checker()
+    refusal = OSError(f"{BROKEN_MESSAGE} after failed or cancelled decompression")
+    checker.handle_call(1, {"op": "read", "n": 3}, Outcome("error", error=refusal))
+    assert not checker.violations, checker.violations
+
+
+def test_rewind_after_a_salvage_draining_seek_end_restores_reads():
+    checker = _drained_salvage_checker()
+    checker.handle_call(1, {"op": "seek0"}, Outcome("ok", 0))
+    checker.handle_call(2, {"op": "read", "n": 3}, Outcome("ok", checker.upper[:3]))
+    assert not checker.violations, checker.violations
+
+
+def test_repeated_seek_end_after_a_salvage_drain_must_refuse():
+    checker = _drained_salvage_checker()
+    checker.handle_call(1, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
+    assert any("drained the salvage" in v for v in checker.violations)
+
+
+def test_repeated_seek_end_refusal_after_a_salvage_drain_is_accepted():
+    checker = _drained_salvage_checker()
+    refusal = OSError(f"{BROKEN_MESSAGE} after failed or cancelled decompression")
+    checker.handle_call(
+        1, {"op": "seek_end", "offset": 0}, Outcome("error", error=refusal)
+    )
+    assert not checker.violations, checker.violations
+
+
+def test_rewind_lets_seek_end_drain_again():
+    checker = _drained_salvage_checker()
+    checker.handle_call(1, {"op": "seek0"}, Outcome("ok", 0))
+    assert not checker.salvage_drained
+    checker.health = Health.VALIDATION_SALVAGE  # a new failure after the rewind
+    checker.handle_call(2, {"op": "seek_end", "offset": 0}, Outcome("ok", 7))
+    assert not checker.violations, checker.violations

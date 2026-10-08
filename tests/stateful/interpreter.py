@@ -583,6 +583,8 @@ def _surface(handle, op: dict[str, Any], text: dict[str, Any] | None):
         return seek_back()
     if name == "seek0":
         return handle.seek(0)
+    if name == "seek_end":
+        return handle.seek(op["offset"], os.SEEK_END)
     if name == "buffer_read":
         return handle.buffer.read(op.get("n", -1))
     if name == "close":

@@ -182,6 +182,8 @@ tests.
   #114; the larger-payload cancel-during-seek event remains.)*
 - **`SEEK_END`.** The generator never issues end-relative seeks. Add them,
   including after an oversized `peek()`, to catch R04-class defects.
+  *(Done with R04: a separate seed block from 1,000,000, so lower seeds are
+  unchanged; 200 block seeds join the PR set.)*
 - Re-record the b1 reference runs (`tests/data/wp10_b1_runs.json`) if the run
   records change, as in b2.
 
@@ -221,7 +223,7 @@ and after partial consumption, on physical and cached-rewind sources, binary
 and text (`seek(0, SEEK_END)` on text reads to the end first). Drain unread
 output without double-counting it. Controls with a corrupt trailer and with
 `max_decompressed_size` show that seeking to the end cannot bypass
-validation or limits.
+validation or limits. *(Implemented on `fix/rc1-seek-end`.)*
 
 ### R05–R07: workflows
 
