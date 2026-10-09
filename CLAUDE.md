@@ -288,10 +288,11 @@ Always include:
   cancellation, text seeks that fail after moving the reader, end-relative
   seeks after `peek()`, `inspect()`/`verify()` settlement and small
   cancellation and cleanup repairs. Python 3.15
-  runs in an informational CI job; the Beta classifier and frozen
-  compatibility contract remain in force.
+  runs in an informational CI job. Development continues as
+  `2.0.0rc2.dev0` while the Beta classifier and frozen compatibility
+  contract remain in force.
 
 ---
 
-**Last Updated:** 2026-10-07
+**Last Updated:** 2026-10-09
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!

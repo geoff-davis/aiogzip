@@ -1064,7 +1064,8 @@ resource after its owner had released it.
 - Normalize iteration errors from `AsyncGzipBinaryFile` to `TypeError`, matching the standard file API.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
 
-[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b2...HEAD
+[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0rc1...HEAD
+[2.0.0rc1]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b2...v2.0.0rc1
 [2.0.0b2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b1...v2.0.0b2
 [2.0.0b1]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a4...v2.0.0b1
 [2.0.0a4]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a3...v2.0.0a4
