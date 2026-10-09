@@ -24,20 +24,20 @@ from aiogzip import AsyncGzipBinaryFile, _codec_async
 async def test_real_codec_worker_settles_before_caller_cancellation(
     monkeypatch, cancellations, cancel_waiter, kind
 ):
-    """Caller/shield-waiter cancellation retains real encoder and decoder operations."""
+    """Caller/completion-waiter cancellation retains real encoder and decoder operations."""
     loop = asyncio.get_running_loop()
     entered = asyncio.Event()
     release, settled = threading.Event(), threading.Event()
     original = _codec_async._run_in_thread
     waiters = []
-    original_shield = asyncio.shield
+    original_waiter = _codec_async._completion_waiter
 
-    def shield(work):
-        waiter = original_shield(work)
+    def observe_waiter(work):
+        waiter = original_waiter(work)
         waiters.append(waiter)
         return waiter
 
-    monkeypatch.setattr(asyncio, "shield", shield)
+    monkeypatch.setattr(_codec_async, "_completion_waiter", observe_waiter)
 
     async def gated(method, data):
         def advance(workload):
@@ -66,7 +66,7 @@ async def test_real_codec_worker_settles_before_caller_cancellation(
         for _ in range(cancellations):
             caller.cancel()
             if cancel_waiter:
-                waiters[0].cancel()
+                waiters[-1].cancel()
             await asyncio.sleep(0)
         assert not caller.done()
         with pytest.raises(RuntimeError, match="active operation"):
