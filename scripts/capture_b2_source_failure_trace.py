@@ -13,15 +13,15 @@ import sys
 import threading
 from pathlib import Path
 
-from capture_file_state_trace import git_metadata
+from capture_file_state_trace import FIXTURE_LEVEL, git_metadata
 
 
 async def capture(package):
     import aiofiles.threadpool
 
     a, b = b"member A\n", b"member B\n"
-    wire_a = gzip.compress(a, mtime=123)
-    wire = wire_a + gzip.compress(b, mtime=123)
+    wire_a = gzip.compress(a, compresslevel=FIXTURE_LEVEL, mtime=123)
+    wire = wire_a + gzip.compress(b, compresslevel=FIXTURE_LEVEL, mtime=123)
     semantic, diagnostic = {}, {}
 
     async def finish_trace(file, caller, events):
