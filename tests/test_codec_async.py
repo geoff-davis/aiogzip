@@ -444,6 +444,8 @@ async def test_valid_empty_block_stream_makes_scheduler_progress(monkeypatch):
         output.extend(await _collect(decoder.finish()))
     finally:
         companion_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await companion_task
 
     assert b"".join(output) == expected
     assert turns.count("checkpoint") >= 2
