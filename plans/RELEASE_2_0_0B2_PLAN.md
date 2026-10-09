@@ -1,7 +1,7 @@
 # aiogzip 2.0.0b2: Correctness, Performance, and File-State Plan
 
 > **Revision 2 — 2026-09-07. Supersedes the September 1 b2 plan.**
-> **Status:** WP0–WP6 completed locally (C0 pinned as `refs/c0/v2.0.0b2`); WP7 onward and release qualification remain pending.
+> **Status:** complete. 2.0.0b2 was published 2026-10-07, and G00–G22 are signed off.
 > **Target:** `2.0.0b2`.
 > **Commit this file as:** `plans/RELEASE_2_0_0B2_PLAN.md`.
 > **Historical reviewed starting point:** `dc8950cb334e1cf4082f2bf50074464e06c72287`.
@@ -308,8 +308,8 @@ create competing copies of the same checkboxes in every section.
 * [x] G18 — [Documentation and index](reviews/v2.0.0b2-wp10-qualification.md#g18-documentation-and-index)
 * [x] G19 — [Cross review and maintainer approval of `d841d94`](reviews/v2.0.0b2-candidate-review.md)
 * [x] G20 — [Version, changelog, artifacts and release notes](reviews/v2.0.0b2-release-prep.md) (artifact source `3c421a1`)
-* [ ] G21 — [Publication verified](reviews/v2.0.0b2-post-release.md) (awaiting maintainer sign-off)
-* [ ] G22 — [Post-release record and RC handoff](reviews/v2.0.0b2-post-release.md) (awaiting maintainer sign-off)
+* [x] G21 — [Publication verified](reviews/v2.0.0b2-post-release.md)
+* [x] G22 — [Post-release record and RC handoff](reviews/v2.0.0b2-post-release.md)
 
 A finding may be closed as not reproduced only with the exact tested scenario,
 environment, and explanation. Failure to reproduce a helper signature or failure to
