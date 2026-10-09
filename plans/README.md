@@ -38,6 +38,8 @@ b2 baselines in plan §17. It was drawn from two read-only reviews of
 [Codex](reviews/data/rc1/codex-review.md.txt). Plan §18 still lists the
 deferred work.
 
+- [R12 pre-registration: RC1 timing windows](reviews/v2.0.0rc1-r12-preregistration.md)
+
 Each release's artifact hashes are recorded under
 [release artifact records](releases/README.md); the publish workflow uploads
 only the recorded files.
