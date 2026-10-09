@@ -117,9 +117,10 @@ use async with.").
 - ✅ Seamless integration with `aiocsv` for CSV processing
 
 > **Default compression level.** `aiogzip` defaults to `compresslevel=6` (the
-> zlib default — a better speed/ratio tradeoff), whereas `gzip.open()` defaults
-> to `9`. The two therefore produce different `.gz` sizes by default. For
-> byte-size parity with stdlib defaults, pass `compresslevel=9`:
+> zlib default — a better speed/ratio tradeoff). Before Python 3.15,
+> `gzip.open()` defaults to `9`, so the two produce different `.gz` sizes by
+> default; Python 3.15 lowers the stdlib default to `6` as well. For byte-size
+> parity with stdlib's level 9, pass `compresslevel=9`:
 >
 > ```python
 > async with aiogzip.open("file.gz", "wb", compresslevel=9) as f:
