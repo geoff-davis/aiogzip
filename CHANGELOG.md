@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Cancelling an `async with` exit while the body was raising and a read or
+  write on the same handle was still active (as a timeout or `TaskGroup`
+  does) skipped the close once that call had settled, leaving the handle and
+  its file open until `close()` or garbage collection. The exit now closes
+  the file before the cancellation propagates, as an uncancelled exit does,
+  and the body's exception stays in the cancellation's exception chain. A
+  clean exit cancelled twice while waiting for an active call is fixed the
+  same way.
+- When an open was cancelled after the file had been acquired, a repeated
+  cancellation while the late file was being closed was noted as
+  `Opening cleanup also failed: CancelledError(...)`, and a failure of that
+  close was lost. Like the context exit and `inspect()`/`verify()`, opening
+  cleanup now notes only a real close failure.
 - On Python 3.14, a codec step or native file call that failed after its
   caller was cancelled was also logged by the event loop as an "exception in
   shielded future", although the failure was already raised as the
@@ -1061,7 +1074,8 @@ resource after its owner had released it.
 - Normalize iteration errors from `AsyncGzipBinaryFile` to `TypeError`, matching the standard file API.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
 
-[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b2...HEAD
+[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0rc1...HEAD
+[2.0.0rc1]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b2...v2.0.0rc1
 [2.0.0b2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b1...v2.0.0b2
 [2.0.0b1]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a4...v2.0.0b1
 [2.0.0a4]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a3...v2.0.0a4

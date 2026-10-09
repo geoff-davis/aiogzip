@@ -1,6 +1,7 @@
 # aiogzip 2.0.0rc1 plan
 
-> **Status:** draft, 2026-10-08. Development version `2.0.0rc1.dev0`.
+> **Status:** complete. 2.0.0rc1 was published 2026-10-09, and every gate is
+> signed off. Development continues as `2.0.0rc2.dev0`.
 >
 > **Source:** two independent read-only reviews of the released `v2.0.0b2`
 > (`962bfe4`), from the same [brief](reviews/data/rc1/rc1-review-prompt.txt):
@@ -77,7 +78,7 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 - [x] R11
 - [x] R12
 - [x] R13
-- [ ] R14
+- [x] R14 — [Publication verified](reviews/v2.0.0rc1-post-release.md)
 - [x] R15
 
 ## 3. Order
@@ -567,6 +568,18 @@ repaired in PR #135; the artifacts were rebuilt and round 2 found nothing.
 
 *Closed 2026-10-09: the maintainer approved `f67dd99` (hosted run
 37983380928, 22 of 22).*
+
+### R14: publication
+
+PR #134 merged as `d382f17`, which the signed tag `v2.0.0rc1` targets. The
+publish workflow uploaded exactly the recorded wheel and sdist, with
+verified attestations, and a fresh install from PyPI passed the
+installed-artifact smoke and the maintained examples. The release-merge run
+exposed a race in one R13 test; PR #136 repairs it. The
+[post-release record](reviews/v2.0.0rc1-post-release.md) has the evidence.
+Development continues as `2.0.0rc2.dev0`.
+
+*Signed off by the maintainer ("I sign off", 2026-10-09).*
 
 ## 5. Deferred past RC1
 

@@ -21,7 +21,7 @@ from ._common import (
     _validate_optional_positive_int,
 )
 from ._metadata import GzipInfo, GzipMemberInfo, VerificationResult
-from ._opening import _acquire_path, _initial_call
+from ._opening import _acquire_path, _initial_call, _note_cleanup_failure
 from ._source_io import _is_native_source, _NativeSourceCall
 from .codec import GzipDecoder, _AsyncDrivableOperation, _snapshot_bytes_input
 
@@ -29,21 +29,6 @@ __all__ = ["GzipInfo", "GzipMemberInfo", "VerificationResult"]
 
 _Filename = Union[str, bytes, Path, None]
 _ReadFileObj = Optional[Union[WithAsyncRead, WithAsyncReadWrite]]
-
-
-def _note_cleanup_failure(failure: BaseException, cleanup: BaseException) -> None:
-    """Note a source cleanup failure on the exception that keeps precedence.
-
-    A repeated cancellation during cleanup is not itself a failure, but
-    settlement may raise it from one (a failed native close); note that cause,
-    as the file handles' context exit does.
-    """
-    if isinstance(cleanup, asyncio.CancelledError):
-        cause = cleanup.__cause__
-        if cause is None or isinstance(cause, asyncio.CancelledError):
-            return
-        cleanup = cause
-    failure.add_note(f"Source cleanup also failed: {cleanup!r}")
 
 
 async def _read_native(source: Any, size: int) -> Any:
@@ -176,4 +161,4 @@ async def _scan_gzip(
                         if cleanup.__context__ is None:
                             cleanup.__context__ = failure
                         raise
-                    _note_cleanup_failure(failure, cleanup)
+                    _note_cleanup_failure(failure, cleanup, "Source")
