@@ -36,7 +36,8 @@ All notable changes to this project will be documented in this file.
   worker thread could leave a late-opened file unclosed, or close the source
   while the worker was still reading it. The scan now waits for the native
   open, read and close to settle before cancellation propagates, as the file
-  handles do; borrowed sources keep their ownership rules.
+  handles do; a native read still queued is skipped without touching the
+  source. Borrowed sources keep their ownership rules.
 - If `inspect()` or `verify()` failed and the caller was cancelled while the
   source was being closed, the scan error was raised and the cancellation was
   lost. The cancellation now propagates, with the scan error as its context,

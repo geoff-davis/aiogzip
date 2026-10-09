@@ -18,6 +18,7 @@ import aiofiles
 import pytest
 
 import aiogzip
+from aiogzip._source_io import _NativeSourceCall
 
 PAYLOAD = b"inspection settlement\n" * 4000
 OPERATIONS = [aiogzip.inspect, aiogzip.verify]
@@ -26,7 +27,8 @@ OPERATIONS = [aiogzip.inspect, aiogzip.verify]
 class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
     """Default executor that parks the next submission of a named function.
 
-    Every submission is logged by name and target, with its start, end and
+    ``gate`` parks it inside the source access; ``hold`` parks it while still
+    queued, before a settled native call's entry guard. Every submission is logged by name and target, with its start, end and
     error, so tests can check that cleanup waited for the worker's last
     access. ``fail`` makes the next submission of a name raise instead of
     running.
@@ -36,6 +38,7 @@ class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
         super().__init__(max_workers=4)
         self.loop = loop
         self.gate: str | None = None
+        self.hold: str | None = None
         self.entered = asyncio.Event()
         self.release = threading.Event()
         self.lock = threading.Lock()
@@ -50,31 +53,61 @@ class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
 
     def submit(self, fn, /, *args, **kwargs):
         target = fn.func if isinstance(fn, functools.partial) else fn
-        name = getattr(target, "__name__", "")
-        owner = getattr(target, "__self__", None)
+        native = isinstance(target, _NativeSourceCall)
+        if native:
+            name, owner = target.method, target.source
+        else:
+            name = getattr(target, "__name__", "")
+            owner = getattr(target, "__self__", None)
         park = self.gate == name
         if park:
             self.gate = None
+        hold = self.hold == name
+        if hold:
+            self.hold = None
         injected = self.fail.pop(name, None)
+
+        def access(call):
+            # The gated, logged source access itself.
+            if park:
+                self.loop.call_soon_threadsafe(self.entered.set)
+                if not self.release.wait(10):
+                    raise TimeoutError("gate never released")
+            self._record("start", name, owner)
+            try:
+                if injected is not None:
+                    raise injected
+                result = call()
+            except BaseException as error:
+                self._record("error", name, error)
+                raise
+            self._record("end", name, result if name == "open" else owner)
+            return result
+
+        if native:
+            # A settled native call guards entry itself; gate and log inside
+            # that guard, at the moment the source is actually touched.
+            method = getattr(owner, name)
+            target.source = _Access(owner, name, lambda *a: access(lambda: method(*a)))
+
+            def body():
+                return fn(*args, **kwargs)
+
+        else:
+
+            def body():
+                return access(lambda: fn(*args, **kwargs))
 
         def run():
             with self.lock:
                 self.running += 1
             try:
-                if park:
+                if hold:
+                    # Queued: parked before the call's entry guard.
                     self.loop.call_soon_threadsafe(self.entered.set)
                     if not self.release.wait(10):
-                        raise TimeoutError("gate never released")
-                self._record("start", name, owner)
-                try:
-                    if injected is not None:
-                        raise injected
-                    result = fn(*args, **kwargs)
-                except BaseException as error:
-                    self._record("error", name, error)
-                    raise
-                self._record("end", name, result if name == "open" else owner)
-                return result
+                        raise TimeoutError("hold never released")
+                return body()
             finally:
                 with self.lock:
                     self.running -= 1
@@ -89,6 +122,17 @@ class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
     def entries(self, kind, name):
         with self.lock:
             return [value for k, n, value in self.log if (k, n) == (kind, name)]
+
+
+class _Access:
+    """Stand-in source whose ``name`` method is the gated access."""
+
+    def __init__(self, source, name, method):
+        self._source = source
+        setattr(self, name, method)
+
+    def __getattr__(self, attribute):
+        return getattr(self._source, attribute)
 
 
 @pytest.fixture
@@ -205,6 +249,58 @@ async def test_cancelled_read_of_a_borrowed_native_source(
             assert not gated.entries("error", "read")
 
 
+async def _cancel_queued(gated, coroutine, cancels):
+    """Cancel a scan whose read is still queued; it must not wait for it."""
+    task = asyncio.create_task(coroutine)
+    try:
+        await asyncio.wait_for(gated.entered.wait(), 10)
+        for _ in range(cancels):
+            task.cancel()
+            await asyncio.sleep(0)
+        # Well inside the parked worker's 10 s watchdog: a scan that waits for
+        # the queued read times out here while the worker is still parked.
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(asyncio.shield(task), 2)
+        # The scan finished while its worker was still parked before entry.
+        with gated.lock:
+            assert gated.running == 1
+    finally:
+        # Never leave the worker parked, so a failure here cannot hang teardown.
+        gated.release.set()
+        await asyncio.gather(task, return_exceptions=True)
+    gated.wait_idle()
+
+
+@pytest.mark.parametrize("operation", OPERATIONS)
+@pytest.mark.parametrize("cancels", [1, 3])
+async def test_cancelled_queued_read_never_touches_the_source(
+    path, gated, operation, cancels
+):
+    gated.hold = "read"
+    await _cancel_queued(gated, operation(path), cancels)
+    (raw,) = gated.entries("end", "open")
+    assert raw.closed
+    # The prevented read never ran, before or after the close.
+    assert gated.entries("start", "read") == []
+    assert gated.entries("start", "close") == [raw]
+
+
+@pytest.mark.parametrize("operation", OPERATIONS)
+@pytest.mark.parametrize("closefd", [False, True])
+async def test_cancelled_queued_read_of_a_borrowed_native_source(
+    path, gated, operation, closefd
+):
+    async with aiofiles.open(path, "rb") as source:
+        raw = source._file
+        gated.hold = "read"
+        await _cancel_queued(gated, operation(None, fileobj=source, closefd=closefd), 1)
+        assert gated.entries("start", "read") == []
+        assert raw.closed is closefd
+        if not closefd:
+            # The borrowed cursor did not move: the prevented read never ran.
+            assert raw.tell() == 0
+
+
 @pytest.mark.parametrize("operation", OPERATIONS)
 async def test_uncancelled_scan_still_succeeds(path, gated, operation):
     result = await operation(path)
@@ -308,6 +404,21 @@ class TestCleanupPrecedence:
         assert error.__cause__ is failure
         gated.wait_idle()
         _only_close(gated).close()
+
+    @pytest.mark.parametrize("operation", OPERATIONS)
+    @pytest.mark.parametrize("cancels", [1, 3])
+    async def test_cancelled_read_whose_worker_fails(
+        self, path, gated, operation, cancels
+    ):
+        failure = OSError("injected read failure")
+        gated.fail["read"] = failure
+        gated.gate = "read"
+        error = await _cancel_parked(gated, operation(path), cancels)
+        # The cancellation propagates, caused by the settled worker failure.
+        assert isinstance(error, asyncio.CancelledError)
+        assert error.__cause__ is failure
+        gated.wait_idle()
+        assert _only_close(gated).closed
 
 
 async def _open_in_another_loop(target):
