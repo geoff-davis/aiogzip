@@ -1135,11 +1135,18 @@ A cookie saved with <code>tell()</code> before the failure is not a recovery poi
 <code>seek(cookie)</code> may raise the same terminal <code>OSError</code> instead of rewinding. Call
 <code>seek(0)</code> first; once the reader has recovered, a saved cookie is an ordinary
 position again.</p>
-<p>A text <code>seek()</code> that fails or is cancelled either leaves the reader exactly
-where it was or makes it terminal: if the seek had already moved the
-underlying binary reader, later reads raise the same terminal <code>OSError</code> until
-<code>seek(0)</code> succeeds. A failed text seek is never followed by text from the wrong
-position.</p>
+<p>An absolute text <code>seek()</code>, to a position or a <code>tell()</code> cookie, that fails or
+is cancelled after it has moved the underlying binary reader makes the
+reader terminal: later reads raise the same terminal <code>OSError</code> until
+<code>seek(0)</code> recovers it. A seek that fails before moving the binary reader
+leaves the text position where it was. If the binary reader is
+still healthy, the text reader is unchanged and the seek can be retried.
+Otherwise the binary reader's failure rules above apply: a gzip integrity
+failure leaves the recovery state, so later reads return the recovered text
+from the original position, and any other failure makes the reader terminal.
+Either way, a failed absolute seek is never followed by text from the wrong
+position. <code>seek(0, SEEK_END)</code> reads to the end, so its failures follow the
+<code>read()</code> rules above, including the <code>UnicodeDecodeError</code> caution below.</p>
 <p>Do not retry a text read that raised <code>UnicodeDecodeError</code>. The reader does
 not become terminal, but the failed read has already consumed the whole chunk
 of decompressed bytes it was decoding, so the next read resumes after that
