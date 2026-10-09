@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Cancelling an `async with` exit while the body was raising and a read or
+  write on the same handle was still active (as a timeout or `TaskGroup`
+  does) skipped the close once that call had settled, leaving the handle and
+  its file open until `close()` or garbage collection. The exit now closes
+  the file before the cancellation propagates, as an uncancelled exit does,
+  and the body's exception stays in the cancellation's exception chain. A
+  clean exit cancelled twice while waiting for an active call is fixed the
+  same way.
+
 ## [2.0.0rc1] - 2026-10-09
 
 This release candidate keeps the 2.0 public API frozen: every public
