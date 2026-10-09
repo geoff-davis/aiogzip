@@ -1,0 +1,151 @@
+# aiogzip 2.0.0rc1, R13 round 2: Claude review
+
+(Returned as the subagent's final message on 2026-10-09. Saved here by the
+implementing session, which kept the header, dispositions, findings and
+verdict and condensed the evidence under each answer; the answers
+themselves are as given. Probe scripts were under
+/tmp/claude-1000/r13r2-claude-review/probes/ and are not archived.)
+
+- Reviewed SHA: f67dd991bbd38f2135a6934e61175f6cbe6bf0c9 (working tree at
+  that commit, clean apart from two untracked files outside the release
+  inputs).
+- Reviewer: Claude, `claude-opus-5-5`, fresh subagent; nothing under
+  ~/.claude read.
+- Scope: `git diff v2.0.0b2 f67dd99`, emphasis on `src/`, plus the round 2
+  material (`git diff 7498a0c f74b905` and the CHANGELOG corrections).
+  Read-only; code run from `git archive` extracts of f67dd99, v2.0.0b2 and
+  7498a0c with the repo's `.venv/bin/python` and `PYTHONPATH=<extract>/src`.
+  No benchmarks.
+
+Identity: `git diff --name-only d85a727 f67dd99 | grep -v '^plans/'` printed
+nothing.
+
+Artifacts: rebuilt from `git archive d85a727` with SOURCE_DATE_EPOCH=1791504000,
+uv 0.9.22, Python 3.14.2, `--build-constraints scripts/release-constraints.txt`
+and `--no-create-gitignore`; both match `plans/releases/v2.0.0rc1.sha256`
+byte for byte (wheel 7f8da83d…0e7263, sdist e7a5f8fa…b09b0b). The CHANGELOG's
+first date gives epoch 1791504000, as `publish.yml` derives.
+
+Full suite from the extract, both engines: 7330 passed, 6 skipped, 1 failed.
+The failure is `test_version_is_public_string_synchronized_with_metadata`,
+from stale installed metadata (`2.0.0rc1.dev0`) in the local `.venv`; an
+environment artifact, not a candidate defect.
+
+Sensitivity of the RC1 test files on the b2 source:
+
+| Test file | Failed on b2 |
+| --- | --- |
+| `test_cancelled_close.py` | 129 of 169 |
+| `test_text_seek_failure.py` | 16 of 22 |
+| `test_inspection_settlement.py` | 46 of 52 |
+| `test_seek_end.py` | 39 of 60 |
+| `test_abort_cleanup_reporting.py` | 14 of 20 |
+| `test_text_writelines_empty.py` | 2 of 34 |
+
+On the pre-#135 source (`7498a0c`), `test_inspection_settlement.py` fails
+exactly the 4 `TestRepeatedCancellationDuringCleanup` tests.
+
+## Answers
+
+1. Native completion before cleanup: yes, with the disclosed BC13 carve-out.
+   `_close_underlying` and `_finish_abort` submit through `_submit_native`
+   and wait in `_settle_before_cancel`; the scan's `_read_native` settles a
+   cancelled read before the `finally` closes the source through
+   `_initial_call`. Probe p4: 1500 random cancellations of verify, inspect,
+   close and context exit on a one-worker executor, counting /proc/self/fd:
+   no fd leak and no loop exception-handler reports; on b2 it leaks fds on
+   cancelled `close()` and text context exit. Carve-out: see N-a.
+2. Late I/O results: yes. `_NativeSourceCall` decides entry and prevention
+   under one lock; a successful scan read is returned once, a queued
+   cancelled read is prevented, a running one is settled and its result
+   discarded. `track_position=False` only skips `no_effect` evidence.
+3. Resource ownership and the close latch: yes. No await between
+   `_acquire_path` and the protected `try`; decoder construction inside it.
+   The abort latch requires the executor future to have completed without
+   exception. Probe p5 (2×1500 random cancelled exits with an active read,
+   1- and 2-worker executors): no handle latched CLOSED over an open raw
+   file, no fd leak after an explicit `close()` of handles left OPEN.
+   Borrowed files left open.
+4. Text seek transaction (BC11): yes, as narrowed by C1 and C1b. Snapshot of
+   immutable values plus a copied `_pending_lines`; cursor
+   `(position, decoder identity)` with the old decoder kept alive;
+   `_decode_cookie` errors raised before capture. Probe p3 (UTF-8 multibyte
+   text; no-effect and effect source failures, cancellation, timeouts;
+   checks the next read after a failed seek returns the pre-seek text or
+   the broken-stream `OSError`): 500 seeds on both engines, about 1,700
+   failed or cancelled seeks and 1,400 checked continuations, no violation;
+   b2 fails seed 0. A non-restorable binary-seek failure resets `_position`
+   so text sees "unchanged", but the binary reader is BROKEN and its poison
+   observer has dropped the text buffer. A CRC stop without movement
+   restores text in VALIDATION_SALVAGE (C1, documented).
+5. End-relative seek (BC12): yes. Each byte counted once; EOF and
+   `max_decompressed_size` unchanged. Probe p2 (read, peek, SEEK_SET,
+   SEEK_CUR, SEEK_END over multi-member streams, chunk sizes 1 to 64K,
+   against a payload model): 600 seeds pass on both engines; b2 fails seed
+   5 (`seek(5, SEEK_END)` returned 3119 instead of 5000).
+6. `writelines()` bound: yes, for exact `str`. Probe p7: 3000 random mixes
+   (empty strings, empty and non-empty subclasses, long lines,
+   `writelines([""])`; utf-8, utf-16, utf-32, utf-8-sig, latin-1; chunk
+   sizes 1 to 64) decompress identically to b2, BOM-only cases included.
+7. Cancellation accounting and error reporting (BC15): yes. The uncancel is
+   in `finally`, one request per abort, consumed once; outside counts
+   untouched. Types and precedence unchanged; cleanup failures only notes.
+   CLI exit 2 with `{"ok": false, ...}`. Probe p1 (scan error, then an
+   outside cancellation during the native close, then a failing close):
+   `CancelledError` with `__cause__` the close `OSError` and `__context__`
+   the `BadGzipFile`.
+8. Differential predicates: qualified yes; code spot-checked, sweeps not
+   re-run. BC11 requires identical failing seek rows, both cursor witnesses
+   moved and candidate BROKEN, and claims only refusals against a
+   reading-on reference until BROKEN ends. BC12 is metamorphic against
+   `fixed_root`, which refuses unless the original loop matches exactly
+   once. No overclaim found.
+9. Public contract: yes. Manifest and `pyproject.toml` unchanged; no
+   signature or exception-type change.
+10. Performance: qualified; no timing. The R12 record matches the packet,
+    including that `inspect()` was not re-timed after #128.
+11. Test-only changes: yes. F-A, F-B (now the inline path, which it guards)
+    and #132's level pin keep their sensitivity.
+12. Release inputs: yes. Changelog and ledger checked line by line against
+    the source; identity and rebuild bind the artifacts; `publish.yml`
+    verifies with exact set equality, proves refusal of an altered
+    artifact, and re-verifies before upload in both publish jobs.
+
+## Round 1 dispositions
+
+| ID | Correct and complete? |
+| --- | --- |
+| C1 | Yes; wording matches the three outcomes (restore, VALIDATION_SALVAGE, BROKEN) |
+| C1b | Yes; BC11 scoped to absolute seeks, text `SEEK_END` follows `read()` |
+| C2, C3, C5 | Yes; packet text corrected |
+| C4 | Yes; probe p7 found no byte change |
+| F1 | Yes; 4 tests fail without the repair; triple-fault precedence right (p1); the deferred `_acquire_path` case accurately described |
+| F2 | Yes, deferral accurate; p1 also showed the shielded-future log on 3.14.2 with the error chained correctly |
+| N1 | Yes; no action |
+| N3 | Disposition correct; description too narrow (N-a) |
+
+## Findings
+
+N-a (note; present in b2, not new in RC1; reproduced). `_finish_abort`'s
+`except asyncio.CancelledError: raise` around the active call's settlement,
+reached from `_close_on_context_exit`'s exceptional branch. A single first
+cancellation is enough, not only a repeated one. Probe p6: inside
+`async with aiogzip.open(path, "rb")` the body starts `f.read(10)` in a
+separate task; with a one-worker executor kept busy that read is queued as a
+native fill; the body raises `KeyError`, so the exit aborts; one
+`task.cancel()` arrives while the abort settles the queued read. Result:
+`__aexit__` raises `CancelledError` with `__context__ = None` (the
+`KeyError` is not chained), `f.closed == False` with the raw file still
+open, and the reader task gets `OSError: read aborted because the gzip file
+was closed…` although it is not. Identical on b2. BC13's ledger wording is
+accurate; only the packet's N3 should be widened. In probe p5, 11 of the
+handles left OPEN came from single-cancellation exits, 5 from two.
+
+N-b (note; environment only). Stale installed metadata in the local `.venv`.
+
+No blocker, high, medium or low defect in the RC1 changes.
+
+## Verdict
+
+No blocker; I would approve f67dd99 for 2.0.0rc1. The only follow-up is to
+widen the packet's N3 wording.

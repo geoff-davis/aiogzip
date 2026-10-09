@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0rc1] - 2026-10-09
+
+This release candidate keeps the 2.0 public API frozen: every public
+signature, type and codec-lifecycle rule is unchanged from `2.0.0b1`, and the
+runtime contract manifest is identical. It fixes remaining cases in which
+`2.0.0b2` could leave a file open after a cancelled close, return text from
+the wrong position after a failed seek, miscount an end-relative seek after
+`peek()`, or lose a cancellation in `inspect()` and `verify()`.
+
 ### Fixed
 
 - Cancelling `close()`, or an `async with` exit, while the underlying file's
@@ -16,10 +25,11 @@ All notable changes to this project will be documented in this file.
   and custom `close()` methods are unchanged.
 - Text `writelines()` stored every empty string it received in its pending
   batch, whose flush threshold counts characters, so a long run of empty
-  strings grew memory with the number of inputs. Empty strings are no longer
-  stored, so the batch stays within `chunk_size` items as documented. The
-  bytes written are unchanged, including the byte-order mark an empty write
-  emits for UTF-16 and UTF-32.
+  strings grew memory with the number of inputs. Empty `str` values are no
+  longer stored, so the batch stays within `chunk_size` items as documented;
+  empty instances of `str` subclasses are still stored, as before. The bytes
+  written are unchanged, including the byte-order mark an empty write emits
+  for UTF-16 and UTF-32.
 - An exceptional context exit that aborted a custom source or sink call whose
   code swallowed the cancellation left the calling task's cancellation count
   raised, so an enclosing `asyncio.timeout()` could report its own expiry as
@@ -43,12 +53,14 @@ All notable changes to this project will be documented in this file.
   lost. The cancellation now propagates, with the scan error as its context,
   and a close failure after a scan failure is attached to the scan error as a
   note instead of being dropped.
-- A text `seek()` that failed or was cancelled after it had moved the
-  underlying binary reader could leave the reader healthy over the old
-  buffered text, so the next read returned text from the wrong position
-  without an error. Such a reader now raises the terminal broken-stream
-  `OSError` until `seek(0)` succeeds; a seek that failed before moving the
-  binary reader leaves the text reader exactly as it was.
+- An absolute text `seek()` (to a position or a `tell()` cookie) that failed
+  or was cancelled after it had moved the underlying binary reader could
+  leave the reader healthy over the old buffered text, so the next read
+  returned text from the wrong position without an error. Such a reader now raises the terminal broken-stream
+  `OSError` until `seek(0)` succeeds. A seek that failed before moving the
+  binary reader keeps the text position, and later reads follow the usual
+  rules for the error that stopped it. `seek(0, os.SEEK_END)` reads to the
+  end and follows the `read()` failure rules, as before.
 - A binary `seek(offset, os.SEEK_END)` after a `peek()` that had already
   reached the end of the data ignored the peeked bytes, so it returned a
   position short of the end (0 on a fresh file) and later reads returned
@@ -65,7 +77,8 @@ All notable changes to this project will be documented in this file.
   gzip clamps, a text read must not be retried after `UnicodeDecodeError`,
   and `inspect()` memory grows with the member count and header fields.
   Also documented the end-relative seek and context-exit cleanup fixes in
-  this release.
+  this release. The note on `compresslevel` defaults now says that
+  `gzip.open()` defaults to 9 only before Python 3.15, which lowers it to 6.
 
 ## [2.0.0b2] - 2026-10-07
 
