@@ -122,8 +122,10 @@ otherwise it stays reportably open and `close()` retries. A cancellation that
 arrives while the exit is still waiting for an active call to settle no longer
 skips the close: once that call has settled, the exit closes the file in the
 same way and then propagates the cancellation. When the context body raised,
-that cancellation keeps the body's exception as its `__context__`. Custom file
-objects' async `close()` methods are cancelled cooperatively, as before.
+that cancellation keeps the body's exception in its chain: as its
+`__context__`, or, when the close failed, as the context of the close failure
+that is the cancellation's `__cause__`. Custom file objects' async `close()`
+methods are cancelled cooperatively, as before.
 
 Cancellation while a clean context exit is waiting for an active call also
 attempts abortive owned-resource cleanup before the cancellation propagates.

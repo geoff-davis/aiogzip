@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
   does) skipped the close once that call had settled, leaving the handle and
   its file open until `close()` or garbage collection. The exit now closes
   the file before the cancellation propagates, as an uncancelled exit does,
-  and the cancellation keeps the body's exception as its `__context__`. A
+  and the body's exception stays in the cancellation's exception chain. A
   clean exit cancelled twice while waiting for an active call is fixed the
   same way.
 

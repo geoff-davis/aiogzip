@@ -617,6 +617,68 @@ class TestCancelledAbortSettlement:
         assert opened.handle.closed
 
     @pytest.mark.parametrize("kind", KINDS)
+    @pytest.mark.parametrize("close_fails", [False, True])
+    async def test_custom_source(self, kind, close_fails):
+        failure = OSError("injected close failure")
+
+        class Source:
+            # The read finishes its cancellation only when released.
+            def __init__(self):
+                self.entered = asyncio.Event()
+                self.release = asyncio.Event()
+                self.closes = 0
+
+            async def read(self, size=-1):
+                self.entered.set()
+                try:
+                    await asyncio.Future()
+                except asyncio.CancelledError:
+                    await self.release.wait()
+                    raise
+                raise AssertionError("unreachable")
+
+            async def close(self):
+                self.closes += 1
+                if close_fails:
+                    raise failure
+
+        source = Source()
+        cls = AsyncGzipBinaryFile if kind == "binary" else AsyncGzipTextFile
+        handle = cls(
+            None, "rb" if kind == "binary" else "rt", fileobj=source, closefd=True
+        )
+        await handle.__aenter__()
+        reader = asyncio.create_task(handle.read())
+        await asyncio.wait_for(source.entered.wait(), 10)
+        body = KeyError("body")
+
+        async def exit_context():
+            try:
+                raise body
+            except KeyError:
+                return await handle.__aexit__(KeyError, body, body.__traceback__)
+
+        exiting = asyncio.create_task(exit_context())
+        await asyncio.sleep(0.01)
+        exiting.cancel()
+        await asyncio.sleep(0.01)
+        # The abort is still waiting for the source's read to finish.
+        assert not exiting.done() and source.closes == 0
+        source.release.set()
+        error = await _outcome(exiting)
+        assert isinstance(error, asyncio.CancelledError)
+        assert source.closes == 1
+        if close_fails:
+            assert error.__cause__ is failure
+            assert failure.__context__ is body
+            assert not handle.closed
+        else:
+            assert error.__context__ is body
+            assert handle.closed
+        result = await _outcome(reader)
+        assert isinstance(result, OSError) and "read aborted" in str(result)
+
+    @pytest.mark.parametrize("kind", KINDS)
     async def test_borrowed_file_stays_open(self, path, executor, kind):
         opened = await _open(kind, "r", "borrowed", path)
         active, exiting, body = await _cancel_abort_settlement(
