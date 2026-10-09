@@ -76,7 +76,7 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 - [x] R10
 - [x] R11
 - [x] R12
-- [ ] R13
+- [x] R13
 - [ ] R14
 - [x] R15
 
@@ -557,6 +557,16 @@ are in the [R12 record](reviews/v2.0.0rc1-r12-record.md).
 
 *Closed 2026-10-09: Codex approved, maintainer signed off, merged in PRs #128
 and #129.*
+
+### R13: RC review and approval
+
+Codex and a fresh Claude Opus 5.5 subagent cross-reviewed the candidate in
+two rounds, recorded in the [candidate review](reviews/v2.0.0rc1-candidate-review.md).
+Round 1 found documentation overstatements and one low diagnostic defect,
+repaired in PR #135; the artifacts were rebuilt and round 2 found nothing.
+
+*Closed 2026-10-09: the maintainer approved `f67dd99` (hosted run
+37983380928, 22 of 22).*
 
 ## 5. Deferred past RC1
 
