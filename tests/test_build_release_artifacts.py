@@ -153,3 +153,31 @@ def test_source_version_needs_no_site_packages():
     )
     init = (root / "src" / "aiogzip" / "__init__.py").read_text(encoding="utf-8")
     assert f'__version__ = "{result.stdout.strip()}"' in init
+
+
+def test_release_artifacts_are_exactly_one_wheel_and_one_sdist(release, tmp_path):
+    (tmp_path / "pkg-1.0-py3-none-any.whl").write_bytes(b"w")
+    (tmp_path / "pkg-1.0.tar.gz").write_bytes(b"s")
+    assert release._release_artifacts(tmp_path) == (
+        tmp_path / "pkg-1.0-py3-none-any.whl",
+        tmp_path / "pkg-1.0.tar.gz",
+    )
+
+
+@pytest.mark.parametrize(
+    "extra", [".gitignore", "pkg-1.0-py3-none-any.whl.asc", "pkg-0.9.tar.gz"]
+)
+def test_any_other_file_in_dist_fails(release, tmp_path, extra):
+    # Every file in dist is recorded and published, and the publish job's
+    # artifact upload drops hidden files, so uv's .gitignore once entered the
+    # record and would have failed the publish job's second check.
+    (tmp_path / "pkg-1.0-py3-none-any.whl").write_bytes(b"w")
+    (tmp_path / "pkg-1.0.tar.gz").write_bytes(b"s")
+    (tmp_path / extra).write_bytes(b"x")
+    with pytest.raises(RuntimeError, match="exactly one wheel and one sdist"):
+        release._release_artifacts(tmp_path)
+
+
+def test_uv_build_does_not_create_a_gitignore():
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert '"--no-create-gitignore"' in source
