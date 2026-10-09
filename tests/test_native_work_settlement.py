@@ -73,7 +73,7 @@ async def test_cancel_retains_native_input_and_cleanup_order(
             if target in ("caller", "both"):
                 caller.cancel("caller cancelled")
             if target in ("waiter", "both"):
-                waiters[0].cancel("helper cancelled")
+                waiters[-1].cancel("helper cancelled")
             for _ in range(4):
                 await asyncio.sleep(0)
             assert not caller.done()

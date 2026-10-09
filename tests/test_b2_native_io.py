@@ -66,7 +66,7 @@ async def test_real_codec_worker_settles_before_caller_cancellation(
         for _ in range(cancellations):
             caller.cancel()
             if cancel_waiter:
-                waiters[0].cancel()
+                waiters[-1].cancel()
             await asyncio.sleep(0)
         assert not caller.done()
         with pytest.raises(RuntimeError, match="active operation"):
