@@ -1,0 +1,78 @@
+Reviewed **9a3bf3b47fa644e6568e4d84768895d18f4112a3** as one change from `v2.0.0b2`.
+
+The requested identity command printed nothing:
+
+```text
+git diff --name-only 2a350db 9a3bf3b | grep -v '^plans/'
+```
+
+`tests/data/public_api_2_0.json` is identical to both b2 and b1. The working tree’s source, tests, scripts and workflows match the reviewed SHA. The packet has local modifications; this review uses its **committed contents at 9a3bf3b**, not those modifications.
+
+I reviewed statically and ran small, in-memory functional probes. I did not change files, run benchmarks or repeat the executor suites. Hosted CI success is maintainer-reported; my read-only GitHub query could not connect.
+
+**Answers to the 12 questions**
+
+1. **Native completion before cleanup — Qualified yes.** Entered native work settles before cleanup; queued scan reads may instead be prevented before entry. Submitted native closes are not cancelled. Evidence: `_inspection.py:34–58`, `_source_io.py:124–139`, `_binary.py:2206–2277`, `_codec_async.py:52–75`. The qualification remains that cancellation during abort’s active-call settlement can propagate before close is submitted.
+
+2. **Late I/O results — Yes.** Late acquisition is closed; cancelled scan reads either never enter or finish before the scan becomes terminal. Their discarded output is not subsequently fed to the decoder. Successful reads are fed once. Evidence: `_opening.py:36–71`, `_inspection.py:45–58` and `104–128`. `track_position=False` removes checkpoint work, not completion ownership.
+
+3. **Ownership and close latch — Yes, subject to cleanup failures.** Ownership follows `owns_source`/`closefd`; borrowed files remain open. Abort checks the executor future’s actual outcome before latching CLOSED after cancellation. A failing close leaves abort cleanup retryable. Evidence: `_inspection.py:85–92`, `_binary.py:2228–2268`; `TestCloseThatLeavesTheFileOpen` in `tests/test_cancelled_close.py:544`.
+
+4. **Text seek transaction — Qualified.** The SET-position transaction correctly distinguishes a changed logical position or decoder identity, copies the pending-line list, and restores decoder/origin/newline state where permitted. It also respects closure during abort. Evidence: `_text.py:583–680`, `_binary.py:1673–1700`; rollback and cancellation tests at `tests/test_text_seek_failure.py:383`, `426` and `531`. **The blanket “every failed seek changes nothing or becomes BROKEN” claim is stronger than the implementation; finding 1 below.**
+
+5. **End-relative seek — Yes for the drain accounting.** Unread bytes are counted and removed before the next refill or EOF check, so they cannot be counted twice. Validation and limits still run through `_fill_buffer()`. Evidence: `_binary.py:604–639`, `tests/test_seek_end.py`. **EOF alone is not proof of validation:** failure paths also set EOF, and `_decompress_next()` sets it before driving `finish()` (`_binary.py:1368–1390`). Health must be considered alongside it.
+
+6. **`writelines()` bound — Qualified yes for ordinary strings.** Exact empty strings use a flag; batching and BOM behavior remain equivalent. String subclasses deliberately retain b2’s treatment. Evidence: `_text.py:2178–2226`, `tests/test_text_writelines_empty.py:213–236`. Consequently, the universal bound claim needs qualification; finding 4 below.
+
+7. **Cancellation accounting and reporting — Yes for BC15.** The custom-call `finally` consumes the abort’s one request irrespective of outcome; `_finish_abort()` issues that request under the close lock. Outside requests remain counted. Cleanup notes retain BC15’s precedence, including failure-bearing repeated cancellation. Evidence: `_binary.py:1537–1585`, `1872–1894`, `1958–1977`, `2206–2216`; `tests/test_abort_cleanup_reporting.py`. CLI failures retain JSON/text formatting and exit 2 (`__main__.py:85–94`).
+
+8. **Differential predicates — Qualified yes.** I found no new overclaim in their combined composition. BC11 requires moved witnesses and candidate BROKEN, then exact refusal/read-on shapes. BC12 patches exactly one known loop and checks prefix and event order. Clause S claims only the narrowly witnessed cancel row. Evidence: `differential.py:337–403`, `1208–1384`, `1415–1468`, `1706–1760`. BC11’s admitted error outcomes remain evidence *consistent with* reading on, rather than an independent proof of its cause; the ledger discloses that limitation. Unmodeled lossy spans remain excluded from BC2 claims (`2187–2237`).
+
+9. **Public contract — Yes.** The manifest and public signatures/types remain frozen; the production delta consists of ledgered correctness fixes. Evidence: unchanged manifest, `docs/stability.md:3–7` and `29–44`, ledger BC11–BC15. I found no interaction requiring another beta.
+
+10. **Performance — Qualified.** R12 records the attributable slowdown, repair, accepted +6.52% `verify()` remainder, and noise dispositions honestly. Its re-check explicitly covers **verify only** (`v2.0.0rc1-r12-record.md:89–109`). The candidate packet loses that qualification; finding 3 below. No new timing was performed.
+
+11. **Test-only changes — Yes, with the disclosed limits.** GC suppression preserves a positive leak control and restores collection after failure. The checkpoint test forbids executor offload and requires an actual companion-task handoff. Explicit compression level 9 preserves recorded capture fixtures. Evidence: `interpreter.py:1128–1143`, `test_stateful.py:128–185`, `test_codec_async.py:411–452`, `capture_file_state_trace.py:26`. Process-wide descriptor interference and cross-version benchmark defaults remain appropriately disclosed.
+
+12. **Release inputs — Qualified yes.** Identity establishes unchanged release inputs since `2a350db`; the committed record names exactly the wheel and sdist. Publication checks them before artifact transfer and again before either upload. Evidence: `publish.yml:93–161` and `175–190`, `verify_release_artifacts.py`, `build_release_artifacts.py:235–313`. Changelog/ledger wording needs the corrections below. Changing packaged documentation or the changelog requires rebuilding the artifacts and updating their record.
+
+**Findings**
+
+1. **MEDIUM — BC11’s published guarantee overstates unchanged-cursor failures.**
+   Locations: [docs/errors.md:245](/home/geoff/Projects/personal/aiogzip/docs/errors.md:245), [CHANGELOG.md:55](/home/geoff/Projects/personal/aiogzip/CHANGELOG.md:55), ledger BC11, packet question 4.
+
+   **Reproduced:** On a fresh text reader containing `abc\ndef\n` with a bad CRC, both `seek(100)` and `seek(0, SEEK_END)` raise `BadGzipFile`, leave `VALIDATION_SALVAGE`, and permit the next `read()` to return `abc\ndef\n`. The cursor is unchanged, but health and available salvage have changed. `SEEK_END` also runs through `read()`, outside the new SET transaction (`_text.py:575–579`).
+
+   This is compatible validation-salvage behavior, not a demonstrated runtime defect. Narrow the guarantee to cursor-moving transactional seeks and distinguish no-effect rollback from integrity-failure salvage. **Behavior present in b2; overstatement new in RC1.**
+
+2. **MEDIUM — Packet overstates differential coverage against C0.**
+   Location: committed packet **line 108**.
+
+   It says both listed seed ranges pass against b2, b1 **and c0**. The plan records the 1M block against b2/b1 and only 0–5999 against C0 (`RC1_PLAN.md:213–215`). It also separately records the passing 2M block (`240–247`), which the packet omits.
+
+   **Verified by record comparison, not a new sweep.** State the reference/range combinations separately. **New RC1 packet error.**
+
+3. **MEDIUM — Packet overstates post-repair inspection measurements.**
+   Locations: committed packet **lines 109 and 141–142**.
+
+   The initial window found `inspect()` costs above 5%; after #128, only `verify()` was re-timed. The packet’s “repair rows within 5% apart from verify” wording reads as a measured post-repair result for inspection too. Preserve R12’s explicit limit: inspection shares the repaired path, but its final cost was not separately measured.
+
+   **Verified against R12’s record; no new timing. New RC1 packet overstatement.**
+
+4. **LOW — R08’s bound is not universal for accepted string subclasses.**
+   Locations: [CHANGELOG.md:26](/home/geoff/Projects/personal/aiogzip/CHANGELOG.md:26), [_text.py:2178](/home/geoff/Projects/personal/aiogzip/src/aiogzip/_text.py:2178), packet question 6.
+
+   **Reproduced:** With `chunk_size=64`, an iterator yielding 1,000 instances of a plain empty `str` subclass leaves 1,000 entries in `pending` before exhaustion. This intentionally preserves subclass behavior.
+
+   Qualify the bound and “empty strings are no longer stored” claims to ordinary/exact strings. **Runtime limitation present in b2; universal claim new in RC1.**
+
+5. **LOW — Packet’s BC14 diagnostic summary omits precedence qualifications.**
+   Location: committed packet **lines 127–129**.
+
+   Cleanup cancellation outranks an **ordinary Exception**, not an existing cancellation or interrupt. Those remain primary with cleanup noted (`_inspection.py:152–164`). The ledger already states this accurately. Qualify the packet likewise.
+
+   **Verified statically; no additional reproduction. New RC1 packet imprecision.**
+
+The committed §17 table otherwise accurately distinguishes informational Python 3.15 qualification from support, and identifies external review as a pending maintainer decision. The deferral list is substantially complete. I did not independently verify its current public-feedback or remote branch-protection claims.
+
+**Verdict: changes requested for documentation and evidence accuracy; no new RC1 runtime blocker found in the combined repairs.**

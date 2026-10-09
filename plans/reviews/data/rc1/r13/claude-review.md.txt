@@ -1,0 +1,170 @@
+# aiogzip 2.0.0rc1 candidate review (R13), Claude cross review
+
+(Returned as the subagent's final message on 2026-10-09; the harness refused
+its write to /tmp/claude-1000/r13-claude-review/report.md. Saved here by the
+implementing session, which kept the header, findings and verdict and
+condensed the evidence under each answer; the answers themselves are as
+given. Probe scripts were under /tmp/claude-1000/r13-claude-review/probes/
+and are not archived.)
+
+## 1. Header
+
+- Reviewed SHA: `9a3bf3b47fa644e6568e4d84768895d18f4112a3`. The working tree
+  is at that commit; the only local changes are the uncommitted `plans/`
+  packet edit and two untracked files, none touched.
+- Reviewer model: `claude-opus-5-5` (Claude Opus 5.5), a fresh subagent with
+  no access to the implementing session's history or memory. Same model
+  family as the implementer: a second reader, not an independent review.
+- Scope: `git diff v2.0.0b2 9a3bf3b`, most attention on `src/` (`_binary.py`,
+  `_text.py`, `_inspection.py`, `_opening.py`, `__main__.py`, `_common.py`);
+  tests, differential predicates, workflows and the release record
+  spot-checked. Ledger rows BC11–BC15, the RC1 plan and the R12 record used
+  as leads and checked against the code. No repository edits, no benchmarks.
+
+### Candidate identity
+
+- `git diff --name-only 2a350db 9a3bf3b | grep -v '^plans/'` printed nothing.
+- `tests/data/public_api_2_0.json` is byte-identical to the v2.0.0b1 and
+  v2.0.0b2 copies.
+- `codec.py`, `_codec_async.py`, `_streaming.py`, `_source_io.py` and
+  `_metadata.py` are unchanged from b2.
+
+### Artifact rebuild
+
+From `git archive 2a350db`:
+`SOURCE_DATE_EPOCH=1791504000 uv build --wheel --sdist --build-constraints scripts/release-constraints.txt --no-create-gitignore`
+with uv 0.9.22 (flit_core 4.1.0 via the constraints). Exactly two files, both
+byte-identical to `plans/releases/v2.0.0rc1.sha256`:
+
+- `aiogzip-2.0.0rc1-py3-none-any.whl`: `7a2fd1f0b3754d0fe64b3b1e982be4a4f8ae771c46f8852f0b03c52d57078acc`
+- `aiogzip-2.0.0rc1.tar.gz`: `a19dee969a595c6687fbc8dc5a433cf7c7fb910b6aa12c5616129248ff8e2b00`
+
+The sdist has no `plans/` member.
+
+### Test runs at the SHA
+
+| Run | Engine | Result |
+| --- | --- | --- |
+| Full suite | default (zlib-ng decompression) | 7331 passed, 2 skipped |
+| Full suite | `AIOGZIP_ENGINE=stdlib` | 7331 passed, 2 skipped |
+| RC1 regression files only | default | 429 passed |
+| RC1 regression files only | stdlib | 353 passed |
+
+## 2. Answers
+
+Q1. Native completion before cleanup: yes, with one carve-out BC13
+discloses. `_close_underlying` and `_finish_abort` submit the close with
+`_submit_native` and await `_settle_before_cancel`, which shields the work,
+never cancels it and waits through repeated cancellations. The scan settles
+its open (`_acquire_path`), each read (`_read_native`, `_NativeSourceCall`
+with `cancel_pending=True`) and its close (`_initial_call`). Probes p1 and p4
+confirmed the caller resumes only after the gated native close returned.
+Carve-out: a cancellation landing in `_finish_abort` while it is still
+settling the active call re-raises before any close is submitted; the handle
+stays OPEN and the fd open until garbage collection (BC13: "as before").
+
+Q2. Late I/O results: yes. A scan read completing after cancellation is
+retrieved, its bytes dropped, and a worker failure chained as `__cause__`. A
+queued read is prevented under the `_NativeSourceCall` lock. After
+cancellation no read result reaches the decoder. `track_position=False` only
+disables `no_effect` evidence, which the scan never uses. A late path open is
+closed exactly once (probe p3).
+
+Q3. Resource ownership and the BC13 latch: yes. The scan owns the source only
+when `fileobj is None` or `closefd is True`; a late open is closed inside
+`_acquire_path` with no await before the scan's `try`; decoder construction
+is inside the protected region. `cancelled_after_close` is set only when
+`not work.cancelled() and work.exception() is None` on the executor future
+after settlement; a failing close raises before `_mark_closed`, leaving the
+handle OPEN. `closefd=False` files are never closed.
+
+Q4. Text seek transaction (BC11): yes. The cursor is `(_position, _decoder)`
+with decoder identity kept alive by the tuple. When the binary reader breaks,
+binary `seek()` resets `_position`, so the cursor can compare equal, but
+`_can_restore_failed_read()` is then False and the poison observer has
+already latched and cleared text. The snapshot shares no mutable state.
+`_pending_read_origin` is outside the snapshot but excluded by the
+`_read_call` reservation. Probes p2 and p5: after a forward seek moves the
+cursor and fails, reads, `buffer.read` and text `seek(0, SEEK_END)` raise the
+terminal `OSError`; `seek(0)` recovers.
+
+Q5. End-relative seek (BC12): yes. The loop counts unread output, breaks on
+EOF, then fills; each byte counted once. EOF still set by the decoder after
+trailer validation; `max_decompressed_size` still enforced; a non-HEALTHY
+reader rejected before the loop. `BC12_AFTER` matches the shipped loop.
+
+Q6. `writelines()` bound: qualified yes. For exact `str`, `pending` holds only
+non-empty strings; `pending_empty` reproduces every write a stored `""` would
+have caused on every exit path; bytes identical to b2. Caveat N2.
+
+Q7. Cancellation accounting and reporting (BC15): qualified yes. The uncancel
+is in `finally`, guarded by `_source_abort_requested`, consumed exactly once.
+Types and precedence unchanged; cleanup failures only as notes. CLI: usage
+errors 2, stream errors 1 with `{"ok": false, ...}`, other `Exception` 2. Not
+consistent with BC15: the scan's cleanup notes (F1).
+
+Q8. Differential predicates: qualified yes (spot check). BC11 requires an
+identical failing seek, both `cursor_moved` witnesses and candidate BROKEN,
+and claims only refusals against a reading-on reference until BROKEN ends.
+BC12 is metamorphic (`count(BC12_BEFORE) == 1`, prefix agreement) and claims
+only `diff(original) − diff(fixed)`. Seed sweeps not re-run; clause S not
+audited beyond the ledger.
+
+Q9. Public contract: yes. Manifest byte-identical; no signature, exception
+type or dataclass change; `__init__.py` diff is the version only.
+
+Q10. Performance: yes (record review only). R12 discloses the R03 cost, its
+attribution, the #128 repair and re-check (+4.46 to +6.52% on `verify()`), and
+that `inspect()` was not re-timed after #128. `f7c03c0` has the same
+`_inspection.py`, `_source_io.py` and `_opening.py` as `2a350db`; after
+`dd70af4` the only `src/` changes are #128 and the version.
+
+Q11. Test-only changes: yes. F-A keeps leak sensitivity; F-B requires strict
+checkpoint/companion alternation with no offload; #132 pins level 9.
+
+Q12. Release inputs: yes. Rebuilt artifacts byte-identical; changelog matches
+the code apart from F1/N2 wording; the publish workflow builds
+`--ref $GITHUB_SHA` with uv 0.9.22, derives the epoch from the first dated
+changelog heading, verifies with a negative control, uploads, and re-verifies
+after download immediately before publishing.
+
+## 3. Findings
+
+F1 (low, new in RC1): the scan reports a repeated cancellation as a cleanup
+failure and loses a real close failure. `_inspection.py:152-164`. A scan
+cancelled during a read, then cancelled again during the settled cleanup
+close, notes `Source cleanup also failed: CancelledError()` although nothing
+failed; if the close raised `OSError`, settlement raises
+`cancellation from OSError`, the note still says `CancelledError()` and the
+`OSError` is lost. `_close_on_context_exit` (BC15) adds no note for a bare
+repeated cancellation and notes its `__cause__` otherwise. Reproduced for
+`inspect()` and `verify()` with a gated executor. Diagnostics only. Related b2
+defect: `_acquire_path` (`_opening.py:57`) produces
+`Opening cleanup also failed: CancelledError()` the same way (probe p3).
+
+F2 (low; mechanism in b2, newly reached by RC1 closes): on Python 3.14+, a
+failed settled native close under cancellation also logs "OSError exception
+in shielded future". `_settle_before_cancel` (`_codec_async.py:52-75`); from
+CPython 3.14 `shield` attaches `_log_on_exception` to the inner future when
+the outer is cancelled. Reproduced: 3.12 no handler calls; 3.14
+`['OSError exception in shielded future']`, with the correct
+`CancelledError` caused by the `OSError` in both. Spurious error-level log
+only.
+
+Notes:
+
+- N1: BC11 recovery is broader than "until a seek(0) that completes": a
+  positive plain `seek(n)` also leaves BROKEN; `tell()` on a BROKEN text
+  handle returns the binary position instead of raising.
+- N2: `writelines()` still stores zero-length `str` subclasses
+  (`_text.py:2212`), as b2 did; the changelog and code comment overstate the
+  bound for subclasses.
+- N3: a repeated cancellation while the abort is still settling the active
+  call skips the close; BC13 discloses this as "as before".
+
+## 4. Verdict
+
+No blocker, high or medium issues. The two low findings affect diagnostics
+only (F1 new in RC1; F2 a b2 mechanism RC1's closes now reach). Neither needs
+to block the RC, but F1 is a cheap fix if the candidate is rebuilt for
+another reason.
