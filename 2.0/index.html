@@ -988,9 +988,10 @@ use async with.").</p>
 </ul>
 <blockquote>
 <p><strong>Default compression level.</strong> <code>aiogzip</code> defaults to <code>compresslevel=6</code> (the
-zlib default — a better speed/ratio tradeoff), whereas <code>gzip.open()</code> defaults
-to <code>9</code>. The two therefore produce different <code>.gz</code> sizes by default. For
-byte-size parity with stdlib defaults, pass <code>compresslevel=9</code>:</p>
+zlib default — a better speed/ratio tradeoff). Before Python 3.15,
+<code>gzip.open()</code> defaults to <code>9</code>, so the two produce different <code>.gz</code> sizes by
+default; Python 3.15 lowers the stdlib default to <code>6</code> as well. For byte-size
+parity with stdlib's level 9, pass <code>compresslevel=9</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">async</span> <span class="k">with</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"file.gz"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">,</span> <span class="n">compresslevel</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="k">await</span> <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">"..."</span><span class="p">)</span>
 </code></pre></div>

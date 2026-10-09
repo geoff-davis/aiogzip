@@ -526,6 +526,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#closed-and-unopened-handles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closed and unopened handles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-sink-errors-in-write-and-flush" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom sink errors in write() and flush()
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#same-handle-concurrency" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -761,6 +783,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#closed-and-unopened-handles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closed and unopened handles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-sink-errors-in-write-and-flush" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom sink errors in write() and flush()
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#same-handle-concurrency" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -898,7 +942,7 @@ system text may vary.</p>
 <tr>
 <td>Operations on a closed file</td>
 <td><code>ValueError</code></td>
-<td>Matches <code>io</code> module conventions.</td>
+<td>Matches <code>io</code> module conventions, except that <code>async for</code> over a closed handle ends without raising (see below).</td>
 </tr>
 <tr>
 <td>Reading a write-mode file (or vice versa)</td>
@@ -920,6 +964,30 @@ to general:</p>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="o">...</span>  <span class="c1"># I/O failure, or the decompression cap tripped (see below)</span>
 </code></pre></div>
+<h2 id="closed-and-unopened-handles">Closed and unopened handles</h2>
+<p>Reads, writes and seeks on a closed handle raise <code>ValueError</code>. Iteration is
+the exception: <code>async for</code> over a closed binary or text handle yields nothing
+and ends, as if at end of file, instead of raising. Check <code>closed</code> first if a
+loop must distinguish a closed handle from an empty stream.</p>
+<p><code>flush()</code> on a write handle that has not been opened yet (constructed but not
+entered with <code>async with</code>) returns without error: no gzip member has started,
+so there is nothing to flush.</p>
+<h2 id="custom-sink-errors-in-write-and-flush">Custom sink errors in <code>write()</code> and <code>flush()</code></h2>
+<p>When a custom <code>fileobj</code>'s <code>write()</code> raises, the two calls report it
+differently:</p>
+<ul>
+<li><code>write()</code> lets the sink's exception propagate unchanged, whatever its type.</li>
+<li><code>flush()</code> wraps any <code>Exception</code> that is not an <code>OSError</code> as
+  <code>OSError("Unexpected error during flush: ...")</code>, with the original as
+  <code>__cause__</code>. A sink's <code>OSError</code> normally propagates as raised (aiogzip
+  rewrites only one whose message begins with its own internal
+  <code>Unexpected error during compression flush:</code> prefix). Cancellation and
+  interrupts such as <code>KeyboardInterrupt</code> propagate unwrapped.</li>
+</ul>
+<p>Either way the writer is broken afterwards: discard the incomplete output and
+create a new writer. Code that catches a sink's own exception type around
+<code>flush()</code> should inspect <code>__cause__</code>. Unifying the two is a candidate for a
+later release because it changes an exception type.</p>
 <h2 id="same-handle-concurrency">Same-handle concurrency</h2>
 <p>One <code>AsyncGzipBinaryFile</code> or <code>AsyncGzipTextFile</code> handle is intentionally owned
 by one task at a time. If a read, seek, write, flush, or close overlaps an
@@ -954,8 +1022,36 @@ it never returns a truncated prefix or reports success for a gzip member that
 can no longer receive its trailer. Cancellation delivered during cleanup still
 propagates, and a failed abortive underlying close leaves the handle reportably
 open so <code>close()</code> can be retried.</p>
+<p>Once a handle has submitted the native close of an aiofiles file it owns (a
+path, or a file object passed with <code>closefd=True</code>), cancellation cannot
+abandon that close: it runs to completion before the cancellation propagates,
+and a close failure becomes the cancellation's <code>__cause__</code>. During an
+abortive exit, the handle is closed only if that close returned normally;
+otherwise it stays reportably open and <code>close()</code> retries. A cancellation that
+arrives before the close is submitted, for example while the exit is still
+waiting for an active call to settle, propagates first and also leaves the
+handle open for <code>close()</code>. Custom file objects' async <code>close()</code> methods are
+cancelled cooperatively, as before.</p>
 <p>Cancellation while a clean context exit is waiting for an active call also
 attempts abortive owned-resource cleanup before the cancellation propagates.</p>
+<p>If that abortive cleanup fails, for example because a custom source's
+<code>close()</code> raises, the failure is recorded as a note beginning
+<code>Context-exit cleanup also failed:</code> instead of being dropped. Exception types
+and precedence are unchanged:</p>
+<ul>
+<li>When the context body raised, an ordinary exception from the cleanup is
+  noted on the body's exception. A cancellation or interrupt delivered during
+  the cleanup propagates instead, as before.</li>
+<li>When a cancellation interrupted a clean exit, the cancellation propagates
+  and any cleanup failure is noted on it, including a failure carried as the
+  cause of a repeated cancellation. A repeated cancellation on its own adds no
+  note.</li>
+</ul>
+<p>To abort an active read or write on a custom file object, the exit cancels
+the task running that call once, and consumes that request however the call
+ends, even if the custom object swallows the cancellation. An enclosing
+<code>asyncio.timeout()</code> in that task therefore still reports its own expiry as
+<code>TimeoutError</code>, and a separate outside cancellation of the task is kept.</p>
 <p>The maintained examples avoid same-handle overlap entirely: each shard task
 owns a separate file handle, and each transport codec operation is exhausted
 before the next begins.</p>
@@ -1039,6 +1135,25 @@ A cookie saved with <code>tell()</code> before the failure is not a recovery poi
 <code>seek(cookie)</code> may raise the same terminal <code>OSError</code> instead of rewinding. Call
 <code>seek(0)</code> first; once the reader has recovered, a saved cookie is an ordinary
 position again.</p>
+<p>An absolute text <code>seek()</code>, to a position or a <code>tell()</code> cookie, that fails or
+is cancelled after it has moved the underlying binary reader makes the
+reader terminal: later reads raise the same terminal <code>OSError</code> until
+<code>seek(0)</code> recovers it. A seek that fails before moving the binary reader
+leaves the text position where it was. If the binary reader is
+still healthy, the text reader is unchanged and the seek can be retried.
+Otherwise the binary reader's failure rules above apply: a gzip integrity
+failure leaves the recovery state, so later reads return the recovered text
+from the original position, and any other failure makes the reader terminal.
+Either way, a failed absolute seek is never followed by text from the wrong
+position. <code>seek(0, SEEK_END)</code> reads to the end, so its failures follow the
+<code>read()</code> rules above, including the <code>UnicodeDecodeError</code> caution below.</p>
+<p>Do not retry a text read that raised <code>UnicodeDecodeError</code>. The reader does
+not become terminal, but the failed read has already consumed the whole chunk
+of decompressed bytes it was decoding, so the next read resumes after that
+chunk and silently skips text, possibly far more than the undecodable bytes
+themselves. Call <code>seek(0)</code> to
+start again from the beginning, or reopen the file with a different <code>encoding</code>
+or an <code>errors</code> handler such as <code>"replace"</code>.</p>
 <h2 id="codec-finalization-and-operation-abandonment">Codec finalization and operation abandonment</h2>
 <p>Every state-changing <code>GzipEncoder</code> or <code>GzipDecoder</code> call reserves the codec and
 returns a lazy <code>CodecOperation</code>. Engine errors, integrity failures, or closing

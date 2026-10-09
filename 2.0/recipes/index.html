@@ -1108,6 +1108,17 @@ return the concatenated decompressed contents.</p>
 access index. Prefer sequential processing when possible. If repeated replay
 is expensive, reopening can make lifecycle intent clearer but does not avoid
 the decompression cost required to reach a later uncompressed offset.</p>
+<p>A binary reader's <code>seek(offset, SEEK_END)</code> decompresses the rest of the stream
+(validating every trailer) to find the end, then moves to <code>end + offset</code>,
+clamped to the range from zero to the end. Output already buffered by a
+<code>peek()</code> or partial read counts exactly once, so the result is the same
+whether or not the reader had already reached EOF.</p>
+<p>A read-mode <code>seek()</code> whose target is negative, such as <code>seek(-5)</code> or a
+<code>SEEK_CUR</code> offset that goes before the start, raises <code>OSError("Negative seek
+in read mode")</code>. The stdlib <code>gzip.GzipFile</code> instead clamps it and returns 0.
+Clamp the target yourself if you depend on that behavior. In text mode a
+negative argument is a <code>tell()</code> cookie, not an offset (see
+<a href="../api/#seek-and-tell-in-text-mode"><code>seek()</code> and <code>tell()</code> in text mode</a>).</p>
 <h2 id="cancellation">Cancellation</h2>
 <p>Large compression and decompression calls may run in an executor. A worker
 thread cannot be stopped after its awaiting task is cancelled, so cancellation
