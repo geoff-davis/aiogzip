@@ -8,8 +8,8 @@ G17 quiet gate.
   - `results-ab-20261009-010000/`: b2 `962bfe4` against the candidate
     `dd70af4`.
   - `results-aa-20261009-011210/`: the candidate against itself.
-  - Each window holds its 32 runner, write-size and `rc1_paths.py` capture
-    JSONs and logs, `captures.tsv`, `foreign.log`, `quiet-gate.log`,
+  - Each window holds 48 capture JSONs and their logs (16 runner,
+    16 write-size and 16 `rc1_paths.py`), `captures.tsv`, `foreign.log`, `quiet-gate.log`,
     `environment.json`, `uv-sync-check.log`, `provenance.txt` and
     `window.json`, with each window's `summary.txt` beside it.
   - `harness/` holds the driver, the retry wrapper, `summarize.py`, the
