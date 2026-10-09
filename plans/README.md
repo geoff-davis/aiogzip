@@ -46,6 +46,11 @@ deferred work.
 - [Post-release: R14](reviews/v2.0.0rc1-post-release.md); 2.0.0rc1 was
   published on 2026-10-09 and development continues as `2.0.0rc2.dev0`
 
+### RC2 plan
+
+The [2.0.0rc2 plan](RELEASE_2_0_0RC2_PLAN.md) (gates S01–S09) covers the
+three deferred R13 limitations the maintainer chose to fix before 2.0.0.
+
 Each release's artifact hashes are recorded under
 [release artifact records](releases/README.md); the publish workflow uploads
 only the recorded files.
