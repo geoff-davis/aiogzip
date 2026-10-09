@@ -39,6 +39,8 @@ b2 baselines in plan §17. It was drawn from two read-only reviews of
 deferred work.
 
 - [R12 pre-registration: RC1 timing windows](reviews/v2.0.0rc1-r12-preregistration.md)
+- [R12 record: RC1 timing windows](reviews/v2.0.0rc1-r12-record.md), with
+  [its evidence](benchmarks/data/rc1/r12/README.md)
 
 Each release's artifact hashes are recorded under
 [release artifact records](releases/README.md); the publish workflow uploads
