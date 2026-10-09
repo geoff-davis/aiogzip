@@ -49,6 +49,25 @@ async def _run_in_thread(method: Callable[[bytes], _T], data: bytes) -> _T:
     return await _settle_before_cancel(loop.run_in_executor(None, method, data))
 
 
+def _completion_waiter(work: asyncio.Future[_T]) -> asyncio.Future[None]:
+    """Return a private future that completes when ``work`` does.
+
+    Unlike ``asyncio.shield``, the waiter never retrieves ``work``'s outcome,
+    so the caller alone observes it. Since Python 3.14, a cancelled shield
+    makes the loop log a later failure of the inner future even after the
+    caller retrieved and chained it.
+    """
+    waiter: asyncio.Future[None] = work.get_loop().create_future()
+
+    def wake(_: asyncio.Future[_T]) -> None:
+        if not waiter.done():
+            waiter.set_result(None)
+
+    work.add_done_callback(wake)
+    waiter.add_done_callback(lambda _: work.remove_done_callback(wake))
+    return waiter
+
+
 async def _settle_before_cancel(work: asyncio.Future[_T]) -> _T:
     """Delay cancellation until privately owned work reaches its terminal state.
 
@@ -57,22 +76,20 @@ async def _settle_before_cancel(work: asyncio.Future[_T]) -> _T:
     simultaneous worker failure as the cancellation's cause, and retrieve every
     result so no exception is left unobserved.
     """
-    try:
-        return await asyncio.shield(work)
-    except asyncio.CancelledError as cancellation:
-        while not work.done():
-            try:
-                await asyncio.shield(work)
-            except asyncio.CancelledError:
-                continue
-            except BaseException:
-                break
+    cancellation: asyncio.CancelledError | None = None
+    while not work.done():
         try:
-            work.result()
-        except BaseException as failure:
-            if failure is not cancellation:
-                raise cancellation from failure
-        raise
+            await _completion_waiter(work)
+        except asyncio.CancelledError as cancelled:
+            if cancellation is None:
+                cancellation = cancelled
+    if cancellation is None:
+        return work.result()
+    try:
+        work.result()
+    except BaseException as failure:
+        raise cancellation from failure
+    raise cancellation
 
 
 async def _cooperative_checkpoint() -> None:

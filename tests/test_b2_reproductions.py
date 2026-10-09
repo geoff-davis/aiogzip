@@ -58,7 +58,7 @@ async def test_native_cleanup_follows_final_worker_access(monkeypatch):
         await asyncio.wait_for(entered.wait(), 5)
         caller.cancel()
         # With no helper, owners[0] is caller: this is repeated caller cancellation.
-        # Distinct shield-waiter cancellation is covered in the settlement matrix.
+        # Distinct completion-waiter cancellation is covered in the settlement matrix.
         owners[0].cancel()
         # A callback barrier lets cancellation propagate without wall-clock sleeps.
         for _ in range(8):

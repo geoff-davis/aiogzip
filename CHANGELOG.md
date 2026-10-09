@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- On Python 3.14, a codec step or native file call that failed after its
+  caller was cancelled was also logged by the event loop as an "exception in
+  shielded future", although the failure was already raised as the
+  cancellation's cause. Cancellation now waits for the work without
+  `asyncio.shield`, so the failure is reported only through the exception.
+
 ## [2.0.0rc1] - 2026-10-09
 
 This release candidate keeps the 2.0 public API frozen: every public
