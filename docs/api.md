@@ -195,8 +195,9 @@ with many members or very large header fields can therefore use substantial
 memory; prefer `verify()` when per-member metadata is not needed.
 
 Cancelling `inspect()` or `verify()` waits for any native open, read or close
-already handed to a worker thread to finish before the cancellation
-propagates. A file opened by path is closed once, and only after its last
+already running in a worker thread to finish before the cancellation
+propagates. A native read still queued for a worker is skipped and never
+touches the source. A file opened by path is closed once, and only after its last
 read; if that close itself fails, the failure is reported as below. A
 borrowed `fileobj` is closed only when `closefd=True`.
 

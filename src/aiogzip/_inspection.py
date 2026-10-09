@@ -7,7 +7,11 @@ from typing import Any, Optional, Tuple, Union, cast
 
 import aiofiles
 
-from ._codec_async import _DECODE_OFFLOAD_THRESHOLD, _drive_operation
+from ._codec_async import (
+    _DECODE_OFFLOAD_THRESHOLD,
+    _drive_operation,
+    _settle_before_cancel,
+)
 from ._common import (
     WithAsyncRead,
     WithAsyncReadWrite,
@@ -18,13 +22,40 @@ from ._common import (
 )
 from ._metadata import GzipInfo, GzipMemberInfo, VerificationResult
 from ._opening import _acquire_path, _initial_call
-from ._source_io import _is_native_source
+from ._source_io import _is_native_source, _NativeSourceCall
 from .codec import GzipDecoder, _AsyncDrivableOperation, _snapshot_bytes_input
 
 __all__ = ["GzipInfo", "GzipMemberInfo", "VerificationResult"]
 
 _Filename = Union[str, bytes, Path, None]
 _ReadFileObj = Optional[Union[WithAsyncRead, WithAsyncReadWrite]]
+
+
+async def _read_native(source: Any, size: int) -> Any:
+    """Read a native aiofiles source; a cancelled read settles before it raises.
+
+    Cleanup must never close a source still being read. Unlike
+    ``_initial_call``, a successful read awaits the executor directly, with no
+    shield; only a cancellation pays for settlement, which also stops a read
+    the worker has not yet entered from touching the source at all.
+    """
+    loop = asyncio.get_running_loop()
+    if source._loop is not loop:
+        raise RuntimeError("aiofiles source belongs to a different event loop")
+    call = _NativeSourceCall(source._file, "read", (size,), loop, track_position=False)
+    try:
+        return await loop.run_in_executor(source._executor, call)
+    except asyncio.CancelledError as cancellation:
+        try:
+            await _settle_before_cancel(call.completion(cancel_pending=True))
+        except asyncio.CancelledError:
+            pass  # Settlement has finished; keep the first cancellation.
+        if not call.prevented:
+            try:
+                call.result()
+            except BaseException as failure:
+                raise cancellation from failure
+        raise cancellation
 
 
 @dataclass(frozen=True)
@@ -71,9 +102,7 @@ async def _scan_gzip(
         while True:
             try:
                 if _is_native_source(source, "read"):
-                    # Settle the worker's read before cancellation propagates,
-                    # so cleanup never closes a source still being read.
-                    chunk = await _initial_call(source, "read", chunk_size)
+                    chunk = await _read_native(source, chunk_size)
                 else:
                     chunk = await source.read(chunk_size)
             except OSError:
