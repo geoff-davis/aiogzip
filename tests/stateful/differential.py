@@ -361,6 +361,7 @@ def compare(
         clauses = (
             bc2_aborted_native_read(pair),
             bc2_trigger_only(pair),
+            bc2_recovered_cancel(pair),
             bc2_shadow_claim(pair, shadow),
             bc2_broken_refusal(pair, shadow),
         )
@@ -1099,6 +1100,9 @@ def _closed_row(pair: Pair, key) -> Row | None:
         return None
     if name in ("overlap", "close_during", "cancel"):
         call = pair.op(key)["call"]["op"]
+        if name == "cancel" and call == "seek_mark":
+            # No cookie: the event lands alone, as a direct seek_mark does.
+            return Row(key, _closed_outcome(call))
         return Row(key, _closed_outcome(call), {"skipped": True})
     return Row(key, _closed_outcome(name))
 
@@ -1230,16 +1234,114 @@ def _served(name: str, row: Row) -> bool:
     return _symbolic_text(value)
 
 
-def bc11(pair: Pair) -> Claim:
-    """A failed text seek that moved the binary cursor makes the candidate
-    terminal; the reference keeps serving its old text over the moved
-    position.
+# Errors a reference raises as it reads on from the moved cursor: decoding
+# from a byte that is not a character boundary, inflating from one that does
+# not start a member or block, or the scenario's armed source failure, which
+# the candidate's refusal never reaches.
+READ_ON_ERRORS = frozenset({"UnicodeDecodeError", "BadGzipFile"})
+# Each injected source failure's message, the op that arms it, and whether
+# its ``taken`` range is non-empty.
+INJECTED_SOURCE = {
+    "injected source failure without effect": ("fail_no_effect", False),
+    "injected source failure at end of input": ("fail_consumed", False),
+    "injected source failure after consuming input": ("fail_consumed", True),
+}
+BC11_READS = TEXT_READS | {"buffer_read", "seek_end"}
 
-    The seek event is identical on both sides and fails, both runs record
-    the cursor as moved by it, and the candidate model has the reader
-    BROKEN after it. Later differing reads are claimed while the candidate
-    stays BROKEN: the candidate refuses with the broken-stream error and
-    the reference returns data. A recovery ends the span.
+
+def _read_on(pair: Pair, name: str, row: Row) -> bool:
+    """The reference row carries out a read the candidate refused: it served
+    data (``_served``), a text ``seek_end`` returned a position, or the read
+    failed as reading on from the moved cursor can (``READ_ON_ERRORS``, or
+    an armed injected source failure with its exact ``taken`` range)."""
+    if _served(name, row):
+        return True
+    if (row.second, row.parked, row.pulled) != (None, None, None):
+        return False
+    outcome = row.outcome
+    if not isinstance(outcome, dict):
+        return False
+    if name == "seek_end" and outcome.keys() == {"ok"}:
+        return row.taken is None and _length(outcome["ok"])
+    if not (
+        outcome.keys() == {"error", "message"} and isinstance(outcome["message"], str)
+    ):
+        return False
+    if outcome["error"] in READ_ON_ERRORS:
+        return row.taken is None
+    if outcome["error"] == "OSError" and outcome["message"] in INJECTED_SOURCE:
+        arm, consumed = INJECTED_SOURCE[outcome["message"]]
+        taken = wire_range(pair, row.taken)
+        return (
+            taken is not None
+            and (taken[0] < taken[1]) is consumed
+            and _armed(pair, row.key[0], arm)
+        )
+    return False
+
+
+def _injected(row: Row) -> bool:
+    return any(
+        isinstance(o, dict) and o.get("message") in INJECTED_SOURCE
+        for o in (row.outcome, row.second)
+    )
+
+
+def _armed(pair: Pair, index: int, arm: str) -> bool:
+    """The scenario's last source failure armed before event ``index`` is
+    ``arm``, and no reference event since has raised an injected failure."""
+    ops = pair.scenario["ops"]
+    arms = {arm for arm, _consumed in INJECTED_SOURCE.values()}
+    armed = [i for i in range(min(index, len(ops))) if ops[i]["op"] in arms]
+    if not armed or ops[armed[-1]]["op"] != arm:
+        return False
+    return not any(armed[-1] < r.key[0] < index and _injected(r) for r in pair.ref)
+
+
+def _bc11_trigger(pair: Pair, row: Row) -> bool:
+    """A text seek, direct or as a ``cancel`` event's call, failed the same
+    way on both sides after moving the cursor, leaving the candidate BROKEN.
+    b1's cancelled seek may also carry the lost-range witness of a native
+    read it cancelled (BC2's L2 shape), which the candidate's row lacks."""
+    key = row.key
+    r = pair.ref_by_key.get(key)
+    if key[1] in SEEK_OPS:
+        failed = is_error(row.outcome)
+    elif key[1] == "cancel" and pair.op(key)["call"]["op"] in SEEK_OPS:
+        failed = row.outcome == {"cancelled": True}
+        if (
+            pair.reference == "b1"
+            and r is not None
+            and wire_range(pair, r.taken) is not None
+        ):
+            r = dataclasses.replace(r, taken=None)
+    else:
+        return False
+    return (
+        failed
+        and r == row
+        and _moved(pair.cand_info, key[0]) is True
+        and _moved(pair.ref_info, key[0]) is True
+        and pair.health_after(key) == "BROKEN"
+    )
+
+
+def _refused(row: Any) -> bool:
+    return row in BROKEN_REFUSALS
+
+
+def bc11(pair: Pair) -> Claim:
+    """A failed or cancelled text seek that moved the binary cursor makes the
+    candidate terminal; the reference reads on over the moved position.
+
+    The seek event (a direct seek that fails, or a ``cancel`` event whose
+    seek call is cancelled) is identical on both sides, both runs record the
+    cursor as moved by it, and the candidate model has the reader BROKEN
+    after it. Later differing reads, a text ``seek_end`` included, are
+    claimed while the candidate stays BROKEN: the candidate refuses with the
+    broken-stream error and the reference carries the read out
+    (``_read_on``). So is an ``abort`` event around such a read whose abort
+    outcome is the same on both sides. A recovery ends the span.
     """
     claim = Claim()
     if pair.mode != "rt":
@@ -1247,29 +1349,34 @@ def bc11(pair: Pair) -> Claim:
     span = False
     for row in pair.cand:
         key = row.key
-        if key[1] in SEEK_OPS:
-            r = pair.ref_by_key.get(key)
-            if (
-                r == row
-                and is_error(row.outcome)
-                and _moved(pair.cand_info, key[0]) is True
-                and _moved(pair.ref_info, key[0]) is True
-                and pair.health_after(key) == "BROKEN"
-            ):
-                span = True
-                continue
+        if _bc11_trigger(pair, row):
+            span = True
+            continue
         if not span:
             continue
         if pair.health_before(key) != "BROKEN":
             span = False
             continue
-        if key in pair.diffs and key[1] in TEXT_READS | {"buffer_read"}:
+        if key in pair.diffs and key[1] in BC11_READS:
             r = pair.ref_by_key[key]
             if (
-                row.outcome in BROKEN_REFUSALS
+                _refused(row.outcome)
                 and (row.second, row.parked, row.taken, row.pulled)
                 == (None, None, None, None)
-                and _served(key[1], r)
+                and _read_on(pair, key[1], r)
+            ):
+                claim.events.add(key)
+        elif key in pair.diffs and key[1] == "abort":
+            r = pair.ref_by_key[key]
+            call = pair.op(key)["call"]["op"]
+            if (
+                call in BC11_READS
+                and is_error(row.outcome, "InjectedAbort")
+                and r.outcome == row.outcome
+                and _refused(row.second)
+                and (row.parked, row.taken, row.pulled) == (None, None, None)
+                and (r.parked, r.pulled) == (None, None)
+                and _read_on(pair, call, Row(key, r.second, taken=r.taken))
             ):
                 claim.events.add(key)
         if pair.health_after(key) != "BROKEN":
@@ -1491,11 +1598,13 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
     return None
 
 
-def _evidence(pair: Pair, name: str, index: int) -> list[list[Any]] | None:
-    """The reference's ``name`` evidence records at event ``index``, or None
-    when the evidence is malformed anywhere: it must be a list of
-    ``[event index, list]`` records whose index is exactly an int."""
-    records = pair.ref_info.get(name, [])
+def _evidence(
+    pair: Pair, name: str, index: int, info: dict[str, Any] | None = None
+) -> list[list[Any]] | None:
+    """The reference's (or ``info``'s) ``name`` evidence records at event
+    ``index``, or None when the evidence is malformed anywhere: it must be a
+    list of ``[event index, list]`` records whose index is exactly an int."""
+    records = (pair.ref_info if info is None else info).get(name, [])
     if not isinstance(records, list):
         return None
     found = []
@@ -1588,6 +1697,66 @@ def bc2_trigger_only(pair: Pair) -> Claim:
     trigger = _trigger(pair, key, c, r, pair.scenario["source"])
     if trigger is not None and trigger[0] == "L2" and c.taken is None:
         claim.events.add(key)
+    return claim
+
+
+NATIVE_READ = {"via": "native", "method": "read", "bytes": None}
+
+
+def _rewound(seeks: list[list[Any]] | None) -> bool:
+    """Exactly one source seek at the event, to exactly the int 0."""
+    return (
+        seeks is not None
+        and len(seeks) == 1
+        and len(seeks[0]) == 1
+        and type(seeks[0][0]) is int
+        and seeks[0][0] == 0
+    )
+
+
+def bc2_recovered_cancel(pair: Pair) -> Claim:
+    """S: a cancelled cookie seek entered from validation salvage loses the
+    first chunk b1 read after its recovery rewind.
+
+    The seek rewinds the native source to 0, which in b1 discards the
+    salvage and starts a fresh decoder; the cancel then lands on the parked
+    native read of the cookie replay, whose bytes b1 drops. Only the cancel
+    row is claimed: its one-sided ``taken`` witness, exactly the first chunk
+    of the wire. What b1 does after the loss is BC11's (the candidate is
+    BROKEN), so no lossy run checks b1's text continuation.
+    """
+    claim = Claim()
+    if pair.reference != "b1" or pair.mode != "rt":
+        return claim
+    if pair.scenario["source"]["kind"] != "native":
+        return claim
+    wire_size = len(unb64(pair.scenario["wire"]))
+    for key in pair.diffs:
+        op = pair.op(key)
+        if key[1] != "cancel" or op.get("call", {}).get("op") != "seek_mark":
+            continue
+        if type(op.get("after")) is not int or op["after"] != 1:
+            continue
+        if pair.health_before(key) != "VALIDATION_SALVAGE":
+            continue
+        c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+        n = pair.cand_order[key]
+        m = next(i for i, row in enumerate(pair.ref) if row.key == key)
+        if pair.cand[:n] != pair.ref[:m]:
+            continue  # a difference before the cancel: not this shape
+        if (
+            c.outcome == {"cancelled": True}
+            and c == dataclasses.replace(r, taken=None)
+            and c.parked == NATIVE_READ
+            and c.pulled is None
+            and wire_range(pair, r.taken)
+            == [0, min(pair.scenario["chunk_size"], wire_size)]
+            and _rewound(_evidence(pair, "seeks", key[0]))
+            and _rewound(_evidence(pair, "seeks", key[0], pair.cand_info))
+            and _moved(pair.cand_info, key[0]) is True
+            and _moved(pair.ref_info, key[0]) is True
+        ):
+            claim.events.add(key)
     return claim
 
 
@@ -1935,6 +2104,9 @@ def bc2_claim(
     replays = _replays(pair, request, lossy)
     if replays is None:
         return claim  # replay evidence not exactly b1's; claim nothing
+    unmodeled = _unmodeled(pair, lossy)
+    if unmodeled is None:
+        return claim  # malformed unmodeled evidence; claim nothing
     order = pair.cand_order
     start = order[request.trigger]
     converged = _converged(pair, lossy, start)
@@ -1967,8 +2139,102 @@ def bc2_claim(
             continue
         if key[0] in rejected or key[1] == "final":
             continue
+        if any(
+            begin <= key[0] and (close is None or key[0] < close)
+            for begin, close in unmodeled
+        ):
+            continue  # the lossy model does not check content here
         claim.events.add(key)
     return claim
+
+
+def _moved_events(info: dict[str, Any]) -> list[int] | None:
+    """The events a run's ``cursor_moved`` witnesses record as moving the
+    cursor (none when the run predates the witness), or None when a record
+    is malformed."""
+    records = info.get("cursor_moved", [])
+    if not isinstance(records, list):
+        return None
+    events = []
+    for record in records:
+        if not (
+            isinstance(record, list)
+            and len(record) == 2
+            and type(record[0]) is int
+            and type(record[1]) is bool
+        ):
+            return None
+        if record[1]:
+            events.append(record[0])
+    return events
+
+
+def _seek0_done(pair: Pair, row: Row) -> bool:
+    """A b1 ``seek(0)`` that completed, directly or as a parked call."""
+    name = row.key[1]
+    if name in ("cancel", "overlap", "close_during"):
+        name = pair.op(row.key)["call"]["op"]
+    outcome = row.outcome
+    return (
+        name == "seek0"
+        and isinstance(outcome, dict)
+        and outcome.keys() == {"ok"}
+        and type(outcome["ok"]) is int
+        and outcome["ok"] == 0
+    )
+
+
+def _unmodeled(pair: Pair, lossy: dict[str, Any]) -> list[list[Any]] | None:
+    """The lossy run's ``unmodeled`` spans, or None unless its witnesses are
+    exactly b1's reference run's and the spans match them exactly: each span opens at an event they record as moving the
+    cursor, and every such event opens a span or lies inside an open one
+    (the field is absent when there are none). A span closes at the first
+    completed b1 ``seek(0)`` after it opens, or stays open when there is
+    none; spans are ordered and disjoint. Each opening
+    event is a single b1 text seek, direct or as a ``cancel`` event's call,
+    that b1's reference run also records as moving the cursor."""
+    spans = lossy.get("unmodeled", [])
+    moved = _moved_events(lossy)
+    if moved is None or moved != _moved_events(pair.ref_info):
+        return None  # the lossy run's witnesses are not b1's
+    if type(spans) is not list:
+        return None
+    if "unmodeled" in lossy and not spans:
+        return None
+    previous = None  # the last span's end
+    for n, span in enumerate(spans):
+        if not (isinstance(span, list) and len(span) == 2):
+            return None
+        begin, close = span
+        if type(begin) is not int or not (close is None or type(close) is int):
+            return None
+        if previous is None and n or (previous is not None and begin <= previous):
+            return None  # after an open span, or overlapping the last one
+        # The model resumes at the first completed seek(0) after the span
+        # opens, and only there.
+        resumed = [
+            r.key[0] for r in pair.ref if r.key[0] > begin and _seek0_done(pair, r)
+        ]
+        if close != (resumed[0] if resumed else None):
+            return None
+        rows = [r for r in pair.ref if r.key[0] == begin]
+        if len(rows) != 1 or _moved(pair.ref_info, begin) is not True:
+            return None
+        name = rows[0].key[1]
+        if not (
+            name in SEEK_OPS
+            or (name == "cancel" and pair.op(rows[0].key)["call"]["op"] in SEEK_OPS)
+        ):
+            return None
+        previous = close
+    starts = [begin for begin, _close in spans]
+    for event in moved:
+        inside = any(
+            begin < event and (close is None or event < close) for begin, close in spans
+        )
+        if event not in starts and not inside:
+            return None
+    return spans
 
 
 def _losses(pair: Pair, request: Bc2Request, lossy: dict[str, Any]) -> list[int] | None:

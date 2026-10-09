@@ -40,6 +40,7 @@ from differential import (
     _text_of,
     _wire_scenario,
     bc2_claim,
+    bc2_recovered_cancel,
     bc2_request,
     bc2_shadow_claim,
     bc2_trigger_only,
@@ -3948,6 +3949,9 @@ def rc1_lossy(reference: str, seed: int) -> dict[str, Any] | None:
 def test_rc1_fixture_covers_exactly_the_listed_seeds():
     listed = {f"b2/{seed}" for seed in (225, 1000193) + BC12_SEEDS}
     listed |= {"b1/1000089", "b1/1000132", "b1/1000196"}
+    listed |= {f"b2/{seed}" for seed in BC11_BLOCK}
+    listed |= {"b1/2000039", "b1/2000100", "b1/2000121", "b1/4533"}
+    listed |= {f"b1/{seed}" for seed in BC11_B1_L2}
     assert set(RC1) == listed
 
 
@@ -4147,6 +4151,613 @@ def test_bc11_rejects_a_binary_reader():
     pair = rc1_pair("b2", 225)
     pair.scenario["mode"] = "rb"
     fails(pair, "(7, 'buffer_read', 0)")
+
+
+# BC11 on the seek-cancel block (seeds 2,000,000 and up): cancel triggers,
+# text seek_end reads, reads on into errors, and an abort around a read.
+
+BC11_BLOCK = {
+    2000074: {(8, "readline", 0)},  # injected source failure, exact taken
+    2000099: {(7, "seek_end", 0)},  # direct seek trigger; seek_end position
+    2000100: {(9, "readlines", 0), (11, "abort", 0)},  # BadGzipFile; abort
+    2000160: {(6, "next", 0)},  # served text
+    2000181: {(4, "seek_end", 0)},  # UnicodeDecodeError
+}
+INJECTED = "injected source failure after consuming input"
+
+
+@pytest.mark.parametrize("reference", ["b2", "c0"])
+@pytest.mark.parametrize("seed", sorted(BC11_BLOCK))
+def test_bc11_recorded_block_difference_is_claimed(seed, reference):
+    record = RC1[f"b2/{seed}"]["reference"]
+    pair = make_pair(seed, parse(record["trace"]), reference=reference, ref_info=record)
+    result = compare(pair)
+    assert result.ok, result.failures
+    claimed = {name for name, items in result.claims.items() if items}
+    assert claimed == {"BC11-TEXT-SEEK-FAILURE"}
+    assert set(claims(result, "BC11-TEXT-SEEK-FAILURE")) == {
+        str(("event", key)) for key in BC11_BLOCK[seed]
+    }
+
+
+def test_parked_cancel_seek_cookie_is_a_symbol():
+    seek = {"op": "cancel", "call": {"op": "seek_mark", "label": "m"}}
+    events = [
+        Event(0, {"op": "tell_mark", "label": "m"}, Outcome("ok", 10**40)),
+        Event(1, seek, Outcome("ok", 10**40), Outcome("skipped")),
+        Event(2, {"op": "cancel", "call": {"op": "read"}}, Outcome("ok", "x")),
+    ]
+    assert [row[2] for row in interpreter.symbolic(events)] == [
+        {"ok": "C1"},
+        {"ok": "C1"},
+        {"ok": {"str": "x"}},
+    ]
+
+
+def test_bc11_cancel_trigger_needs_identical_rows():
+    pair = _ref_edit(
+        2000160, (5, "cancel", 0), second={"ok": {"str": "cancel ignored"}}
+    )
+    fails(pair, "(5, 'cancel', 0)", "(6, 'next', 0)")
+
+
+def test_bc11_cancel_trigger_needs_a_cancelled_call():
+    pair = rc1_pair("b2", 2000160)
+    key = (5, "cancel", 0)
+    cand = edit(pair.cand, key, outcome={"error": "OSError", "message": "boom"})
+    ref = edit(pair.ref, key, outcome={"error": "OSError", "message": "boom"})
+    fails(dataclasses.replace(pair, cand=cand, ref=ref), "(6, 'next', 0)")
+
+
+def test_bc11_cancel_trigger_needs_the_moved_witness():
+    pair = rc1_pair("b2", 2000160)
+    pair.ref_info["cursor_moved"] = [[5, False]]
+    fails(pair, "(6, 'next', 0)")
+
+
+def test_bc11_cancel_trigger_needs_a_seek_call():
+    pair = rc1_pair("b2", 2000160)
+    op = pair.op((5, "cancel", 0))
+    op["call"] = {"op": "read", "size": 1}
+    fails(pair, "(6, 'next', 0)")
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"taken": None},
+        {"taken": [7, 0]},
+        {"taken": [-1, 7]},
+        {"taken": [0, 7.0]},
+        {"taken": [0, True]},
+        {"taken": [0, 7, 9]},
+        {"outcome": {"error": "OSError", "message": "injected source failure"}},
+        {"outcome": {"error": "OSError", "message": "boom"}},
+        {"outcome": {"error": "RuntimeError", "message": INJECTED}},
+        {"outcome": {"error": "OSError", "message": INJECTED, "extra": 1}},
+        {"second": {"error": "OSError", "message": INJECTED}},
+        {"pulled": [0, 7]},
+    ],
+)
+def test_bc11_rejects_an_injected_failure_with_another_shape(fields):
+    fails(_ref_edit(2000074, (8, "readline", 0), **fields), "(8, 'readline', 0)")
+
+
+def _wire_size(seed: int) -> int:
+    return len(unb64(generate(seed)["wire"]))
+
+
+@pytest.mark.parametrize(
+    "taken",
+    [
+        lambda n: [0, n + 1],
+        lambda n: [n + 1, n + 1],
+        lambda n: [3, 3],  # an empty range after consuming input
+    ],
+)
+def test_bc11_rejects_an_injected_failure_off_the_wire(taken):
+    pair = _ref_edit(2000074, (8, "readline", 0), taken=taken(_wire_size(2000074)))
+    fails(pair, "(8, 'readline', 0)")
+
+
+def test_bc11_accepts_an_injected_failure_up_to_the_wire_end():
+    n = _wire_size(2000074)
+    passes(
+        _ref_edit(2000074, (8, "readline", 0), taken=[0, n]),
+        "BC11-TEXT-SEEK-FAILURE",
+    )
+
+
+@pytest.mark.parametrize("op", [{"op": "fail_no_effect"}, {"op": "tell"}])
+def test_bc11_rejects_an_injected_failure_not_armed_as_raised(op):
+    pair = rc1_pair("b2", 2000074)
+    pair.scenario["ops"][6] = op
+    fails(pair, "(8, 'readline', 0)")
+
+
+def test_bc11_rejects_an_injected_failure_the_reference_already_raised():
+    from differential import _armed
+
+    pair = rc1_pair("b2", 2000074)
+    assert _armed(pair, 8, "fail_consumed")
+    assert not _armed(pair, 8, "fail_no_effect")
+    assert not _armed(pair, 6, "fail_consumed")
+    raised = {"error": "OSError", "message": INJECTED}
+    for fields in ({"outcome": raised}, {"second": raised}):
+        ref = edit(pair.ref, (7, "cancel", 0), **fields)
+        assert not _armed(dataclasses.replace(pair, ref=ref), 8, "fail_consumed")
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"taken": [0, 7]},
+        {"outcome": {"error": "ValueError", "message": "boom"}},
+        {"outcome": {"error": "BadGzipFile", "message": 7}},
+        {"outcome": {"error": "BadGzipFile"}},
+        {"parked": {"via": "native", "method": "read", "bytes": None}},
+    ],
+)
+def test_bc11_rejects_a_read_on_error_with_another_shape(fields):
+    fails(_ref_edit(2000100, (9, "readlines", 0), **fields), "(9, 'readlines', 0)")
+
+
+def test_bc11_read_on_error_claims_a_text_seek_end():
+    passes(
+        _ref_edit(
+            2000099,
+            (7, "seek_end", 0),
+            outcome={"error": "UnicodeDecodeError", "message": "truncated data"},
+        ),
+        "BC11-TEXT-SEEK-FAILURE",
+    )
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"outcome": {"ok": -1}},
+        {"outcome": {"ok": True}},
+        {"outcome": {"ok": 7498.0}},
+        {"outcome": {"ok": "C9"}},
+        {"outcome": {"ok": 7498, "extra": 1}},
+        {"taken": [0, 1]},
+    ],
+)
+def test_bc11_rejects_a_seek_end_without_a_position(fields):
+    fails(_ref_edit(2000099, (7, "seek_end", 0), **fields), "(7, 'seek_end', 0)")
+
+
+ABORT = (11, "abort", 0)
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"outcome": {"error": "InjectedAbort", "message": "abort at 12"}},
+        {"second": {"ok": -1}},
+        {"second": {"error": "OSError", "message": "boom"}},
+        {"second": {"error": "BadGzipFile", "message": "x"}, "taken": [0, 1]},
+        {"parked": {"via": "native", "method": "read", "bytes": None}},
+        {"pulled": [0, 1]},
+    ],
+)
+def test_bc11_rejects_a_reference_abort_with_another_shape(fields):
+    fails(_ref_edit(2000100, ABORT, **fields), "(11, 'abort', 0)")
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"outcome": {"error": "InjectedAbort", "message": "abort at 12"}},
+        {"second": {"error": "OSError", "message": "boom"}},
+        {"parked": {"via": "native", "method": "read", "bytes": None}},
+        {"taken": [0, 1]},
+    ],
+)
+def test_bc11_rejects_a_candidate_abort_with_another_shape(fields):
+    pair = rc1_pair("b2", 2000100)
+    pair = dataclasses.replace(pair, cand=edit(pair.cand, ABORT, **fields))
+    fails(pair, "(11, 'abort', 0)")
+
+
+def test_bc11_abort_needs_a_read_call():
+    # The reference's error would count as reading on, were tell a read.
+    error = {"error": "BadGzipFile", "message": "x"}
+    pair = _ref_edit(2000100, ABORT, second=error)
+    passes(pair, "BC11-TEXT-SEEK-FAILURE")
+    pair.op(ABORT)["call"] = {"op": "tell"}
+    fails(pair, "(11, 'abort', 0)")
+
+
+# S: b1's cancelled cookie seek entered from validation salvage. Its rewind to
+# 0 recovers the reader, and the cancel lands on the replay's native read,
+# whose first chunk (taken [0, 7]) b1 drops. BC2 claims the cancel row only;
+# BC11 claims b1's read on into BadGzipFile.
+S_CANCEL = (8, "cancel", 0)
+
+
+def _s_pair() -> Pair:
+    return rc1_pair("b1", 2000100)
+
+
+def test_bc2_s_claims_b1s_cancelled_seek_after_its_recovery_rewind():
+    pair = _s_pair()
+    assert pair.health_before(S_CANCEL) == "VALIDATION_SALVAGE"
+    assert pair.ref_by_key[S_CANCEL].taken == [0, pair.scenario["chunk_size"]]
+    assert bc2_request(pair) is None  # no lossy run checks the continuation
+    assert bc2_recovered_cancel(pair).events == {S_CANCEL}
+    result = compare(pair, rc1_lossy("b1", 2000100))
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT") == [repr(("event", S_CANCEL))]
+    assert claims(result, "BC11-TEXT-SEEK-FAILURE") == [
+        "('event', (9, 'readlines', 0))"
+    ]
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"taken": [0, 6]},  # not the whole first chunk
+        {"taken": [0, 8]},
+        {"taken": [1, 8]},  # not from the rewound offset
+        {"taken": [0, 0]},
+        {"taken": [0, True]},
+        {"taken": [0, 7, 0]},
+        {"second": {"ok": {"str": "other"}}},
+        {"pulled": [0, 7]},
+    ],
+)
+def test_bc2_s_rejects_another_reference_cancel_row(fields):
+    pair = _s_pair()
+    pair = dataclasses.replace(pair, ref=edit(pair.ref, S_CANCEL, **fields))
+    fails(pair, repr(S_CANCEL))
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"parked": {"via": "native", "method": "seek", "bytes": None}},
+        {"parked": {"via": "native", "method": "read", "bytes": 7}},
+        {"parked": None},
+        {"pulled": [0, 1]},
+        {"outcome": {"ok": 0}},
+    ],
+)
+def test_bc2_s_rejects_another_cancel_shape_on_both_sides(fields):
+    pair = _s_pair()
+    pair = dataclasses.replace(
+        pair,
+        cand=edit(pair.cand, S_CANCEL, **fields),
+        ref=edit(pair.ref, S_CANCEL, **fields),
+    )
+    fails(pair, repr(S_CANCEL))
+
+
+def test_bc2_s_rejects_a_candidate_witness():
+    pair = _s_pair()
+    pair = dataclasses.replace(pair, cand=edit(pair.cand, S_CANCEL, taken=[0, 6]))
+    fails(pair, repr(S_CANCEL))
+
+
+def test_bc2_s_rejects_an_earlier_difference():
+    pair = _s_pair()
+    earlier = (7, "buffer_read", 0)
+    pair = dataclasses.replace(
+        pair, ref=edit(pair.ref, earlier, outcome={"ok": {"bytes": "00"}})
+    )
+    fails(pair, repr(earlier), repr(S_CANCEL))
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"after": 2},
+        {"after": True},
+        {"after": None},
+        {"call": {"op": "seek0"}},
+        {"call": {"op": "tell_mark", "label": "m0"}},
+    ],
+)
+def test_bc2_s_rejects_another_cancel_op(change):
+    pair = _s_pair()
+    pair.op(S_CANCEL).update(change)
+    assert bc2_recovered_cancel(pair).events == set()
+
+
+def test_bc2_s_needs_validation_salvage_on_entry():
+    pair = _s_pair()
+    n = pair.cand_order[S_CANCEL]
+    for health in ("HEALTHY", "BROKEN", None):
+        info = copy.deepcopy(pair.cand_info)
+        info["health"][n] = [health, info["health"][n][1]]
+        assert (
+            bc2_recovered_cancel(dataclasses.replace(pair, cand_info=info)).events
+            == set()
+        )
+
+
+def test_bc2_s_needs_the_first_chunk_of_this_scenario():
+    pair = _s_pair()
+    pair.scenario["chunk_size"] = 8
+    assert bc2_recovered_cancel(pair).events == set()
+
+
+@pytest.mark.parametrize("side", ["cand_info", "ref_info"])
+@pytest.mark.parametrize(
+    ("name", "records"),
+    [
+        ("seeks", [[3, [0]]]),  # no rewind at the cancel
+        ("seeks", [[3, [0]], [8, [5]]]),
+        ("seeks", [[3, [0]], [8, [0, 0]]]),
+        ("seeks", [[3, [0]], [8, [0]], [8, [0]]]),
+        ("seeks", [[3, [0]], [8, [False]]]),
+        ("seeks", [[3, [0]], [8, [0.0]]]),
+        ("seeks", [[3, [0]], [True, [0]]]),
+        ("seeks", "x"),
+        ("cursor_moved", [[8, False]]),
+        ("cursor_moved", []),
+        ("cursor_moved", [[8, True], [8, True]]),
+    ],
+)
+def test_bc2_s_needs_the_rewind_and_moved_witnesses(side, name, records):
+    pair = _s_pair()
+    info = copy.deepcopy(getattr(pair, side))
+    info[name] = records
+    pair = dataclasses.replace(pair, **{side: info})
+    assert bc2_recovered_cancel(pair).events == set()
+
+
+def test_bc2_s_is_b1_text_and_native_only():
+    pair = _s_pair()
+    assert (
+        bc2_recovered_cancel(dataclasses.replace(pair, reference="b2")).events == set()
+    )
+    pair.scenario["mode"] = "rb"
+    assert bc2_recovered_cancel(pair).events == set()
+    pair = _s_pair()
+    pair.scenario["source"] = {"kind": "custom", "checkpoint": False}
+    assert bc2_recovered_cancel(pair).events == set()
+
+
+# b1's cancelled seek that is also BC2's L2 trigger: BC2 claims the cancel
+# row, whose lost-range witness the candidate lacks, and BC11 the read on.
+# In 2000160, BC2 also claims a later loss (op 9) after op 7's seek(0).
+BC11_B1_L2 = {2000160: ((5, "cancel", 0), (6, "next", 0), [(9, "cancel", 0)])}
+BC11_B1_L2 |= {2000181: ((3, "cancel", 0), (4, "seek_end", 0), [])}
+
+
+@pytest.mark.parametrize("seed", sorted(BC11_B1_L2))
+def test_bc11_b1_cancel_trigger_with_a_lost_range(seed):
+    trigger, read, later = BC11_B1_L2[seed]
+    pair, lossy = rc1_pair("b1", seed), rc1_lossy("b1", seed)
+    assert pair.cand_by_key[trigger].taken is None
+    assert pair.ref_by_key[trigger].taken is not None
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT") == [
+        str(("event", key)) for key in [trigger, *later]
+    ]
+    assert claims(result, "BC11-TEXT-SEEK-FAILURE") == [str(("event", read))]
+
+
+@pytest.mark.parametrize(
+    "taken",
+    [lambda n: [0, n + 1], lambda n: [7, 3], lambda n: [0.0, 7]],
+)
+def test_bc11_b1_cancel_trigger_needs_a_valid_lost_range(taken):
+    from differential import _bc11_trigger
+
+    trigger, _read, _later = BC11_B1_L2[2000160]
+    pair = rc1_pair("b1", 2000160)
+    assert _bc11_trigger(pair, pair.cand_by_key[trigger])
+    ref = edit(pair.ref, trigger, taken=taken(_wire_size(2000160)))
+    pair = dataclasses.replace(pair, ref=ref)
+    assert not _bc11_trigger(pair, pair.cand_by_key[trigger])
+
+
+def test_bc11_cancel_trigger_tolerates_a_lost_range_only_from_b1():
+    from differential import _bc11_trigger
+
+    trigger, _read, _later = BC11_B1_L2[2000160]
+    pair = dataclasses.replace(rc1_pair("b1", 2000160), reference="b2")
+    assert not _bc11_trigger(pair, pair.cand_by_key[trigger])
+    pair = rc1_pair("b1", 2000160)
+    cand = edit(pair.cand, trigger, taken=[7, 13])  # b1's is [7, 14]
+    pair = dataclasses.replace(pair, cand=cand)
+    assert not _bc11_trigger(pair, pair.cand_by_key[trigger])
+    pair = rc1_pair("b1", 2000160)
+    ref = edit(pair.ref, trigger, second={"ok": {"str": "cancel ignored"}})
+    pair = dataclasses.replace(pair, ref=ref)
+    assert not _bc11_trigger(pair, pair.cand_by_key[trigger])
+
+
+def test_bc3_closed_cancelled_seek_mark_has_no_cookie():
+    from differential import _closed_row
+
+    pair = rc1_pair("b1", 2000039)
+    key = (4, "cancel", 0)
+    assert pair.ref_by_key[key] == _closed_row(pair, key) == Row(key, {"skipped": True})
+    result = compare(pair, rc1_lossy("b1", 2000039))
+    assert result.ok, result.failures
+    assert str(("event", key)) in claims(result, "BC3-OPENING")
+
+
+def test_b1_lossy_text_seek_moved_keeps_health():
+    # b1 has no BC11: a failed seek that moved the cursor leaves the lossy
+    # model HEALTHY, stops it checking content, and records the event
+    # (b1/2000121, whose seek at op 8 is also the BC2 trigger).
+    checker = _lossy_checker()
+    before = checker.health
+    checker.index = 8
+    checker.text_seek_moved()
+    assert checker.health is before and not checker.modeled
+    assert checker.candidates == list(range(len(checker.upper) + 1))
+    assert checker.unmodeled == [[8, None]]
+    lossy = rc1_lossy("b1", 2000121)
+    assert lossy["violations"] == [] and lossy["cursor_moved"] == [[8, True]]
+    assert lossy["unmodeled"] == [[8, None]]
+    assert {health for pair in lossy["health"] for health in pair} == {"HEALTHY"}
+    passes(rc1_pair("b1", 2000121), "BC11-TEXT-SEEK-FAILURE", lossy)
+
+
+def test_lossy_run_records_where_it_stops_checking_content():
+    # Run against the candidate, b1's lossy model records the moved seek; the
+    # candidate's BC11 refusal at op 10 is the one read b1's model rejects.
+    request = bc2_request(rc1_pair("b1", 2000121))
+    scenario = generate(2000121)
+    run = recorded_run(aiogzip, scenario, ENGINE, "lossy", request.line(scenario))
+    assert run["unmodeled"] == [[8, None]]
+    assert run["violations"] == [
+        [10, "op 10: read reported a broken stream while healthy"]
+    ]
+    assert "unmodeled" not in _lossy_run(2060)
+    # b1/4533's seek(0) at op 8 closes the span its op 6 opened.
+    request = bc2_request(rc1_pair("b1", 4533))
+    scenario = generate(4533)
+    run = recorded_run(aiogzip, scenario, ENGINE, "lossy", request.line(scenario))
+    assert run["unmodeled"] == [[6, 8]] and run["violations"] == []
+
+
+def _2000121_changed_close() -> tuple[Pair, dict[str, Any]]:
+    """b1/2000121 with b1's cleanup close after the moved seek changed to an
+    error no predicate explains, in its trace and its lossy run alike."""
+    key = (11, "cleanup_close", 0)
+    error = {"error": "RuntimeError", "message": "unrelated"}
+    pair = rc1_pair("b1", 2000121)
+    pair = dataclasses.replace(pair, ref=edit(pair.ref, key, outcome=error))
+    pair.ref_info["trace"] = [
+        [*item[:2], error, *item[3:]] if item[:2] == list(key[:2]) else item
+        for item in pair.ref_info["trace"]
+    ]
+    assert parse(pair.ref_info["trace"]) == pair.ref
+    lossy = rc1_lossy("b1", 2000121)
+    lossy["trace"] = pair.ref_info["trace"]
+    return pair, lossy
+
+
+def test_bc2_claims_nothing_where_the_lossy_model_stops_checking_content():
+    pair, lossy = _2000121_changed_close()
+    fails(pair, "(11, 'cleanup_close', 0)", lossy=lossy)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda lossy: lossy.pop("unmodeled"),
+        lambda lossy: lossy.update(unmodeled=[]),
+        # Partially omitted: b1's lossy run also witnessed op 3 moving.
+        lambda lossy: lossy.update(cursor_moved=[[3, True], [8, True]]),
+        lambda lossy: lossy.update(cursor_moved=[[8, False]]),
+        lambda lossy: lossy.update(unmodeled=[[9, None]]),
+        lambda lossy: [lossy.pop("unmodeled"), lossy.pop("cursor_moved")],
+        lambda lossy: [lossy.pop("unmodeled"), lossy.update(cursor_moved=[])],
+        lambda lossy: lossy.update(unmodeled=[[8, 10]]),  # not a seek(0)
+    ],
+)
+def test_bc2_needs_exact_unmodeled_evidence(change):
+    pair, lossy = _2000121_changed_close()
+    change(lossy)
+    fails(pair, "(11, 'cleanup_close', 0)", lossy=lossy)
+
+
+@pytest.mark.parametrize(
+    "records",
+    [[[8, 1]], [[8.0, True]], [[True, True]], [[8, True, None]], [8], {"8": True}],
+)
+def test_moved_events_rejects_malformed_witnesses(records):
+    from differential import _moved_events
+
+    assert _moved_events({"cursor_moved": [[3, False], [8, True]]}) == [8]
+    assert _moved_events({}) == []
+    assert _moved_events({"cursor_moved": records}) is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        [8],
+        [[8.0, None]],
+        [[True, None]],
+        [[8]],
+        [[8, None, None]],
+        [[8, None], [8, None]],
+        [[9, None]],
+        [[10, None]],
+        [[99, None]],
+        [[8, 8]],
+        [[8, 7]],
+        [[8, 11]],  # cleanup_close, not a seek(0)
+        [[8, 11.0]],
+        "8",
+        None,
+    ],
+)
+def test_bc2_rejects_malformed_unmodeled_evidence(value):
+    from differential import _unmodeled
+
+    pair = rc1_pair("b1", 2000121)
+    moved = {"cursor_moved": [[8, True]]}
+    assert _unmodeled(pair, moved | {"unmodeled": [[8, None]]}) == [[8, None]]
+    assert _unmodeled(pair, moved | {"unmodeled": value}) is None
+    assert _unmodeled(pair, moved) is None
+    # The lossy run's witnesses must be b1's reference run's.
+    for lossy in ({}, {"cursor_moved": []}, {"cursor_moved": [[8, False]]}):
+        assert _unmodeled(pair, lossy) is None
+        assert _unmodeled(pair, lossy | {"unmodeled": [[8, None]]}) is None
+    pair.ref_info["cursor_moved"] = [[8, False]]
+    unmoved = {"cursor_moved": [[8, False]]}
+    assert _unmodeled(pair, unmoved) == []
+    assert _unmodeled(pair, {}) == []  # no moved events on either side
+    assert _unmodeled(pair, unmoved | {"unmodeled": []}) is None
+    assert _unmodeled(pair, unmoved | {"unmodeled": [[8, None]]}) is None
+    del pair.ref_info["cursor_moved"]
+    assert _unmodeled(pair, {}) == []  # runs from before the witness
+
+
+def test_bc2_claims_again_after_the_seek0_that_resumes_checking():
+    # b1/4533: BC2's trigger is op 4; op 6's seek moves the cursor and op 8's
+    # seek(0) resumes the lossy model's content checks, so BC2 claims b1's
+    # lost-input reads from op 9 on.
+    from differential import _unmodeled
+
+    pair, lossy = rc1_pair("b1", 4533), rc1_lossy("b1", 4533)
+    assert lossy["unmodeled"] == [[6, 8]] and lossy["violations"] == []
+    result = compare(pair, lossy)
+    assert result.ok, result.failures
+    assert {(9, "read", 0), (13, "abort", 0)} <= {
+        key
+        for key in pair.diffs
+        if str(("event", key)) in claims(result, "BC2-LOST-INPUT")
+    }
+    # [0, 8] opens at op 0's seek(0), which no witness records as moving.
+    for spans in ([[6, None]], [[6, 7]], [[6, 8], [9, None]], [[0, 8]]):
+        assert _unmodeled(pair, lossy | {"unmodeled": spans}) is None
+    # A witness inside an open span opens none of its own; one outside every
+    # span must open its own.
+    for records, expected in (
+        ([[6, True], [7, True]], [[6, 8]]),
+        ([[6, True], [9, True]], None),
+    ):
+        witnessed = copy.deepcopy(pair)
+        witnessed.ref_info["cursor_moved"] = records
+        assert _unmodeled(witnessed, lossy | {"cursor_moved": records}) == expected
+    # Witnesses missing from the lossy run alone.
+    assert _unmodeled(pair, lossy | {"cursor_moved": []}) is None
+    bare = {k: v for k, v in lossy.items() if k not in ("cursor_moved", "unmodeled")}
+    assert _unmodeled(pair, bare) is None
+    # A seek(0) that did not complete with exactly 0 resumes nothing.
+    for outcome in (
+        {"error": "OSError", "message": "boom"},
+        {"ok": False},
+        {"ok": 0.0},
+        {"ok": 0, "extra": 1},
+    ):
+        ref = edit(pair.ref, (8, "seek0", 0), outcome=outcome)
+        failed = dataclasses.replace(pair, ref=ref)
+        assert _unmodeled(failed, lossy) is None
+        assert _unmodeled(failed, lossy | {"unmodeled": [[6, None]]}) == [[6, None]]
+    fails(pair, "(9, 'read', 0)", lossy=lossy | {"unmodeled": [[6, None]]})
 
 
 # BC12

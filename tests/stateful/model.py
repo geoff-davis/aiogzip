@@ -1397,6 +1397,10 @@ class LossyChecker(Checker):
         self.losses: list[list[Any]] = []
         # R3: later G-native replays as [event index, origin].
         self.replays: list[list[int]] = []
+        # Spans in which the model stops checking content, as [the moved
+        # seek (``text_seek_moved``), the seek(0) that resumes checking or
+        # None]; BC2 claims nothing inside them.
+        self.unmodeled: list[list[int | None]] = []
         self.index: int | None = None
         self.event: Any = None
         self.lossy = types.SimpleNamespace(**{n: getattr(self, n) for n in self.VIEW})
@@ -1441,6 +1445,16 @@ class LossyChecker(Checker):
             return
         super().expect_concurrent(index, outcome)
 
+    def text_seek_moved(self) -> None:
+        """b1 has no BC11: it keeps reading over the moved cursor with its
+        old text, so health stays and content is unmodeled until seek(0).
+        The event opens a span in ``unmodeled``."""
+        self.lose_position()
+        self.modeled = False
+        assert self.index is not None
+        if not (self.unmodeled and self.unmodeled[-1][1] is None):
+            self.unmodeled.append([self.index, None])
+
     def physical_rewind(self, event) -> bool:
         """Whether ``event`` completed a source seek back over the lost range.
 
@@ -1462,6 +1476,9 @@ class LossyChecker(Checker):
             self.lost = True
             self.state = "lossy"
         super().observe(event)
+        if self.unmodeled and self.unmodeled[-1][1] is None and self.modeled:
+            # Only a completed seek(0) resumes checking content.
+            self.unmodeled[-1][1] = event.index
 
     def later_loss(self, transition: str) -> tuple[bool, list[int] | None]:
         """Whether this event is a witnessed later loss, and its range
