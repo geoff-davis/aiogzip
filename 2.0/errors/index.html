@@ -1028,10 +1028,13 @@ abandon that close: it runs to completion before the cancellation propagates,
 and a close failure becomes the cancellation's <code>__cause__</code>. During an
 abortive exit, the handle is closed only if that close returned normally;
 otherwise it stays reportably open and <code>close()</code> retries. A cancellation that
-arrives before the close is submitted, for example while the exit is still
-waiting for an active call to settle, propagates first and also leaves the
-handle open for <code>close()</code>. Custom file objects' async <code>close()</code> methods are
-cancelled cooperatively, as before.</p>
+arrives while the exit is still waiting for an active call to settle no longer
+skips the close: once that call has settled, the exit closes the file in the
+same way and then propagates the cancellation. When the context body raised,
+that cancellation keeps the body's exception in its chain: as its
+<code>__context__</code>, or, when the close failed, as the context of the close failure
+that is the cancellation's <code>__cause__</code>. Custom file objects' async <code>close()</code>
+methods are cancelled cooperatively, as before.</p>
 <p>Cancellation while a clean context exit is waiting for an active call also
 attempts abortive owned-resource cleanup before the cancellation propagates.</p>
 <p>If that abortive cleanup fails, for example because a custom source's
