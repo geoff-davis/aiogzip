@@ -75,7 +75,7 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 - [x] R09
 - [x] R10
 - [x] R11
-- [ ] R12
+- [x] R12
 - [ ] R13
 - [ ] R14
 - [x] R15
@@ -542,6 +542,21 @@ for the new claims are in `tests/data/rc1_reference_runs.json`, whose seeds
 join the recorded-wire digest (the same on Python 3.12 and 3.14).
 
 *Closed 2026-10-08: Codex approved, maintainer signed off, merged in PR #123.*
+
+### R12: performance
+
+The timing windows ran at 01:00 on 2026-10-09, as
+[pre-registered](reviews/v2.0.0rc1-r12-preregistration.md). The repair rows
+for R01, R04, R08 and R15 were within 5% of b2; R08's empty-string
+`writelines` was about 15% faster. R03's `inspect()`/`verify()` were up to
+13% slower on sub-millisecond calls. An attribution run traced that to the
+settled reads, and PR #128 moved them to `_NativeSourceCall`. A re-check put
+`verify()` within 5% of b2 except zlib-ng on a compressible file (+6.52%,
+about 10 µs per call), which the maintainer accepted. Details and evidence
+are in the [R12 record](reviews/v2.0.0rc1-r12-record.md).
+
+*Closed 2026-10-09: Codex approved, maintainer signed off, merged in PRs #128
+and #129.*
 
 ## 5. Deferred past RC1
 
