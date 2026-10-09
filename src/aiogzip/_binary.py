@@ -1562,24 +1562,25 @@ class AsyncGzipBinaryFile:
 
         try:
             await close_call()
+            return
         except ConcurrentOperationError:
             # A task spawned from the body may still own the codec. Preserve
             # the body's exception and close resources without discarding the
-            # live operation underneath that task.
-            try:
-                await self._abort_active_call_on_exit()
-            except asyncio.CancelledError:
-                # Cancellation delivered during cleanup is the current task's
-                # control flow (timeout/TaskGroup), not a secondary close error.
-                raise
-            except Exception as cleanup:
-                # As in close()'s failed-write path, the primary exception wins
-                # after the underlying close has at least been attempted; the
-                # cleanup failure is kept as a note on it.
-                if body_error is not None:
-                    body_error.add_note(
-                        f"Context-exit cleanup also failed: {cleanup!r}"
-                    )
+            # live operation underneath that task. Abort outside this handler,
+            # so a cancellation keeps the body's exception as its context.
+            pass
+        try:
+            await self._abort_active_call_on_exit()
+        except asyncio.CancelledError:
+            # Cancellation delivered during cleanup is the current task's
+            # control flow (timeout/TaskGroup), not a secondary close error.
+            raise
+        except Exception as cleanup:
+            # As in close()'s failed-write path, the primary exception wins
+            # after the underlying close has at least been attempted; the
+            # cleanup failure is kept as a note on it.
+            if body_error is not None:
+                body_error.add_note(f"Context-exit cleanup also failed: {cleanup!r}")
 
     def _check_write_call_available(self) -> None:
         """Reject overlapping writer calls before they mutate codec state."""
@@ -2216,11 +2217,14 @@ class AsyncGzipBinaryFile:
             owner.cancel()
         elif self._source_native_call is not None:
             work = self._source_native_call.completion()
+        pending: Optional[asyncio.CancelledError] = None
         if work is not None:
             try:
                 await _settle_before_cancel(work)
-            except asyncio.CancelledError:
-                raise
+            except asyncio.CancelledError as cancellation:
+                # Settlement has finished the active call, so the file can
+                # still be released before the cancellation propagates.
+                pending = cancellation
             except Exception:
                 # The read/seek owner observes the native failure. Its
                 # settlement still permits this context to release the file.
@@ -2236,18 +2240,28 @@ class AsyncGzipBinaryFile:
             # A failure, or a cancellation not proven to follow a successful
             # close, leaves the broken handle reportably open so an explicit
             # close() can retry the underlying close.
-            if _is_native_source(close_file, "close"):
-                work = _submit_native(close_file, "close")
-                try:
-                    await _settle_before_cancel(work)
-                except asyncio.CancelledError as cancellation:
-                    # The native close has settled. Latch closure only on
-                    # proof that it returned normally, then propagate (BC13).
-                    if work.cancelled() or work.exception() is not None:
-                        raise
-                    cancelled_after_close = cancellation
-            else:
-                await self._close_underlying(close_file)
+            try:
+                if _is_native_source(close_file, "close"):
+                    work = _submit_native(close_file, "close")
+                    try:
+                        await _settle_before_cancel(work)
+                    except asyncio.CancelledError as cancellation:
+                        # The native close has settled. Latch closure only on
+                        # proof that it returned normally, then propagate
+                        # (BC13).
+                        if work.cancelled() or work.exception() is not None:
+                            raise
+                        cancelled_after_close = cancellation
+                else:
+                    await self._close_underlying(close_file)
+            except Exception as failure:
+                if pending is None:
+                    raise
+                # The cancellation keeps precedence, caused by the failed
+                # close, which leaves the handle open for a retry (BC13).
+                raise pending from failure
+        if cancelled_after_close is None:
+            cancelled_after_close = pending
         try:
             self._mark_closed()
         except BaseException as observer_error:

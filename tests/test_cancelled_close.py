@@ -12,6 +12,7 @@ import asyncio
 import concurrent.futures
 import functools
 import gzip
+import io
 import os
 import threading
 
@@ -513,6 +514,197 @@ class TestAbortClose:
         assert executor.entries("start", "close") == [opened.raw, opened.raw]
         assert opened.handle.closed
         assert opened.raw.closed
+
+
+# (via, cancels): an exceptional exit aborts at once, so one cancellation
+# lands in the abort's settlement; a clean exit aborts on the first and needs
+# a second.
+SETTLEMENT_CANCELS = [("error-exit", 1), ("error-exit", 3), ("clean-exit", 2)]
+
+
+async def _cancel_abort_settlement(
+    opened, executor, name, call, via, cancels, close_stage=None
+):
+    """Cancel a context exit while its abort settles a held active call.
+
+    Return the active call's task, the exiting task and the body error.
+    ``close_stage`` also holds the close that follows, before the call is
+    released.
+    """
+    held = executor.arm(name, "running")
+    active = asyncio.create_task(call)
+    await asyncio.wait_for(held.entered.wait(), 10)
+    body = KeyError("body") if via == "error-exit" else None
+
+    async def exit_context():
+        # As ``async with`` does, exit while the body's exception is handled.
+        if body is None:
+            return await opened.handle.__aexit__(None, None, None)
+        try:
+            raise body
+        except KeyError:
+            return await opened.handle.__aexit__(KeyError, body, body.__traceback__)
+
+    exiting = asyncio.create_task(exit_context())
+    await asyncio.sleep(0.01)
+    for _ in range(cancels):
+        exiting.cancel()
+        await asyncio.sleep(0.01)
+    # The abort is still settling the held call and has not closed yet.
+    assert not exiting.done()
+    assert executor.entries("start", "close") == []
+    if close_stage is not None:
+        executor.arm("close", close_stage)
+    held.release.set()
+    return active, exiting, body
+
+
+class TestCancelledAbortSettlement:
+    """A cancellation while the abort settles the active call still closes.
+
+    Settlement has finished the active call before the cancellation
+    propagates, so the abort releases the file first (BC16). An exceptional
+    exit's cancellation keeps the body's exception as its context.
+    """
+
+    @pytest.mark.parametrize("kind", KINDS)
+    @pytest.mark.parametrize(("via", "cancels"), SETTLEMENT_CANCELS)
+    @pytest.mark.parametrize("source", ["path", "closefd"])
+    async def test_active_read(self, path, executor, kind, via, cancels, source):
+        opened = await _open(kind, "r", source, path)
+        active, exiting, body = await _cancel_abort_settlement(
+            opened, executor, "read", opened.handle.read(), via, cancels
+        )
+        error = await _outcome(exiting)
+        assert isinstance(error, asyncio.CancelledError)
+        if body is not None:
+            assert error.__context__ is body
+        assert not getattr(error, "__notes__", []), error.__notes__
+        result = await _outcome(active)
+        assert isinstance(result, OSError) and "read aborted" in str(result)
+        executor.wait_idle()
+        read_end = executor.index("end", "read")
+        close_start = executor.index("start", "close")
+        assert len(close_start) == 1 and read_end[-1] < close_start[0]
+        assert opened.raw.closed
+        assert opened.handle.closed
+        assert opened.binary._read_health.name == "BROKEN"
+
+    @pytest.mark.parametrize("kind", KINDS)
+    @pytest.mark.parametrize(("via", "cancels"), SETTLEMENT_CANCELS)
+    async def test_active_write(self, path, executor, kind, via, cancels):
+        opened = await _open(kind, "w", "path", path)
+        data = os.urandom(1 << 20)
+        active, exiting, body = await _cancel_abort_settlement(
+            opened,
+            executor,
+            "write",
+            opened.handle.write(data if kind == "binary" else data.hex()),
+            via,
+            cancels,
+        )
+        error = await _outcome(exiting)
+        assert isinstance(error, asyncio.CancelledError)
+        if body is not None:
+            assert error.__context__ is body
+        written = await _outcome(active)
+        assert isinstance(written, OSError) and "write aborted" in str(written)
+        executor.wait_idle()
+        write_end = executor.index("end", "write")
+        close_start = executor.index("start", "close")
+        assert len(close_start) == 1 and write_end[0] < close_start[0]
+        assert opened.raw.closed
+        assert opened.handle.closed
+
+    @pytest.mark.parametrize("kind", KINDS)
+    async def test_borrowed_file_stays_open(self, path, executor, kind):
+        opened = await _open(kind, "r", "borrowed", path)
+        active, exiting, body = await _cancel_abort_settlement(
+            opened, executor, "read", opened.handle.read(), "error-exit", 1
+        )
+        error = await _outcome(exiting)
+        assert isinstance(error, asyncio.CancelledError)
+        assert error.__context__ is body
+        await _outcome(active)
+        executor.wait_idle()
+        assert executor.entries("start", "close") == []
+        assert opened.handle.closed
+        assert not opened.borrowed._file.closed
+        _close_borrowed(opened)
+
+    @pytest.mark.parametrize("kind", KINDS)
+    async def test_failing_close_is_the_cause_and_stays_open(
+        self, path, executor, kind
+    ):
+        opened = await _open(kind, "r", "path", path)
+        failure = OSError("injected close failure")
+        executor.fail["close"] = failure
+        active, exiting, body = await _cancel_abort_settlement(
+            opened, executor, "read", opened.handle.read(), "error-exit", 1
+        )
+        error = await _outcome(exiting)
+        assert isinstance(error, asyncio.CancelledError)
+        assert error.__cause__ is failure
+        await _outcome(active)
+        executor.wait_idle()
+        # The failed close leaves the broken handle open; close() retries.
+        assert not opened.handle.closed
+        await opened.handle.close()
+        executor.wait_idle()
+        assert executor.entries("start", "close") == [opened.raw, opened.raw]
+        assert opened.handle.closed
+        assert opened.raw.closed
+
+    async def test_failing_close_after_a_failed_active_read(self, path, executor):
+        read_failure = OSError("injected read failure")
+
+        class FailingReader(io.BufferedReader):
+            # Fails inside the native call, as a real read error would.
+            fail = False
+
+            def read(self, size=-1, /):
+                if self.fail:
+                    raise read_failure
+                return super().read(size)
+
+        raw = FailingReader(io.FileIO(path, "rb"))
+        source = aiofiles.threadpool.wrap(raw, loop=asyncio.get_running_loop())
+        handle = AsyncGzipBinaryFile(None, "rb", fileobj=source, closefd=True)
+        await handle.__aenter__()
+        opened = _Opened(handle, raw, True, None)
+        close_failure = OSError("injected close failure")
+        executor.fail["close"] = close_failure
+        raw.fail = True
+        active, exiting, _ = await _cancel_abort_settlement(
+            opened, executor, "read", opened.handle.read(), "error-exit", 1
+        )
+        error = await _outcome(exiting)
+        # The read's owner reports the read failure; the cancellation is
+        # caused by the close failure.
+        assert isinstance(error, asyncio.CancelledError)
+        assert error.__cause__ is close_failure
+        assert not getattr(error, "__notes__", []), error.__notes__
+        assert await _outcome(active) is read_failure
+        executor.wait_idle()
+        assert not opened.handle.closed
+        await opened.handle.close()
+        assert raw.closed
+
+    @pytest.mark.parametrize("kind", KINDS)
+    @pytest.mark.parametrize("stage", STAGES)
+    async def test_cancelled_again_during_the_close(self, path, executor, kind, stage):
+        opened = await _open(kind, "r", "path", path)
+        active, exiting, _ = await _cancel_abort_settlement(
+            opened, executor, "read", opened.handle.read(), "error-exit", 1, stage
+        )
+        # Cancel the exit once more while the held close is pending.
+        error = await _cancel_held(exiting, executor.armed[-1], 1)
+        assert isinstance(error, asyncio.CancelledError)
+        await _outcome(active)
+        executor.wait_idle()
+        assert executor.entries("start", "close") == [opened.raw]
+        assert opened.raw.closed
+        assert opened.handle.closed
 
 
 @pytest.mark.parametrize("kind", KINDS)
