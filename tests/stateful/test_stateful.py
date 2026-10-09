@@ -10,6 +10,8 @@ see "Seeds, minimization and CI" in plans/design/v2.0.0b2-wp10-qualification.md.
 from __future__ import annotations
 
 import asyncio
+import gc
+import os
 import re
 from functools import cache
 from pathlib import Path
@@ -112,6 +114,72 @@ def test_seed_set_covers_every_table_row():
             rf"assert_lifecycle\(\s*\w+(\.\w+)*,\s*{source_state},\s*\"{event}\"",
             body,
         ), (path, name, row)
+
+
+# fd_delta counts every descriptor in the process. An automatic collection
+# mid-scenario once closed a file an earlier test left in unreachable
+# garbage, and the run reported "-1 file descriptors leaked" (CI flake F-A).
+
+needs_fd_counts = pytest.mark.skipif(
+    interpreter._open_fds() is None, reason="platform does not expose open fds"
+)
+
+
+def test_no_automatic_collection_runs_during_a_scenario():
+    collections = []
+    allocations = []
+    during = []
+
+    def record(phase, info):
+        if phase == "start":
+            collections.append(info["generation"])
+
+    def allocate(handle, event, context):
+        # Far past any threshold below: automatic collection would run here.
+        allocations.append([[] for _ in range(1000)])
+        if event.op["op"] == "final":  # after the last count
+            during.extend(collections)
+
+    # Allocate everything first, so only the replay runs at a threshold of 1.
+    scenario, hooks = generate(0), (allocate,)
+    thresholds = gc.get_threshold()
+    gc.callbacks.append(record)
+    gc.set_threshold(1, 1, 1)
+    try:
+        replay(aiogzip, scenario, hooks)
+    finally:
+        gc.set_threshold(*thresholds)
+        gc.callbacks.remove(record)
+    assert len(allocations) > 2
+    assert during == []
+    assert gc.isenabled()
+
+
+def test_collection_is_restored_when_a_scenario_raises():
+    def explode(handle, event, context):
+        raise RuntimeError("hook failed")
+
+    with pytest.raises(RuntimeError, match="hook failed"):
+        replay(aiogzip, generate(0), (explode,))
+    assert gc.isenabled()
+
+
+@needs_fd_counts
+def test_a_file_the_scenario_leaves_open_still_counts():
+    # Positive control: with collection paused, a descriptor opened during
+    # the scenario and still open at the final count is reported.
+    kept = []
+
+    def leak(handle, event, context):
+        if not kept:
+            kept.append(open(os.devnull, "rb"))  # noqa: SIM115
+
+    try:
+        events, _trace = replay(aiogzip, generate(0), (leak,))
+    finally:
+        for file in kept:
+            file.close()
+    assert events[-1].outcome.value["fd_delta"] == 1
 
 
 def test_timed_out_scenario_closes_its_handle(monkeypatch):

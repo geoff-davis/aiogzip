@@ -451,6 +451,7 @@ async def _park(gate: Gate) -> bool:
 # file an earlier seed leaked cannot move a later seed's fd_delta. In-process
 # test runs skip it: a full collection of pytest's heap per scenario triples
 # the suite's time, and nothing there compares fd_delta across processes.
+# Instead replay() keeps automatic collection off between the two counts.
 COLLECT_FOR_FD_COUNTS = False
 
 
@@ -1126,8 +1127,19 @@ def _digest(data: bytes) -> str:
 
 def replay(package, scenario: dict[str, Any], hooks: tuple[Hook, ...] = ()):
     """Run one scenario on a fresh event loop; return (raw events, trace)."""
-    with tempfile.TemporaryDirectory(prefix="aiogzip-stateful-") as directory:
-        events = asyncio.run(run(package, scenario, Path(directory), hooks))
+    # fd_delta counts the whole process's descriptors. An automatic
+    # collection mid-scenario can close a file some earlier test left in
+    # unreachable garbage, which reads as -1 (CI flake F-A). Collections stay
+    # off from the first count to the last; the differential's explicit
+    # collections (COLLECT_FOR_FD_COUNTS) still run.
+    enabled = gc.isenabled()
+    gc.disable()
+    try:
+        with tempfile.TemporaryDirectory(prefix="aiogzip-stateful-") as directory:
+            events = asyncio.run(run(package, scenario, Path(directory), hooks))
+    finally:
+        if enabled:
+            gc.enable()
     return events, symbolic(events, directory)
 
 
