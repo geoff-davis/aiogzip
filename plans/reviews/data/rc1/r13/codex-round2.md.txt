@@ -1,0 +1,42 @@
+**APPROVED for R13 round 2 at `f67dd991bbd38f2135a6934e61175f6cbe6bf0c9`. No new findings.**
+
+The identity command printed nothing. The public manifest remains identical to b2. Candidate and artifact source `d85a727` share source tree `847d16032b58d960ba55b9e3c19a566f430ac08c`.
+
+The release record names exactly:
+
+- Wheel: `7f8da83d01517e68f07ea703b7ebb4d7ce9c05eb5ab776f35ccaf522fc0e7263`
+- Sdist: `e7a5f8fa56d3eae2dc97618faa987641e9bc84c76798c04190decfa8e1b09b0b`
+
+The direct non-plans diff from round 1 contains exactly PR #135 and the two changelog corrections. The separate main-to-release diff also contains the expected release version, dated changelog section and CLAUDE.md version-history updates.
+
+All 12 answers follow:
+
+1. **Qualified yes — unchanged.** Entered native work settles before cleanup; queued scan reads may be prevented. Cancellation during abort settlement can still precede close submission, as disclosed. Evidence: `_binary.py:2206`, `_inspection.py:49`, `_codec_async.py:52`.
+
+2. **Yes — unchanged.** Late acquisitions are cleaned up; scan reads are either prevented or settled before cancellation propagates, without double-feeding their output. Evidence: `_opening.py:36`, `_inspection.py:60`.
+
+3. **Yes, subject to cleanup failures — unchanged.** Ownership and borrowed-file handling remain correct. Abort’s CLOSED latch requires proof that native close returned normally. Evidence: `_inspection.py:100`, `_binary.py:2239`.
+
+4. **Qualified yes — wording corrected.** Absolute seeks have the reviewed transaction behavior. Unchanged-cursor failures retain binary health policy; text `SEEK_END` follows `read()` rules. Evidence: `_text.py:575` and `599`, [docs/errors.md:245](/home/geoff/Projects/personal/aiogzip/docs/errors.md:245).
+
+5. **Yes for drain accounting — unchanged.** Buffered bytes are counted once, and validation/limit failures remain enforced. EOF alone still does not prove successful validation; health must accompany it. Evidence: `_binary.py:604` and `1368`.
+
+6. **Qualified yes — limitation now disclosed.** Ordinary empty strings no longer accumulate. String subclasses retain b2 behavior; byte output and BOM behavior remain unchanged. Evidence: `_text.py:2178`, `tests/test_text_writelines_empty.py:213`, corrected changelog.
+
+7. **Yes — BC15 unchanged; scan diagnostics improved.** Abort accounting and precedence remain intact. PR #135 now suppresses a pure repeated-cancellation note and records its non-cancellation cause when present. Evidence: [_inspection.py:34](/home/geoff/Projects/personal/aiogzip/src/aiogzip/_inspection.py:34) and `179`; `tests/test_inspection_settlement.py:463`.
+
+8. **Qualified yes — unchanged.** BC11, BC12 composition and clause S retain their reviewed restrictions. No predicate changes occurred in round 2. Evidence: `differential.py:1301`, `1439`, `1717`.
+
+9. **Yes — unchanged.** No public manifest, signature, dataclass or exception-hierarchy change. The diagnostic repair is compatible with the stability policy. Evidence: unchanged manifest; `docs/stability.md:3` and `29`.
+
+10. **Qualified — unchanged measurements, corrected claims.** The packet now preserves the accepted +6.52% `verify()` cost and explicitly says `inspect()` was not separately re-timed after #128. Evidence: `v2.0.0rc1-r12-record.md:89–109`.
+
+11. **Yes — unchanged.** The flake controls retain defect sensitivity, and compression level 9 preserves recorded fixtures. PR #135 adds focused cleanup-note regressions. Evidence: `interpreter.py:1128`, `test_stateful.py:128`, `test_codec_async.py:411`, `capture_file_state_trace.py:26`.
+
+12. **Yes.** Corrected changelog and ledger match the code. Identity binds this candidate to the rebuilt release inputs; publication verifies the exact recorded files before transfer and before either upload. Evidence: release record, `publish.yml:98`, `153`, `181`.
+
+The round-1 findings table and dispositions accurately capture my findings and their closure. The corrected sweep combinations, performance qualifications, BC14 precedence summary and deferred limitations are consistent with the code and supporting records.
+
+Hosted run `37983380928` passing all 22 checks is maintainer-reported; I did not independently retrieve it or rerun suites. No files or checkout state were changed, and no timing runs were performed.
+
+**Verdict: approved for maintainer sign-off at the exact reviewed SHA.**
