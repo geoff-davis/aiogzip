@@ -408,27 +408,43 @@ def _empty_block_gzip(empty_blocks):
     return b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff" + bytes(raw) + trailer
 
 
-async def test_valid_empty_block_stream_makes_scheduler_progress():
-    wire = _empty_block_gzip(60_000)
+async def test_valid_empty_block_stream_makes_scheduler_progress(monkeypatch):
+    # The no-output checkpoint must let other tasks run while the decoder
+    # consumes empty stored blocks. The decoder advances inline and each
+    # checkpoint hands off to a companion task, so the test cannot pass on an
+    # executor wait's yield instead (it once counted loop ticks and flaked).
+    async def unexpected_offload(method, data):
+        raise AssertionError("empty blocks must advance inline")
+
+    monkeypatch.setattr(async_module, "_run_in_thread", unexpected_offload)
+    wire = _empty_block_gzip(200_000)
     expected = gzip.decompress(wire)
-    ticks = 0
-    done = False
-    primed = asyncio.Event()
+    reached = asyncio.Event()
+    turns = []
+    real_checkpoint = async_module._cooperative_checkpoint
 
-    async def ticker():
-        nonlocal ticks
-        while not done:
-            ticks += 1
-            primed.set()
-            await asyncio.sleep(0)
+    async def companion():
+        while True:
+            await reached.wait()
+            reached.clear()
+            turns.append("companion")
 
-    ticker_task = asyncio.create_task(ticker())
-    await primed.wait()
-    decoder = GzipDecoder()
-    output = await _collect(decoder.feed(wire), workload=wire)
-    output.extend(await _collect(decoder.finish()))
-    done = True
-    await ticker_task
+    async def checkpoint():
+        turns.append("checkpoint")
+        reached.set()
+        await real_checkpoint()
+        assert turns[-1] == "companion", "the checkpoint did not yield"
+
+    monkeypatch.setattr(async_module, "_cooperative_checkpoint", checkpoint)
+    companion_task = asyncio.create_task(companion())
+    await asyncio.sleep(0)
+    try:
+        decoder = GzipDecoder()
+        output = await _collect(decoder.feed(wire))
+        output.extend(await _collect(decoder.finish()))
+    finally:
+        companion_task.cancel()
 
     assert b"".join(output) == expected
-    assert ticks > 1
+    assert turns.count("checkpoint") >= 2
+    assert turns == ["checkpoint", "companion"] * turns.count("checkpoint")
