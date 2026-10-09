@@ -361,6 +361,7 @@ def compare(
         clauses = (
             bc2_aborted_native_read(pair),
             bc2_trigger_only(pair),
+            bc2_recovered_cancel(pair),
             bc2_shadow_claim(pair, shadow),
             bc2_broken_refusal(pair, shadow),
         )
@@ -1597,11 +1598,13 @@ def _trigger(pair: Pair, key, c: Row, r: Row, source) -> tuple[str, list[int]] |
     return None
 
 
-def _evidence(pair: Pair, name: str, index: int) -> list[list[Any]] | None:
-    """The reference's ``name`` evidence records at event ``index``, or None
-    when the evidence is malformed anywhere: it must be a list of
-    ``[event index, list]`` records whose index is exactly an int."""
-    records = pair.ref_info.get(name, [])
+def _evidence(
+    pair: Pair, name: str, index: int, info: dict[str, Any] | None = None
+) -> list[list[Any]] | None:
+    """The reference's (or ``info``'s) ``name`` evidence records at event
+    ``index``, or None when the evidence is malformed anywhere: it must be a
+    list of ``[event index, list]`` records whose index is exactly an int."""
+    records = (pair.ref_info if info is None else info).get(name, [])
     if not isinstance(records, list):
         return None
     found = []
@@ -1694,6 +1697,66 @@ def bc2_trigger_only(pair: Pair) -> Claim:
     trigger = _trigger(pair, key, c, r, pair.scenario["source"])
     if trigger is not None and trigger[0] == "L2" and c.taken is None:
         claim.events.add(key)
+    return claim
+
+
+NATIVE_READ = {"via": "native", "method": "read", "bytes": None}
+
+
+def _rewound(seeks: list[list[Any]] | None) -> bool:
+    """Exactly one source seek at the event, to exactly the int 0."""
+    return (
+        seeks is not None
+        and len(seeks) == 1
+        and len(seeks[0]) == 1
+        and type(seeks[0][0]) is int
+        and seeks[0][0] == 0
+    )
+
+
+def bc2_recovered_cancel(pair: Pair) -> Claim:
+    """S: a cancelled cookie seek entered from validation salvage loses the
+    first chunk b1 read after its recovery rewind.
+
+    The seek rewinds the native source to 0, which in b1 discards the
+    salvage and starts a fresh decoder; the cancel then lands on the parked
+    native read of the cookie replay, whose bytes b1 drops. Only the cancel
+    row is claimed: its one-sided ``taken`` witness, exactly the first chunk
+    of the wire. What b1 does after the loss is BC11's (the candidate is
+    BROKEN), so no lossy run checks b1's text continuation.
+    """
+    claim = Claim()
+    if pair.reference != "b1" or pair.mode != "rt":
+        return claim
+    if pair.scenario["source"]["kind"] != "native":
+        return claim
+    wire_size = len(unb64(pair.scenario["wire"]))
+    for key in pair.diffs:
+        op = pair.op(key)
+        if key[1] != "cancel" or op.get("call", {}).get("op") != "seek_mark":
+            continue
+        if type(op.get("after")) is not int or op["after"] != 1:
+            continue
+        if pair.health_before(key) != "VALIDATION_SALVAGE":
+            continue
+        c, r = pair.cand_by_key[key], pair.ref_by_key[key]
+        n = pair.cand_order[key]
+        m = next(i for i, row in enumerate(pair.ref) if row.key == key)
+        if pair.cand[:n] != pair.ref[:m]:
+            continue  # a difference before the cancel: not this shape
+        if (
+            c.outcome == {"cancelled": True}
+            and c == dataclasses.replace(r, taken=None)
+            and c.parked == NATIVE_READ
+            and c.pulled is None
+            and wire_range(pair, r.taken)
+            == [0, min(pair.scenario["chunk_size"], wire_size)]
+            and _rewound(_evidence(pair, "seeks", key[0]))
+            and _rewound(_evidence(pair, "seeks", key[0], pair.cand_info))
+            and _moved(pair.cand_info, key[0]) is True
+            and _moved(pair.ref_info, key[0]) is True
+        ):
+            claim.events.add(key)
     return claim
 
 

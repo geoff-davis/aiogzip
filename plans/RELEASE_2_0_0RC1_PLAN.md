@@ -238,11 +238,13 @@ tests.
   witnesses and b1's `seek(0)` rows exactly, and BC2 claims nothing inside
   one (b1/2000121, an open span; b1/4533, a span closed by `seek(0)`, after
   which BC2 claims b1's lost input as before). Seeds 2,000,000–2,000,199
-  then pass against b2 and c0 (BC11 claims 6 each). Against b1 one
-  difference remains, ledgered as unclaimed: in b1/2000100 a cancelled
-  cookie seek stops b1's native read (`taken [0, 7]`) while the reader is
-  in validation salvage, where BC2 admits no trigger; BC11 claims b1's
-  read on into `BadGzipFile` after it. Its disposition is the maintainer's.
+  then pass against b2 and c0 (BC11 claims 6 each). Against b1 the last
+  difference, b1/2000100, is BC2's: a cancelled cookie seek entered from
+  validation salvage, but its rewind to 0 recovered b1's reader before the
+  cancel stopped the native read of the first chunk (`taken [0, 7]`). At
+  maintainer direction BC2's narrow clause S claims that cancel row only,
+  and BC11 claims b1's read on into `BadGzipFile` after it, so the block
+  passes against b1 too.
   Eleven runs join `tests/data/rc1_reference_runs.json` (ten block runs and b1/4533),
   recorded on stdlib and
   zlib-ng with identical records, and their claims and near misses are

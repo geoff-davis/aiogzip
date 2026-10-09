@@ -40,6 +40,7 @@ from differential import (
     _text_of,
     _wire_scenario,
     bc2_claim,
+    bc2_recovered_cancel,
     bc2_request,
     bc2_shadow_claim,
     bc2_trigger_only,
@@ -4369,16 +4370,154 @@ def test_bc11_abort_needs_a_read_call():
     fails(pair, "(11, 'abort', 0)")
 
 
-def test_bc11_b1_cancelled_seek_from_salvage_stays_unclaimed():
-    # b1's cancelled seek (op 8) stops its native read with taken [0, 7]
-    # while the reader is in validation salvage, where BC2 admits no
-    # trigger: that row stays unclaimed. It still starts BC11's span, which
-    # claims b1's read on into BadGzipFile.
-    result = compare(rc1_pair("b1", 2000100), rc1_lossy("b1", 2000100))
-    assert result.failures == ["unclaimed difference ('event', (8, 'cancel', 0))"]
+# S: b1's cancelled cookie seek entered from validation salvage. Its rewind to
+# 0 recovers the reader, and the cancel lands on the replay's native read,
+# whose first chunk (taken [0, 7]) b1 drops. BC2 claims the cancel row only;
+# BC11 claims b1's read on into BadGzipFile.
+S_CANCEL = (8, "cancel", 0)
+
+
+def _s_pair() -> Pair:
+    return rc1_pair("b1", 2000100)
+
+
+def test_bc2_s_claims_b1s_cancelled_seek_after_its_recovery_rewind():
+    pair = _s_pair()
+    assert pair.health_before(S_CANCEL) == "VALIDATION_SALVAGE"
+    assert pair.ref_by_key[S_CANCEL].taken == [0, pair.scenario["chunk_size"]]
+    assert bc2_request(pair) is None  # no lossy run checks the continuation
+    assert bc2_recovered_cancel(pair).events == {S_CANCEL}
+    result = compare(pair, rc1_lossy("b1", 2000100))
+    assert result.ok, result.failures
+    assert claims(result, "BC2-LOST-INPUT") == [repr(("event", S_CANCEL))]
     assert claims(result, "BC11-TEXT-SEEK-FAILURE") == [
         "('event', (9, 'readlines', 0))"
     ]
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"taken": [0, 6]},  # not the whole first chunk
+        {"taken": [0, 8]},
+        {"taken": [1, 8]},  # not from the rewound offset
+        {"taken": [0, 0]},
+        {"taken": [0, True]},
+        {"taken": [0, 7, 0]},
+        {"second": {"ok": {"str": "other"}}},
+        {"pulled": [0, 7]},
+    ],
+)
+def test_bc2_s_rejects_another_reference_cancel_row(fields):
+    pair = _s_pair()
+    pair = dataclasses.replace(pair, ref=edit(pair.ref, S_CANCEL, **fields))
+    fails(pair, repr(S_CANCEL))
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"parked": {"via": "native", "method": "seek", "bytes": None}},
+        {"parked": {"via": "native", "method": "read", "bytes": 7}},
+        {"parked": None},
+        {"pulled": [0, 1]},
+        {"outcome": {"ok": 0}},
+    ],
+)
+def test_bc2_s_rejects_another_cancel_shape_on_both_sides(fields):
+    pair = _s_pair()
+    pair = dataclasses.replace(
+        pair,
+        cand=edit(pair.cand, S_CANCEL, **fields),
+        ref=edit(pair.ref, S_CANCEL, **fields),
+    )
+    fails(pair, repr(S_CANCEL))
+
+
+def test_bc2_s_rejects_a_candidate_witness():
+    pair = _s_pair()
+    pair = dataclasses.replace(pair, cand=edit(pair.cand, S_CANCEL, taken=[0, 6]))
+    fails(pair, repr(S_CANCEL))
+
+
+def test_bc2_s_rejects_an_earlier_difference():
+    pair = _s_pair()
+    earlier = (7, "buffer_read", 0)
+    pair = dataclasses.replace(
+        pair, ref=edit(pair.ref, earlier, outcome={"ok": {"bytes": "00"}})
+    )
+    fails(pair, repr(earlier), repr(S_CANCEL))
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"after": 2},
+        {"after": True},
+        {"after": None},
+        {"call": {"op": "seek0"}},
+        {"call": {"op": "tell_mark", "label": "m0"}},
+    ],
+)
+def test_bc2_s_rejects_another_cancel_op(change):
+    pair = _s_pair()
+    pair.op(S_CANCEL).update(change)
+    assert bc2_recovered_cancel(pair).events == set()
+
+
+def test_bc2_s_needs_validation_salvage_on_entry():
+    pair = _s_pair()
+    n = pair.cand_order[S_CANCEL]
+    for health in ("HEALTHY", "BROKEN", None):
+        info = copy.deepcopy(pair.cand_info)
+        info["health"][n] = [health, info["health"][n][1]]
+        assert (
+            bc2_recovered_cancel(dataclasses.replace(pair, cand_info=info)).events
+            == set()
+        )
+
+
+def test_bc2_s_needs_the_first_chunk_of_this_scenario():
+    pair = _s_pair()
+    pair.scenario["chunk_size"] = 8
+    assert bc2_recovered_cancel(pair).events == set()
+
+
+@pytest.mark.parametrize("side", ["cand_info", "ref_info"])
+@pytest.mark.parametrize(
+    ("name", "records"),
+    [
+        ("seeks", [[3, [0]]]),  # no rewind at the cancel
+        ("seeks", [[3, [0]], [8, [5]]]),
+        ("seeks", [[3, [0]], [8, [0, 0]]]),
+        ("seeks", [[3, [0]], [8, [0]], [8, [0]]]),
+        ("seeks", [[3, [0]], [8, [False]]]),
+        ("seeks", [[3, [0]], [8, [0.0]]]),
+        ("seeks", [[3, [0]], [True, [0]]]),
+        ("seeks", "x"),
+        ("cursor_moved", [[8, False]]),
+        ("cursor_moved", []),
+        ("cursor_moved", [[8, True], [8, True]]),
+    ],
+)
+def test_bc2_s_needs_the_rewind_and_moved_witnesses(side, name, records):
+    pair = _s_pair()
+    info = copy.deepcopy(getattr(pair, side))
+    info[name] = records
+    pair = dataclasses.replace(pair, **{side: info})
+    assert bc2_recovered_cancel(pair).events == set()
+
+
+def test_bc2_s_is_b1_text_and_native_only():
+    pair = _s_pair()
+    assert (
+        bc2_recovered_cancel(dataclasses.replace(pair, reference="b2")).events == set()
+    )
+    pair.scenario["mode"] = "rb"
+    assert bc2_recovered_cancel(pair).events == set()
+    pair = _s_pair()
+    pair.scenario["source"] = {"kind": "custom", "checkpoint": False}
+    assert bc2_recovered_cancel(pair).events == set()
 
 
 # b1's cancelled seek that is also BC2's L2 trigger: BC2 claims the cancel
