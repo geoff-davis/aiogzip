@@ -21,6 +21,10 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+# The recorded fixture hashes assume gzip's pre-3.15 default level; Python
+# 3.15 lowered gzip.compress's default from 9 to 6, which changes the bytes.
+FIXTURE_LEVEL = 9
+
 
 class Source:
     def __init__(self, wire: bytes) -> None:
@@ -63,7 +67,7 @@ async def capture(package):
     semantic = {}
     diagnostics = {}
     payload = "α\r\nbeta\rgamma\nlast"
-    wire = gzip.compress(payload.encode(), mtime=123)
+    wire = gzip.compress(payload.encode(), compresslevel=FIXTURE_LEVEL, mtime=123)
     for newline in (None, "", "\n", "\r", "\r\n"):
         sources = [Source(wire), Source(wire)]
         handles = [
@@ -140,7 +144,7 @@ async def capture_extended(package):
     """Small named public scenarios; failure boundaries are fixed by each source."""
     semantic, diagnostic = {}, {}
     payload = b"alpha\nbeta\ngamma\nlast"
-    wire = gzip.compress(payload, mtime=123)
+    wire = gzip.compress(payload, compresslevel=FIXTURE_LEVEL, mtime=123)
 
     def value(result):
         if isinstance(result, bytes):
@@ -348,7 +352,11 @@ async def capture_extended(package):
 
     for encoding in ("utf-8", "utf-16", "iso2022_jp"):
         content = "日本語\r\nabc\r終\n"
-        source = Source(gzip.compress(content.encode(encoding), mtime=123))
+        source = Source(
+            gzip.compress(
+                content.encode(encoding), compresslevel=FIXTURE_LEVEL, mtime=123
+            )
+        )
         events = []
         async with package.AsyncGzipTextFile(
             None,

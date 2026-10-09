@@ -174,8 +174,9 @@ async with aiogzip.open("events.jsonl.gz", "rt") as f:
 
 Important differences and caveats:
 
-- `aiogzip` defaults to `compresslevel=6`; `gzip.open()` defaults to `9`.
-  Pass `compresslevel=9` when that parity matters.
+- `aiogzip` defaults to `compresslevel=6`; `gzip.open()` defaults to `9`
+  before Python 3.15 and `6` from 3.15. Pass `compresslevel=9` when parity
+  with the older default matters.
 - Paths (including `pathlib.Path`) are accepted directly. Supported external
   asynchronous sources and destinations are passed with `filename=None` and
   `fileobj=...`; their `read()` or `write()` methods must be async.
