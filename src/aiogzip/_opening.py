@@ -12,6 +12,23 @@ from ._source_io import _is_native_source
 _STANDARD_OPEN = aiofiles.open
 
 
+def _note_cleanup_failure(
+    failure: BaseException, cleanup: BaseException, what: str
+) -> None:
+    """Note a cleanup failure on the exception that keeps precedence.
+
+    A repeated cancellation during cleanup is not itself a failure, but
+    settlement may raise it from one (a failed native close); note that cause,
+    as the file handles' context exit does.
+    """
+    if isinstance(cleanup, asyncio.CancelledError):
+        cause = cleanup.__cause__
+        if cause is None or isinstance(cause, asyncio.CancelledError):
+            return
+        cleanup = cause
+    failure.add_note(f"{what} cleanup also failed: {cleanup!r}")
+
+
 def _submit_native(file: Any, method: str, *args: Any) -> "asyncio.Future[Any]":
     """Submit a supported native call with aiofiles' own loop and executor."""
     loop = asyncio.get_running_loop()
@@ -54,7 +71,7 @@ async def _acquire_path(filename: Any, mode: str, opener: Any) -> Any:
         try:
             await _settle_before_cancel(loop.run_in_executor(None, raw.close))
         except BaseException as cleanup:
-            cancellation.add_note(f"Opening cleanup also failed: {cleanup!r}")
+            _note_cleanup_failure(cancellation, cleanup, "Opening")
         raise
     try:
         return aiofiles.threadpool.wrap(raw, loop=loop)

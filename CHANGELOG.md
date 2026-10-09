@@ -14,6 +14,11 @@ All notable changes to this project will be documented in this file.
   and the body's exception stays in the cancellation's exception chain. A
   clean exit cancelled twice while waiting for an active call is fixed the
   same way.
+- When an open was cancelled after the file had been acquired, a repeated
+  cancellation while the late file was being closed was noted as
+  `Opening cleanup also failed: CancelledError(...)`, and a failure of that
+  close was lost. Like the context exit and `inspect()`/`verify()`, opening
+  cleanup now notes only a real close failure.
 
 ## [2.0.0rc1] - 2026-10-09
 

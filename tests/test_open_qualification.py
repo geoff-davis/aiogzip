@@ -537,10 +537,12 @@ async def test_cooperative_cleanup_finishes_before_releasing_open_reservation(
 
 @pytest.mark.parametrize("text", [False, True])
 @pytest.mark.parametrize("writing", [False, True])
+@pytest.mark.parametrize("close_fails", [False, True])
 async def test_cancelled_acquisition_retains_close_through_more_cancellation(
-    monkeypatch, tmp_path, text, writing
+    monkeypatch, tmp_path, text, writing, close_fails
 ):
     loop = asyncio.get_running_loop()
+    close_failure = OSError("injected close failure")
     entered_open, entered_close = asyncio.Event(), asyncio.Event()
     release_open, release_close = threading.Event(), threading.Event()
     acquired = []
@@ -554,6 +556,8 @@ async def test_cancelled_acquisition_retains_close_through_more_cancellation(
                 raise RuntimeError("cleanup watchdog expired")
             self.closes += 1
             super().close()
+            if close_fails:
+                raise close_failure
 
     def acquire(*args):
         raw = File(*args)
@@ -586,7 +590,13 @@ async def test_cancelled_acquisition_retains_close_through_more_cancellation(
         ) as caught:
             await opener
         assert caught.value.__cause__ is None
-        assert any("later cleanup cancel" in note for note in caught.value.__notes__)
+        notes = getattr(caught.value, "__notes__", [])
+        # A repeated cancellation during cleanup is not a cleanup failure;
+        # a close failure that settlement chained to it is (BC17).
+        if close_fails:
+            assert notes == [f"Opening cleanup also failed: {close_failure!r}"]
+        else:
+            assert notes == []
         assert acquired[0].closed and acquired[0].closes == 1
         assert_lifecycle(f, OPENING, "acquisition_fails")
         await f.close()
