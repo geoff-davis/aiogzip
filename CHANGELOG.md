@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0rc1] - 2026-10-09
+
+This release candidate keeps the 2.0 public API frozen: every public
+signature, type and codec-lifecycle rule is unchanged from `2.0.0b1`, and the
+runtime contract manifest is identical. It fixes remaining cases in which
+`2.0.0b2` could leave a file open after a cancelled close, return text from
+the wrong position after a failed seek, miscount an end-relative seek after
+`peek()`, or lose a cancellation in `inspect()` and `verify()`.
+
 ### Fixed
 
 - Cancelling `close()`, or an `async with` exit, while the underlying file's
@@ -65,7 +74,8 @@ All notable changes to this project will be documented in this file.
   gzip clamps, a text read must not be retried after `UnicodeDecodeError`,
   and `inspect()` memory grows with the member count and header fields.
   Also documented the end-relative seek and context-exit cleanup fixes in
-  this release.
+  this release. The note on `compresslevel` defaults now says that
+  `gzip.open()` defaults to 9 only before Python 3.15, which lowers it to 6.
 
 ## [2.0.0b2] - 2026-10-07
 

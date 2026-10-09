@@ -279,12 +279,17 @@ Always include:
   adds deterministic runtime and typing contracts, proves the supported
   dependency floors and installed artifacts, and publishes the beta stability
   policy.
-- **2.0.0b2 (current release)** - Keeps the frozen API and corrects
-  cancellation, ownership and recovery cases in which b1 could lose, skip or
-  misreport data (behavior exceptions BC1–BC10), with explicit binary read
-  health, a text replay-origin object and a narrow text/binary bridge.
-  Development continues as `2.0.0rc1.dev0` while the Beta classifier and
-  frozen compatibility contract remain in force; an RC is not guaranteed.
+- **2.0.0b2** - Keeps the frozen API and corrects cancellation, ownership
+  and recovery cases in which b1 could lose, skip or misreport data (behavior
+  exceptions BC1–BC10), with explicit binary read health, a text
+  replay-origin object and a narrow text/binary bridge.
+- **2.0.0rc1 (current release)** - Keeps the frozen API and fixes the
+  remaining b2 cases (BC11–BC15): a queued native close lost to
+  cancellation, text seeks that fail after moving the reader, end-relative
+  seeks after `peek()`, `inspect()`/`verify()` settlement and small
+  cancellation and cleanup repairs. Python 3.15
+  runs in an informational CI job; the Beta classifier and frozen
+  compatibility contract remain in force.
 
 ---
 
