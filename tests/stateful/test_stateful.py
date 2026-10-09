@@ -128,19 +128,21 @@ needs_fd_counts = pytest.mark.skipif(
 def test_no_automatic_collection_runs_during_a_scenario():
     collections = []
     allocations = []
-    during = []
+    enabled = []
 
     def record(phase, info):
-        if phase == "start":
+        # Count from the first event on: before replay() pauses collection,
+        # the caller (or coverage's tracer) can still trigger one.
+        if phase == "start" and allocations:
             collections.append(info["generation"])
 
     def allocate(handle, event, context):
+        enabled.append(gc.isenabled())
         # Far past any threshold below: automatic collection would run here.
         allocations.append([[] for _ in range(1000)])
         if event.op["op"] == "final":  # after the last count
-            during.extend(collections)
+            allocations.append(list(collections))
 
-    # Allocate everything first, so only the replay runs at a threshold of 1.
     scenario, hooks = generate(0), (allocate,)
     thresholds = gc.get_threshold()
     gc.callbacks.append(record)
@@ -150,8 +152,9 @@ def test_no_automatic_collection_runs_during_a_scenario():
     finally:
         gc.set_threshold(*thresholds)
         gc.callbacks.remove(record)
-    assert len(allocations) > 2
-    assert during == []
+    assert len(allocations) > 3
+    assert allocations[-1] == []
+    assert not any(enabled)
     assert gc.isenabled()
 
 
