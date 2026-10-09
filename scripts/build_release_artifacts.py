@@ -235,15 +235,13 @@ def build(ref: str, evidence: Path, python: str) -> dict[str, object]:
                     str(constraints),
                     "--out-dir",
                     str(dist),
+                    # The release record names every file in dist, and the
+                    # publish job's artifact upload drops hidden files.
+                    "--no-create-gitignore",
                 ],
                 cwd=source,
             )
-            wheels = sorted(dist.glob("*.whl"))
-            sdists = sorted(dist.glob("*.tar.gz"))
-            if len(wheels) != 1 or len(sdists) != 1:
-                raise RuntimeError(
-                    f"expected one wheel and one sdist: {wheels + sdists}"
-                )
+            wheel, sdist = _release_artifacts(dist)
             twine = [
                 "uv",
                 "tool",
@@ -255,15 +253,15 @@ def build(ref: str, evidence: Path, python: str) -> dict[str, object]:
                 "twine",
             ]
             _run(
-                [*twine, "check", "--strict", str(wheels[0]), str(sdists[0])],
+                [*twine, "check", "--strict", str(wheel), str(sdist)],
                 cwd=scratch,
             )
             version = _source_version(source)
-            packaged = _extract_sdist(sdists[0], scratch / "sdist")
+            packaged = _extract_sdist(sdist, scratch / "sdist")
             packaged_digests = _require_packaged_trees(packaged, source)
             for artifact, kind, examples_root in (
-                (wheels[0], "wheel", source),
-                (sdists[0], "sdist", packaged),
+                (wheel, "wheel", source),
+                (sdist, "sdist", packaged),
             ):
                 _smoke(
                     artifact,
@@ -283,11 +281,11 @@ def build(ref: str, evidence: Path, python: str) -> dict[str, object]:
                     "twine": " ".join(
                         _output([*twine, "--version"], cwd=scratch).split()
                     ),
-                    "backend": _wheel_generator(wheels[0]),
+                    "backend": _wheel_generator(wheel),
                     "python": _output([python, "--version"], cwd=scratch),
                     "platform": platform.platform(),
                 },
-                "artifacts": [_inventory_entry(wheels[0]), _inventory_entry(sdists[0])],
+                "artifacts": [_inventory_entry(wheel), _inventory_entry(sdist)],
                 "sdist_packaged_files": packaged_digests,
                 "reports": sorted(
                     path.name for path in evidence.glob("*.json") if path.is_file()
@@ -299,6 +297,20 @@ def build(ref: str, evidence: Path, python: str) -> dict[str, object]:
         json.dumps(inventory, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return inventory
+
+
+def _release_artifacts(dist: Path) -> tuple[Path, Path]:
+    """The one wheel and one sdist in ``dist``; anything else there fails.
+
+    Every file in ``dist`` is recorded and published, so a stray file (uv's
+    ``.gitignore``, say) would either enter the release record or fail it.
+    """
+    names = sorted(path.name for path in dist.iterdir())
+    wheels = [name for name in names if name.endswith(".whl")]
+    sdists = [name for name in names if name.endswith(".tar.gz")]
+    if len(wheels) != 1 or len(sdists) != 1 or len(names) != 2:
+        raise RuntimeError(f"expected exactly one wheel and one sdist: {names}")
+    return dist / wheels[0], dist / sdists[0]
 
 
 def _require_clean(source: Path) -> None:
