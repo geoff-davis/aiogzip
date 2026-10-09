@@ -421,6 +421,74 @@ class TestCleanupPrecedence:
         assert _only_close(gated).closed
 
 
+async def _cancel_again_in_close(gated, coroutine, first):
+    """Cancel a scan parked in ``first``, then again while cleanup closes.
+
+    Return the exception the scan raised.
+    """
+    raised = []
+
+    async def scan():
+        try:
+            return await coroutine
+        except BaseException as error:
+            raised.append(error)
+            raise
+
+    gated.gate = first
+    task = asyncio.create_task(scan())
+    await asyncio.wait_for(gated.entered.wait(), 10)
+    task.cancel()
+    await asyncio.sleep(0.01)
+    # Park the cleanup close behind a fresh gate, then release ``first``.
+    released, gated.release = gated.release, threading.Event()
+    gated.entered.clear()
+    gated.gate = "close"
+    released.set()
+    await asyncio.wait_for(gated.entered.wait(), 10)
+    task.cancel()
+    await asyncio.sleep(0.01)
+    assert not task.done()
+    gated.release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    (error,) = raised
+    return error
+
+
+class TestRepeatedCancellationDuringCleanup:
+    """A repeated cancellation is not a scan cleanup failure (R13 F1).
+
+    Settlement raises it from a failed native close, so only that cause is
+    noted, as for the file handles' context exit (BC15). Opening cleanup
+    (``_acquire_path``) keeps b2's note of the repeated cancellation itself
+    (``test_open_qualification``).
+    """
+
+    @pytest.mark.parametrize("operation", OPERATIONS)
+    @pytest.mark.parametrize("first", ["read"])
+    async def test_successful_close_adds_no_note(self, path, gated, operation, first):
+        error = await _cancel_again_in_close(gated, operation(path), first)
+        assert not getattr(error, "__notes__", []), error.__notes__
+        gated.wait_idle()
+        (raw,) = gated.entries("end", "open")
+        assert raw.closed
+        assert gated.entries("end", "close") == [raw]
+
+    @pytest.mark.parametrize("operation", OPERATIONS)
+    @pytest.mark.parametrize("first", ["read"])
+    async def test_failing_close_is_noted(self, path, gated, operation, first):
+        gated.fail["close"] = OSError("injected close failure")
+        error = await _cancel_again_in_close(gated, operation(path), first)
+        notes = getattr(error, "__notes__", [])
+        assert len(notes) == 1, notes
+        assert "injected close failure" in notes[0], notes
+        assert "CancelledError" not in notes[0], notes
+        gated.wait_idle()
+        (raw,) = gated.entries("end", "open")
+        raw.close()
+
+
 async def _open_in_another_loop(target):
     return await aiofiles.open(target, "rb")
 

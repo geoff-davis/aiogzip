@@ -242,10 +242,15 @@ A cookie saved with `tell()` before the failure is not a recovery point:
 `seek(0)` first; once the reader has recovered, a saved cookie is an ordinary
 position again.
 
-A text `seek()` that fails or is cancelled either leaves the reader exactly
-where it was or makes it terminal: if the seek had already moved the
-underlying binary reader, later reads raise the same terminal `OSError` until
-`seek(0)` succeeds. A failed text seek is never followed by text from the wrong
+A text `seek()` that fails or is cancelled after it has moved the underlying
+binary reader makes the reader terminal: later reads raise the same terminal
+`OSError` until `seek(0)` recovers it. A seek that fails before moving the
+binary reader leaves the text position where it was. If the binary reader is
+still healthy, the text reader is unchanged and the seek can be retried.
+Otherwise the binary reader's failure rules above apply: a gzip integrity
+failure leaves the recovery state, so later reads return the recovered text
+from the original position, and any other failure makes the reader terminal.
+Either way, a failed text seek is never followed by text from the wrong
 position.
 
 Do not retry a text read that raised `UnicodeDecodeError`. The reader does
