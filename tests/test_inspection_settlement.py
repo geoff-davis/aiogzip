@@ -70,8 +70,11 @@ class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
         def access(call):
             # The gated, logged source access itself.
             if park:
+                # Take the release event before signalling: a test may swap
+                # it as soon as ``entered`` is set.
+                release = self.release
                 self.loop.call_soon_threadsafe(self.entered.set)
-                if not self.release.wait(10):
+                if not release.wait(10):
                     raise TimeoutError("gate never released")
             self._record("start", name, owner)
             try:
@@ -104,8 +107,9 @@ class _GatedExecutor(concurrent.futures.ThreadPoolExecutor):
             try:
                 if hold:
                     # Queued: parked before the call's entry guard.
+                    release = self.release
                     self.loop.call_soon_threadsafe(self.entered.set)
-                    if not self.release.wait(10):
+                    if not release.wait(10):
                         raise TimeoutError("hold never released")
                 return body()
             finally:

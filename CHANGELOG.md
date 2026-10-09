@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Cancelling an `async with` exit while the body was raising and a read or
+  write on the same handle was still active (as a timeout or `TaskGroup`
+  does) skipped the close once that call had settled, leaving the handle and
+  its file open until `close()` or garbage collection. The exit now closes
+  the file before the cancellation propagates, as an uncancelled exit does,
+  and the body's exception stays in the cancellation's exception chain. A
+  clean exit cancelled twice while waiting for an active call is fixed the
+  same way.
 - When an open was cancelled after the file had been acquired, a repeated
   cancellation while the late file was being closed was noted as
   `Opening cleanup also failed: CancelledError(...)`, and a failure of that
