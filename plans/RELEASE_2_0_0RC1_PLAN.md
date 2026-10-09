@@ -77,7 +77,7 @@ performance baseline:      v2.0.0b2, with historical continuity rows
 - [x] R11
 - [x] R12
 - [x] R13
-- [ ] R14
+- [ ] R14 — [Publication verified](reviews/v2.0.0rc1-post-release.md) (awaiting maintainer sign-off)
 - [x] R15
 
 ## 3. Order
@@ -567,6 +567,18 @@ repaired in PR #135; the artifacts were rebuilt and round 2 found nothing.
 
 *Closed 2026-10-09: the maintainer approved `f67dd99` (hosted run
 37983380928, 22 of 22).*
+
+### R14: publication
+
+PR #134 merged as `d382f17`, which the signed tag `v2.0.0rc1` targets. The
+publish workflow uploaded exactly the recorded wheel and sdist, with
+verified attestations, and a fresh install from PyPI passed the
+installed-artifact smoke and the maintained examples. The release-merge run
+exposed a race in one R13 test; PR #136 repairs it. The
+[post-release record](reviews/v2.0.0rc1-post-release.md) has the evidence.
+Development continues as `2.0.0rc2.dev0`.
+
+*Awaiting the maintainer's sign-off.*
 
 ## 5. Deferred past RC1
 
