@@ -590,12 +590,12 @@ class AsyncGzipTextFile:
                     seen_newlines,
                     chars_to_skip,
                 ) = self._decode_cookie(offset)
-            # A failed seek either changes nothing or makes the reader
-            # terminal (BC11). With the binary read cursor in place no input
-            # was consumed, so text state is restored if binary health still
-            # allows it, as after a no-effect source failure (BC2); a failure
-            # that poisoned the binary reader keeps that policy. A moved
-            # cursor leaves text at an unknown position.
+            # A failed seek never leaves text over a moved cursor (BC11).
+            # With the binary read cursor in place no input was consumed, so
+            # text state is restored if binary health still allows it, as
+            # after a no-effect source failure (BC2); a failure that poisoned
+            # the binary reader keeps that policy. A moved cursor leaves text
+            # at an unknown position.
             cursor = binary_file._read_cursor()
             saved = self._seek_rollback_state()
             try:
@@ -2175,8 +2175,9 @@ class AsyncGzipTextFile:
         # Like binary writelines(), refuse a torn member even when there is
         # nothing to write.
         self._binary_file._check_write_usable()
-        # ``pending`` holds only non-empty strings, so its size is bounded by
-        # the chunk size however many empty strings arrive. ``pending_empty``
+        # ``pending`` holds no exact empty ``str``, so its size is bounded by
+        # the chunk size however many of them arrive (an empty ``str``
+        # subclass is still stored, as before; see below). ``pending_empty``
         # records that an empty string joined the current batch, so the batch
         # is still written (an empty write emits a UTF-16/32 BOM, for example)
         # exactly when a stored empty string would have produced it.
