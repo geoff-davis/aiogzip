@@ -184,6 +184,50 @@ jobs:
             runtime-fast.json
           if-no-files-found: warn
 
+  # Informational: the next CPython, pre-releases allowed. Not a required
+  # check and not a support claim (no classifier); a failure here shows on
+  # the PR without blocking it. Stdlib zlib only, since zlib-ng wheels may
+  # lag a new interpreter. Promote it into the build matrix once 3.15 is
+  # final and qualified.
+  python-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Python 3.15
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.15"
+          allow-prereleases: true
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[test,csv]"
+
+      - name: Attest runtime environment
+        run: >-
+          python scripts/report_runtime_versions.py --mode csv --latest
+          --output runtime-report.json
+
+      - name: Check frozen public API manifest
+        run: python scripts/capture_public_api.py --check tests/data/public_api_2_0.json
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Upload runtime attestation
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: runtime-python-preview
+          path: runtime-report.json
+          if-no-files-found: warn
+
   # The main matrix above installs only [test,csv], so it exercises the
   # pure-Python default (stdlib zlib, zlib-ng absent) — the common
   # `pip install aiogzip` install — across the full version/OS sweep. This

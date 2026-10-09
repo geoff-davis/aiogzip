@@ -195,6 +195,12 @@ translation). The macOS build leg also reruns the suite with zlib-ng; keep
 macOS jobs to about two per run, because GitHub runs few macOS jobs at a time
 per account and queued ones have been cancelled before starting.
 
+The `python-preview` job runs the suite on the next CPython (3.15,
+pre-releases allowed, stdlib zlib only). It is informational: not a required
+check, `continue-on-error`, and no classifier claims the version. Promote it
+into the `build` matrix (and branch protection) only once that version is
+final and qualified.
+
 `main` has branch protection requiring every CI job (lint, all build matrix
 legs, fast-engine — not coverage-comment), and repo auto-merge is enabled:
 `gh pr merge <n> --auto --merge` lands a PR when checks pass. **Gotcha:**
