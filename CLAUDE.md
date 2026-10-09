@@ -202,7 +202,7 @@ into the `build` matrix (and branch protection) only once that version is
 final and qualified.
 
 `main` has branch protection requiring every CI job (lint, all build matrix
-legs, fast-engine — not coverage-comment), and repo auto-merge is enabled:
+legs, fast-engine — not coverage-comment or python-preview), and repo auto-merge is enabled:
 `gh pr merge <n> --auto --merge` lands a PR when checks pass. **Gotcha:**
 the required checks are matched by job name, so changing the matrix (adding
 a Python version, renaming a job, swapping an OS) requires updating the

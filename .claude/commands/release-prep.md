@@ -78,4 +78,4 @@ Prepare a new release of aiogzip. This skill handles changelog generation, versi
 - Push the branch.
 - Create a PR with title `Prepare release v<version>` and body summarizing the changelog entries.
 - Report the PR URL to the user.
-- Remind the user: after CI passes and the PR is merged, run `/release-tag` to tag and publish.
+- Remind the user: after the required checks pass and the PR is merged, run `/release-tag` to tag and publish.
