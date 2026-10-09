@@ -41,6 +41,8 @@ deferred work.
 - [R12 pre-registration: RC1 timing windows](reviews/v2.0.0rc1-r12-preregistration.md)
 - [R12 record: RC1 timing windows](reviews/v2.0.0rc1-r12-record.md), with
   [its evidence](benchmarks/data/rc1/r12/README.md)
+- [R13 candidate review](reviews/v2.0.0rc1-candidate-review.md), with the
+  [Claude reviewer prompt](reviews/data/rc1/r13/claude-review-prompt.txt)
 
 Each release's artifact hashes are recorded under
 [release artifact records](releases/README.md); the publish workflow uploads
