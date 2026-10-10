@@ -46,7 +46,7 @@ PR per repair with both engines' suites and the hosted matrix green.
 - [x] S06 — [Timing windows](reviews/v2.0.0rc2-s06-record.md), signed off 2026-10-10
 - [x] S07 — PR #142 (Python 3.15 required via uv's CPython 3.15.0), signed off 2026-10-10
 - [x] S08 — Codex and Claude reviews of `91e360c`, delta `cb3c488`; maintainer approved `cb3c488`, 2026-10-10
-- [ ] S09 — [post-release record](reviews/v2.0.0rc2-post-release.md); published 2026-10-10, awaiting sign-off
+- [x] S09 — [post-release record](reviews/v2.0.0rc2-post-release.md); published 2026-10-10, signed off 2026-10-10
 
 ## 3. Gate results
 

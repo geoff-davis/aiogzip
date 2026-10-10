@@ -58,6 +58,14 @@ three deferred R13 limitations the maintainer chose to fix before 2.0.0.
   [S08 review texts](reviews/data/rc2/s08/); 2.0.0rc2 was published on
   2026-10-10 and development continues as `2.0.0rc3.dev0`
 
+### 2.0.0 plan
+
+The [2.0.0 plan](RELEASE_2_0_0_PLAN.md) (gates T01–T10) takes 2.0.0rc2's
+source unchanged to a stable release. It was drawn from two read-only
+readiness reviews: [Claude Opus 5.5](reviews/data/2.0.0/opus-review.md.txt)
+and [Codex](reviews/data/2.0.0/codex-review.md.txt), with their
+[prompts](reviews/data/2.0.0/).
+
 Each release's artifact hashes are recorded under
 [release artifact records](releases/README.md); the publish workflow uploads
 only the recorded files.

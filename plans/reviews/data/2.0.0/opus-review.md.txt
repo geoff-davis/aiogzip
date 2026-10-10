@@ -1,0 +1,64 @@
+## 2.0.0 readiness review (read-only, against origin/main 3dd9e94 + PRs #145, #146)
+
+No release-blocking defect in `src/`. Every MUST below is metadata, docs, or process that a 2.0.0 release-prep PR can carry. **No rc3 is needed**, provided the 2.0.0 `src/` equals v2.0.0rc2 except `__version__`.
+
+### What I verified
+- Scratch worktree of origin/main, main venv (Python 3.14.2): full suite 7375 passed, 2 skipped (zlib-ng); identical with `AIOGZIP_ENGINE=stdlib`. Worktree removed.
+- Parity probe vs stdlib `gzip`: empty input, concatenated members, zero padding, trailing garbage, partial magic, truncation, non-gzip input, CRLF/CR text lines, `inspect()` — all behave as documented (truncation raises `BadGzipFile` where stdlib raises `EOFError`; documented at `docs/errors.md:18`).
+- CI: main run 38066269454 22/22 success; branch protection's 21 required contexts all match current job names (3.15 leg required). Only main failure in the last 60 runs was 37988295737 (Windows 3.12, the S04 race fixed by #136). PyPI: default 1.11.0 (Production/Stable, `>=3.8`); 2.0 line through rc2.
+- Code sample: `_opening.py`, `_codec_async.py`, `_inspection.py` (head), codec decoder loop/limits (`codec.py:563-736`), native/custom source+sink settlement (`_binary.py:1865-1990`). No TODOs, no finalizers, no private-asyncio hacks beyond `Task.uncancel()` correctly paired with own cancel requests. Nothing new found.
+
+### MUST (blocks 2.0.0)
+
+**M1. Close out rc2: S09 sign-off and merge #145.** `plans/RELEASE_2_0_0RC2_PLAN.md` on main still has S08/S09 unticked; #145's record says "Maintainer sign-off: Pending." #145 is green except `fast-engine` still pending at review time. *Process only.*
+
+**M2. Remove beta/prerelease wording from everything that ships in the artifacts.** The README becomes the PyPI long description and the classifier is in metadata; both are immutable once uploaded.
+- `pyproject.toml:18` — `Development Status :: 4 - Beta` → `5 - Production/Stable`.
+- `tests/test_version_sync.py:88-89` hard-asserts the Beta classifier; must change in the same PR (and ideally pin the stable classifier for a non-pre version).
+- `README.md:25-27` — "The 2.0 beta is a prerelease".
+- `docs/stability.md:3-18` — whole page is framed as the beta policy; needs rewriting as the stable policy (SemVer meaning for 2.x minor/patch, deprecation rule, Python-version support policy).
+- `SECURITY.md:9,11` — "Latest 2.0 beta/prerelease" support table.
+- Also "beta-frozen" wording: `docs/migration.md:10,89-90`, `docs/codec.md:8`, `docs/streaming.md:13`, `docs/api.md:64,120`.
+*Release-prep PR (metadata + docs + one test); no `src/` change.*
+
+**M3. `[2.0.0]` CHANGELOG entry and compare link.** Most users jump from 1.11.0; they won't read eight prerelease entries. The entry should summarise 1.11→2.0: Python 3.11 floor, codec API, `ConcurrentOperationError`/overlap rejection, exact-Boolean validation, `mtime` = last completed header (a3), terminal read health + `seek(0)` recovery, custom-source `tell()` probing (b2 "Changed", `CHANGELOG.md:174-186`), cancellation now waits for native I/O (BC1/BC2/BC13). *Release-prep PR.*
+
+**M4. Source-identity gate (gate, not a work item).** `git diff v2.0.0rc2 <candidate> -- src/` must show only the `__version__` line, and `tests/data/public_api_2_0.json` must be byte-identical. If anything else in `src/` changes (including the S08 docstring LOW), the project's own rule requires an rc3.
+
+### SHOULD (do before 2.0.0 unless waived)
+
+**S1. Merge #146 (pin `uv build` interpreter).** The first rc2 publish (run 38064418547) was refused because the record build ran on 3.15 (tarfile gzip level 6 vs 3.14's 9). 3.15 is still installed on the maintainer machine. The publish workflow fails closed so it can't ship bad bytes, but without #146 the 2.0.0 record build will very likely repeat the re-tag dance unless `UV_PYTHON` is set. I reviewed the diff: it adds `--python` to the `uv build` call plus a pinning test. *`scripts/` + `tests/` only; no rc needed.*
+
+**S2. Docs workflow version derivation + stale docs versions (new finding, not in any plan).** `.github/workflows/docs.yml:60` uses `DOCS_VERSION="${VERSION%.*}"`, which strips only the last dot segment, so every `.dev0` push has deployed its own docs version. `origin/gh-pages:versions.json` lists 2.0.0a3, a4, b1, b2, rc1, rc2 (all titled `*.dev0`) beside 2.0 (alias `dev`) and 1.11 (alias `latest`). Merging #145 (`2.0.0rc3.dev0`) will create a "2.0.0rc3" version and move `dev` to it; after 2.0.0, `2.0.1.dev0` → "2.0.1", `2.1.0.dev0` → "2.1.0". The stable site's version selector will show seven stale dev snapshots and `/dev/` will sit on an rc3 snapshot. Fix: derive `major.minor` (e.g. via `packaging.version`), `mike delete` the stale versions, and decide where `dev` points after 2.0.0. *Workflow + gh-pages, not `src/`.*
+
+**S3. 1.x→2.0 migration guide is incomplete.** `docs/migration.md:46-52` says "Ordinary asyncio callers do not need to change their code… The main compatibility change is the Python 3.11 floor." It omits behavior a 1.11 user can hit: overlap raising `ConcurrentOperationError`, the `mtime` semantics change, terminal read failure with `seek(0)`-only recovery, the custom-source `tell()` requirement, cancellation waiting for blocked native I/O. Related stale text: `docs/index.md:136` still says handle state is "mutated without locking — the same contract as standard-library file objects" (2.0 now rejects overlap first); `examples/README.md:46` names `dist/aiogzip-2.0.0b2*.whl`. *Docs only.*
+
+**S4. State the 1.x support window.** `SECURITY.md` supports "Latest 1.x maintenance release" with no end; `origin/1.x` (8b24d0e, 1.11.0) has no branch protection; Python 3.10 (the last interpreter only 1.x serves) reaches EOL this month. Decide and document (e.g. security fixes only until a stated date) in SECURITY.md, the stability page and the migration page. *Docs only.*
+
+**S5. Decide a feedback window.** rc2 was published today and rc1 yesterday. The b2 plan §17 keeps "public feedback intake" and "external RC review" on the RC path; the rc1 candidate review (lines 226-228) recorded no public reports and that Codex/Claude cross-review stands in for external review. No external issue has been filed since #86 (July), and pip doesn't pick prereleases by default, so silence is weak evidence. Recommend a short soak (~7–14 days with no new reports) or an explicit maintainer waiver recorded in the plan.
+
+### LATER (post-2.0; agree with existing deferrals)
+- **S08 LOWs** — stale "no shield" docstring at `_inspection.py:39`; `_opening.py:73` converts a `KeyboardInterrupt` from the late close into a note. The second is effectively unreachable: the close runs in an executor thread (SIGINT is never delivered there), and `asyncio.run` turns SIGINT into cancellation. Both are `src/` changes and would force an rc3 now; do them in 2.0.1.
+- **3.15 leg → setup-python** — the actions manifest still tops out at 3.15.0-rc.3; keep uv-managed for now.
+- **Performance page refresh** — `docs/performance.md:10` headlines 2.0.0a1 numbers; later per-call costs (G17 D1–D4) are all <10%, so not misleading. Optional one-line date caveat in S3's docs pass; no timing window is needed because `src/` = rc2, which S06 timed.
+- **Dependabot PRs** #102 (setup-uv 10.2.0) and #124 (uv-lock).
+- **Housekeeping** — leftover `/tmp/aiogzip-s06-*` and `scratchpad/s05/cand` worktrees (pre-existing); the untracked `plans/RELEASE_2_0_0B2_PLAN_REVISION_2.md` disposition.
+- **Existing deferrals** — F3, empty `str` subclasses in `writelines()`, custom-sink wrapping, `aiofiles` fallback (aiofiles 25.1.0 is current; unpinned CI covers it), `inspect()` limit, §18 items, #71, #72. I agree with all.
+
+### Proposed 2.0.0 gate register
+
+| Gate | Item | Acceptance |
+| --- | --- | --- |
+| T01 | rc2 closeout | S09 signed off; #145 merged |
+| T02 | Release tooling | #146 merged; a record build of rc2 with the script reproduces both PyPI hashes |
+| T03 | Docs versioning | Docs version derived as `major.minor` for every dev/pre version; stale `2.0.0*` versions deleted; `dev` alias placement post-2.0.0 decided; deploy verified on a dev push |
+| T04 | Stable wording and metadata | Production/Stable classifier + `test_version_sync` updated; README, stability page (SemVer, deprecation, Python support), SECURITY table, codec/streaming/api/migration pages free of beta/prerelease wording |
+| T05 | Migration and changelog | Consolidated 1.11→2.0 behavior list in `migration.md`; `[2.0.0]` CHANGELOG entry with link; `index.md:136` and `examples/README.md:46` fixed |
+| T06 | 1.x policy | 1.x support window stated in SECURITY.md and docs |
+| T07 | Feedback window | Soak period passed with no new correctness reports, or maintainer waiver recorded |
+| T08 | Source identity | `git diff v2.0.0rc2 <candidate> -- src/` = `__version__` only; API manifest byte-identical; no ledger/timing work needed (else stop and plan rc3) |
+| T09 | Candidate review | Codex + fresh Claude review of the exact candidate; 22/22 hosted CI at that SHA; maintainer approval |
+| T10 | Publication | Signed tag; exact-artifact publish matches record; GitHub release marked Latest; PyPI default becomes 2.0.0 with stable classifier; attestations; public-install smoke + examples; `latest` docs alias moved to 2.0 and set default, 1.11 still served; post-release record and next dev version |
+
+### Bottom line
+After M1–M3, with M4 holding, the project is ready for 2.0.0 and no rc3 is needed: every remaining item is metadata, docs, workflow, or process. Three review rounds, differential sweeps, the hosted matrix, and my local both-engine runs found nothing release-blocking in `src/`, and the known LOWs are safe to ship. The biggest practical risks are release-mechanics rather than code: beta wording frozen into the PyPI page, a docs site cluttered with dev snapshots just as `latest` flips to 2.0, a record-hash mismatch if #146 isn't merged first, and 1.11 users meeting 2.0's stricter concurrency and cancellation behavior without a consolidated migration note. Only a desire to fix the S08 LOWs (or any other `src/` change) before 2.0.0 would justify an rc3, and I recommend shipping those in 2.0.1 instead.
