@@ -54,6 +54,9 @@ three deferred R13 limitations the maintainer chose to fix before 2.0.0.
 - [S06 pre-registration: RC2 timing windows](reviews/v2.0.0rc2-s06-preregistration.md)
 - [S06 record: RC2 timing windows](reviews/v2.0.0rc2-s06-record.md), with
   [its evidence](benchmarks/data/rc2/s06/README.md)
+- [Post-release: S08 and S09](reviews/v2.0.0rc2-post-release.md), with the
+  [S08 review texts](reviews/data/rc2/s08/); 2.0.0rc2 was published on
+  2026-10-10 and development continues as `2.0.0rc3.dev0`
 
 Each release's artifact hashes are recorded under
 [release artifact records](releases/README.md); the publish workflow uploads
