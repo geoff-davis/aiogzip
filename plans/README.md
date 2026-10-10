@@ -52,6 +52,8 @@ The [2.0.0rc2 plan](RELEASE_2_0_0RC2_PLAN.md) (gates S01–S09) covers the
 three deferred R13 limitations the maintainer chose to fix before 2.0.0.
 
 - [S06 pre-registration: RC2 timing windows](reviews/v2.0.0rc2-s06-preregistration.md)
+- [S06 record: RC2 timing windows](reviews/v2.0.0rc2-s06-record.md), with
+  [its evidence](benchmarks/data/rc2/s06/README.md)
 
 Each release's artifact hashes are recorded under
 [release artifact records](releases/README.md); the publish workflow uploads
