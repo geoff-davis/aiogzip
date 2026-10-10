@@ -37,10 +37,10 @@ PR per repair with both engines' suites and the hosted matrix green.
 | S08 | RC review and approval | Cross review of the exact candidate by Codex and a fresh Claude subagent; hosted CI at that SHA; the maintainer's explicit approval |
 | S09 | Publication | Release preparation, exact-artifact publication and post-release record, as for RC1 |
 
-- [ ] S01
-- [ ] S02
-- [ ] S03
-- [ ] S04
+- [x] S01 — PR #138 (BC16), signed off 2026-10-10
+- [x] S02 — PR #140 (BC18), signed off 2026-10-10
+- [x] S03 — PR #139 (BC17), signed off 2026-10-10
+- [x] S04 — PR #136, signed off 2026-10-10
 - [ ] S05
 - [x] S06 — [Timing windows](reviews/v2.0.0rc2-s06-record.md), signed off 2026-10-10
 - [ ] S07
