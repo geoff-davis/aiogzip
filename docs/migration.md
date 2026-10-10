@@ -57,8 +57,9 @@ last interpreter that only 1.x supports, reached end of life on 2026-10-01.
 ### Behavior changes since 1.11
 
 2.0 makes several behaviors stricter or more precisely defined. Code that
-relied on the 1.11 behavior below should be checked; each item links to the
-detailed rule.
+relied on the 1.11 behavior below should be checked. This list covers the
+key changes; each item links to the detailed rule, and the changelog has the
+rest.
 
 - **Overlapping calls on one handle** raise the public
   `ConcurrentOperationError`, an `OSError` subtype, instead of interleaving.
@@ -69,10 +70,13 @@ detailed rule.
   On a concatenated stream, read-ahead can move it past the member whose bytes
   the current read returned. See
   [Live member timestamps](api.md#live-member-timestamps).
-- **A failed or cancelled read of the underlying source** leaves the reader
-  usable only if the failure is proven to have consumed no input. Otherwise
-  the reader is terminal until a `seek(0)` completes, or until the source is
-  reopened. An `OSError` alone no longer means that a retry is safe. See
+- **A failed or cancelled read of a custom source** leaves the reader usable
+  only if the failure is proven to have consumed no input. Otherwise the
+  reader is terminal until a `seek(0)` completes, or until the source is
+  reopened. An `OSError` alone no longer means that a retry is safe. A native
+  aiofiles read is different: once started, it finishes before the
+  cancellation propagates, and the reader keeps its bytes for the next read.
+  See
   [Source failures and cancellation](recipes.md#source-failures-and-cancellation).
 - **A custom source's synchronous `tell()`**, if it has one, provides that
   proof. It is now called before each physical read and seek, and after a
@@ -87,17 +91,22 @@ detailed rule.
 - **A text read that raises `UnicodeDecodeError`** does not make the reader
   terminal, but it has already consumed the chunk it was decoding. Do not
   retry it: call `seek(0)`, or reopen the file with another `encoding` or an
-  `errors` handler such as `"replace"`.
+  `errors` handler such as `"replace"`. See
+  [Recovery data after an integrity failure](errors.md#recovery-data-after-an-integrity-failure),
+  which ends with this rule.
 - **Text recovery after a failure** goes through `seek(0)`. A `tell()` cookie
   saved before the failure may be refused with the terminal `OSError`; once
   `seek(0)` has recovered the reader, the cookie is an ordinary position
   again. Text cookies are valid only on the handle that produced them. See
   [`seek()` and `tell()` in text mode](api.md#seek-and-tell-in-text-mode).
-- **Cancellation waits for native I/O** already running in a worker thread: a
-  native open, read, write, flush, seek or submitted close finishes before
-  the cancellation propagates, so no part of the stream is skipped and no
-  file is left open. A cancellation can therefore take as long as the blocked
-  call. See [Cancellation](recipes.md#cancellation).
+- **Cancellation waits for native I/O** already running in a worker thread:
+  cancellation cannot abandon a native open, read, write, flush or seek, or a
+  submitted close, so no part of the stream is skipped. A cancellation can
+  therefore take as long as the blocked call. If a submitted close fails,
+  the failure becomes the cancellation's cause, and an aborted handle stays
+  reportably open so that `close()` can be retried. See
+  [Cancellation](recipes.md#cancellation) and
+  [Same-handle concurrency](errors.md#same-handle-concurrency).
 - **Boolean options are exact**, as described below.
 
 ### Exact Boolean options
