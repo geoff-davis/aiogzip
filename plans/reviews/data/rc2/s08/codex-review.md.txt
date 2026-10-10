@@ -1,0 +1,16 @@
+I’ll review the RC2 changes as one release candidate, check the repair interactions and records, and verify the API manifest and artifact evidence.
+The BC16–BC18 changes compose consistently with the earlier repairs, and the API manifest is unchanged. I found a missing RC2 changelog comparison link. I’m checking artifact reproducibility and the merged exception-precedence paths before the verdict.
+**LOW — missing RC2 changelog link:** [CHANGELOG.md:1089](/home/geoff/Projects/personal/aiogzip/CHANGELOG.md:1089) has no `[2.0.0rc2]` comparison-link definition, so the new heading is unlinked. Add the rc1→rc2 link and advance `[Unreleased]` to rc2→HEAD. This changes the sdist, requiring an updated artifact record.
+
+No correctness blockers found. BC16–BC18 compose correctly: abort settlement completes before cleanup, native close retains its existing latch rules, opening preserves the original cancellation, and the completion waiter preserves first-cancellation precedence and worker failures. Isolated probes confirmed repeated-cancellation accounting, cause chaining, callback removal and absence of loop reports.
+
+The public API manifest is byte-identical to rc1. The 3.15 workflow and release version/date are consistent.
+
+Both supplied artifacts match the recorded hashes, inventory and smoke reports:
+
+- Wheel: 86,294 bytes, 20 members.
+- Sdist: 899,785 bytes, 237 members.
+
+Packaged source and changelog match `91e360c`; the epoch is correctly midnight UTC on October 10. I verified existing artifacts rather than rebuilding, and did not independently verify hosted CI or branch protection.
+
+**Verdict: APPROVED for S08 technical review, with the non-blocking changelog-link correction above.**

@@ -1,6 +1,7 @@
 # aiogzip 2.0.0rc2 plan
 
-> **Status:** draft, 2026-10-09. Development version `2.0.0rc2.dev0`.
+> **Status:** 2.0.0rc2 published 2026-10-10; development continues as
+> `2.0.0rc3.dev0`.
 >
 > **Source:** the maintainer's choice, on 2026-10-09 after 2.0.0rc1 was
 > published, of three deferred
@@ -44,8 +45,8 @@ PR per repair with both engines' suites and the hosted matrix green.
 - [x] S05 — [Differential rerun](#s05-differential-rerun), signed off 2026-10-10
 - [x] S06 — [Timing windows](reviews/v2.0.0rc2-s06-record.md), signed off 2026-10-10
 - [x] S07 — PR #142 (Python 3.15 required via uv's CPython 3.15.0), signed off 2026-10-10
-- [ ] S08
-- [ ] S09
+- [x] S08 — Codex and Claude reviews of `91e360c`, delta `cb3c488`; maintainer approved `cb3c488`, 2026-10-10
+- [ ] S09 — [post-release record](reviews/v2.0.0rc2-post-release.md); published 2026-10-10, awaiting sign-off
 
 ## 3. Gate results
 

@@ -1,0 +1,10 @@
+I’ll check the failed publish log, how the build script selects its interpreter, and the replacement hash. I’ll also review whether the re-tagging plan changes any release inputs.
+APPROVED. The diagnosis and replacement record check out.
+
+- The saved publish log shows the record check rejecting `cb12f998…` before artifact upload; the dependent publish job could not run.
+- The build script selects `--python` only for smoke environments; its `uv build` command leaves interpreter selection to uv. CPython 3.15’s `tarfile.gzopen` defaults to level 6, versus level 9 on 3.14.
+- The old and replacement sdists decompress to byte-identical tar data (`afe00387…`). The replacement is 888,734 bytes and matches the workflow’s full `cb12f998…` hash. The wheel is unchanged.
+
+Re-tagging is reasonable for this unpublished release. Confirm the merge changes only the record outside previously approved inputs, retain the failed-attempt evidence, and explicitly disclose the replacement tag SHA.
+
+Non-blocking follow-up: pass the intended build interpreter explicitly to `uv build` and record it separately from the smoke interpreter to prevent recurrence.

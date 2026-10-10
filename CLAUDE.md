@@ -294,8 +294,9 @@ Always include:
   cases deferred from rc1 (BC16–BC18): a cancelled exit abort that skipped
   the close, an opening cleanup note for a repeated cancellation, and
   Python 3.14's duplicate "exception in shielded future" log. Python 3.15
-  is supported, with a required CI leg. The Beta classifier and frozen
-  compatibility contract remain in force.
+  is supported, with a required CI leg. Development continues as
+  `2.0.0rc3.dev0` while the Beta classifier and frozen compatibility
+  contract remain in force.
 
 ---
 

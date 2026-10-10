@@ -1,0 +1,11 @@
+I’ll check the delta and updated artifact record, then verify the sdist hash against the available build evidence.
+APPROVED. No remaining findings.
+
+The delta contains exactly the two changelog-link corrections, the lifecycle-table clarification, and the updated sdist hash. Source code and the public API manifest are unchanged.
+
+The new artifacts match the record and inventory:
+
+- Wheel unchanged: `7bef7086…010039c`.
+- Sdist: 899,798 bytes, `b9399771…e9da673`.
+
+The sdist contains the corrected changelog from `4189035`. I verified the supplied artifacts directly; I did not independently rebuild them.
