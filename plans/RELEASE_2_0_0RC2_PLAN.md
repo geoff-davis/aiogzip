@@ -41,7 +41,7 @@ PR per repair with both engines' suites and the hosted matrix green.
 - [x] S02 — PR #140 (BC18), signed off 2026-10-10
 - [x] S03 — PR #139 (BC17), signed off 2026-10-10
 - [x] S04 — PR #136, signed off 2026-10-10
-- [ ] S05
+- [x] S05 — [Differential rerun](#s05-differential-rerun), signed off 2026-10-10
 - [x] S06 — [Timing windows](reviews/v2.0.0rc2-s06-record.md), signed off 2026-10-10
 - [ ] S07
 - [ ] S08
@@ -73,6 +73,8 @@ difference needed a new predicate: BC16–BC18 change only abort-settlement,
 cancelled-open and logging paths that the generator does not reach with a
 differing outcome. The stateful suite (`tests/stateful/`) passes in both
 engine modes as part of the full suite at the candidate.
+
+*Closed 2026-10-10: Codex approved, maintainer signed off ("I sign off").*
 
 ## 4. Deferred past 2.0
 
