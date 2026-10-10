@@ -47,7 +47,34 @@ PR per repair with both engines' suites and the hosted matrix green.
 - [ ] S08
 - [ ] S09
 
-## 3. Deferred past 2.0
+## 3. Gate results
+
+### S05: differential rerun
+
+Sweeps on the candidate `0b9c7c4` (main after #136–#140) ran from a clean
+worktree with its own `tests/stateful/differential.py`, against the b2
+(`962bfe4`) and b1 (`048700f`) references in `.cache/wp10/`. They used seeds
+0–5999, the R04 block 1,000,000–1,000,199 and the R02 seek-cancel block
+2,000,000–2,000,199, on both engines. All twelve runs reported 0 failed, and
+the two engines gave identical claim counts:
+
+| Reference | Seeds | Claims |
+| --- | --- | --- |
+| b2 | 0–5999 | BC11 1 |
+| b2 | 1,000,000–1,000,199 | BC11 1, BC12 4 |
+| b2 | 2,000,000–2,000,199 | BC11 6 |
+| b1 | 0–5999 | BC2 605, BC3 358, BC7 18, BC8 214, BC9 21, BC10 1, BC11 1 |
+| b1 | 1,000,000–1,000,199 | BC2 26, BC3 10, BC7 2, BC8 8, BC9 1, BC11 1, BC12 4 |
+| b1 | 2,000,000–2,000,199 | BC2 33, BC3 9, BC11 7 |
+
+The 0–5999 and 1,000,000 rows equal RC1's recorded R11 results. The b2 rows
+equal the sweeps run on the S01 fix (`181c29c`) before it merged. No
+difference needed a new predicate: BC16–BC18 change only abort-settlement,
+cancelled-open and logging paths that the generator does not reach with a
+differing outcome. The stateful suite (`tests/stateful/`) passes in both
+engine modes as part of the full suite at the candidate.
+
+## 4. Deferred past 2.0
 
 F3 (`tell()` during `readlines()`), `writelines()` with empty `str`
 subclasses, and RC1 plan §5's implementation and API opportunities: custom-sink
