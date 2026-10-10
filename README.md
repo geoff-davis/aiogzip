@@ -22,9 +22,10 @@ pip install aiogzip
 ```
 
 aiogzip 2.0 requires Python 3.11 or newer. Python 3.8 through 3.10 users should
-remain on the latest compatible 1.x release. The 2.0 beta is a prerelease; see
-the [stability policy](https://geoff-davis.github.io/aiogzip/stability/) for
-its compatibility guarantees and non-guarantees.
+remain on the latest compatible 1.x release, which receives security fixes
+until 2027-04-30. See the
+[stability policy](https://geoff-davis.github.io/aiogzip/stability/) for the
+2.0 compatibility guarantees and non-guarantees.
 
 ## Text-mode quickstart
 
