@@ -3,21 +3,20 @@
 Release plans, design records, review records and benchmark evidence. Files
 stay at the paths they were committed under; this index is the way in.
 
-## Active: 2.0.0b2
+## Active: 2.0.0
 
-2.0.0b2 was published on 2026-10-07; development continues as
-`2.0.0rc1.dev0`. The [post-release record](reviews/v2.0.0b2-post-release.md)
-covers publication (G21) and the RC handoff (G22). The b2 release plan is
-[Revision 2](RELEASE_2_0_0B2_PLAN.md). The
-G00–G22 register in that plan is authoritative. Reproducing a defect does not
-complete its repair gate, and local tests do not establish release readiness.
+2.0.0rc2 was published on 2026-10-10; development continues as
+`2.0.0rc3.dev0`. The [2.0.0 plan](RELEASE_2_0_0_PLAN.md) (gates T01–T10)
+takes 2.0.0rc2's source unchanged to a stable release, and its gate register
+is authoritative. It was drawn from two read-only readiness reviews:
+[Claude Opus 5.5](reviews/data/2.0.0/opus-review.md.txt) and
+[Codex](reviews/data/2.0.0/codex-review.md.txt), with their
+[prompts](reviews/data/2.0.0/). Reproducing a defect does not complete its
+repair gate, and local tests do not establish release readiness.
 
-An exact byte copy of the supplied revision is kept as
-[review input](reviews/inputs/b2/RELEASE_2_0_0B2_PLAN_REVISION_2.md.txt). The
-`.txt` suffix keeps the original Markdown free of formatter changes. The
-untracked working copy `RELEASE_2_0_0B2_PLAN_REVISION_2.md` in this directory
-is byte-identical to it. It stays untracked until the maintainer decides what
-to do with it.
+Each release's artifact hashes are recorded under
+[release artifact records](releases/README.md); the publish workflow uploads
+only the recorded files.
 
 Durable invariants (start here):
 
@@ -26,8 +25,23 @@ Durable invariants (start here):
   checkpoint, the bridge allowlist, the parity map, performance constraints
   and the behavior exceptions.
 - [Behavior-exception ledger](reviews/v2.0.0b2-behavior-exceptions.md):
-  every approved difference from b1 (BC1–BC10).
+  every approved difference from b1 (BC1–BC18).
 - [Findings and evidence limitations](reviews/v2.0.0b2-findings.md)
+
+### b2 plan
+
+2.0.0b2 was published on 2026-10-07, and development then continued as
+`2.0.0rc1.dev0`. The [post-release record](reviews/v2.0.0b2-post-release.md)
+covers publication (G21) and the RC handoff (G22). The b2 release plan is
+[Revision 2](RELEASE_2_0_0B2_PLAN.md). Its
+G00–G22 register is complete.
+
+An exact byte copy of the supplied revision is kept as
+[review input](reviews/inputs/b2/RELEASE_2_0_0B2_PLAN_REVISION_2.md.txt). The
+`.txt` suffix keeps the original Markdown free of formatter changes. The
+untracked working copy `RELEASE_2_0_0B2_PLAN_REVISION_2.md` in this directory
+is byte-identical to it. It stays untracked until the maintainer decides what
+to do with it.
 
 ### RC1 plan
 
@@ -57,18 +71,6 @@ three deferred R13 limitations the maintainer chose to fix before 2.0.0.
 - [Post-release: S08 and S09](reviews/v2.0.0rc2-post-release.md), with the
   [S08 review texts](reviews/data/rc2/s08/); 2.0.0rc2 was published on
   2026-10-10 and development continues as `2.0.0rc3.dev0`
-
-### 2.0.0 plan
-
-The [2.0.0 plan](RELEASE_2_0_0_PLAN.md) (gates T01–T10) takes 2.0.0rc2's
-source unchanged to a stable release. It was drawn from two read-only
-readiness reviews: [Claude Opus 5.5](reviews/data/2.0.0/opus-review.md.txt)
-and [Codex](reviews/data/2.0.0/codex-review.md.txt), with their
-[prompts](reviews/data/2.0.0/).
-
-Each release's artifact hashes are recorded under
-[release artifact records](releases/README.md); the publish workflow uploads
-only the recorded files.
 
 ### b2 design records
 

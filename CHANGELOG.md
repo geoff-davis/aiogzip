@@ -4,6 +4,92 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+This section becomes the `[2.0.0]` entry when 2.0.0 is released. It
+summarizes the changes from 1.11.0 for users who skipped the 2.0
+prereleases; each prerelease entry below has the details. The
+[migration guide](docs/migration.md#moving-an-existing-aiogzip-application-to-20)
+lists the behavior changes a 1.11 application can meet.
+
+### Changed since 2.0.0rc2
+
+- No library code has changed since `2.0.0rc2`.
+
+### Documentation since 2.0.0rc2
+
+- The migration guide lists every 1.11 → 2.0 behavior change, each linked
+  to its detailed rule, and states the 1.x support window.
+- The home page describes same-handle concurrency as it is: an overlapping
+  call raises `ConcurrentOperationError`.
+- The development documentation built from `main` is published as a single
+  `dev` version, so `latest` never shows development builds.
+
+### Requirements
+
+- Python 3.11 or newer; 3.11 through 3.15 are supported and tested. On
+  Python 3.8 through 3.10, dependency resolution keeps selecting the latest
+  1.x release.
+- The tested dependency floors are `aiofiles>=23.2.1`, `aiocsv>=1.2.3` for
+  the CSV integration, and `zlib-ng>=0.4.0` for the optional fast engine.
+- The 1.x line receives security fixes only, until 2027-04-30.
+
+### Added
+
+- Public synchronous `GzipEncoder` and `GzipDecoder` sans-I/O codecs, with
+  the typed `CodecOperation` their state changes return, for applications
+  that drive gzip over their own transport. See the
+  [codec guide](docs/codec.md).
+- Public `ConcurrentOperationError`, raised when calls overlap on one file
+  handle.
+- A [stability policy](docs/stability.md) and a frozen public API, checked by
+  a runtime contract manifest and typing fixtures.
+- Two maintained examples: a fragmented transport over the codec, and
+  concurrent JSONL ingest with one handle per task.
+
+### Changed
+
+- File reads and writes, `compress_chunks()`/`decompress_chunks()`,
+  `inspect()` and `verify()` share one gzip state machine.
+- Boolean options accept only exact `True` or `False` (and `None` for
+  `closefd`).
+- In read mode, `mtime` reports the most recently completed member header.
+- After a custom source's read fails or is cancelled, the reader stays usable
+  only if an unchanged synchronous `tell()` proves no input was consumed;
+  otherwise it is terminal until `seek(0)`. That `tell()` is now called
+  before each physical read and seek.
+- After an integrity failure, decoded output stays readable as unvalidated
+  recovery data, and later reads raise a terminal `OSError` instead of
+  returning a clean EOF. A text `tell()` cookie saved before the failure is
+  usable again only after `seek(0)`.
+- Cancellation waits for native I/O and codec work already running in a
+  worker thread before it propagates.
+- Decoder output chunks are at most 256 KiB even when `output_chunk_size` is
+  larger.
+
+### Fixed
+
+- The 2.0 prereleases corrected cancellation, ownership and recovery cases
+  in which earlier builds could lose, skip or misreport data, leave a file
+  open, or touch a resource after its owner had released it: compressed input
+  skipped after a failed or cancelled source read, closes lost to
+  cancellation, text returned from the wrong position after a failed seek,
+  end-relative seeks after `peek()`, and cancellations lost by `inspect()`
+  and `verify()`. See the `2.0.0b2`, `2.0.0rc1` and `2.0.0rc2` entries.
+
+### Performance
+
+- At `2.0.0a2`, `decompress_chunks()` with large items measured about 20%
+  faster than 1.11.0 (see the `2.0.0a2` entry). That comparison was not
+  repeated for 2.0.0.
+- Small writes are slower than in 1.11.0, and per-call paths such as
+  `flush()`, `read1()` and small-buffer `readline()` cost about 6–9% more
+  than in `2.0.0b1`. Batch tiny records with `writelines()`.
+
+### Security
+
+- `max_decompressed_size` bounds every decompression path, and no path
+  yields a byte beyond it. Stream integrity is established only once the
+  whole stream has been read or decoded without an error.
+
 ## [2.0.0rc2] - 2026-10-10
 
 This release candidate keeps the 2.0 public API frozen: every public

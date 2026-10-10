@@ -1,6 +1,7 @@
 # aiogzip 2.0.0 plan
 
-> **Status:** draft, 2026-10-10. Development version `2.0.0rc3.dev0`.
+> **Status:** active since 2026-10-10; T01 and T02 signed off. Development
+> version `2.0.0rc3.dev0`.
 >
 > **Source:** two read-only readiness reviews of `main` at `3dd9e94`, made
 > after 2.0.0rc2 was published and with PRs #145 and #146 included. One was
@@ -63,7 +64,7 @@ timing window is needed.
 | T10 | Publication | See [T10 below](#t10-publication) |
 
 - [x] T01 (signed off 2026-10-10)
-- [ ] T02
+- [x] T02 (signed off 2026-10-10)
 - [ ] T03
 - [ ] T04
 - [ ] T05
@@ -183,6 +184,11 @@ ledger:
 
 The `[2.0.0]` entry should summarize 1.11.0 → 2.0.0 for users who skipped
 the prereleases, and list what changed since rc2.
+
+Until the release date is known, the entry is drafted under `[Unreleased]`.
+T08's release PR retitles it `[2.0.0] - <date>`, drops its "becomes the
+`[2.0.0]` entry" preamble, and adds the comparison link
+`[2.0.0]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0rc2...v2.0.0`.
 
 Stale text elsewhere:
 

@@ -133,7 +133,7 @@ For `AsyncGzipTextFile`, `tell()` returns a plain non-negative byte offset when 
 
 Backward seeks restart decompression from the beginning of the gzip stream. For non-seekable `fileobj` inputs, `aiogzip` keeps a bounded compressed-input replay cache so rewind can work without loading unbounded data; tune it with `max_rewind_cache_size` or set it to `None` for the previous unbounded behavior.
 
-**Concurrency:** An open `aiogzip` file is not safe for concurrent use by multiple `asyncio` tasks. Its internal buffers and decoder/compressor state are mutated without locking — the same contract as standard-library file objects. Give each task its own file object, or serialize access behind your own lock.
+**Concurrency:** An open `aiogzip` file is owned by one `asyncio` task at a time. A read, seek, write, flush or close that overlaps a call already in flight on the same handle raises `ConcurrentOperationError` and leaves the active call intact; it is not a lock. Give each task its own file object, or hold your own lock across each complete logical operation (see [Same-handle concurrency](errors.md#same-handle-concurrency)).
 
 **Note:** `aiogzip` does not provide whole-buffer `compress()` or
 `decompress()` helpers analogous to `gzip.compress()` and `gzip.decompress()`.

@@ -52,6 +52,16 @@ diagnostics, not stable feature flags; do not branch on an exact string. The
 literal value of `aiogzip.__version__` likewise changes with each release,
 though it remains a public string synchronized with package metadata.
 
+## Supported release lines
+
+The 2.0 line receives correctness and security fixes. The 1.x line, which
+still serves Python 3.8 through 3.10, receives security fixes only, until
+2027-04-30; after that date it receives no further releases. Python 3.10, the
+last of those interpreters, reached end of life on 2026-10-01. Fixes made in
+2.0 are not backported to 1.x unless they are security fixes. See the
+[security policy](https://github.com/geoff-davis/aiogzip/security/policy) for
+how to report a vulnerability.
+
 ## Examples and future changes
 
 Repository examples are maintained and tested as integration workflows, but

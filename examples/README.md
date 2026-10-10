@@ -37,13 +37,14 @@ or rename an earlier demo run before repeating it.
 Build from the repository root, create an isolated environment, and invoke the
 repository-owned example files with that environment's interpreter. Because
 the scripts live under `examples/`, the checkout's `src/` directory is not on
-their import path; `aiogzip` resolves from the installed wheel.
+their import path; `aiogzip` resolves from the installed wheel. Start with
+an empty `dist/` so that the wheel pattern below matches only the new build.
 
 ```bash
 uv build
 python -m venv .venv-example
 .venv-example/bin/python -m pip install \
-  dist/aiogzip-2.0.0b2*.whl
+  dist/aiogzip-*.whl
 .venv-example/bin/python examples/fragmented_transport.py --self-test
 .venv-example/bin/python examples/concurrent_jsonl_ingest.py \
   --generate-fixtures ./wheel-demo-input \
