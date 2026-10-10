@@ -37,17 +37,46 @@ PR per repair with both engines' suites and the hosted matrix green.
 | S08 | RC review and approval | Cross review of the exact candidate by Codex and a fresh Claude subagent; hosted CI at that SHA; the maintainer's explicit approval |
 | S09 | Publication | Release preparation, exact-artifact publication and post-release record, as for RC1 |
 
-- [ ] S01
-- [ ] S02
-- [ ] S03
-- [ ] S04
-- [ ] S05
-- [ ] S06
+- [x] S01 — PR #138 (BC16), signed off 2026-10-10
+- [x] S02 — PR #140 (BC18), signed off 2026-10-10
+- [x] S03 — PR #139 (BC17), signed off 2026-10-10
+- [x] S04 — PR #136, signed off 2026-10-10
+- [x] S05 — [Differential rerun](#s05-differential-rerun), signed off 2026-10-10
+- [x] S06 — [Timing windows](reviews/v2.0.0rc2-s06-record.md), signed off 2026-10-10
 - [ ] S07
 - [ ] S08
 - [ ] S09
 
-## 3. Deferred past 2.0
+## 3. Gate results
+
+### S05: differential rerun
+
+Sweeps on the candidate `0b9c7c4` (main after #136–#140) ran from a clean
+worktree with its own `tests/stateful/differential.py`, against the b2
+(`962bfe4`) and b1 (`048700f`) references in `.cache/wp10/`. They used seeds
+0–5999, the R04 block 1,000,000–1,000,199 and the R02 seek-cancel block
+2,000,000–2,000,199, on both engines. All twelve runs reported 0 failed, and
+the two engines gave identical claim counts:
+
+| Reference | Seeds | Claims |
+| --- | --- | --- |
+| b2 | 0–5999 | BC11 1 |
+| b2 | 1,000,000–1,000,199 | BC11 1, BC12 4 |
+| b2 | 2,000,000–2,000,199 | BC11 6 |
+| b1 | 0–5999 | BC2 605, BC3 358, BC7 18, BC8 214, BC9 21, BC10 1, BC11 1 |
+| b1 | 1,000,000–1,000,199 | BC2 26, BC3 10, BC7 2, BC8 8, BC9 1, BC11 1, BC12 4 |
+| b1 | 2,000,000–2,000,199 | BC2 33, BC3 9, BC11 7 |
+
+The 0–5999 and 1,000,000 rows equal RC1's recorded R11 results. The b2 rows
+equal the sweeps run on the S01 fix (`181c29c`) before it merged. No
+difference needed a new predicate: BC16–BC18 change only abort-settlement,
+cancelled-open and logging paths that the generator does not reach with a
+differing outcome. The stateful suite (`tests/stateful/`) passes in both
+engine modes as part of the full suite at the candidate.
+
+*Closed 2026-10-10: Codex approved, maintainer signed off ("I sign off").*
+
+## 4. Deferred past 2.0
 
 F3 (`tell()` during `readlines()`), `writelines()` with empty `str`
 subclasses, and RC1 plan §5's implementation and API opportunities: custom-sink
