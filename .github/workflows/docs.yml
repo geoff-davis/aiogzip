@@ -53,7 +53,7 @@ jobs:
         # On main, a stable release takes the `latest` alias (the site
         # default), a pre-release updates its minor line, and a development
         # version deploys to the single `dev` version, so `latest` never
-        # serves unreleased changes. Maintenance branches (1.x) republish
+        # serves development builds. Maintenance branches (1.x) republish
         # their minor line without touching aliases — existing aliases stay
         # attached, so a 1.11 patch keeps updating `latest` for as long as
         # `latest` still points at 1.11.

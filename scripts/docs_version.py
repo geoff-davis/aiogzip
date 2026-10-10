@@ -4,7 +4,7 @@
 Prints ``<major.minor> <kind>``, where kind is ``stable``, ``prerelease`` or
 ``dev``. The docs workflow deploys a stable or prerelease version on ``main``
 to its ``major.minor`` docs version, and a development version to the single
-``dev`` docs version, so ``latest`` only ever serves released docs.
+``dev`` docs version, so ``latest`` never serves development builds.
 Maintenance branches deploy every version to its ``major.minor``.
 """
 
