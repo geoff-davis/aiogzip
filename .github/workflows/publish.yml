@@ -34,7 +34,7 @@ jobs:
       # tests/test_build_release_artifacts.py drives the release build script,
       # which requires uv on PATH.
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.2.0
 
       - name: Verify tag matches package version
         id: version
@@ -80,7 +80,7 @@ jobs:
           python-version: "3.14"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.2.0
         with:
           version: "0.9.22"
 

@@ -38,7 +38,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.2.0
 
       # Deliberately unpinned (uv.lock is not consulted): CI exercises fresh
       # dependency releases before users hit them. uv just installs faster.
@@ -72,7 +72,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.2.0
 
       - name: Install dependencies
         run: uv pip install --system -e ".[docs]"
@@ -118,7 +118,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.2.0
 
       # actions/setup-python does not offer 3.15.0 yet, so the 3.15 leg uses
       # uv's managed CPython 3.15.0 (python-build-standalone) in a virtual
@@ -219,7 +219,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.2.0
 
       - name: Install dependencies (with fast extra)
         run: uv pip install --system -e ".[test,csv,fast]"
@@ -273,7 +273,7 @@ jobs:
           python-version: "3.11"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.2.0
 
       - name: Build candidate wheel
         run: uv build --wheel --out-dir dist
@@ -444,7 +444,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.2.0
 
       - name: Build candidate ${{ matrix.artifact }}
         shell: bash
