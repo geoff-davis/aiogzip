@@ -64,9 +64,16 @@ Prepare a new release of aiogzip. This skill handles changelog generation, versi
   `plans/` is not packaged, so adding the record does not change the hashes:
   - Match the publish workflow's build job exactly, or the hashes will not
     match: uv `0.9.22` (`uv --version`; the version is pinned in
-    `.github/workflows/publish.yml`), Python 3.14 (`uv run python --version`;
-    a different project venv interpreter means stop and fix the venv), and
+    `.github/workflows/publish.yml`; if the local uv differs, install that
+    version into a scratch directory with `uv pip install --target <dir>
+    uv==0.9.22` and put `<dir>/bin` first on `PATH`), Python 3.14
+    (`uv run python --version`; a different project venv interpreter means
+    stop and fix the venv), and
     `export SOURCE_DATE_EPOCH="$(TZ=UTC date -d <changelog release date> +%s)"`.
+    The script runs `uv build` and the smokes on the interpreter that runs it
+    (or `--python`). The sdist's gzip level follows that interpreter's
+    `tarfile` default (9 on 3.14, 6 on 3.15), which is why v2.0.0rc2's first
+    record, built on 3.15, failed the publish check.
   - Build that commit: `uv run python scripts/build_release_artifacts.py
     --ref HEAD --evidence-dir <new directory outside the repository>`. It
     builds with the tools pinned in

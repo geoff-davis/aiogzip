@@ -181,3 +181,11 @@ def test_any_other_file_in_dist_fails(release, tmp_path, extra):
 def test_uv_build_does_not_create_a_gitignore():
     source = SCRIPT.read_text(encoding="utf-8")
     assert '"--no-create-gitignore"' in source
+
+
+def test_uv_build_uses_the_given_interpreter():
+    # The sdist's gzip level follows the build interpreter's tarfile
+    # default, so the build must not let uv pick an interpreter.
+    source = SCRIPT.read_text(encoding="utf-8")
+    build_call = source[source.index('"build",') : source.index('"--out-dir",')]
+    assert '"--python",\n                    python,' in build_call
