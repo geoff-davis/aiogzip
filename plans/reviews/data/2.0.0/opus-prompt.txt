@@ -1,0 +1,21 @@
+You are an independent reviewer assessing what must be done before the aiogzip library makes its final 2.0.0 release. Repository: /home/geoff/Projects/personal/aiogzip (main is at 3dd9e94; 2.0.0rc2 was published to PyPI on 2026-10-10). Two open PRs are relevant context: #145 (branch docs/rc2-post-release: rc2 post-release record, version bump to 2.0.0rc3.dev0) and #146 (branch fix/release-build-interpreter: pins the `uv build` interpreter in scripts/build_release_artifacts.py). Read them with `git show origin/<branch>` or `gh pr diff <n>`.
+
+Strictly read-only: do NOT commit, push, edit tracked files, change branches in the main checkout, create tags/releases, or run benchmarks. You may run tests or scripts from a scratch worktree (`git worktree add <dir> origin/main` under the session scratchpad, using the main checkout's .venv/bin/python with PYTHONPATH=src; never `uv run` inside the worktree) and must remove any worktree you create. `gh` is authenticated for read access (issues, PRs, branch protection, releases); PyPI JSON is at https://pypi.org/pypi/aiogzip/json.
+
+Start with CLAUDE.md and plans/README.md, which indexes every plan and record. Then survey:
+- every open plan, deferral and follow-up: the RC1 and RC2 plans, the post-release records, the b2 behavior-exception ledger (plans/reviews/v2.0.0b2-behavior-exceptions.md), and the stability policy and compatibility-contract docs;
+- open GitHub issues and PRs;
+- CI and branch protection;
+- packaging metadata: the Beta classifier, the version, and `python_requires`;
+- user docs: mkdocs versions and aliases (`latest` still serves 1.11), the 1.x→2.0 migration guide, CHANGELOG, README;
+- the 1.x maintenance branch story;
+- any code-level risk you consider release-blocking. Sample the core modules (src/aiogzip/codec.py, _binary.py, _text.py, _codec_async.py, _opening.py, _inspection.py) with a reviewer's eye.
+
+Classify each item as:
+- MUST: it blocks 2.0.0;
+- SHOULD: do it before 2.0.0 unless the maintainer waives it;
+- LATER: after 2.0.
+
+Give each item evidence (file:line, command output or URL) and a concrete reason. Say whether it needs source changes, which by the project's rules means another release candidate (rc3) with ledger entries and review, or whether it can go directly into a 2.0.0 release-prep PR (metadata, docs, classifier, changelog). Don't re-raise items the plans already defer past 2.0 unless you believe the deferral is wrong, and if you do, explain why. Don't pad the list. A short list of real items beats a long list of nits.
+
+End with a proposed gate list for a 2.0.0 plan, in the style of the RC2 plan's gate register, and a one-paragraph bottom line: is the project ready for 2.0.0 after the listed MUST items, and is an rc3 needed?

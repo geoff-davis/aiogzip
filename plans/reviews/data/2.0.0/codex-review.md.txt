@@ -1,0 +1,63 @@
+I’ll review both PRs, then survey the remaining plans, release policy, repository state and GitHub status. I’ll distinguish release blockers from waived or post-2.0 work, and flag anything I can’t verify remotely.
+The remote checks are accessible. Main’s branch protection includes the required Linux 3.15 check, and the open issues are the already-deferred AnyIO and indexed-access work. The other open PRs are #145, #146 and two dependency updates. I’m checking publication attestations and docs aliases next; the main remaining work appears to be stable-release preparation and evidence at the final SHA.
+I found two issues in #145: its CI table labels run 38063352582 as `91e360c`, but GitHub identifies it as `cb3c488`; the actual `91e360c` run was cancelled. Also, the docs workflow maps `2.0.0rc3.dev0` to a `2.0.0rc3` directory rather than the intended `2.0` minor line.
+
+#146’s interpreter pin is correct. Its focused tests pass, and the supplied rebuilds show the expected hashes on Python 3.14 and the alternate gzip hash on 3.15.
+PR #145: **CHANGES REQUESTED**, with two MEDIUM findings.
+
+1. **Wrong CI identity.** The post-release record attributes run `38063352582` to `91e360c` at lines 35–38 and 112. GitHub identifies that successful run as **`cb3c488`**. The run for `91e360c`, `38062920614`, was cancelled. Correct both references; the approved final candidate did have all 22 checks green. [Successful run](https://github.com/geoff-davis/aiogzip/actions/runs/38063352582), [cancelled run](https://github.com/geoff-davis/aiogzip/actions/runs/38062920614).
+
+2. **The development-version bump exposes a docs-version bug.** [docs.yml:60](/home/geoff/Projects/personal/aiogzip/.github/workflows/docs.yml:60) uses `${VERSION%.*}`. For `2.0.0rc3.dev0`, that produces **`2.0.0rc3`**, so merging #145 moves `dev` to a separate directory instead of updating `2.0`. The same problem occurs with `2.0.1.dev0`. Extract the first two release components and pin stable, RC and development-version cases in a test. This is a pre-existing workflow defect, reproduced by the proposed bump.
+
+The other independently checked publication facts agree:
+
+- Signed tag object `292422c` targets `3dd9e94`; GitHub reports a valid signature.
+- Publish run `38066701963` succeeded.
+- PyPI filenames, sizes, hashes, upload times, classifiers and non-yanked status match the record.
+- Both PyPI provenance bundles name `publish.yml`, repository `geoff-davis/aiogzip`, environment `pypi`, and the recorded artifact hashes.
+- Live docs currently show `2.0`, titled `2.0.0rc2`, with alias `dev`; `latest` remains on `1.11`.
+- `2.0.0rc2 < 2.0.0rc3.dev0 < 2.0.0`, so the development version is sensible and does not require publishing rc3.
+
+I did not repeat the public-install smoke or cryptographic `pypi-attestations verify` command; those execution claims remain record-reported. [Published release](https://github.com/geoff-davis/aiogzip/releases/tag/v2.0.0rc2), [PyPI release](https://pypi.org/project/aiogzip/2.0.0rc2/).
+
+PR #146: **APPROVED**.
+
+The explicit interpreter reaches `uv build`, and the same argument already selects the smoke environments. This closes the interpreter-selection gap without changing the runtime package. The 18 focused tests pass. The supplied rebuild artifacts match the published hashes on Python 3.14.2 and the previously refused sdist hash on 3.15.0. [Build command](/home/geoff/Projects/personal/aiogzip/scripts/build_release_artifacts.py:232).
+
+For 2.0.0, I found **no new runtime blocker requiring rc3**. Main plus these PRs changes the approved rc2 runtime only through the development-version string. The API manifest is byte-identical across b1, rc2 and both PRs. The remaining work is release preparation, documentation and qualification of the exact final artifacts.
+
+| Priority | Item | Concrete requirement and evidence |
+|---|---|---|
+| **MUST** | Finish the RC2 closeout | Correct #145, obtain maintainer S09 sign-off, and record the build-interpreter repair. Avoid carrying an inaccurate CI identity into the final release packet. [RC2 post-release record](https://github.com/geoff-davis/aiogzip/blob/750c481/plans/reviews/v2.0.0rc2-post-release.md). |
+| **MUST** | Pin the final build interpreter | Merge #146 before recording final artifacts. Use the workflow’s uv version, Python minor version, backend constraints and release-date epoch. The rc2 incident demonstrated that the smoke interpreter alone did not identify the build interpreter. [Build script](/home/geoff/Projects/personal/aiogzip/scripts/build_release_artifacts.py:232). |
+| **MUST** | Prepare stable metadata and wording | Set `__version__` to `2.0.0`, change the Beta classifier to Production/Stable, date the changelog, and add correct comparison links. Replace current-tense prerelease guidance in README, migration and stability docs; preserve the compatibility boundary rather than expanding it. [Metadata](/home/geoff/Projects/personal/aiogzip/pyproject.toml:13), [stability policy](/home/geoff/Projects/personal/aiogzip/docs/stability.md:3), [migration wording](/home/geoff/Projects/personal/aiogzip/docs/migration.md:89). |
+| **MUST** | Correct docs deployment and verify stable aliases | Fix minor-line extraction. At final publication, verify `latest` and the site default serve `2.0`, while `1.11` remains accessible. Decide explicitly what happens to `dev` after publication. [Docs workflow](/home/geoff/Projects/personal/aiogzip/.github/workflows/docs.yml:51). |
+| **MUST** | Qualify the exact final SHA | Require the full hosted matrix, strict docs, typing checks and frozen API check at the reviewed release head. Review the merge delta before tagging. Main currently requires all 21 gating contexts, including Linux 3.15; coverage-comment is the extra non-gating job. [Branch protection](https://api.github.com/repos/geoff-davis/aiogzip/branches/main/protection/required_status_checks). |
+| **MUST** | Build and verify final artifacts | Build twice under the pinned environment, compare hashes, smoke wheel and sdist, run maintained integrations, and commit the `v2.0.0.sha256` record. The old rc2 artifacts cannot substitute for artifacts containing the final version and metadata. [Release preparation](/home/geoff/Projects/personal/aiogzip/.claude/commands/release-prep.md:62). |
+| **MUST** | Update security support wording | Explicitly list the latest stable 2.0 release as supported, retain the declared latest-1.x support, and preserve the private reporting route. The current table describes only the latest 2.0 prerelease. [SECURITY.md](/home/geoff/Projects/personal/aiogzip/SECURITY.md:5). |
+| **MUST** | Final approval and publication verification | Record the cross review, any waivers, and maintainer approval of the exact SHA. Publish a normal GitHub release, then verify PyPI hashes, attestations, clean installs and docs before closing the final gate. [Publication requirements](/home/geoff/Projects/personal/aiogzip/plans/RELEASE_2_0_0B2_PLAN.md:1407). |
+| **SHOULD** | Strengthen the 1.x migration section | Add a concise account of changed failure/recovery behavior: custom-source retry guarantees, terminal readers, cancellation settlement and saved-cookie recovery. These are documented elsewhere, but the migration page emphasizes the Python floor and Boolean validation. Link to the detailed error guide rather than copying the ledger. [Migration guide](/home/geoff/Projects/personal/aiogzip/docs/migration.md:46), [recovery rules](/home/geoff/Projects/personal/aiogzip/docs/errors.md:235). |
+| **SHOULD** | Record feedback intake and representative application testing | The b2 handoff explicitly retained public feedback intake. Record what was solicited, received and dispositioned, plus representative workload results—or an explicit waiver. There is no existing requirement for an arbitrary waiting period or a non-maintainer human reviewer. [Handoff](/home/geoff/Projects/personal/aiogzip/plans/RELEASE_2_0_0B2_PLAN.md:1434). |
+| **SHOULD** | Refresh the plans index | It still calls b2 “Active,” says development continues as rc1.dev0, and describes the ledger as BC1–BC10. Point readers to the final plan and BC1–BC18; leave historical checklists as historical evidence. [Index](/home/geoff/Projects/personal/aiogzip/plans/README.md:5). |
+| **SHOULD** | Make the 1.x maintenance commitment explicit | The remote `1.x` branch exists and retains Python `>=3.8`; its docs deployment preserves main-owned aliases. State the maintenance scope for older interpreters without inventing an indefinite support promise. [Contributing](/home/geoff/Projects/personal/aiogzip/docs/contributing.md:5), [maintenance branch](https://github.com/geoff-davis/aiogzip/tree/1.x). |
+| **SHOULD** | Rehearse the repaired artifact path on hosted infrastructure | #146 changes interpreter selection in the build script. A hosted comparison against the final record, optionally through TestPyPI, would catch environment differences before the production tag. The final publish hash gate remains mandatory either way. |
+
+The following remain **LATER**, with no reason found to overturn their dispositions:
+
+- The explicitly deferred runtime/API opportunities, including concurrent `tell()`, empty `str` subclasses, custom-sink error normalization, aiofiles fallback, resource-policy additions, AnyIO and indexed access. [RC2 deferrals](/home/geoff/Projects/personal/aiogzip/plans/RELEASE_2_0_0RC2_PLAN.md:79).
+- The accepted S08 docstring and opening-cleanup interrupt LOWs. Pulling either into this release would create another source delta to qualify.
+- Switching Python 3.15 from uv to setup-python. The current leg is supported, tested and required.
+- Dependency PRs [#102](https://github.com/geoff-davis/aiogzip/pull/102) and [#124](https://github.com/geoff-davis/aiogzip/pull/124). There are no open Dependabot alerts; these updates are not release blockers. Keep the qualified toolchain unless an update has a concrete release benefit.
+- Open issues [#71](https://github.com/geoff-davis/aiogzip/issues/71) and [#72](https://github.com/geoff-davis/aiogzip/issues/72), both already deferred.
+
+A final release can follow rc2 directly if changes remain in workflows, build tooling, tests, docs, plans and metadata, plus the mandatory version bump. Under your stated rule, **any additional non-version `src/` change requires rc3**, even a source-comment cleanup. Runtime changes also reopen the relevant correctness, differential and performance gates. With runtime unchanged, retain S05/S06 evidence; a new timing window is unnecessary.
+
+A proposed 2.0.0 plan could use these gates:
+
+1. **Final scope and closeout:** corrected RC2 record, sign-off, merged build repair, explicit deferrals.
+2. **Stable documentation and metadata:** version, classifier, changelog, migration, security policy and docs-version extraction.
+3. **Feedback disposition:** results or explicit waivers.
+4. **Exact-candidate qualification:** hosted matrix, API/typing/docs checks, runtime identity and retained S05/S06 applicability.
+5. **Exact artifacts:** pinned reproducible builds, installed smokes, integrations and committed hashes.
+6. **Cross review and maintainer approval:** exact release head and reviewed merge delta.
+7. **Publication and post-release verification:** signed tag, stable release, PyPI provenance, public installs, aliases and maintenance handoff.
