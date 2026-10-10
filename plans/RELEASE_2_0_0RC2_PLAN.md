@@ -33,7 +33,7 @@ PR per repair with both engines' suites and the hosted matrix green.
 | S04 | Windows gate race | The inspection-settlement test race from the RC1 release-merge run is fixed (PR #136) |
 | S05 | Differential rerun | Stateful and differential sweeps against b2 and b1 pass, with every new difference claimed by a ledger row |
 | S06 | Performance | S02's change on the offload path, and any other hot-path change, timed against rc1 in an authorized window; no unexplained cost above 5% |
-| S07 | Python 3.15 | Promoted from the informational job into the build matrix and branch protection if `setup-python` offers 3.15.0 before S08; otherwise stays informational |
+| S07 | Python 3.15 | Promoted from the informational job into the build matrix and branch protection, with a classifier. Amended 2026-10-10 at the maintainer's direction ("Promote via uv"): `setup-python` still offered only 3.15.0rc3, so the leg installs uv's managed CPython 3.15.0 until setup-python offers it |
 | S08 | RC review and approval | Cross review of the exact candidate by Codex and a fresh Claude subagent; hosted CI at that SHA; the maintainer's explicit approval |
 | S09 | Publication | Release preparation, exact-artifact publication and post-release record, as for RC1 |
 

@@ -125,7 +125,7 @@ the primary error during cleanup, and avoid reading ahead from an async source.
 The codec itself performs no I/O and no executor offload; wrappers own those
 policies.
 
-Development and CI target Python 3.11 through 3.14. Code in the 2.0 line may
+Development and CI target Python 3.11 through 3.15. Code in the 2.0 line may
 use Python 3.11 syntax, while compatibility fixes for older interpreters belong
 on the `1.x` maintenance branch.
 

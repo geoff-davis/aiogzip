@@ -86,8 +86,8 @@ jobs:
     # The macOS leg also runs the zlib-ng suite (see below).
     timeout-minutes: ${{ matrix.os == 'macos-latest' && 25 || 15 }}
     # Defines a build matrix for your tests. Linux runs the full Python
-    # version sweep; Windows runs the oldest-common (3.12) and newest (3.14)
-    # versions to guard platform-specific paths (e.g. os.linesep newline
+    # version sweep, 3.11 to 3.15; Windows runs the oldest-common (3.12) and
+    # 3.14 versions to guard platform-specific paths (e.g. os.linesep newline
     # translation in text mode, path handling) without the full sweep's cost.
     # macOS runs 3.14 only: GitHub runs few macOS jobs at a time per account,
     # and with more macOS legs queued jobs were cancelled before they started.
@@ -95,7 +95,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
         include:
           - os: windows-latest
             python-version: "3.12"
@@ -112,12 +112,25 @@ jobs:
 
       # Step 2: Sets up the specific version of Python from the matrix
       - name: Set up Python ${{ matrix.python-version }}
+        if: matrix.python-version != '3.15'
         uses: actions/setup-python@v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.0.1
+
+      # actions/setup-python does not offer 3.15.0 yet, so the 3.15 leg uses
+      # uv's managed CPython 3.15.0 (python-build-standalone) in a virtual
+      # environment. UV_PYTHON points `uv pip install --system` at it, and the
+      # PATH entry makes it the `python`, `pytest` and `mypy` the later steps
+      # run. Switch this leg to setup-python once it offers 3.15.0.
+      - name: Set up Python 3.15.0 (uv-managed)
+        if: matrix.python-version == '3.15'
+        run: |
+          uv venv --python 3.15.0 --managed-python "$RUNNER_TEMP/python-3.15"
+          echo "$RUNNER_TEMP/python-3.15/bin" >> "$GITHUB_PATH"
+          echo "UV_PYTHON=$RUNNER_TEMP/python-3.15/bin/python" >> "$GITHUB_ENV"
 
       # Step 3: Install dependencies. The [test] extra skips lint-only
       # tooling (ruff and prek); deliberately unpinned (uv.lock is
@@ -182,50 +195,6 @@ jobs:
           path: |
             runtime-report.json
             runtime-fast.json
-          if-no-files-found: warn
-
-  # Informational: the next CPython, pre-releases allowed. Not a required
-  # check and not a support claim (no classifier); a failure here shows on
-  # the PR without blocking it. Stdlib zlib only, since zlib-ng wheels may
-  # lag a new interpreter. Promote it into the build matrix once 3.15 is
-  # final and qualified.
-  python-preview:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    continue-on-error: true
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7.0.1
-
-      - name: Set up Python 3.15
-        uses: actions/setup-python@v7.0.0
-        with:
-          python-version: "3.15"
-          allow-prereleases: true
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.0.1
-
-      - name: Install dependencies
-        run: uv pip install --system -e ".[test,csv]"
-
-      - name: Attest runtime environment
-        run: >-
-          python scripts/report_runtime_versions.py --mode csv --latest
-          --output runtime-report.json
-
-      - name: Check frozen public API manifest
-        run: python scripts/capture_public_api.py --check tests/data/public_api_2_0.json
-
-      - name: Run tests
-        run: pytest -q
-
-      - name: Upload runtime attestation
-        if: always()
-        uses: actions/upload-artifact@v7.0.2
-        with:
-          name: runtime-python-preview
-          path: runtime-report.json
           if-no-files-found: warn
 
   # The main matrix above installs only [test,csv], so it exercises the
