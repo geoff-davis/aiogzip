@@ -160,14 +160,19 @@ ledger:
 
 - overlapping calls on one handle raise `ConcurrentOperationError`;
 - `mtime` reports the last completed member header;
-- a read failure that may have consumed input or produced partial output is
-  terminal until `seek(0)`. A failure proven to have had no effect stays
-  retryable, and an integrity failure can leave readable salvage;
-- a custom source's synchronous `tell()`, if it has one, is now called before
-  each physical read and seek and after a failure, so it must be cheap and
-  free of side effects. A source without a synchronous `tell()` still works,
-  but after a failed read on it the reader stays terminal until `seek(0)`,
-  because nothing can prove the read consumed no input;
+- when the underlying source's read fails or is cancelled, the reader stays
+  usable only if the failure is proven to have consumed no input; otherwise
+  it is terminal until `seek(0)`;
+- a custom source's synchronous `tell()`, if it has one, provides that proof.
+  It is now called before each physical read and seek and after a failure,
+  so it must be cheap and free of side effects. A source without one still
+  works, but a failed read on it leaves the reader terminal until `seek(0)`;
+- after an integrity failure (a CRC-32 or `ISIZE` mismatch), output already
+  decoded stays readable as unvalidated recovery data, and later reads raise
+  the terminal `OSError`;
+- a text read that raises `UnicodeDecodeError` does not make the reader
+  terminal, but it has consumed the chunk it was decoding, so it must not be
+  retried; `seek(0)` or reopening with another `encoding` recovers;
 - cancellation waits for native I/O already in a worker thread;
 - exact-Boolean validation;
 - text-mode recovery through saved cookies.
@@ -197,7 +202,7 @@ No 1.x security fix is known to be needed:
   recovery repairs. They are not security fixes, and they depend on the 2.0
   architecture, so they are not backported.
 
-**D5 (decided, applied 2026-10-10).** `1.x` has no protection. Its CI workflow triggers
+**D5 (decided, applied 2026-10-10).** Previously, `1.x` had no protection. Its CI workflow triggers
 only on `main`, so no checks run on `1.x` pushes or PRs; only the docs
 workflow runs there. Light protection, blocking force-pushes and branch
 deletion, costs nothing and guards the line users on Python 3.8–3.10 rely on.
