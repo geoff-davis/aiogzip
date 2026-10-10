@@ -43,7 +43,7 @@ PR per repair with both engines' suites and the hosted matrix green.
 - [x] S04 — PR #136, signed off 2026-10-10
 - [x] S05 — [Differential rerun](#s05-differential-rerun), signed off 2026-10-10
 - [x] S06 — [Timing windows](reviews/v2.0.0rc2-s06-record.md), signed off 2026-10-10
-- [ ] S07
+- [x] S07 — PR #142 (Python 3.15 required via uv's CPython 3.15.0), signed off 2026-10-10
 - [ ] S08
 - [ ] S09
 

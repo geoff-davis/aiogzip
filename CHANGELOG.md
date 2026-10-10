@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0rc2] - 2026-10-10
+
+This release candidate keeps the 2.0 public API frozen: every public
+signature, type and codec-lifecycle rule is unchanged from `2.0.0b1`. It
+fixes three cancellation cases deferred from `2.0.0rc1`, and adds Python 3.15
+as a supported version.
+
 ### Added
 
 - Python 3.15 is supported: it has a classifier and a required CI leg, which
