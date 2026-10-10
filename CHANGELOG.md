@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0rc2] - 2026-10-10
+
+This release candidate keeps the 2.0 public API frozen: every public
+signature, type and codec-lifecycle rule is unchanged from `2.0.0b1`. It
+fixes three cancellation cases deferred from `2.0.0rc1`, and adds Python 3.15
+as a supported version.
+
 ### Added
 
 - Python 3.15 is supported: it has a classifier and a required CI leg, which
@@ -1079,7 +1086,8 @@ resource after its owner had released it.
 - Normalize iteration errors from `AsyncGzipBinaryFile` to `TypeError`, matching the standard file API.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
 
-[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0rc1...HEAD
+[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0rc2...HEAD
+[2.0.0rc2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0rc1...v2.0.0rc2
 [2.0.0rc1]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b2...v2.0.0rc1
 [2.0.0b2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b1...v2.0.0b2
 [2.0.0b1]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0a4...v2.0.0b1

@@ -285,16 +285,19 @@ Always include:
   and recovery cases in which b1 could lose, skip or misreport data (behavior
   exceptions BC1–BC10), with explicit binary read health, a text
   replay-origin object and a narrow text/binary bridge.
-- **2.0.0rc1 (current release)** - Keeps the frozen API and fixes the
+- **2.0.0rc1** - Keeps the frozen API and fixes the
   remaining b2 cases (BC11–BC15): a queued native close lost to
   cancellation, text seeks that fail after moving the reader, end-relative
   seeks after `peek()`, `inspect()`/`verify()` settlement and small
-  cancellation and cleanup repairs. Python 3.15
-  ran in an informational CI job; 2.0.0rc2 promotes it to a supported version. Development continues as
-  `2.0.0rc2.dev0` while the Beta classifier and frozen compatibility
-  contract remain in force.
+  cancellation and cleanup repairs.
+- **2.0.0rc2 (current release)** - Keeps the frozen API and fixes three
+  cases deferred from rc1 (BC16–BC18): a cancelled exit abort that skipped
+  the close, an opening cleanup note for a repeated cancellation, and
+  Python 3.14's duplicate "exception in shielded future" log. Python 3.15
+  is supported, with a required CI leg. The Beta classifier and frozen
+  compatibility contract remain in force.
 
 ---
 
-**Last Updated:** 2026-10-09
+**Last Updated:** 2026-10-10
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
