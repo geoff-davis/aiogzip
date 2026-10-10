@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Python 3.15 is supported: it has a classifier and a required CI leg, which
+  uses uv's CPython 3.15.0 build until `actions/setup-python` offers 3.15.0.
+
 ### Fixed
 
 - Cancelling an `async with` exit while the body was raising and a read or

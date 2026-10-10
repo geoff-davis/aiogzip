@@ -27,7 +27,7 @@ uv sync --all-extras
 
 The lockfile pins development only — CI deliberately installs unpinned
 (`uv pip install --system`, which resolves fresh from PyPI and never reads
-`uv.lock`) so new dependency releases are exercised across Python 3.11-3.14
+`uv.lock`) so new dependency releases are exercised across Python 3.11-3.15
 before users hit them. Dependabot's `uv` ecosystem keeps `uv.lock` current.
 
 The lockfile resolves for Python 3.11 and newer, matching the 2.0 package
@@ -188,21 +188,23 @@ Notes:
 
 ## CI/CD Notes
 
-The project uses GitHub Actions which tests against Python 3.11 through 3.14.
+The project uses GitHub Actions which tests against Python 3.11 through 3.15.
 Linux runs the full version sweep; Windows runs 3.12 and 3.14 and macOS runs
 3.14 to guard platform-specific paths (e.g. `os.linesep` newline
 translation). The macOS build leg also reruns the suite with zlib-ng; keep
 macOS jobs to about two per run, because GitHub runs few macOS jobs at a time
 per account and queued ones have been cancelled before starting.
 
-The `python-preview` job runs the suite on the next CPython (3.15,
-pre-releases allowed, stdlib zlib only). It is informational: not a required
-check, `continue-on-error`, and no classifier claims the version. Promote it
-into the `build` matrix (and branch protection) only once that version is
-final and qualified.
+The Linux 3.15 leg installs uv's managed CPython 3.15.0 (`uv venv
+--managed-python`, with `UV_PYTHON` pointing `uv pip install --system` at
+it), because `actions/setup-python` did not offer 3.15.0 when 3.15 was
+promoted for 2.0.0rc2. Switch it to setup-python once that offers 3.15.0.
+The informational `python-preview` job that ran 3.15 pre-releases was
+removed at the promotion; re-add one for 3.16 when setup-python offers its
+pre-releases (not a required check, `continue-on-error`, no classifier).
 
 `main` has branch protection requiring every CI job (lint, all build matrix
-legs, fast-engine — not coverage-comment or python-preview), and repo auto-merge is enabled:
+legs, fast-engine — not coverage-comment), and repo auto-merge is enabled:
 `gh pr merge <n> --auto --merge` lands a PR when checks pass. **Gotcha:**
 the required checks are matched by job name, so changing the matrix (adding
 a Python version, renaming a job, swapping an OS) requires updating the
@@ -288,7 +290,7 @@ Always include:
   cancellation, text seeks that fail after moving the reader, end-relative
   seeks after `peek()`, `inspect()`/`verify()` settlement and small
   cancellation and cleanup repairs. Python 3.15
-  runs in an informational CI job. Development continues as
+  ran in an informational CI job; 2.0.0rc2 promotes it to a supported version. Development continues as
   `2.0.0rc2.dev0` while the Beta classifier and frozen compatibility
   contract remain in force.
 
