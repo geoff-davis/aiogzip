@@ -20,8 +20,8 @@ lists the behavior changes a 1.11 application can meet.
 
 ### Documentation since 2.0.0rc2
 
-- The migration guide lists every 1.11 → 2.0 behavior change, each linked
-  to its detailed rule, and states the 1.x support window.
+- The migration guide lists the key 1.11 → 2.0 behavior changes, each
+  linked to its detailed rule, and states the 1.x support window.
 - The home page describes same-handle concurrency as it is: an overlapping
   call raises `ConcurrentOperationError`.
 - The development documentation built from `main` is published as a single
@@ -62,10 +62,10 @@ lists the behavior changes a 1.11 application can meet.
   before each physical read and seek.
 - After an integrity failure, decoded output stays readable as unvalidated
   recovery data, and later reads raise a terminal `OSError` instead of
-  returning a clean EOF. A text `tell()` cookie saved before the failure is
-  usable again only after `seek(0)`.
-- Cancellation waits for native I/O and codec work already running in a
-  worker thread before it propagates.
+  returning a clean EOF. A text `tell()` cookie saved before the failure may
+  be refused; `seek(0)` is the guaranteed recovery.
+- Cancellation cannot abandon native I/O or codec work already running in a
+  worker thread; it propagates once that work has finished.
 - Decoder output chunks are at most 256 KiB even when `output_chunk_size` is
   larger.
 
