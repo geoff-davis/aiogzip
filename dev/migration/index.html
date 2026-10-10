@@ -372,6 +372,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Moving an existing aiogzip application to 2.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#behavior-changes-since-111" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior changes since 1.11
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exact-boolean-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact Boolean options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-synchronous-codec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The synchronous codec
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -725,6 +764,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Moving an existing aiogzip application to 2.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#behavior-changes-since-111" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior changes since 1.11
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exact-boolean-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact Boolean options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-synchronous-codec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The synchronous codec
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -803,16 +881,72 @@ the other.</p>
 <p>If you forget and use <code>with</code> or <code>for</code>, aiogzip raises a <code>TypeError</code> that says
 exactly what to change (e.g. <code>"must be used with 'async with', not 'with'"</code>).</p>
 <h2 id="moving-an-existing-aiogzip-application-to-20">Moving an existing aiogzip application to 2.0</h2>
-<p>Ordinary asyncio callers do not need to change their code. The high-level
+<p>Most asyncio callers do not need to change their code. The high-level
 <code>open()</code>, <code>AsyncGzipFile()</code>, <code>read()</code>, <code>write()</code>, <code>inspect()</code>, <code>verify()</code>,
-<code>compress_chunks()</code>, and <code>decompress_chunks()</code> APIs retain their asynchronous
-lifecycle and interoperability behavior. The main compatibility change is the
-Python 3.11 floor.</p>
-<p>During the alpha series, Boolean configuration was tightened before the 2.0
-API freeze to avoid preserving accidental truth-value coercion. Pass the exact
-built-in values <code>True</code> or <code>False</code> for <code>fast_compress</code>, <code>strict_size</code>, and the
-direct decoder's <code>collect_member_info</code>. Integer stand-ins (<code>0</code>, <code>1</code>), strings
-such as <code>"false"</code>, and custom truthy or falsy objects raise <code>TypeError</code>:</p>
+<code>compress_chunks()</code>, and <code>decompress_chunks()</code> APIs keep their names,
+signatures and asynchronous lifecycle, and files remain interoperable. The
+main compatibility change is the Python 3.11 floor.</p>
+<p>The 1.x line receives security fixes only, until 2027-04-30. Python 3.10, the
+last interpreter that only 1.x supports, reached end of life on 2026-10-01.</p>
+<h3 id="behavior-changes-since-111">Behavior changes since 1.11</h3>
+<p>2.0 makes several behaviors stricter or more precisely defined. Code that
+relied on the 1.11 behavior below should be checked. This list covers the
+key changes; each item links to the detailed rule, and the changelog has the
+rest.</p>
+<ul>
+<li><strong>Overlapping calls on one handle</strong> raise the public
+  <code>ConcurrentOperationError</code>, an <code>OSError</code> subtype, instead of interleaving.
+  The call already in flight is unaffected. Give each task its own handle or
+  hold an application lock across the whole logical operation. See
+  <a href="../errors/#same-handle-concurrency">Same-handle concurrency</a>.</li>
+<li><strong><code>mtime</code> in read mode</strong> reports the most recently completed member header.
+  On a concatenated stream, read-ahead can move it past the member whose bytes
+  the current read returned. See
+  <a href="../api/#live-member-timestamps">Live member timestamps</a>.</li>
+<li><strong>A failed or cancelled read of a custom source</strong> leaves the reader usable
+  only if the failure is proven to have consumed no input. Otherwise the
+  reader is terminal until a <code>seek(0)</code> completes, or until the source is
+  reopened. An <code>OSError</code> alone no longer means that a retry is safe. A native
+  aiofiles read is different: once started, it finishes before the
+  cancellation propagates, and the reader keeps its bytes for the next read.
+  See
+  <a href="../recipes/#source-failures-and-cancellation">Source failures and cancellation</a>.</li>
+<li><strong>A custom source's synchronous <code>tell()</code></strong>, if it has one, provides that
+  proof. It is now called before each physical read and seek, and after a
+  failure, so it must be cheap and free of side effects. Async <code>tell()</code>
+  methods do not count. A source without a synchronous <code>tell()</code> still works,
+  but a failed read on it leaves the reader terminal until <code>seek(0)</code>.</li>
+<li><strong>After an integrity failure</strong> (a CRC-32 or <code>ISIZE</code> mismatch), output
+  already decoded stays readable as unvalidated recovery data, and later
+  reads raise the terminal <code>OSError</code> instead of returning a clean EOF. The
+  recovery data is not proof that its member is valid. See
+  <a href="../errors/#recovery-data-after-an-integrity-failure">Recovery data after an integrity failure</a>.</li>
+<li><strong>A text read that raises <code>UnicodeDecodeError</code></strong> does not make the reader
+  terminal, but it has already consumed the chunk it was decoding. Do not
+  retry it: call <code>seek(0)</code>, or reopen the file with another <code>encoding</code> or an
+  <code>errors</code> handler such as <code>"replace"</code>. See
+  <a href="../errors/#recovery-data-after-an-integrity-failure">Recovery data after an integrity failure</a>,
+  which ends with this rule.</li>
+<li><strong>Text recovery after a failure</strong> goes through <code>seek(0)</code>. A <code>tell()</code> cookie
+  saved before the failure may be refused with the terminal <code>OSError</code>; once
+  <code>seek(0)</code> has recovered the reader, the cookie is an ordinary position
+  again. Text cookies are valid only on the handle that produced them. See
+  <a href="../api/#seek-and-tell-in-text-mode"><code>seek()</code> and <code>tell()</code> in text mode</a>.</li>
+<li><strong>Cancellation waits for native I/O</strong> already running in a worker thread:
+  cancellation cannot abandon a native open, read, write, flush or seek, or a
+  submitted close, so no part of the stream is skipped. A cancellation can
+  therefore take as long as the blocked call. If a submitted close fails,
+  the failure becomes the cancellation's cause, and an aborted handle stays
+  reportably open so that <code>close()</code> can be retried. See
+  <a href="../recipes/#cancellation">Cancellation</a> and
+  <a href="../errors/#same-handle-concurrency">Same-handle concurrency</a>.</li>
+<li><strong>Boolean options are exact</strong>, as described below.</li>
+</ul>
+<h3 id="exact-boolean-options">Exact Boolean options</h3>
+<p>Pass the exact built-in values <code>True</code> or <code>False</code> for <code>fast_compress</code>,
+<code>strict_size</code>, and the direct decoder's <code>collect_member_info</code>. Integer
+stand-ins (<code>0</code>, <code>1</code>), strings such as <code>"false"</code>, and custom truthy or falsy
+objects raise <code>TypeError</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">aiogzip</span><span class="o">.</span><span class="n">GzipEncoder</span><span class="p">(</span><span class="n">fast_compress</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># valid</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">aiogzip</span><span class="o">.</span><span class="n">GzipEncoder</span><span class="p">(</span><span class="n">fast_compress</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>      <span class="c1"># TypeError</span>
 </code></pre></div>
@@ -820,6 +954,7 @@ such as <code>"false"</code>, and custom truthy or falsy objects raise <code>Typ
 ownership default: a resource opened from a path is closed by aiogzip, while a
 caller-supplied <code>fileobj</code> remains open. Use an explicit Boolean only when
 overriding that default.</p>
+<h3 id="the-synchronous-codec">The synchronous codec</h3>
 <p>aiogzip 2.0 also adds synchronous <code>GzipEncoder</code> and <code>GzipDecoder</code> classes for
 applications that own a custom transport and want to drive aiogzip's gzip
 state machine directly:</p>

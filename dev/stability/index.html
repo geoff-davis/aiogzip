@@ -591,6 +591,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#supported-release-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported release lines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#examples-and-future-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -739,6 +750,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#supported-release-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported release lines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#examples-and-future-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -816,6 +838,14 @@ not compatibility promises.</p>
 diagnostics, not stable feature flags; do not branch on an exact string. The
 literal value of <code>aiogzip.__version__</code> likewise changes with each release,
 though it remains a public string synchronized with package metadata.</p>
+<h2 id="supported-release-lines">Supported release lines</h2>
+<p>The 2.0 line receives correctness and security fixes. The 1.x line, which
+still serves Python 3.8 through 3.10, receives security fixes only, until
+2027-04-30; after that date it receives no further releases. Python 3.10, the
+last of those interpreters, reached end of life on 2026-10-01. Fixes made in
+2.0 are not backported to 1.x unless they are security fixes. See the
+<a href="https://github.com/geoff-davis/aiogzip/security/policy">security policy</a> for
+how to report a vulnerability.</p>
 <h2 id="examples-and-future-changes">Examples and future changes</h2>
 <p>Repository examples are maintained and tested as integration workflows, but
 their helper functions, command-line wording, frame formats, staging layouts,
