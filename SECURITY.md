@@ -2,12 +2,14 @@
 
 ## Supported Versions
 
-Security fixes are released on top of the latest release line:
+Security fixes are released on top of the latest release of each supported
+line. The 1.x line, which still serves Python 3.8 through 3.10, receives
+security fixes only, until 2027-04-30; after that date it is unsupported.
 
 | Version line | Supported |
 | --- | --- |
 | Latest 2.0 beta/prerelease | :white_check_mark: |
-| Latest 1.x maintenance release | :white_check_mark: |
+| Latest 1.x maintenance release | :white_check_mark: Security fixes only, until 2027-04-30 |
 | Older 2.0 alphas/betas | :x: Upgrade to the latest prerelease |
 | Older 1.x releases | :x: |
 
