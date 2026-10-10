@@ -13,6 +13,10 @@ lists the behavior changes a 1.11 application can meet.
 ### Changed since 2.0.0rc2
 
 - No library code has changed since `2.0.0rc2`.
+- The package is classified `Development Status :: 5 - Production/Stable`.
+- The [stability policy](docs/stability.md) now covers the stable line: what
+  patch and minor releases may change, the deprecation rule, and when Python
+  versions are added or dropped.
 
 ### Documentation since 2.0.0rc2
 

@@ -7,7 +7,7 @@ three things change:
 aiogzip 2.0 requires Python 3.11 or newer. On Python 3.8 through 3.10, normal
 dependency resolution continues selecting the newest compatible 1.x release;
 pin `aiogzip<2` when an explicit upper bound is preferred. Upgrade the
-interpreter before selecting a 2.0 prerelease.
+interpreter before moving to 2.0.
 
 | | `gzip` | `aiogzip` |
 |---|---|---|
@@ -138,8 +138,8 @@ operation iterators are lazy and must be exhausted before the next call, and
 decompression integrity is established only after `finish()` is exhausted.
 See the [synchronous codec guide](codec.md) before integrating it.
 
-`GzipEncoder`, `GzipDecoder`, and `CodecOperation` are public and beta-frozen
-for the 2.0 line as of `2.0.0b1`. The beta remains a prerelease; see the
+`GzipEncoder`, `GzipDecoder`, and `CodecOperation` are public and have been
+frozen for the 2.0 line since `2.0.0b1`. See the
 [stability policy](stability.md) for the exact compatibility boundary.
 
 Next steps: [Examples](examples.md) for common tasks,
