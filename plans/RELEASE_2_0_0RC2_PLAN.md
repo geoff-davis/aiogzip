@@ -42,7 +42,7 @@ PR per repair with both engines' suites and the hosted matrix green.
 - [ ] S03
 - [ ] S04
 - [ ] S05
-- [ ] S06
+- [x] S06 — [Timing windows](reviews/v2.0.0rc2-s06-record.md), signed off 2026-10-10
 - [ ] S07
 - [ ] S08
 - [ ] S09
