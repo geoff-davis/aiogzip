@@ -62,7 +62,7 @@ timing window is needed.
 | T09 | Candidate review and approval | Cross review of the exact candidate by Codex and a fresh Claude subagent; all required hosted checks green at that SHA; the maintainer's explicit approval |
 | T10 | Publication | See [T10 below](#t10-publication) |
 
-- [ ] T01
+- [x] T01 (signed off 2026-10-10)
 - [ ] T02
 - [ ] T03
 - [ ] T04
@@ -83,7 +83,7 @@ The acceptance has four parts:
   single `dev` docs version, and a stable or prerelease version to its
   `major.minor` docs version.
 - A test pins the version cases.
-- The stale versions are deleted with `mike delete`.
+- The stale versions are deleted with `mike delete` before the fix merges.
 - One deploy is verified after the fix merges.
 
 `.github/workflows/docs.yml:60` sets `DOCS_VERSION="${VERSION%.*}"`, which
@@ -105,8 +105,12 @@ The fix should take the first two release components, for example with
 
 The stale versions are deleted with `mike delete`: `2.0.0a3`, `2.0.0a4`,
 `2.0.0b1`, `2.0.0b2`, `2.0.0rc1`, `2.0.0rc2` and `2.0.0rc3`. This is a write
-to `gh-pages`, so it needs the maintainer's go-ahead. It also needs to happen
-after the workflow fix, or the next push recreates one.
+to `gh-pages`, so it needs the maintainer's go-ahead (given 2026-10-10). It
+must happen after the last push to `main` under the old workflow, or that push
+recreates one, and before the fix's own deploy: deleting `2.0.0rc3` also drops
+the `dev` alias, and mike refuses to deploy a version named `dev` while an
+alias of that name exists (checked locally against mike's current release). So
+the fix PR is the next merge to `main` after the deletion.
 
 **D3 (decided).** Once the version derivation is fixed, a `.dev0`
 push on `main` after 2.0.0, such as `2.0.1.dev0`, would deploy to `2.0`: the
