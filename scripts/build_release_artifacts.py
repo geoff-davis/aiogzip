@@ -17,7 +17,9 @@ match the commit byte for byte; the wheel ships no examples, so its run
 uses the worktree copies.
 
 The build backend and twine are pinned by ``scripts/release-constraints.txt``
-in the commit being built. Requires ``uv`` on PATH and network access to
+in the commit being built. One interpreter (``--python``) runs both the
+isolated build and the smoke venvs; the sdist's hash depends on its version,
+so build with the Python version the publish workflow uses. Requires ``uv`` on PATH and network access to
 install the latest runtime dependencies and the pinned tools.
 """
 
@@ -233,6 +235,11 @@ def build(ref: str, evidence: Path, python: str) -> dict[str, object]:
                     "--sdist",
                     "--build-constraints",
                     str(constraints),
+                    # Pin the build interpreter: tarfile's default gzip level
+                    # differs between Python versions (9 on 3.14, 6 on 3.15),
+                    # so letting uv choose one changes the sdist's hash.
+                    "--python",
+                    python,
                     "--out-dir",
                     str(dist),
                     # The release record names every file in dist, and the
@@ -331,7 +338,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--python",
         default=sys.executable,
-        help="interpreter for the smoke venvs (default: this one)",
+        help="interpreter for the build and the smoke venvs (default: this one)",
     )
     args = parser.parse_args(argv)
     if shutil.which("uv") is None:
