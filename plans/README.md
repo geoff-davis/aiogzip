@@ -15,6 +15,7 @@ is authoritative. It was drawn from two read-only readiness reviews:
 repair gate, and local tests do not establish release readiness.
 
 - [T06 feedback record](reviews/v2.0.0-t06-feedback.md)
+- [T08 release preparation record](reviews/v2.0.0-t08-release-prep.md)
 
 Each release's artifact hashes are recorded under
 [release artifact records](releases/README.md); the publish workflow uploads
