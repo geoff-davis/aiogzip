@@ -57,7 +57,7 @@ timing window is needed.
 | T03 | Stable metadata and wording | See [T03 below](#t03-stable-metadata-and-wording) |
 | T04 | Migration guide and changelog | See [T04 below](#t04-migration-guide-and-changelog) |
 | T05 | Support policy | See [T05 below](#t05-support-policy) |
-| T06 | Feedback | D1's window has passed. Recorded: how feedback was solicited, the public reports received and their dispositions, and representative workload results. Any of these the maintainer waives is recorded as a waiver. |
+| T06 | Feedback | D1's window has passed. Recorded: how feedback was solicited, the public reports received and their dispositions, and representative workload results. Any of these the maintainer waives is recorded as a waiver. Recorded in [`reviews/v2.0.0-t06-feedback.md`](reviews/v2.0.0-t06-feedback.md). |
 | T07 | Plans index | See [T07 below](#t07-plans-index) |
 | T08 | Release preparation and source identity | See [T08 below](#t08-release-preparation-and-source-identity) |
 | T09 | Candidate review and approval | Cross review of the exact candidate by Codex and a fresh Claude subagent; all required hosted checks green at that SHA; the maintainer's explicit approval |
