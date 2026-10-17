@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
   cancelled or failing pull-request run no longer shows as a failure.
 - The custom-source recovery recipe no longer describes its rule as a 2.0.0b2
   change.
+- The README shows a total-downloads badge.
 
 ## [2.0.0] - 2026-10-17
 
