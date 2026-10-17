@@ -1,7 +1,7 @@
 # aiogzip 2.0.0 plan
 
-> **Status:** active since 2026-10-10; T01, T02, T04, T05 and T07 signed
-> off. Development version `2.0.0rc3.dev0`.
+> **Status:** active since 2026-10-10; T01, T02, T04, T05, T06 and T07
+> signed off. Development version `2.0.0rc3.dev0`.
 >
 > **Source:** two read-only readiness reviews of `main` at `3dd9e94`, made
 > after 2.0.0rc2 was published and with PRs #145 and #146 included. One was
@@ -68,7 +68,7 @@ timing window is needed.
 - [ ] T03
 - [x] T04 (signed off 2026-10-10)
 - [x] T05 (signed off 2026-10-10)
-- [ ] T06
+- [x] T06 (signed off 2026-10-17)
 - [x] T07 (signed off 2026-10-10)
 - [ ] T08
 - [ ] T09
