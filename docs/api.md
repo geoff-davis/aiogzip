@@ -61,8 +61,7 @@ The contract is identical across `AsyncGzipBinaryFile`,
 async-iterable compressor, and the synchronous codec. Validation happens
 before file acquisition, external file methods, source iteration, zlib-ng
 warning logic, or codec operation reservation. This contract was tightened
-during the alpha series and is frozen for 2.0; it is not a new beta change or
-a security fix.
+during the alpha series and is frozen for 2.0; it is not a security fix.
 
 For writers, `strict_size=False` preserves gzip's normal modulo-2³² `ISIZE`;
 `strict_size=True` rejects a member crossing that field's range.
@@ -117,7 +116,7 @@ payload = b"".join(decoder.feed(wire)) + b"".join(decoder.finish())
 > **Warning:** Decoder output can precede its trailer. Integrity is established
 > only after the operation returned by `finish()` is exhausted.
 
-The public codec API is beta-frozen for the 2.0 line. See the
+The public codec API is frozen for the 2.0 line. See the
 [stability policy](stability.md) and [synchronous codec guide](codec.md) for
 the compatibility boundary, constructor validation, immutable input
 snapshots, lifecycle hazards, thread safety, and error behavior.

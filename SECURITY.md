@@ -8,9 +8,9 @@ security fixes only, until 2027-04-30; after that date it is unsupported.
 
 | Version line | Supported |
 | --- | --- |
-| Latest 2.0 beta/prerelease | :white_check_mark: |
+| Latest 2.x release | :white_check_mark: |
 | Latest 1.x maintenance release | :white_check_mark: Security fixes only, until 2027-04-30 |
-| Older 2.0 alphas/betas | :x: Upgrade to the latest prerelease |
+| Older 2.x releases and 2.0 prereleases | :x: Upgrade to the latest 2.x release |
 | Older 1.x releases | :x: |
 
 ## Reporting a Vulnerability

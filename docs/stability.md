@@ -1,13 +1,41 @@
 # Stability policy
 
-aiogzip `2.0.0b1` is the first 2.0 beta. Beginning with that release, the
-documented public API is frozen for the 2.0 line: no intentional incompatible
-change is planned before 2.0 stable. Later betas and release candidates may
-contain compatible correctness fixes, documentation and packaging updates,
-and semantics-preserving performance improvements.
+aiogzip 2.0 is a stable release line. Its documented public API, defined
+below, has been frozen since `2.0.0b1`, and aiogzip follows
+[semantic versioning](https://semver.org/) for that API from 2.0.0 on.
 
-Beta is still a prerelease. Test it against your workloads and pin an exact
-version or an appropriate prerelease range until 2.0 stable is available.
+## Versioning
+
+- A **patch release** (2.0.x) contains compatible correctness and security
+  fixes, documentation and packaging updates, and performance improvements
+  that preserve semantics. It adds no public names.
+- A **minor release** (2.x.0) may also add public names and parameters,
+  deprecate public API, and change the supported Python versions as
+  described below. Existing code that uses the public API as documented
+  keeps working.
+- An incompatible change to the public API, including removing a deprecated
+  name, is made only in a new major release.
+
+## Deprecation
+
+Public API is deprecated before it is removed. A deprecation is announced in
+the changelog and the migration documentation and, where the runtime can
+detect the use, emits `DeprecationWarning`. A deprecated name remains
+available for at least one minor release, and is removed no earlier than the
+next major release.
+
+Security or correctness constraints may occasionally require a faster
+response, such as rejecting input that was previously accepted. Such a change
+is documented explicitly in the changelog.
+
+## Python versions
+
+aiogzip 2.0 supports Python 3.11 through 3.15. A new CPython version is
+supported once it is released and the test matrix covers it, which can happen
+in a patch or minor release. Support for a CPython version that has reached
+end of life may be dropped in a minor release, never in a patch release, and
+the package metadata (`requires-python`) changes with it so that installers
+keep selecting the last compatible release.
 
 ## Public API
 
@@ -15,7 +43,7 @@ The canonical public import paths are the top-level `aiogzip` package and the
 `aiogzip.codec` module. The names documented in the [API reference](api.md),
 including the top-level `__all__` and `aiogzip.codec.__all__` inventories, are
 the supported 2.0 surface. The high-level asyncio APIs and the synchronous
-codec receive the same beta compatibility commitment.
+codec receive the same compatibility commitment.
 
 Modules and names beginning with an underscore are private unless a name is
 also re-exported through a documented public path. In particular,
@@ -62,17 +90,12 @@ last of those interpreters, reached end of life on 2026-10-01. Fixes made in
 [security policy](https://github.com/geoff-davis/aiogzip/security/policy) for
 how to report a vulnerability.
 
-## Examples and future changes
+## Examples and reporting
 
 Repository examples are maintained and tested as integration workflows, but
 their helper functions, command-line wording, frame formats, staging layouts,
 and status labels are application code rather than package API. Only the
 public aiogzip names they import receive the compatibility guarantee above.
-
-After 2.0 stable, an unavoidable incompatible change to public API would be
-announced in the changelog and migration documentation and would normally use
-a deprecation period before removal. Security or correctness constraints may
-occasionally require a faster response, which would be documented explicitly.
 
 Report suspected compatibility regressions through the project's
 [issue tracker](https://github.com/geoff-davis/aiogzip/issues). Report security
