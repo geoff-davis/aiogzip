@@ -569,6 +569,39 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deprecation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deprecation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#python-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python versions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#public-api" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -602,10 +635,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#examples-and-future-changes" class="md-nav__link">
+  <a href="#examples-and-reporting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Examples and future changes
+        Examples and reporting
       
     </span>
   </a>
@@ -728,6 +761,39 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deprecation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deprecation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#python-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python versions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#public-api" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -761,10 +827,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#examples-and-future-changes" class="md-nav__link">
+  <a href="#examples-and-reporting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Examples and future changes
+        Examples and reporting
       
     </span>
   </a>
@@ -792,19 +858,43 @@
 
 
 <h1 id="stability-policy">Stability policy</h1>
-<p>aiogzip <code>2.0.0b1</code> is the first 2.0 beta. Beginning with that release, the
-documented public API is frozen for the 2.0 line: no intentional incompatible
-change is planned before 2.0 stable. Later betas and release candidates may
-contain compatible correctness fixes, documentation and packaging updates,
-and semantics-preserving performance improvements.</p>
-<p>Beta is still a prerelease. Test it against your workloads and pin an exact
-version or an appropriate prerelease range until 2.0 stable is available.</p>
+<p>aiogzip 2.0 is a stable release line. Its documented public API, defined
+below, has been frozen since <code>2.0.0b1</code>, and aiogzip follows
+<a href="https://semver.org/">semantic versioning</a> for that API from 2.0.0 on.</p>
+<h2 id="versioning">Versioning</h2>
+<ul>
+<li>A <strong>patch release</strong> (2.0.x) contains compatible correctness and security
+  fixes, documentation and packaging updates, and performance improvements
+  that preserve semantics. It adds no public names.</li>
+<li>A <strong>minor release</strong> (2.x.0) may also add public names and parameters,
+  deprecate public API, and change the supported Python versions as
+  described below. Existing code that uses the public API as documented
+  keeps working.</li>
+<li>An incompatible change to the public API, including removing a deprecated
+  name, is made only in a new major release.</li>
+</ul>
+<h2 id="deprecation">Deprecation</h2>
+<p>Public API is deprecated before it is removed. A deprecation is announced in
+the changelog and the migration documentation and, where the runtime can
+detect the use, emits <code>DeprecationWarning</code>. A deprecated name remains
+available for at least one minor release, and is removed no earlier than the
+next major release.</p>
+<p>Security or correctness constraints may occasionally require a faster
+response, such as rejecting input that was previously accepted. Such a change
+is documented explicitly in the changelog.</p>
+<h2 id="python-versions">Python versions</h2>
+<p>aiogzip 2.0 supports Python 3.11 through 3.15. A new CPython version is
+supported once it is released and the test matrix covers it, which can happen
+in a patch or minor release. Support for a CPython version that has reached
+end of life may be dropped in a minor release, never in a patch release, and
+the package metadata (<code>requires-python</code>) changes with it so that installers
+keep selecting the last compatible release.</p>
 <h2 id="public-api">Public API</h2>
 <p>The canonical public import paths are the top-level <code>aiogzip</code> package and the
 <code>aiogzip.codec</code> module. The names documented in the <a href="../api/">API reference</a>,
 including the top-level <code>__all__</code> and <code>aiogzip.codec.__all__</code> inventories, are
 the supported 2.0 surface. The high-level asyncio APIs and the synchronous
-codec receive the same beta compatibility commitment.</p>
+codec receive the same compatibility commitment.</p>
 <p>Modules and names beginning with an underscore are private unless a name is
 also re-exported through a documented public path. In particular,
 <code>aiogzip._common</code>, <code>aiogzip._binary</code>, <code>aiogzip._text</code>,
@@ -846,15 +936,11 @@ last of those interpreters, reached end of life on 2026-10-01. Fixes made in
 2.0 are not backported to 1.x unless they are security fixes. See the
 <a href="https://github.com/geoff-davis/aiogzip/security/policy">security policy</a> for
 how to report a vulnerability.</p>
-<h2 id="examples-and-future-changes">Examples and future changes</h2>
+<h2 id="examples-and-reporting">Examples and reporting</h2>
 <p>Repository examples are maintained and tested as integration workflows, but
 their helper functions, command-line wording, frame formats, staging layouts,
 and status labels are application code rather than package API. Only the
 public aiogzip names they import receive the compatibility guarantee above.</p>
-<p>After 2.0 stable, an unavoidable incompatible change to public API would be
-announced in the changelog and migration documentation and would normally use
-a deprecation period before removal. Security or correctness constraints may
-occasionally require a faster response, which would be documented explicitly.</p>
 <p>Report suspected compatibility regressions through the project's
 <a href="https://github.com/geoff-davis/aiogzip/issues">issue tracker</a>. Report security
 problems privately as described in the

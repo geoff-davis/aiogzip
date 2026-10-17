@@ -832,7 +832,7 @@ three things change:</p>
 <p>aiogzip 2.0 requires Python 3.11 or newer. On Python 3.8 through 3.10, normal
 dependency resolution continues selecting the newest compatible 1.x release;
 pin <code>aiogzip&lt;2</code> when an explicit upper bound is preferred. Upgrade the
-interpreter before selecting a 2.0 prerelease.</p>
+interpreter before moving to 2.0.</p>
 <table>
 <thead>
 <tr>
@@ -970,8 +970,8 @@ state machine directly:</p>
 operation iterators are lazy and must be exhausted before the next call, and
 decompression integrity is established only after <code>finish()</code> is exhausted.
 See the <a href="../codec/">synchronous codec guide</a> before integrating it.</p>
-<p><code>GzipEncoder</code>, <code>GzipDecoder</code>, and <code>CodecOperation</code> are public and beta-frozen
-for the 2.0 line as of <code>2.0.0b1</code>. The beta remains a prerelease; see the
+<p><code>GzipEncoder</code>, <code>GzipDecoder</code>, and <code>CodecOperation</code> are public and have been
+frozen for the 2.0 line since <code>2.0.0b1</code>. See the
 <a href="../stability/">stability policy</a> for the exact compatibility boundary.</p>
 <p>Next steps: <a href="../examples/">Examples</a> for common tasks,
 <a href="../recipes/">Recipes</a> for streaming patterns, and the
