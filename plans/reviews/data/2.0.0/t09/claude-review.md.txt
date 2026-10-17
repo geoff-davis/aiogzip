@@ -1,0 +1,50 @@
+## T09 independent review of 1013f99c08e5dba0c79cf39690e9214d1470b204 (PR #155)
+
+**Verdict: APPROVED.** No BLOCKER, HIGH, MEDIUM or LOW findings.
+
+### Findings
+
+- **NIT:** `docs/recipes.md:280-281` says "Treat this as a compatibility
+  correction in 2.0.0b2". True as history, but a 1.11 → 2.0 reader does not
+  need b2 framing; the migration guide already covers the rule without it.
+  Optional wording polish, not in `src/`.
+
+### Verified
+
+1. Source freeze: `git diff v2.0.0rc2 1013f99 -- src/` is only `__version__`;
+   `tests/data/public_api_2_0.json` byte-identical to rc2; the manifest check
+   exits 0. Every packaged file changed since rc2 (README.md, SECURITY.md,
+   CHANGELOG.md, docs/api.md, codec.md, index.md, migration.md, stability.md,
+   streaming.md, examples/README.md, scripts/build_release_artifacts.py,
+   scripts/docs_version.py, three test files) reviewed in full; nothing wrong
+   or risky. `plans/` is not packaged.
+2. Metadata (rebuilt wheel METADATA): Version 2.0.0 from flit dynamic
+   `__version__`; Requires-Python >=3.11; only Development Status is
+   5 - Production/Stable; Python 3.11–3.15; aiofiles>=23.2.1, csv
+   aiocsv>=1.2.3, fast zlib-ng>=0.4.0.
+3. CHANGELOG: empty [Unreleased]; [2.0.0] - 2026-10-17 is the first dated
+   heading; links Unreleased → v2.0.0...HEAD, [2.0.0] → v2.0.0rc2...v2.0.0.
+   Spot-checked claims (256 KiB output cap, 6–9% per-call cost, ~20% faster
+   decompress_chunks at a2 (21.5% recorded), tell() probe, no library code
+   changes) against prerelease entries and code: accurate. Migration anchor
+   exists.
+4. Docs wording: remaining beta/prerelease/rc mentions are accurate history
+   or the domain term "provisional output", except the NIT. The 1.x window
+   (security fixes until 2027-04-30) is consistent across README,
+   SECURITY.md, stability.md, migration.md and CHANGELOG.
+5. Release mechanics: publish.yml unchanged since rc2; its SOURCE_DATE_EPOCH
+   derivation gives 1792195200 from 2026-10-17; builds with Python 3.14 and
+   uv 0.9.22, and the build script passes --python to uv build. Docs routing:
+   docs_version.py "2.0.0" → "2.0 stable" → deploy 2.0 with latest, then
+   set-default latest. Live gh-pages versions.json (dev, 2.0, 1.11 latest)
+   avoids mike's alias/version conflict. origin/main b98ead8 is an ancestor
+   of the candidate, so the merge tree equals 1013f99's.
+6. Independent rebuild (uv 0.9.22, Python 3.14.2, epoch 1792195200):
+   wheel 23d6f840…473c and sdist 71282f83…c6b3 match the record;
+   verify_release_artifacts.py verified both; twine check, smokes and
+   examples passed.
+7. Tests: full suite 7385 passed, 2 skipped; version-sync, docs-version and
+   build-release-artifacts tests 32 passed. All PR #155 checks at 1013f99
+   SUCCESS; PR mergeable.
+
+**Verdict: APPROVED**

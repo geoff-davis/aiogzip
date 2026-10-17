@@ -1,0 +1,8 @@
+**APPROVED at 1013f99. No findings.**
+
+- `src/` differs from rc2 only in `__version__`; the public API manifest is identical.
+- Changelog date, empty `[Unreleased]`, comparison links and CLAUDE.md history are correct.
+- Independent rebuild with uv 0.9.22, Python 3.14.2 and epoch `1792195200` reproduced both recorded hashes exactly.
+- Strict Twine checks, both installed-artifact smokes and 68 maintained-example tests per artifact passed; 44 focused repository checks passed.
+- The T08 record matches the verified evidence. Full-suite counts remain implementer-reported.
+- The publish workflow derives the correct epoch from `2026-10-17`; no hash-gate mismatch identified.

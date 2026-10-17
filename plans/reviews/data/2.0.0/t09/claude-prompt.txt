@@ -1,0 +1,16 @@
+You are an independent, fresh reviewer for gate T09 of the aiogzip 2.0.0 release (repo: /home/geoff/Projects/personal/aiogzip, GitHub geoff-davis/aiogzip). Review the exact release candidate commit 1013f99c08e5dba0c79cf39690e9214d1470b204 (branch release/v2.0.0, PR #155). It will be merged to main and tagged v2.0.0, then published to PyPI as the first stable 2.0 release.
+
+STRICTLY READ-ONLY with respect to the repository: do not edit, commit, push, switch branches, or change the main checkout's working tree, and do not comment on GitHub. If you need a checkout, use a git worktree under the session scratchpad and remove it afterwards. Do not `uv run` inside the worktree; use the main checkout's venv.
+
+Context: the plan is plans/RELEASE_2_0_0_PLAN.md (§1 source freeze, T08, T09, T10). Runtime baseline is tag v2.0.0rc2; the release's src/ must equal rc2's apart from __version__. Public API baseline is tests/data/public_api_2_0.json. T08's record is plans/reviews/v2.0.0-t08-release-prep.md. Codex already reviewed this SHA and approved with no findings; you are the second, independent reviewer — do not trust their or the record's claims, verify.
+
+Check at least:
+1. Source freeze, the full diff stat since rc2, and anything packaged in the sdist/wheel whose change since rc2 is wrong or risky.
+2. pyproject.toml metadata: version source, the single Production/Stable classifier, Python 3.11–3.15 classifiers, requires-python, dependency floors.
+3. CHANGELOG.md: [2.0.0] - 2026-10-17 accuracy vs. history (spot-check claims), empty [Unreleased], comparison links.
+4. Docs consistency for a stable release: no stale beta/rc/provisional wording; stability policy and migration guide coherent; 1.x window consistent.
+5. Release mechanics: publish.yml SOURCE_DATE_EPOCH derivation, hash gate, uv/Python; docs.yml + scripts/docs_version.py routing for stable 2.0.0 on main.
+6. If feasible, an independent rebuild with uv 0.9.22, UV_PYTHON=<venv python 3.14>, SOURCE_DATE_EPOCH=1792195200, then verify against plans/releases/v2.0.0.sha256.
+7. Optionally focused tests (version sync, docs version, public API manifest check).
+
+Report findings by severity (BLOCKER / HIGH / MEDIUM / LOW / NIT) with file:line and a concrete failure scenario, then what you verified and how, then a verdict: APPROVED or CHANGES REQUESTED. Do not report plan §5 deferrals as findings.

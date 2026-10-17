@@ -3,12 +3,12 @@
 Release plans, design records, review records and benchmark evidence. Files
 stay at the paths they were committed under; this index is the way in.
 
-## Active: 2.0.0
+## Released: 2.0.0
 
-2.0.0rc2 was published on 2026-10-10; development continues as
-`2.0.0rc3.dev0`. The [2.0.0 plan](RELEASE_2_0_0_PLAN.md) (gates T01–T10)
-takes 2.0.0rc2's source unchanged to a stable release, and its gate register
-is authoritative. It was drawn from two read-only readiness reviews:
+2.0.0 was published on 2026-10-17; development continues as `2.0.1.dev0`.
+The [2.0.0 plan](RELEASE_2_0_0_PLAN.md) (gates T01–T10) took 2.0.0rc2's
+source unchanged to the stable release, and its gate register is
+authoritative. It was drawn from two read-only readiness reviews:
 [Claude Opus 5.5](reviews/data/2.0.0/opus-review.md.txt) and
 [Codex](reviews/data/2.0.0/codex-review.md.txt), with their
 [prompts](reviews/data/2.0.0/). Reproducing a defect does not complete its
@@ -16,6 +16,8 @@ repair gate, and local tests do not establish release readiness.
 
 - [T06 feedback record](reviews/v2.0.0-t06-feedback.md)
 - [T08 release preparation record](reviews/v2.0.0-t08-release-prep.md)
+- [Post-release record](reviews/v2.0.0-post-release.md) (T09 and T10), with
+  the [T09 reviews](reviews/data/2.0.0/t09/)
 
 Each release's artifact hashes are recorded under
 [release artifact records](releases/README.md); the publish workflow uploads
