@@ -1,7 +1,7 @@
 # aiogzip 2.0.0 plan
 
-> **Status:** active since 2026-10-10; T01, T02, T04, T05 and T07 signed
-> off. Development version `2.0.0rc3.dev0`.
+> **Status:** active since 2026-10-10; T01, T02, T04, T05, T06 and T07
+> signed off. Development version `2.0.0rc3.dev0`.
 >
 > **Source:** two read-only readiness reviews of `main` at `3dd9e94`, made
 > after 2.0.0rc2 was published and with PRs #145 and #146 included. One was
@@ -57,7 +57,7 @@ timing window is needed.
 | T03 | Stable metadata and wording | See [T03 below](#t03-stable-metadata-and-wording) |
 | T04 | Migration guide and changelog | See [T04 below](#t04-migration-guide-and-changelog) |
 | T05 | Support policy | See [T05 below](#t05-support-policy) |
-| T06 | Feedback | D1's window has passed. Recorded: how feedback was solicited, the public reports received and their dispositions, and representative workload results. Any of these the maintainer waives is recorded as a waiver. |
+| T06 | Feedback | D1's window has passed. Recorded: how feedback was solicited, the public reports received and their dispositions, and representative workload results. Any of these the maintainer waives is recorded as a waiver. Recorded in [`reviews/v2.0.0-t06-feedback.md`](reviews/v2.0.0-t06-feedback.md). |
 | T07 | Plans index | See [T07 below](#t07-plans-index) |
 | T08 | Release preparation and source identity | See [T08 below](#t08-release-preparation-and-source-identity) |
 | T09 | Candidate review and approval | Cross review of the exact candidate by Codex and a fresh Claude subagent; all required hosted checks green at that SHA; the maintainer's explicit approval |
@@ -68,7 +68,7 @@ timing window is needed.
 - [ ] T03
 - [x] T04 (signed off 2026-10-10)
 - [x] T05 (signed off 2026-10-10)
-- [ ] T06
+- [x] T06 (signed off 2026-10-17)
 - [x] T07 (signed off 2026-10-10)
 - [ ] T08
 - [ ] T09
