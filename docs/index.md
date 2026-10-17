@@ -2,10 +2,12 @@
 
 **An asynchronous library for reading and writing gzip-compressed files.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/aiogzip.svg)](https://pypi.org/project/aiogzip/)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/aiogzip.svg)
+[![Python versions](https://img.shields.io/pypi/pyversions/aiogzip.svg)](https://pypi.org/project/aiogzip/)
+[![Downloads](https://img.shields.io/pepy/dt/aiogzip)](https://pepy.tech/projects/aiogzip)
 [![Tests](https://github.com/geoff-davis/aiogzip/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/geoff-davis/aiogzip/actions/workflows/ci.yml?query=branch%3Amain)
+[![Coverage](https://raw.githubusercontent.com/geoff-davis/aiogzip/python-coverage-comment-action-data/badge.svg)](https://github.com/geoff-davis/aiogzip/tree/python-coverage-comment-action-data)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 `aiogzip` provides a fast, simple, and asyncio-native interface for handling `.gz` files, making it a useful complement to Python's built-in `gzip` module for asynchronous applications.
 
