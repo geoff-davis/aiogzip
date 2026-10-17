@@ -11,7 +11,8 @@ iteration remains faster with synchronous `gzip`. See
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/aiogzip.svg)](https://pypi.org/project/aiogzip/)
 [![Python versions](https://img.shields.io/pypi/pyversions/aiogzip.svg)](https://pypi.org/project/aiogzip/)
-[![Tests](https://github.com/geoff-davis/aiogzip/workflows/Python%20CI/badge.svg)](https://github.com/geoff-davis/aiogzip/actions)
+[![Downloads](https://img.shields.io/pepy/dt/aiogzip)](https://pepy.tech/projects/aiogzip)
+[![Tests](https://github.com/geoff-davis/aiogzip/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/geoff-davis/aiogzip/actions/workflows/ci.yml?query=branch%3Amain)
 [![Coverage](https://raw.githubusercontent.com/geoff-davis/aiogzip/python-coverage-comment-action-data/badge.svg)](https://github.com/geoff-davis/aiogzip/tree/python-coverage-comment-action-data)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://geoff-davis.github.io/aiogzip/)
 

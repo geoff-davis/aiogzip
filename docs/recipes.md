@@ -277,8 +277,8 @@ A successful read does not require a second checkpoint.
 A broken source-read path does not expose buffered data as validation salvage.
 Recover with a successfully completed physical `seek(0)`, or reopen the source
 from the beginning. A non-seekable replay cache cannot recover input that the
-source consumed without returning. Treat this as a compatibility correction in
-2.0.0b2: an `OSError` alone no longer implies that retrying a custom source is safe.
+source consumed without returning. An `OSError` alone does not imply that
+retrying a custom source is safe.
 Do not access a borrowed source concurrently through another owner.
 
 ## Gzip over S3 / fsspec

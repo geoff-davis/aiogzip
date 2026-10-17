@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/aiogzip.svg)](https://pypi.org/project/aiogzip/)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/aiogzip.svg)
-[![Tests](https://github.com/geoff-davis/aiogzip/workflows/Python%20CI/badge.svg)](https://github.com/geoff-davis/aiogzip/actions)
+[![Tests](https://github.com/geoff-davis/aiogzip/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/geoff-davis/aiogzip/actions/workflows/ci.yml?query=branch%3Amain)
 
 `aiogzip` provides a fast, simple, and asyncio-native interface for handling `.gz` files, making it a useful complement to Python's built-in `gzip` module for asynchronous applications.
 
