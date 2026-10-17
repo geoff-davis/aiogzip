@@ -4,8 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-This section becomes the `[2.0.0]` entry when 2.0.0 is released. It
-summarizes the changes from 1.11.0 for users who skipped the 2.0
+## [2.0.0] - 2026-10-17
+
+This entry summarizes the changes from 1.11.0 for users who skipped the 2.0
 prereleases; each prerelease entry below has the details. The
 [migration guide](docs/migration.md#moving-an-existing-aiogzip-application-to-20)
 lists the behavior changes a 1.11 application can meet.
@@ -1176,7 +1177,8 @@ resource after its owner had released it.
 - Normalize iteration errors from `AsyncGzipBinaryFile` to `TypeError`, matching the standard file API.
 - Declare project metadata dynamically via `aiogzip.__version__`, add explicit license info, and tidy packaging configuration.
 
-[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0rc2...HEAD
+[Unreleased]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0rc2...v2.0.0
 [2.0.0rc2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0rc1...v2.0.0rc2
 [2.0.0rc1]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b2...v2.0.0rc1
 [2.0.0b2]: https://github.com/geoff-davis/aiogzip/compare/v2.0.0b1...v2.0.0b2

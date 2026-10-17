@@ -290,15 +290,18 @@ Always include:
   cancellation, text seeks that fail after moving the reader, end-relative
   seeks after `peek()`, `inspect()`/`verify()` settlement and small
   cancellation and cleanup repairs.
-- **2.0.0rc2 (current release)** - Keeps the frozen API and fixes three
+- **2.0.0rc2** - Keeps the frozen API and fixes three
   cases deferred from rc1 (BC16–BC18): a cancelled exit abort that skipped
   the close, an opening cleanup note for a repeated cancellation, and
   Python 3.14's duplicate "exception in shielded future" log. Python 3.15
-  is supported, with a required CI leg. Development continues as
-  `2.0.0rc3.dev0` while the Beta classifier and frozen compatibility
-  contract remain in force.
+  is supported, with a required CI leg.
+- **2.0.0 (current release)** - The first stable 2.0 release. Its `src/`
+  equals 2.0.0rc2's apart from `__version__`. The package is classified
+  Production/Stable, `docs/stability.md` states the semantic-versioning and
+  deprecation policy, and the 1.x line receives security fixes only until
+  2027-04-30.
 
 ---
 
-**Last Updated:** 2026-10-10
+**Last Updated:** 2026-10-17
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
