@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 - The custom-source recovery recipe no longer describes its rule as a 2.0.0b2
   change.
 - The README shows a total-downloads badge.
+- The README and docs home page show their badges in the same order:
+  release, Python versions, downloads, CI, coverage, documentation (README
+  only) and license.
 
 ## [2.0.0] - 2026-10-17
 
