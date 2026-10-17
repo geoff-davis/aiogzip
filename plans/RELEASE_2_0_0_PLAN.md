@@ -1,8 +1,7 @@
 # aiogzip 2.0.0 plan
 
-> **Status:** active since 2026-10-10; T01 through T09 signed off. 2.0.0
-> was published on 2026-10-17; T10 awaits the maintainer's sign-off.
-> Development version `2.0.1.dev0`.
+> **Status:** complete. Active from 2026-10-10; every gate signed off.
+> 2.0.0 was published on 2026-10-17. Development version `2.0.1.dev0`.
 >
 > **Source:** two read-only readiness reviews of `main` at `3dd9e94`, made
 > after 2.0.0rc2 was published and with PRs #145 and #146 included. One was
@@ -73,7 +72,7 @@ timing window is needed.
 - [x] T07 (signed off 2026-10-10)
 - [x] T08 (signed off 2026-10-17)
 - [x] T09 (approved 2026-10-17)
-- [ ] T10
+- [x] T10 (signed off 2026-10-17)
 
 ## 4. Gate details
 
