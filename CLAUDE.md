@@ -202,6 +202,9 @@ promoted for 2.0.0rc2. Switch it to setup-python once that offers 3.15.0.
 The informational `python-preview` job that ran 3.15 pre-releases was
 removed at the promotion; re-add one for 3.16 when setup-python offers its
 pre-releases (not a required check, `continue-on-error`, no classifier).
+The README and docs home page show the supported range as a static badge
+(`python-3.11–3.15`); when a version is added or dropped, update it with the
+classifiers. `tests/test_version_sync.py` fails until they agree.
 
 `main` has branch protection requiring every CI job (lint, all build matrix
 legs, fast-engine — not coverage-comment), and repo auto-merge is enabled:
