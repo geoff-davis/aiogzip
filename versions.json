@@ -6,14 +6,14 @@
   },
   {
     "version": "2.0",
-    "title": "2.0.0rc2",
-    "aliases": []
+    "title": "2.0.0",
+    "aliases": [
+      "latest"
+    ]
   },
   {
     "version": "1.11",
     "title": "1.11.0",
-    "aliases": [
-      "latest"
-    ]
+    "aliases": []
   }
 ]
