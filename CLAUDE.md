@@ -299,7 +299,7 @@ Always include:
   equals 2.0.0rc2's apart from `__version__`. The package is classified
   Production/Stable, `docs/stability.md` states the semantic-versioning and
   deprecation policy, and the 1.x line receives security fixes only until
-  2027-04-30.
+  2027-04-30. Development continues as `2.0.1.dev0`.
 
 ---
 

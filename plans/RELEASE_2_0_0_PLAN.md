@@ -1,7 +1,8 @@
 # aiogzip 2.0.0 plan
 
-> **Status:** active since 2026-10-10; T01 through T07 signed off. The
-> release candidate for T08 sets the version to `2.0.0`.
+> **Status:** active since 2026-10-10; T01 through T09 signed off. 2.0.0
+> was published on 2026-10-17; T10 awaits the maintainer's sign-off.
+> Development version `2.0.1.dev0`.
 >
 > **Source:** two read-only readiness reviews of `main` at `3dd9e94`, made
 > after 2.0.0rc2 was published and with PRs #145 and #146 included. One was
@@ -60,8 +61,8 @@ timing window is needed.
 | T06 | Feedback | D1's window has passed. Recorded: how feedback was solicited, the public reports received and their dispositions, and representative workload results. Any of these the maintainer waives is recorded as a waiver. Recorded in [`reviews/v2.0.0-t06-feedback.md`](reviews/v2.0.0-t06-feedback.md). |
 | T07 | Plans index | See [T07 below](#t07-plans-index) |
 | T08 | Release preparation and source identity | See [T08 below](#t08-release-preparation-and-source-identity). Recorded in [`reviews/v2.0.0-t08-release-prep.md`](reviews/v2.0.0-t08-release-prep.md). |
-| T09 | Candidate review and approval | Cross review of the exact candidate by Codex and a fresh Claude subagent; all required hosted checks green at that SHA; the maintainer's explicit approval |
-| T10 | Publication | See [T10 below](#t10-publication) |
+| T09 | Candidate review and approval | Cross review of the exact candidate by Codex and a fresh Claude subagent; all required hosted checks green at that SHA; the maintainer's explicit approval. Recorded in [`reviews/v2.0.0-post-release.md`](reviews/v2.0.0-post-release.md). |
+| T10 | Publication | See [T10 below](#t10-publication). Recorded in [`reviews/v2.0.0-post-release.md`](reviews/v2.0.0-post-release.md). |
 
 - [x] T01 (signed off 2026-10-10)
 - [x] T02 (signed off 2026-10-10)
@@ -70,8 +71,8 @@ timing window is needed.
 - [x] T05 (signed off 2026-10-10)
 - [x] T06 (signed off 2026-10-17)
 - [x] T07 (signed off 2026-10-10)
-- [ ] T08
-- [ ] T09
+- [x] T08 (signed off 2026-10-17)
+- [x] T09 (approved 2026-10-17)
 - [ ] T10
 
 ## 4. Gate details
