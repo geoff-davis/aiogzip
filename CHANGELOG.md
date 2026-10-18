@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
   only) and license.
 - The Python badge shows the supported range, `3.11–3.15`, instead of listing
   each version. A test keeps it in step with the package classifiers.
+- A root `CONTRIBUTING.md` and an expanded contributing guide cover forking,
+  uv-based setup, the commit and changelog conventions, the rules for API and
+  behavior changes, and how pull requests are reviewed and tested.
+- README links to documentation pages now name a docs version (`latest`, or
+  `dev` for the contributing guide). The unversioned links returned 404,
+  including on the PyPI project page; a test now rejects them.
 
 ## [2.0.0] - 2026-10-17
 
