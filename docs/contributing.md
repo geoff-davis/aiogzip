@@ -7,50 +7,138 @@ maintenance branch retains compatibility with older supported interpreters.
 
 ## Development Setup
 
-1. **Clone the repository**:
+1. **Fork and clone the repository**:
+
+    Fork [geoff-davis/aiogzip](https://github.com/geoff-davis/aiogzip) on
+    GitHub, then clone your fork and add the main repository as `upstream`:
 
     ```bash
-    git clone https://github.com/geoff-davis/aiogzip.git
+    git clone https://github.com/<your-username>/aiogzip.git
     cd aiogzip
+    git remote add upstream https://github.com/geoff-davis/aiogzip.git
     ```
 
 2. **Install dependencies**:
 
-    We recommend using a virtual environment.
+    The project uses [uv](https://docs.astral.sh/uv/), and `uv.lock` pins the
+    development tools so every contributor runs the same versions:
 
     ```bash
-    python -m venv .venv
-    source .venv/bin/activate
-    pip install -e ".[dev,csv,docs]"
+    uv sync --all-extras
     ```
 
-3. **Install Pre-commit Hooks**:
+    Prefix commands with `uv run` (for example `uv run pytest`), or activate
+    `.venv`. Without uv, `pip install -e ".[dev,csv,fast,docs]"` in a virtual
+    environment also works, but resolves unpinned tool versions.
 
-    This project uses `prek` (a drop-in replacement for `pre-commit`) to
-    ensure code quality.
+3. **Install the Git hooks**:
+
+    This project uses `prek` (a drop-in replacement for `pre-commit`). It
+    runs ruff, mypy, ty and markdownlint on each commit:
 
     ```bash
-    prek install
+    uv run prek install
     ```
+
+    Two hooks may surprise you. `no-commit-to-branch` refuses commits made
+    directly on `main`, so work on a branch. The pre-push hook
+    `check-branch-fresh` refuses a push when your branch is missing commits
+    from `origin/main`; rebase onto it, as the message suggests.
+
+    In a fork, `origin` is your fork, so also keep your branch current with
+    the main repository: `git fetch upstream && git rebase upstream/main`.
 
 ## Running Tests
 
 Run the full test suite using `pytest`:
 
 ```bash
-pytest
+uv run pytest
 ```
+
+The suite has more than 7,000 tests and takes a couple of minutes. While
+iterating, run the module you are working on, for example
+`uv run pytest tests/test_inspection.py`, then the full suite before opening
+a pull request.
 
 ## Code Quality
 
 We use `ruff` for linting and formatting, and both `mypy` and `ty` for static type checking. These are run automatically by prek, but you can run them manually:
 
 ```bash
-ruff check .
-ruff format .
-mypy src
-ty check src
+uv run prek run --all-files   # everything the hooks run
+uv run ruff check .
+uv run ruff format .
+uv run mypy src
+uv run ty check src
 ```
+
+## Making a Change
+
+### Before you start
+
+- Issues labeled
+  [good first issue](https://github.com/geoff-davis/aiogzip/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+  are small, self-contained starting points.
+- Comment on an issue before starting so that it can be assigned to you and
+  two people do not work on the same thing. For anything larger than a small
+  fix, describe your approach first.
+- Report security problems privately as described in the
+  [security policy](https://github.com/geoff-davis/aiogzip/security/policy),
+  not in a public issue.
+
+### Rules that shape a change
+
+- **The public API is stable.** aiogzip 2.0 follows the
+  [stability policy](stability.md). Public signatures, exception types and
+  documented behavior do not change in a patch release; new public names wait
+  for a minor release. Discuss any API change in an issue first.
+- **Behavior changes need a record.** The file handles' lifecycle,
+  cancellation, ownership and recovery rules are specified in
+  [`plans/design/v2.0.0b2-file-state-model.md`](https://github.com/geoff-davis/aiogzip/blob/main/plans/design/v2.0.0b2-file-state-model.md),
+  and every approved behavior difference is listed in the
+  [behavior-exception ledger](https://github.com/geoff-davis/aiogzip/blob/main/plans/reviews/v2.0.0b2-behavior-exceptions.md).
+  Read both before changing `_binary.py`, `_text.py` or `_source_io.py`. A
+  change to observable behavior there needs a model or ledger update, not just
+  an edited test.
+- **Keep gzip logic in the codec.** See [Package Layout](#package-layout)
+  below.
+- **Test what you change.** Add or update tests for any behavior change or
+  bug fix. Tests that write arbitrary text and expect a byte-exact round trip
+  must pass `newline=""`; otherwise the default newline translation breaks
+  them on Windows CI.
+
+### Commits and the changelog
+
+Use conventional commit titles, with a short body explaining why:
+
+```text
+Fix: Short description of the change
+
+What changed and why.
+
+Fixes: #123
+```
+
+Common prefixes are `Fix:`, `Add:` and `Update:`. Add an entry under
+`[Unreleased]` in `CHANGELOG.md` for any user-visible change, in the section
+that fits (Added, Changed, Fixed, Documentation, and so on). Internal changes
+such as a docstring, a test or a refactor need no entry.
+
+### Opening the pull request
+
+1. Push your branch to your fork and open a pull request against `main`.
+2. Write "Fixes #123" in the description so that the issue closes when the
+   pull request merges, and summarize what you changed and how you tested it.
+3. Keep each pull request to one concern; separate fixes are easier to review
+   as separate pull requests.
+
+GitHub Actions does not run automatically for a first-time contributor's pull
+request; a maintainer approves the run. CI then runs the suite on Python
+3.11 through 3.15 on Linux and on selected versions on Windows and macOS, with
+and without the optional zlib-ng engine, and checks linting, the
+documentation build, the minimum dependency versions and the installed
+artifacts. Every required check must pass before a pull request can merge.
 
 ## Performance-Sensitive Changes
 
@@ -137,7 +225,7 @@ When adding new internals, prefer one of the focused modules and keep
 To build the documentation locally:
 
 ```bash
-mkdocs serve
+uv run mkdocs serve
 ```
 
 Then open [http://localhost:8000](http://localhost:8000) in your browser.
