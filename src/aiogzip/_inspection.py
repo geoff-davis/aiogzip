@@ -34,10 +34,10 @@ _ReadFileObj = Optional[Union[WithAsyncRead, WithAsyncReadWrite]]
 async def _read_native(source: Any, size: int) -> Any:
     """Read a native aiofiles source; a cancelled read settles before it raises.
 
-    Cleanup must never close a source still being read. Unlike
-    ``_initial_call``, a successful read awaits the executor directly, with no
-    shield; only a cancellation pays for settlement, which also stops a read
-    the worker has not yet entered from touching the source at all.
+    Cleanup must never close a source still being read. A successful read
+    awaits the executor directly; only a cancellation pays for settlement,
+    which also stops a read the worker has not yet entered from touching the
+    source at all.
     """
     loop = asyncio.get_running_loop()
     if source._loop is not loop:
