@@ -14,6 +14,8 @@ All notable changes to this project will be documented in this file.
 - The README and docs home page show their badges in the same order:
   release, Python versions, downloads, CI, coverage, documentation (README
   only) and license.
+- The Python badge shows the supported range, `3.11–3.15`, instead of listing
+  each version. A test keeps it in step with the package classifiers.
 
 ## [2.0.0] - 2026-10-17
 

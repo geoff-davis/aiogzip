@@ -97,6 +97,42 @@ def test_release_metadata_is_synchronized():
     )
 
 
+def test_python_badge_matches_classifiers():
+    """The README and docs Python badge must show the classifier range.
+
+    The badge is static so that it reads as a range, so adding or dropping a
+    Python version means updating it alongside the classifiers.
+    """
+    root = Path(__file__).resolve().parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]
+    minors = sorted(
+        int(match.group(1))
+        for classifier in project["classifiers"]
+        if (
+            match := re.fullmatch(
+                r"Programming Language :: Python :: 3\.(\d+)", classifier
+            )
+        )
+    )
+    assert minors, "no Python 3.x classifiers"
+    assert minors == list(range(minors[0], minors[-1] + 1)), (
+        "Python classifiers must form a contiguous range"
+    )
+    assert project["requires-python"] == f">=3.{minors[0]}"
+
+    badge = (
+        f"https://img.shields.io/badge/python-3.{minors[0]}%E2%80%933.{minors[-1]}-blue"
+    )
+    for page in ("README.md", "docs/index.md"):
+        text = (root / page).read_text(encoding="utf-8")
+        assert badge in text, f"{page} Python badge does not show {badge}"
+        assert "img.shields.io/pypi/pyversions" not in text, (
+            f"{page} still uses the per-version pyversions badge"
+        )
+
+
 def test_minimum_runtime_dependencies_are_synchronized():
     """Metadata, the assertion script, and CI must use the proven floors."""
     root = Path(__file__).resolve().parents[1]
