@@ -25,7 +25,7 @@ pip install aiogzip
 aiogzip 2.0 requires Python 3.11 or newer. Python 3.8 through 3.10 users should
 remain on the latest compatible 1.x release, which receives security fixes
 until 2027-04-30. See the
-[stability policy](https://geoff-davis.github.io/aiogzip/stability/) for the
+[stability policy](https://geoff-davis.github.io/aiogzip/latest/stability/) for the
 2.0 compatibility guarantees and non-guarantees.
 
 ## Text-mode quickstart
@@ -80,7 +80,7 @@ async for data in aiogzip.compress_chunks(raw_source(), mtime=0):
 Complete decompression integrity validation occurs only if the iterator is
 consumed to the end. Compression output is incomplete if its source fails or
 the consumer exits early. See the
-[async-iterable streaming guide](https://geoff-davis.github.io/aiogzip/streaming/)
+[async-iterable streaming guide](https://geoff-davis.github.io/aiogzip/latest/streaming/)
 for backpressure, limits, cancellation, metadata, and lifecycle behavior.
 
 For synchronous custom transports, the public 2.0 codec performs gzip framing
@@ -102,10 +102,10 @@ payload = b"".join(decoder.feed(wire)) + b"".join(decoder.finish())
 Every returned `CodecOperation` must be exhausted before the next codec call;
 its idempotent `close()` method handles deterministic early abandonment.
 Decoder integrity is established only after `finish()` is exhausted.
-See the [synchronous codec guide](https://geoff-davis.github.io/aiogzip/codec/)
+See the [synchronous codec guide](https://geoff-davis.github.io/aiogzip/latest/codec/)
 for ownership, limits, immutable inputs, and thread-safety details.
 
-See the [recipes](https://geoff-davis.github.io/aiogzip/recipes/) for JSON
+See the [recipes](https://geoff-davis.github.io/aiogzip/latest/recipes/) for JSON
 Lines, untrusted input, reproducible output, append mode, seeking,
 cancellation recovery, and external async streams.
 
@@ -290,7 +290,7 @@ print(aiogzip.engine_info())
 ```
 
 The engine names are informational, not a stable machine-readable interface.
-See the [performance guide](https://geoff-davis.github.io/aiogzip/performance/)
+See the [performance guide](https://geoff-davis.github.io/aiogzip/latest/performance/)
 for benchmarks and tuning guidance.
 
 ## Development and contributing
@@ -299,5 +299,5 @@ The 1.x line is the last to support Python 3.8 through 3.10. aiogzip 2.0
 requires Python 3.11+. Older interpreters continue to resolve the latest
 compatible 1.x release from PyPI.
 
-See the [contributing guide](https://geoff-davis.github.io/aiogzip/contributing/)
+See the [contributing guide](https://geoff-davis.github.io/aiogzip/dev/contributing/)
 for setup, tests, linting, typing, documentation, and benchmark workflows.

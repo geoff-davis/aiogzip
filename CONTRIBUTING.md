@@ -1,7 +1,7 @@
 # Contributing to aiogzip
 
 Thanks for your interest in contributing. The full guide is the
-[contributing page](https://geoff-davis.github.io/aiogzip/contributing/) in
+[contributing page](https://geoff-davis.github.io/aiogzip/dev/contributing/) in
 the documentation, kept in this repository as
 [`docs/contributing.md`](docs/contributing.md). It covers setup, tests,
 code quality, the rules for behavior changes, benchmarks and the package

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -54,3 +55,19 @@ def test_workflow_routes_main_dev_builds_to_dev():
     assert "scripts/docs_version.py" in workflow
     assert '"${VERSION%.*}"' not in workflow
     assert 'mike deploy --push --title "$VERSION" dev' in workflow
+
+
+def test_repository_docs_links_name_a_docs_version():
+    """mike serves pages only beneath a version, so /aiogzip/<page>/ is a 404.
+
+    Only the site root redirects (to ``latest``); every deeper link from the
+    README (also the PyPI page) or CONTRIBUTING.md must name ``latest`` or
+    ``dev``.
+    """
+    link = re.compile(r"https://geoff-davis\.github\.io/aiogzip/([^\s)\"'>]*)")
+    for page in ("README.md", "CONTRIBUTING.md"):
+        text = (ROOT / page).read_text(encoding="utf-8")
+        for path in link.findall(text):
+            assert path == "" or path.startswith(("latest/", "dev/")), (
+                f"{page} links to unversioned docs path /aiogzip/{path}"
+            )

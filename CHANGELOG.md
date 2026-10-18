@@ -19,6 +19,9 @@ All notable changes to this project will be documented in this file.
 - A root `CONTRIBUTING.md` and an expanded contributing guide cover forking,
   uv-based setup, the commit and changelog conventions, the rules for API and
   behavior changes, and how pull requests are reviewed and tested.
+- README links to documentation pages now name a docs version (`latest`, or
+  `dev` for the contributing guide). The unversioned links returned 404,
+  including on the PyPI project page; a test now rejects them.
 
 ## [2.0.0] - 2026-10-17
 
