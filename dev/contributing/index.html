@@ -681,6 +681,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#making-a-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Making a Change
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Making a Change">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rules-that-shape-a-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rules that shape a change
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commits-and-the-changelog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commits and the changelog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opening-the-pull-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opening the pull request
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#performance-sensitive-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -798,6 +859,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#making-a-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Making a Change
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Making a Change">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rules-that-shape-a-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rules that shape a change
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commits-and-the-changelog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commits and the changelog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opening-the-pull-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opening the pull request
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#performance-sensitive-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -874,59 +996,135 @@ maintenance branch retains compatibility with older supported interpreters.</p>
 <h2 id="development-setup">Development Setup</h2>
 <ol>
 <li>
-<p><strong>Clone the repository</strong>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/geoff-davis/aiogzip.git
+<p><strong>Fork and clone the repository</strong>:</p>
+<p>Fork <a href="https://github.com/geoff-davis/aiogzip">geoff-davis/aiogzip</a> on
+GitHub, then clone your fork and add the main repository as <code>upstream</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/&lt;your-username&gt;/aiogzip.git
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>aiogzip
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>git<span class="w"> </span>remote<span class="w"> </span>add<span class="w"> </span>upstream<span class="w"> </span>https://github.com/geoff-davis/aiogzip.git
 </code></pre></div>
 </li>
 <li>
 <p><strong>Install dependencies</strong>:</p>
-<p>We recommend using a virtual environment.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[dev,csv,docs]"</span>
+<p>The project uses <a href="https://docs.astral.sh/uv/">uv</a>, and <code>uv.lock</code> pins the
+development tools so every contributor runs the same versions:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--all-extras
 </code></pre></div>
+<p>Prefix commands with <code>uv run</code> (for example <code>uv run pytest</code>), or activate
+<code>.venv</code>. Without uv, <code>pip install -e ".[dev,csv,fast,docs]"</code> in a virtual
+environment also works, but resolves unpinned tool versions.</p>
 </li>
 <li>
-<p><strong>Install Pre-commit Hooks</strong>:</p>
-<p>This project uses <code>prek</code> (a drop-in replacement for <code>pre-commit</code>) to
-ensure code quality.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>prek<span class="w"> </span>install
+<p><strong>Install the Git hooks</strong>:</p>
+<p>This project uses <code>prek</code> (a drop-in replacement for <code>pre-commit</code>). It
+runs ruff, mypy, ty and markdownlint on each commit:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>prek<span class="w"> </span>install
 </code></pre></div>
+<p>Two hooks may surprise you. <code>no-commit-to-branch</code> refuses commits made
+directly on <code>main</code>, so work on a branch. The pre-push hook
+<code>check-branch-fresh</code> refuses a push when your branch is missing commits
+from <code>origin/main</code>; rebase onto it, as the message suggests.</p>
+<p>In a fork, <code>origin</code> is your fork, so also keep your branch current with
+the main repository: <code>git fetch upstream &amp;&amp; git rebase upstream/main</code>.</p>
 </li>
 </ol>
 <h2 id="running-tests">Running Tests</h2>
 <p>Run the full test suite using <code>pytest</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pytest
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest
 </code></pre></div>
+<p>The suite has more than 7,000 tests and takes a couple of minutes. While
+iterating, run the module you are working on, for example
+<code>uv run pytest tests/test_inspection.py</code>, then the full suite before opening
+a pull request.</p>
 <h2 id="code-quality">Code Quality</h2>
 <p>We use <code>ruff</code> for linting and formatting, and both <code>mypy</code> and <code>ty</code> for static type checking. These are run automatically by prek, but you can run them manually:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ruff<span class="w"> </span>check<span class="w"> </span>.
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ruff<span class="w"> </span>format<span class="w"> </span>.
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>mypy<span class="w"> </span>src
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>ty<span class="w"> </span>check<span class="w"> </span>src
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>prek<span class="w"> </span>run<span class="w"> </span>--all-files<span class="w">   </span><span class="c1"># everything the hooks run</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>check<span class="w"> </span>.
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>.
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>uv<span class="w"> </span>run<span class="w"> </span>mypy<span class="w"> </span>src
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>uv<span class="w"> </span>run<span class="w"> </span>ty<span class="w"> </span>check<span class="w"> </span>src
 </code></pre></div>
+<h2 id="making-a-change">Making a Change</h2>
+<h3 id="before-you-start">Before you start</h3>
+<ul>
+<li>Issues labeled
+  <a href="https://github.com/geoff-davis/aiogzip/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">good first issue</a>
+  are small, self-contained starting points.</li>
+<li>Comment on an issue before starting so that it can be assigned to you and
+  two people do not work on the same thing. For anything larger than a small
+  fix, describe your approach first.</li>
+<li>Report security problems privately as described in the
+  <a href="https://github.com/geoff-davis/aiogzip/security/policy">security policy</a>,
+  not in a public issue.</li>
+</ul>
+<h3 id="rules-that-shape-a-change">Rules that shape a change</h3>
+<ul>
+<li><strong>The public API is stable.</strong> aiogzip 2.0 follows the
+  <a href="../stability/">stability policy</a>. Public signatures, exception types and
+  documented behavior do not change in a patch release; new public names wait
+  for a minor release. Discuss any API change in an issue first.</li>
+<li><strong>Behavior changes need a record.</strong> The file handles' lifecycle,
+  cancellation, ownership and recovery rules are specified in
+  <a href="https://github.com/geoff-davis/aiogzip/blob/main/plans/design/v2.0.0b2-file-state-model.md"><code>plans/design/v2.0.0b2-file-state-model.md</code></a>,
+  and every approved behavior difference is listed in the
+  <a href="https://github.com/geoff-davis/aiogzip/blob/main/plans/reviews/v2.0.0b2-behavior-exceptions.md">behavior-exception ledger</a>.
+  Read both before changing <code>_binary.py</code>, <code>_text.py</code> or <code>_source_io.py</code>. A
+  change to observable behavior there needs a model or ledger update, not just
+  an edited test.</li>
+<li><strong>Keep gzip logic in the codec.</strong> See <a href="#package-layout">Package Layout</a>
+  below.</li>
+<li><strong>Test what you change.</strong> Add or update tests for any behavior change or
+  bug fix. Tests that write arbitrary text and expect a byte-exact round trip
+  must pass <code>newline=""</code>; otherwise the default newline translation breaks
+  them on Windows CI.</li>
+</ul>
+<h3 id="commits-and-the-changelog">Commits and the changelog</h3>
+<p>Use conventional commit titles, with a short body explaining why:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Fix: Short description of the change
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>What changed and why.
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>Fixes: #123
+</code></pre></div>
+<p>Common prefixes are <code>Fix:</code>, <code>Add:</code> and <code>Update:</code>. Add an entry under
+<code>[Unreleased]</code> in <code>CHANGELOG.md</code> for any user-visible change, in the section
+that fits (Added, Changed, Fixed, Documentation, and so on). Internal changes
+such as a docstring, a test or a refactor need no entry.</p>
+<h3 id="opening-the-pull-request">Opening the pull request</h3>
+<ol>
+<li>Push your branch to your fork and open a pull request against <code>main</code>.</li>
+<li>Write "Fixes #123" in the description so that the issue closes when the
+   pull request merges, and summarize what you changed and how you tested it.</li>
+<li>Keep each pull request to one concern; separate fixes are easier to review
+   as separate pull requests.</li>
+</ol>
+<p>GitHub Actions does not run automatically for a first-time contributor's pull
+request; a maintainer approves the run. CI then runs the suite on Python
+3.11 through 3.15 on Linux and on selected versions on Windows and macOS, with
+and without the optional zlib-ng engine, and checks linting, the
+documentation build, the minimum dependency versions and the installed
+artifacts. Every required check must pass before a pull request can merge.</p>
 <h2 id="performance-sensitive-changes">Performance-Sensitive Changes</h2>
 <p>Capture benchmark results before changing codec calls, buffering, text
 decoding, line iteration, executor offloading, or parser hot paths. Comparable
 captures require clean committed source roots; use the current checkout's venv
 and runner for both worktrees so Python, engine, filesystem, data, and repeat
 count stay fixed:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>worktree<span class="w"> </span>add<span class="w"> </span>/tmp/aiogzip-before<span class="w"> </span>&lt;baseline-commit&gt;
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>git<span class="w"> </span>worktree<span class="w"> </span>add<span class="w"> </span>/tmp/aiogzip-after<span class="w"> </span>&lt;candidate-commit&gt;
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>benchmarks/run_benchmarks.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--category<span class="w"> </span>io,scenarios,concurrency<span class="w"> </span>--size<span class="w"> </span><span class="m">8</span><span class="w"> </span>--repeat<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span>--engine<span class="w"> </span>stdlib<span class="w"> </span>--source-root<span class="w"> </span>/tmp/aiogzip-before<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span>--output<span class="w"> </span>/tmp/aiogzip-before.json
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>benchmarks/run_benchmarks.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span>--category<span class="w"> </span>io,scenarios,concurrency<span class="w"> </span>--size<span class="w"> </span><span class="m">8</span><span class="w"> </span>--repeat<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">  </span>--engine<span class="w"> </span>stdlib<span class="w"> </span>--source-root<span class="w"> </span>/tmp/aiogzip-after<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">  </span>--output<span class="w"> </span>/tmp/aiogzip-after.json
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>benchmarks/bench_compare.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">  </span>/tmp/aiogzip-before.json<span class="w"> </span>/tmp/aiogzip-after.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git<span class="w"> </span>worktree<span class="w"> </span>add<span class="w"> </span>/tmp/aiogzip-before<span class="w"> </span>&lt;baseline-commit&gt;
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>git<span class="w"> </span>worktree<span class="w"> </span>add<span class="w"> </span>/tmp/aiogzip-after<span class="w"> </span>&lt;candidate-commit&gt;
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>benchmarks/run_benchmarks.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>--category<span class="w"> </span>io,scenarios,concurrency<span class="w"> </span>--size<span class="w"> </span><span class="m">8</span><span class="w"> </span>--repeat<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span>--engine<span class="w"> </span>stdlib<span class="w"> </span>--source-root<span class="w"> </span>/tmp/aiogzip-before<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span>--output<span class="w"> </span>/tmp/aiogzip-before.json
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>benchmarks/run_benchmarks.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span>--category<span class="w"> </span>io,scenarios,concurrency<span class="w"> </span>--size<span class="w"> </span><span class="m">8</span><span class="w"> </span>--repeat<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span>--engine<span class="w"> </span>stdlib<span class="w"> </span>--source-root<span class="w"> </span>/tmp/aiogzip-after<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">  </span>--output<span class="w"> </span>/tmp/aiogzip-after.json
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>benchmarks/bench_compare.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="w">  </span>/tmp/aiogzip-before.json<span class="w"> </span>/tmp/aiogzip-after.json
 </code></pre></div>
 <p>Repeat with <code>--engine zlib-ng</code> when zlib-ng may be affected. Captures made
 without <code>--source-root</code> are exploratory and the comparator rejects them by
@@ -1035,7 +1233,7 @@ on the <code>1.x</code> maintenance branch.</p>
 <code>__init__.py</code> as the stable public API surface.</p>
 <h2 id="documentation">Documentation</h2>
 <p>To build the documentation locally:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>mkdocs<span class="w"> </span>serve
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uv<span class="w"> </span>run<span class="w"> </span>mkdocs<span class="w"> </span>serve
 </code></pre></div>
 <p>Then open <a href="http://localhost:8000">http://localhost:8000</a> in your browser.</p>
 
