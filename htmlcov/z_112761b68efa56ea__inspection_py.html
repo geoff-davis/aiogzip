@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_112761b68efa56ea__metadata_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-18 00:49 +0000
+            created at 2026-10-18 16:57 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -118,10 +118,10 @@
     <p class="run"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t"><span class="key">async</span> <span class="key">def</span> <span class="nam">_read_native</span><span class="op">(</span><span class="nam">source</span><span class="op">:</span> <span class="nam">Any</span><span class="op">,</span> <span class="nam">size</span><span class="op">:</span> <span class="nam">int</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">Any</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Read a native aiofiles source; a cancelled read settles before it raises.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t36" href="#t36">36</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t"><span class="str">    Cleanup must never close a source still being read. Unlike</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t38" href="#t38">38</a></span><span class="t"><span class="str">    ``_initial_call``, a successful read awaits the executor directly, with no</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t39" href="#t39">39</a></span><span class="t"><span class="str">    shield; only a cancellation pays for settlement, which also stops a read</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t40" href="#t40">40</a></span><span class="t"><span class="str">    the worker has not yet entered from touching the source at all.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t"><span class="str">    Cleanup must never close a source still being read. A successful read</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t38" href="#t38">38</a></span><span class="t"><span class="str">    awaits the executor directly; only a cancellation pays for settlement,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t39" href="#t39">39</a></span><span class="t"><span class="str">    which also stops a read the worker has not yet entered from touching the</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t40" href="#t40">40</a></span><span class="t"><span class="str">    source at all.</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t41" href="#t41">41</a></span><span class="t"><span class="str">    &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t42" href="#t42">42</a></span><span class="t">    <span class="nam">loop</span> <span class="op">=</span> <span class="nam">asyncio</span><span class="op">.</span><span class="nam">get_running_loop</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t43" href="#t43">43</a></span><span class="t">    <span class="key">if</span> <span class="nam">source</span><span class="op">.</span><span class="nam">_loop</span> <span class="key">is</span> <span class="key">not</span> <span class="nam">loop</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -255,7 +255,7 @@
             <a class="nav" href="z_112761b68efa56ea__metadata_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-18 00:49 +0000
+            created at 2026-10-18 16:57 +0000
         </p>
     </div>
 </footer>
