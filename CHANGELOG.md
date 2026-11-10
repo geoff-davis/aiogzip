@@ -20,6 +20,11 @@ All notable changes to this project will be documented in this file.
 - `seek()` raises `TypeError` for a non-integer offset and leaves the position
   unchanged. A read-mode binary handle accepted a `float`, after which every
   read failed until `seek(0)`. (#177)
+- `compress_chunks()` and `decompress_chunks()` no longer lose a cancellation
+  or timeout that arrives while they close the source after a failure or an
+  early `aclose()`. The cancellation propagates with the stream failure as
+  its context, as `verify()` already did. Another error raised by that close
+  is now recorded as a note on the stream failure. (#173)
 
 ### Documentation
 

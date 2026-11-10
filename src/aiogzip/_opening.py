@@ -1,7 +1,7 @@
 """Private acquisition and initialization settlement; no published handle state."""
 
 import asyncio
-from typing import Any, cast
+from typing import Any, Tuple, Type, cast
 
 import aiofiles
 import aiofiles.threadpool
@@ -27,6 +27,27 @@ def _note_cleanup_failure(
             return
         cleanup = cause
     failure.add_note(f"{what} cleanup also failed: {cleanup!r}")
+
+
+def _settle_cleanup_failure(
+    failure: BaseException,
+    cleanup: BaseException,
+    what: str,
+    *,
+    outranked: Tuple[Type[BaseException], ...] = (Exception,),
+) -> None:
+    """Decide between a primary failure and a failure of its cleanup.
+
+    An outside cancellation or interrupt raised by cleanup outranks an
+    ``outranked`` primary failure, which stays its context. Otherwise the
+    primary failure is kept and the cleanup failure noted on it. Call this
+    while handling ``cleanup``; returning means the primary failure stands.
+    """
+    if isinstance(failure, outranked) and not isinstance(cleanup, Exception):
+        if cleanup.__context__ is None:
+            cleanup.__context__ = failure
+        raise cleanup
+    _note_cleanup_failure(failure, cleanup, what)
 
 
 def _submit_native(file: Any, method: str, *args: Any) -> "asyncio.Future[Any]":

@@ -18,6 +18,7 @@ from ._common import (
     _validate_chunk_size,
     _validate_optional_positive_int,
 )
+from ._opening import _settle_cleanup_failure
 from .codec import (
     GzipDecoder,
     GzipEncoder,
@@ -65,7 +66,7 @@ async def _decompress_chunks_impl(
     if not callable(getattr(iterator, "__anext__", None)):
         decoder.discard()
         raise TypeError("source.__aiter__() must return an asynchronous iterator")
-    failed = False
+    failure: Optional[BaseException] = None
     budget = _StreamBudget()
     try:
         while True:
@@ -98,12 +99,12 @@ async def _decompress_chunks_impl(
             cast(_AsyncDrivableOperation, decoder.finish()), budget=budget
         ):
             yield output
-    except BaseException:
-        failed = True
+    except BaseException as error:
+        failure = error
         raise
     finally:
         decoder.discard()
-        await _close_async_iterator(iterator, failed=failed)
+        await _close_async_iterator(iterator, failure)
 
 
 def _compress_chunks(
@@ -148,7 +149,7 @@ async def _compress_chunks_impl(
     if not callable(getattr(iterator, "__anext__", None)):
         encoder.discard()
         raise TypeError("source.__aiter__() must return an asynchronous iterator")
-    failed = False
+    failure: Optional[BaseException] = None
     budget = _StreamBudget()
     try:
         async for output in _drive_operation(
@@ -201,16 +202,23 @@ async def _compress_chunks_impl(
             cast(_AsyncDrivableOperation, encoder.finish()), budget=budget
         ):
             yield output
-    except BaseException:
-        failed = True
+    except BaseException as error:
+        failure = error
         raise
     finally:
         encoder.discard()
-        await _close_async_iterator(iterator, failed=failed)
+        await _close_async_iterator(iterator, failure)
 
 
-async def _close_async_iterator(iterator: Any, *, failed: bool) -> None:
-    """Close a source iterator without replacing an active operation error."""
+async def _close_async_iterator(
+    iterator: Any, failure: Optional[BaseException]
+) -> None:
+    """Close a source iterator, keeping the precedence of an active failure.
+
+    A cancellation or interrupt that arrives during the close outranks an
+    ordinary stream failure or the consumer's early close; any other cleanup
+    failure is noted on the active failure.
+    """
     close = getattr(iterator, "aclose", None)
     if not callable(close):
         return
@@ -218,6 +226,9 @@ async def _close_async_iterator(iterator: Any, *, failed: bool) -> None:
         result: Any = close()
         if hasattr(result, "__await__"):
             await result
-    except BaseException:
-        if not failed:
+    except BaseException as cleanup:
+        if failure is None:
             raise
+        _settle_cleanup_failure(
+            failure, cleanup, "Source", outranked=(Exception, GeneratorExit)
+        )

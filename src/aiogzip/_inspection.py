@@ -21,7 +21,7 @@ from ._common import (
     _validate_optional_positive_int,
 )
 from ._metadata import GzipInfo, GzipMemberInfo, VerificationResult
-from ._opening import _acquire_path, _initial_call, _note_cleanup_failure
+from ._opening import _acquire_path, _initial_call, _settle_cleanup_failure
 from ._source_io import _is_native_source, _NativeSourceCall
 from .codec import GzipDecoder, _AsyncDrivableOperation, _snapshot_bytes_input
 
@@ -154,13 +154,4 @@ async def _scan_gzip(
                 except BaseException as cleanup:
                     if failure is None:
                         raise
-                    # An outside cancellation or interrupt outranks an ordinary
-                    # scan failure, which stays its context; otherwise the
-                    # primary failure is kept and the cleanup failure noted.
-                    if isinstance(failure, Exception) and not isinstance(
-                        cleanup, Exception
-                    ):
-                        if cleanup.__context__ is None:
-                            cleanup.__context__ = failure
-                        raise
-                    _note_cleanup_failure(failure, cleanup, "Source")
+                    _settle_cleanup_failure(failure, cleanup, "Source")
