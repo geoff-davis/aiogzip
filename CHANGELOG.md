@@ -42,9 +42,11 @@ All notable changes to this project will be documented in this file.
   cancellation. (#158)
 - A `bytes` subclass passed to `GzipEncoder.feed()`, `GzipDecoder.feed()`,
   `compress_chunks()`, `decompress_chunks()` or binary `write()`, or returned
-  by a custom source's `read()`, is copied from its raw storage, as the codec
+  by a source's `read()`, is copied from its raw storage, as the codec
   documentation says. On Python 3.12 and newer a subclass that overrides
   `__buffer__` could substitute the data that was compressed or decompressed.
+  On every version, a source chunk whose `__len__` reported zero ended the
+  read early.
 
 ### Documentation
 

@@ -6,7 +6,11 @@ without invoking its overridable methods. On Python 3.12 and newer
 must not go through it.
 """
 
+import asyncio
 import gzip
+import io
+
+import aiofiles.threadpool
 
 from aiogzip import (
     AsyncGzipBinaryFile,
@@ -31,7 +35,7 @@ class Hostile(bytes):
 
     def __len__(self):
         called.append("__len__")
-        return 3
+        return 0
 
     def __bytes__(self):
         called.append("__bytes__")
@@ -101,6 +105,25 @@ async def test_custom_source_chunks_are_read_from_their_raw_storage():
     ) as handle:
         assert await handle.read() == PAYLOAD
         # The rewind replays the cached compressed bytes.
+        await handle.seek(0)
+        assert await handle.read() == PAYLOAD
+    assert called == []
+
+
+async def test_wrapped_raw_reader_chunks_are_read_from_their_raw_storage():
+    """An aiofiles wrapper around a custom raw reader takes the native route."""
+    called.clear()
+
+    class Raw(io.BytesIO):
+        def read(self, size=-1):
+            data = super().read(size)
+            return Hostile(data) if data else b""
+
+    source = aiofiles.threadpool.wrap(
+        Raw(gzip.compress(PAYLOAD)), loop=asyncio.get_running_loop()
+    )
+    async with AsyncGzipBinaryFile(None, "rb", fileobj=source) as handle:
+        assert await handle.read() == PAYLOAD
         await handle.seek(0)
         assert await handle.read() == PAYLOAD
     assert called == []

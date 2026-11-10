@@ -1849,16 +1849,18 @@ class AsyncGzipBinaryFile:
                 chunk = cast(
                     bytes, await self._call_custom_source("read", self._chunk_size)
                 )
-                if type(chunk) is not bytes:
-                    if isinstance(chunk, bytes):
-                        # A subclass is read once from its raw storage, so
-                        # its overrides cannot make the cache, the EOF test
-                        # and the codec disagree.
-                        chunk = bytes.__getitem__(chunk, slice(None))
-                    elif isinstance(chunk, (bytearray, memoryview)):
-                        # The codec takes only bytes; a custom source may
-                        # return another buffer type, as it could in 1.x.
-                        chunk = bytes(chunk)
+            # Every route: an aiofiles wrapper around a custom raw reader
+            # takes the native branch, and a retained result is used later.
+            if type(chunk) is not bytes:
+                if isinstance(chunk, bytes):
+                    # A subclass is read once from its raw storage, so its
+                    # overrides cannot make the cache, the EOF test and the
+                    # codec disagree.
+                    chunk = bytes.__getitem__(chunk, slice(None))
+                elif isinstance(chunk, (bytearray, memoryview)):
+                    # The codec takes only bytes; a source may return another
+                    # buffer type, as it could in 1.x.
+                    chunk = bytes(chunk)
         except OSError:
             raise
         except Exception as e:
