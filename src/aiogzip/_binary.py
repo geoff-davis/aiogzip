@@ -1194,11 +1194,14 @@ class AsyncGzipBinaryFile:
         """Return an exact immutable snapshot of any valid buffer input."""
         if type(data) is bytes:
             return data
+        if isinstance(data, bytes):
+            # The unbound slice copies a subclass's raw storage. It cannot
+            # invoke hostile __bytes__, __len__, indexing or __buffer__
+            # overrides; memoryview() would call the last one (PEP 688).
+            return bytes.__getitem__(data, slice(None))
         try:
-            # memoryview reads bytes subclasses through their raw buffer and
-            # therefore cannot invoke hostile __bytes__, __len__, or indexing
-            # overrides. tobytes() also flattens non-contiguous and multi-byte
-            # views into the exact bytes type required by the public codec.
+            # tobytes() flattens non-contiguous and multi-byte views into the
+            # exact bytes type required by the public codec.
             return memoryview(data).tobytes()
         except TypeError as exc:
             raise TypeError(
@@ -1846,9 +1849,17 @@ class AsyncGzipBinaryFile:
                 chunk = cast(
                     bytes, await self._call_custom_source("read", self._chunk_size)
                 )
-                # The codec takes only bytes; a custom source may return
-                # another buffer type, as it could in 1.x.
-                if isinstance(chunk, (bytearray, memoryview)):
+            # Every route: an aiofiles wrapper around a custom raw reader
+            # takes the native branch, and a retained result is used later.
+            if type(chunk) is not bytes:
+                if isinstance(chunk, bytes):
+                    # A subclass is read once from its raw storage, so its
+                    # overrides cannot make the cache, the EOF test and the
+                    # codec disagree.
+                    chunk = bytes.__getitem__(chunk, slice(None))
+                elif isinstance(chunk, (bytearray, memoryview)):
+                    # The codec takes only bytes; a source may return another
+                    # buffer type, as it could in 1.x.
                     chunk = bytes(chunk)
         except OSError:
             raise

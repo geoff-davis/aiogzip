@@ -89,10 +89,25 @@ async def _acquire_path(filename: Any, mode: str, opener: Any) -> Any:
             raw = work.result()
         except BaseException as failure:
             raise cancellation from failure
+        interrupt: BaseException | None = None
         try:
             await _settle_before_cancel(loop.run_in_executor(None, raw.close))
         except BaseException as cleanup:
-            _note_cleanup_failure(cancellation, cleanup, "Opening")
+            # An outside interrupt outranks the cancellation, as it outranks
+            # an ordinary failure below. A repeated cancellation does not,
+            # but settlement may have raised it from an interrupt.
+            interrupt = (
+                cleanup.__cause__
+                if isinstance(cleanup, asyncio.CancelledError)
+                else cleanup
+            )
+            if isinstance(interrupt, (Exception, asyncio.CancelledError)):
+                interrupt = None
+            if interrupt is None:
+                _note_cleanup_failure(cancellation, cleanup, "Opening")
+        if interrupt is not None:
+            # Raised here so that its context is the original cancellation.
+            raise interrupt  # noqa: B904
         raise
     try:
         return aiofiles.threadpool.wrap(raw, loop=loop)

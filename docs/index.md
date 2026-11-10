@@ -115,7 +115,7 @@ use async with.").
 - ✅ `peek()` and `readinto()` for advanced reading patterns
 - ✅ Reading and writing gzip headers and metadata (e.g., `mtime`, `original_filename`)
 - ✅ Text and binary mode operations with proper encoding/decoding
-- ✅ Full compatibility with `tarfile` for reading `.tar.gz` archives
+- ✅ `tarfile`-style sequential reads of `.tar.gz` data (fixed-size header and member blocks). `tarfile.open(fileobj=...)` itself needs a synchronous file object, so it cannot take an aiogzip handle
 - ✅ Seamless integration with `aiocsv` for CSV processing
 
 > **Default compression level.** `aiogzip` defaults to `compresslevel=6` (the
