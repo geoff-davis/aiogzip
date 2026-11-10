@@ -33,12 +33,12 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v7.0.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.3
 
       # Deliberately unpinned (uv.lock is not consulted): CI exercises fresh
       # dependency releases before users hit them. uv just installs faster.
@@ -67,12 +67,12 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v7.0.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.3
 
       - name: Install dependencies
         run: uv pip install --system -e ".[docs]"
@@ -113,12 +113,12 @@ jobs:
       # Step 2: Sets up the specific version of Python from the matrix
       - name: Set up Python ${{ matrix.python-version }}
         if: matrix.python-version != '3.15'
-        uses: actions/setup-python@v7.0.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.3
 
       # actions/setup-python does not offer 3.15.0 yet, so the 3.15 leg uses
       # uv's managed CPython 3.15.0 (python-build-standalone) in a virtual
@@ -214,12 +214,12 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v7.0.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.3
 
       - name: Install dependencies (with fast extra)
         run: uv pip install --system -e ".[test,csv,fast]"
@@ -268,12 +268,12 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v7.0.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.11"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.3
 
       - name: Build candidate wheel
         run: uv build --wheel --out-dir dist
@@ -439,12 +439,12 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7.0.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.3
 
       - name: Build candidate ${{ matrix.artifact }}
         shell: bash
