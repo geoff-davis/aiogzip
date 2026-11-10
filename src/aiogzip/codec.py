@@ -76,7 +76,9 @@ def _snapshot_bytes_input(data: bytes) -> bytes:
     if type(data) is bytes:
         return data
     if isinstance(data, bytes):
-        return memoryview(data).tobytes()
+        # The unbound slice copies the raw storage. memoryview() would call a
+        # subclass's __buffer__ override (PEP 688).
+        return bytes.__getitem__(data, slice(None))
     raise TypeError("gzip codec input must be bytes")
 
 

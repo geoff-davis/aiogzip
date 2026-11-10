@@ -36,9 +36,20 @@ All notable changes to this project will be documented in this file.
   until later input arrived, and `finish()` on a truncated stream raised
   without emitting them. Complete streams were not affected. The file,
   streaming, `inspect()` and `verify()` paths share the fix. (#171)
+- A `KeyboardInterrupt` or `SystemExit` raised while closing a file whose
+  open completed after the caller was cancelled now propagates, with the
+  cancellation as its context. It was recorded as a note on the
+  cancellation. (#158)
+- A `bytes` subclass passed to `GzipEncoder.feed()`, `GzipDecoder.feed()`,
+  `compress_chunks()` or `decompress_chunks()` is copied from its raw storage,
+  as the codec documentation says. On Python 3.12 and newer a subclass that
+  overrides `__buffer__` could substitute the data the codec saw.
 
 ### Documentation
 
+- The docs home page no longer claims full `tarfile` compatibility. The
+  handles support `tarfile`-style sequential reads; `tarfile.open(fileobj=...)`
+  needs a synchronous file object.
 - The README and docs home page CI badge reports `main` only, so a
   cancelled or failing pull-request run no longer shows as a failure.
 - The custom-source recovery recipe no longer describes its rule as a 2.0.0b2
