@@ -462,6 +462,7 @@ class GzipDecoder(_CodecBase):
         self._inflate_input: bytes | None = None
         self._output = _OutputCursor()
         self._eof_after_output = False
+        self._engine_output_held = False
         self._state = "header"
         self._engine: ZlibEngine = None
         self._header: _ParsedHeader | None = None
@@ -522,6 +523,7 @@ class GzipDecoder(_CodecBase):
         self._inflate_input = None
         self._output.clear()
         self._eof_after_output = False
+        self._engine_output_held = False
         self._engine = None
         self._header = None
         self._header_parser = None
@@ -680,23 +682,32 @@ class GzipDecoder(_CodecBase):
 
             if self._state == "body":
                 if self._inflate_input is None:
-                    if not self._pending:
+                    if self._pending:
+                        self._inflate_input = self._pending.pop_window(
+                            _INFLATE_INPUT_WINDOW
+                        )
+                    elif self._engine_output_held:
+                        # The last step filled its output bound with no input
+                        # left over, so the engine may hold output it can
+                        # produce without input. Drain it rather than wait
+                        # for input that may be unrelated or never arrive.
+                        self._inflate_input = b""
+                    else:
                         break
-                    self._inflate_input = self._pending.pop_window(
-                        _INFLATE_INPUT_WINDOW
-                    )
                 inflate_input = self._inflate_input
-                step = self._inflate(
-                    inflate_input,
-                    self._inflate_output_limit(),
-                )
+                output_limit = self._inflate_output_limit()
+                step = self._inflate(inflate_input, output_limit)
                 self._consumed_size += step.consumed
                 if step.eof:
                     self._inflate_input = None
+                    self._engine_output_held = False
                     if step.retained:
                         self._pending.prepend(step.retained)
                 else:
                     self._inflate_input = step.retained or None
+                    self._engine_output_held = (
+                        not step.retained and len(step.output) >= output_limit
+                    )
                 if step.output:
                     self._account_output(step.output)
                     self._output.set_block(step.output)
