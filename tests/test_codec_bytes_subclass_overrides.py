@@ -1,4 +1,4 @@
-"""A ``bytes`` subclass cannot substitute the data the codec sees.
+"""A ``bytes`` subclass cannot substitute the data the codec sees (BC27).
 
 ``docs/codec.md`` promises that a subclass is copied from its raw storage
 without invoking its overridable methods. On Python 3.12 and newer
@@ -8,7 +8,13 @@ must not go through it.
 
 import gzip
 
-from aiogzip import GzipDecoder, GzipEncoder, compress_chunks, decompress_chunks
+from aiogzip import (
+    AsyncGzipBinaryFile,
+    GzipDecoder,
+    GzipEncoder,
+    compress_chunks,
+    decompress_chunks,
+)
 
 PAYLOAD = b"the real payload " * 64
 called = []
@@ -66,4 +72,35 @@ async def test_chunk_streams_read_a_subclass_from_its_raw_storage():
     assert gzip.decompress(wire) == PAYLOAD
     out = b"".join([chunk async for chunk in decompress_chunks(source(wire))])
     assert out == PAYLOAD
+    assert called == []
+
+
+async def test_file_write_reads_a_subclass_from_its_raw_storage(tmp_path):
+    called.clear()
+    path = tmp_path / "subclass.gz"
+    async with AsyncGzipBinaryFile(path, "wb") as handle:
+        assert await handle.write(Hostile(PAYLOAD)) == len(PAYLOAD)
+        assert await handle.tell() == len(PAYLOAD)
+    assert gzip.decompress(path.read_bytes()) == PAYLOAD
+    assert called == []
+
+
+async def test_custom_source_chunks_are_read_from_their_raw_storage():
+    called.clear()
+
+    class Source:
+        def __init__(self, data):
+            self.data = data
+
+        async def read(self, size=-1):
+            data, self.data = self.data, b""
+            return Hostile(data) if data else b""
+
+    async with AsyncGzipBinaryFile(
+        None, "rb", fileobj=Source(gzip.compress(PAYLOAD))
+    ) as handle:
+        assert await handle.read() == PAYLOAD
+        # The rewind replays the cached compressed bytes.
+        await handle.seek(0)
+        assert await handle.read() == PAYLOAD
     assert called == []
