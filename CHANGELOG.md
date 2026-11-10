@@ -25,6 +25,11 @@ All notable changes to this project will be documented in this file.
   early `aclose()`. The cancellation propagates with the stream failure as
   its context, as `verify()` already did. Another error raised by that close
   is now recorded as a note on the stream failure. (#173)
+- A read-mode `seek(-n, os.SEEK_END)` that is in flight when the `async with`
+  body raises now fails with the documented `read aborted` error. It could
+  rewind and read a custom source after the file was closed, return a
+  position and revive the reader when the close had failed, or raise
+  `ValueError: seek of closed file` for a path-opened file. (#172)
 
 ### Documentation
 
