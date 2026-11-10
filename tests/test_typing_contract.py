@@ -88,3 +88,10 @@ def test_unexpected_diagnostics_fail(tmp_path, monkeypatch, output, message):
     monkeypatch.chdir(tmp_path)
     with pytest.raises(AssertionError, match=message):
         reported(output, "mypy", FIXTURE)
+
+
+def test_a_renamed_code_is_reported_under_its_current_name():
+    old = f"{FIXTURE}:7:5: error[unresolved-attribute] no attribute `close`\n"
+    new = f"{FIXTURE}:7:5: error[missing-attribute] no attribute `close`\n"
+    assert reported(old, "ty", FIXTURE) == {(7, "missing-attribute")}
+    assert reported(new, "ty", FIXTURE) == {(7, "missing-attribute")}

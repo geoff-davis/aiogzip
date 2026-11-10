@@ -4,4 +4,4 @@ from collections.abc import Iterator
 
 
 def close_plain_iterator(iterator: Iterator[bytes]) -> None:
-    iterator.close()  # EXPECT_ERROR[mypy=attr-defined, ty=unresolved-attribute]
+    iterator.close()  # EXPECT_ERROR[mypy=attr-defined, ty=missing-attribute]
