@@ -298,13 +298,19 @@ Always include:
   the close, an opening cleanup note for a repeated cancellation, and
   Python 3.14's duplicate "exception in shielded future" log. Python 3.15
   is supported, with a required CI leg.
-- **2.0.0 (current release)** - The first stable 2.0 release. Its `src/`
+- **2.0.0** - The first stable 2.0 release. Its `src/`
   equals 2.0.0rc2's apart from `__version__`. The package is classified
   Production/Stable, `docs/stability.md` states the semantic-versioning and
   deprecation policy, and the 1.x line receives security fixes only until
-  2027-04-30. Development continues as `2.0.1.dev0`.
+  2027-04-30.
+- **2.0.1 (current release)** - A bug-fix release. It fixes the seven
+  defects found by the post-release review of 2.0.0 (#171–#177), the
+  deferred opening-cleanup interrupt case (#158) and the `bytes` subclass
+  snapshot (behavior exceptions BC19–BC27; review record in
+  `plans/reviews/v2.0.0-code-review.md`). The public API is unchanged.
+  Development continues as `2.0.2.dev0`.
 
 ---
 
-**Last Updated:** 2026-10-17
+**Last Updated:** 2026-11-10
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
