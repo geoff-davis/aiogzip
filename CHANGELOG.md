@@ -30,6 +30,12 @@ All notable changes to this project will be documented in this file.
   rewind and read a custom source after the file was closed, return a
   position and revive the reader when the close had failed, or raise
   `ValueError: seek of closed file` for a path-opened file. (#172)
+- `GzipDecoder.feed()` emits everything its input can decode. When a bounded
+  inflate step filled its output bound exactly as the input ran out, the last
+  bytes of a message ended with `Z_PARTIAL_FLUSH` or `Z_BLOCK` were held
+  until later input arrived, and `finish()` on a truncated stream raised
+  without emitting them. Complete streams were not affected. The file,
+  streaming, `inspect()` and `verify()` paths share the fix. (#171)
 
 ### Documentation
 
