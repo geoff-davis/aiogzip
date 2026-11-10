@@ -1,0 +1,44 @@
+"""After `await stream.aclose()` on a stream suspended mid-operation, the private
+_drive_operation async generator is still un-finalized; asyncio's asyncgen hook
+closes it in a separate task on a later loop turn."""
+import asyncio, gzip, os, gc
+import aiogzip
+
+async def src(blob):
+    yield blob
+
+async def scenario(kind):
+    payload = os.urandom(300_000)
+    data = gzip.compress(payload, mtime=0) if kind == "d" else payload
+    api = aiogzip.decompress_chunks if kind == "d" else aiogzip.compress_chunks
+    stream = api(src(data), output_chunk_size=1000)
+    n = 0
+    async for _ in stream:
+        n += 1
+        if n == 3: break
+    created = []
+    loop = asyncio.get_running_loop()
+    orig = loop.create_task
+    def spy(coro, **kw):
+        created.append(getattr(coro, "__qualname__", repr(coro)))
+        return orig(coro, **kw)
+    loop.create_task = spy
+    await stream.aclose()
+    del stream
+    await asyncio.sleep(0); await asyncio.sleep(0)
+    loop.create_task = orig
+    print(kind, "tasks created by the loop after explicit aclose():", created)
+
+asyncio.run(scenario("d"))
+asyncio.run(scenario("c"))
+
+print("--- loop closed right after explicit aclose (no shutdown_asyncgens):")
+async def tight():
+    stream = aiogzip.decompress_chunks(src(gzip.compress(os.urandom(300_000))), output_chunk_size=1000)
+    async for _ in stream:
+        break
+    await stream.aclose()
+loop = asyncio.new_event_loop()
+loop.run_until_complete(tight())
+loop.close()
+gc.collect()

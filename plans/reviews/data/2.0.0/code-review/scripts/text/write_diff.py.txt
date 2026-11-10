@@ -1,0 +1,46 @@
+import asyncio, gzip, io, os, random, sys, tempfile, collections
+from aiogzip import AsyncGzipTextFile
+D = tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))
+p = os.path.join(D, "f.gz")
+ALPHA = ["a", "\n", "\r", "\r\n", "é", "漢", "😀", "", "x" * 9, "\ud800", "\n\n"]
+stats = collections.Counter(); ex = {}
+class S(str): pass
+async def main():
+    rng = random.Random(int(sys.argv[1]))
+    for it in range(int(sys.argv[2])):
+        enc = rng.choice(["utf-8", "utf-16", "utf-32", "utf-8-sig", "shift_jis", "iso2022_jp", "ascii", "hz", "iso2022_kr", "euc_jp", "big5hkscs", "cp1252"])
+        err = rng.choice(["strict", "replace", "ignore", "backslashreplace", "xmlcharrefreplace", "surrogatepass", "surrogateescape"])
+        nl = rng.choice([None, "", "\n", "\r", "\r\n"])
+        cs = rng.choice([1, 4, 16, 64])
+        calls = []
+        for _ in range(rng.randint(0, 8)):
+            mk = lambda: (S if rng.random() < 0.1 else str)("".join(rng.choice(ALPHA) for _ in range(rng.randint(0, 5))))
+            if rng.random() < 0.5: calls.append(("write", mk()))
+            else: calls.append(("writelines", [mk() for _ in range(rng.randint(0, 6))]))
+        b = io.BytesIO(); t = io.TextIOWrapper(b, encoding=enc, errors=err, newline=nl, write_through=True)
+        ref = []
+        for name, arg in calls:
+            try: ref.append(getattr(t, name)(arg))
+            except Exception as e: ref.append(type(e).__name__)
+        try: t.flush(); t.detach()
+        except Exception as e: ref.append("close:" + type(e).__name__)
+        got = []
+        f = AsyncGzipTextFile(p, "wt", encoding=enc, errors=err, newline=nl, chunk_size=cs)
+        await f.open()
+        for name, arg in calls:
+            try: got.append(await getattr(f, name)(arg))
+            except Exception as e: got.append(type(e).__name__)
+        try: await f.close()
+        except Exception as e: got.append("close:" + type(e).__name__)
+        data = gzip.open(p, "rb").read()
+        refdata = b.getvalue()
+        has_err = any(isinstance(x, str) for x in ref)
+        if got != ref:
+            stats["retval-mismatch" + ("(err)" if has_err else "")] += 1; ex.setdefault("ret" + str(has_err), (enc, err, nl, cs, calls, got, ref))
+        if data != refdata:
+            k = "bytes-mismatch" + ("(after error)" if has_err else "") + enc
+            stats[k] += 1; ex.setdefault(k, (enc, err, nl, cs, calls, data, refdata))
+        else: stats["ok"] += 1
+    print(dict(stats))
+    for k, v in ex.items(): print("EXAMPLE", k, repr(v)[:900])
+asyncio.run(main())

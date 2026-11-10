@@ -1,0 +1,71 @@
+import os
+from pathlib import Path, PurePath
+from typing import AsyncIterator, reveal_type
+import aiofiles
+import aiogzip
+
+
+class MyPath:
+    def __fspath__(self) -> str:
+        return "x.gz"
+
+
+class Reader:
+    async def read(self, size: int = -1) -> bytes:
+        return b""
+
+
+class BytearrayReader:
+    async def read(self, size: int = -1) -> bytearray:
+        return bytearray()
+
+
+class Writer:
+    async def write(self, data: bytes) -> int:
+        return len(data)
+
+
+async def gen() -> AsyncIterator[bytes]:
+    yield b""
+
+
+async def gen_ba() -> AsyncIterator[bytearray]:
+    yield bytearray()
+
+
+async def main(dyn: str, pl: "os.PathLike[str]") -> None:
+    reveal_type(aiogzip.open("f.gz"))                       # binary
+    reveal_type(aiogzip.open("f.gz", "rt"))                 # text
+    reveal_type(aiogzip.open("f.gz", mode="wt", newline=""))
+    reveal_type(aiogzip.open("f.gz", dyn))                  # union
+    # 1. typo / wrong-type kwargs with a literal mode: accepted through the fallback overload?
+    reveal_type(aiogzip.open("f.gz", "rb", chunksize=5))
+    reveal_type(aiogzip.open("f.gz", "rb", compresslevel="nine"))
+    reveal_type(aiogzip.open("f.gz", "rt", encodin="utf-8"))
+    reveal_type(aiogzip.open("f.gz", "rb", encoding="utf-8"))  # runtime ValueError
+    # 2. PathLike that is not pathlib.Path (runtime accepts os.PathLike)
+    aiogzip.open(MyPath(), "rb")
+    aiogzip.open(pl, "rb")
+    aiogzip.open(PurePath("f.gz"), "rb")
+    await aiogzip.read(MyPath())
+    await aiogzip.verify(pl)
+    # 3. fileobj only
+    aiogzip.open(None, "rb", fileobj=Reader())
+    aiogzip.open(None, "wb", fileobj=Writer())
+    aiogzip.open(fileobj=Reader())  # filename has no default
+    await aiogzip.inspect(None, fileobj=BytearrayReader())
+    async with aiofiles.open("f.gz", "rb") as f:
+        aiogzip.open(None, "rb", fileobj=f)
+        await aiogzip.verify(None, fileobj=f)
+    async with aiofiles.open("f.gz", "wb") as w:
+        await aiogzip.write(None, b"x", fileobj=w)
+        await aiogzip.verify(None, fileobj=w)   # write-only handle to a reader API
+    # 4. streaming
+    reveal_type(aiogzip.compress_chunks(gen()))
+    aiogzip.decompress_chunks(gen_ba())
+    # 5. mtime bool, closefd
+    aiogzip.compress_chunks(gen(), mtime=True)
+    # 6. 'U' and odd permutations
+    reveal_type(aiogzip.open("f.gz", "bt"))
+    reveal_type(aiogzip.open("f.gz", "+tr"))
+    reveal_type(aiogzip.AsyncGzipFile("f.gz", "xt"))

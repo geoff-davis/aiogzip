@@ -1,0 +1,26 @@
+"""Same as seek_end_abort.py, with a path-opened (native aiofiles) source."""
+import asyncio, gzip, os, tempfile
+import aiogzip
+
+async def run(op, label):
+    d = tempfile.mkdtemp(); p = os.path.join(d, "a.gz")
+    with open(p, "wb") as fh: fh.write(gzip.compress(b"A" * (8 * 1024 * 1024)))
+    f = aiogzip.AsyncGzipBinaryFile(p, "rb")
+    try:
+        async with f:
+            task = asyncio.create_task(op(f))
+            while not (f._read_call_active and f._source_native_call is None and f._decoder._header_generation):
+                await asyncio.sleep(0)
+            raise RuntimeError("body")
+    except RuntimeError:
+        pass
+    try:
+        print(label, "RETURNED", await task)
+    except BaseException as e:
+        print(label, "raised:", type(e).__name__, e)
+    print("   closed:", f.closed, "health:", f._read_health.name)
+
+async def main():
+    await run(lambda f: f.seek(-3, os.SEEK_END), "seek(-3, SEEK_END)")
+    await run(lambda f: f.seek(0, os.SEEK_END), "seek(0, SEEK_END)")
+asyncio.run(main())

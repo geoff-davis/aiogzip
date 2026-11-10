@@ -1,0 +1,141 @@
+import asyncio, gzip, io, os, pathlib, tempfile, zlib, json
+import aiogzip
+
+D = pathlib.Path(tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__))))
+good = D / "good.jsonl.gz"
+with gzip.open(good, "wt") as f:
+    for i in range(20000):
+        f.write(json.dumps({"id": i, "pad": "x" * (i % 50)}) + "\n")
+raw_bytes = good.read_bytes()
+
+class FsPath:
+    def __init__(self, p): self.p = str(p)
+    def __fspath__(self): return self.p
+
+async def show(name, fn):
+    try:
+        print(f"--- {name}\n   ->", repr(await fn())[:240])
+    except BaseException as e:
+        print(f"--- {name}\n   {type(e).__name__}: {e}")
+
+async def main():
+    await show("os.PathLike runtime", lambda: aiogzip.verify(FsPath(good)))
+    await show("PurePosixPath runtime", lambda: aiogzip.verify(pathlib.PurePosixPath(good)))
+
+    # 1. Lines from an async iterable of compressed bytes (httpx aiter_raw shape)
+    async def http_like():
+        for i in range(0, len(raw_bytes), 1000):
+            yield raw_bytes[i:i+1000]
+    async def direct():
+        async with aiogzip.open(None, "rt", fileobj=http_like()) as f:
+            return await f.readline()
+    await show("async-iterable passed as fileobj", direct)
+
+    class IterReader:  # the glue a user must write today
+        def __init__(self, it): self._it = it.__aiter__(); self._buf = b""
+        async def read(self, n=-1):
+            while n < 0 or len(self._buf) < n:
+                try: self._buf += await self._it.__anext__()
+                except StopAsyncIteration: break
+            if n < 0: out, self._buf = self._buf, b""
+            else: out, self._buf = self._buf[:n], self._buf[n:]
+            return out
+    async def glue():
+        n = 0
+        async with aiogzip.open(None, "rt", fileobj=IterReader(http_like())) as f:
+            async for line in f: n += 1
+        return n
+    await show("async-iterable via hand-written adapter", glue)
+
+    # 2. lines from decompress_chunks without adapter: manual splitting
+    # 3. in-memory one-shot
+    async def oneshot():
+        async def one(): yield raw_bytes
+        return len(b"".join([c async for c in aiogzip.decompress_chunks(one())]))
+    await show("in-memory decompress via decompress_chunks glue", oneshot)
+    def sync_codec():
+        d = aiogzip.GzipDecoder()
+        return len(b"".join(d.feed(raw_bytes)) + b"".join(d.finish()))
+    print("--- sync codec one-shot ->", sync_codec())
+
+    # 4. compressed-offset progress
+    async def progress():
+        async with aiogzip.open(good, "rb") as f:
+            await f.read(100)
+            r = f.raw()
+            out = {"raw": type(r).__name__}
+            for attr in ("tell",):
+                t = getattr(r, attr, None)
+                if t:
+                    v = t()
+                    out["raw.tell"] = await v if hasattr(v, "__await__") else v
+            out["tell"] = await f.tell()
+            out["public attrs"] = [a for a in dir(f) if not a.startswith("_")]
+            return out
+    await show("compressed progress", progress)
+    async def tprogress():
+        async with aiogzip.open(good, "rt") as f:
+            return [a for a in dir(f) if not a.startswith("_")]
+    await show("text public attrs", tprogress)
+
+    # 5. write side: file-like API producing an async iterable (upload body)
+    # 6. sync-iterable source
+    async def write_fileobj_sync():
+        bio = io.BytesIO()
+        async with aiogzip.open(None, "wb", fileobj=bio) as f:
+            await f.write(b"x")
+        return bio.getvalue()
+    await show("write to BytesIO", write_fileobj_sync)
+
+    # 7. stat-ish: size without scanning
+    async def seek_end():
+        async with aiogzip.open(good, "rb") as f:
+            return await f.seek(0, os.SEEK_END)
+    await show("seek END", seek_end)
+
+    # 8. writer header options: comment/extra
+    async def comment():
+        aiogzip.open(D/"c.gz", "wb", comment="hi")
+    await show("writer comment kw", comment)
+    # 9. flush sync point; multi member on write
+    async def text_lines_api():
+        async with aiogzip.open(good, "rb") as f:
+            return hasattr(f, "iter_batches"), hasattr(f, "iter_chunks")
+    await show("binary iter_batches / iter_chunks", text_lines_api)
+    async def aclose():
+        f = aiogzip.open(good, "rb"); await f.open()
+        return hasattr(f, "aclose"), hasattr(f, "mode"), hasattr(f, "__await__")
+    await show("aclose/mode/__await__", aclose)
+    # 10 contextlib.aclosing
+    import contextlib
+    async def aclosing():
+        f = aiogzip.open(good, "rb"); await f.open()
+        async with contextlib.aclosing(f) as g:
+            return await g.read(5)
+    await show("contextlib.aclosing(handle)", aclosing)
+
+asyncio.run(main())
+
+# zran feasibility with Python-level zlib
+print("=== engine probes")
+import zlib_ng.zlib_ng as zng
+for name, z in (("zlib", zlib), ("zlib_ng", zng)):
+    d = z.decompressobj(wbits=-15)
+    print(name, "copy:", hasattr(d, "copy"), "| Z_BLOCK:", hasattr(z, "Z_BLOCK"),
+          "| inflatePrime-like:", [a for a in dir(d) if "prime" in a.lower()],
+          "| zdict kw:", "zdict" in (z.decompressobj.__doc__ or ""))
+    # copy() mid-stream then resume from copy
+    payload = os.urandom(1000) * 300
+    c = z.compressobj(6, z.DEFLATED, -15)
+    half = len(payload) // 2
+    blob1 = c.compress(payload[:half]) + c.flush(z.Z_FULL_FLUSH)
+    blob2 = c.compress(payload[half:]) + c.flush()
+    d = z.decompressobj(wbits=-15)
+    out1 = d.decompress(blob1[: len(blob1) // 2])
+    snap = d.copy()
+    rest = blob1[len(blob1) // 2 :] + blob2
+    a = d.decompress(rest); b = snap.decompress(rest)
+    print("   copy() snapshot resumes identically:", a == b, len(out1) + len(a) == len(payload))
+    # restart at full-flush point with fresh raw inflater, no dictionary
+    d2 = z.decompressobj(wbits=-15)
+    print("   restart at Z_FULL_FLUSH byte offset w/o dict:", d2.decompress(blob2) == payload[half:])

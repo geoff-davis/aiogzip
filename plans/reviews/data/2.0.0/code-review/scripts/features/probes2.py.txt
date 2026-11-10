@@ -1,0 +1,41 @@
+import asyncio, gzip, io, os, pathlib, tempfile
+import aiogzip
+
+class CountingSink:
+    def __init__(self): self.calls = 0; self.sizes = []; self.buf = bytearray()
+    async def write(self, data):
+        self.calls += 1; self.sizes.append(len(data)); self.buf += data; return len(data)
+
+async def main():
+    sink = CountingSink()
+    async with aiogzip.open(None, "wt", fileobj=sink, newline="") as f:
+        for i in range(1000):
+            await f.write(f"{i},alice,30,New York\r\n")   # what aiocsv's writerow does
+    print("1000 row writes -> sink.write calls:", sink.calls, "| total bytes:", len(sink.buf),
+          "| median size:", sorted(sink.sizes)[len(sink.sizes)//2])
+    plain = gzip.compress(b"".join(f"{i},alice,30,New York\r\n".encode() for i in range(1000)), 6)
+    print("   one-shot gzip level 6 size for same data:", len(plain))
+    sink2 = CountingSink()
+    async with aiogzip.open(None, "wt", fileobj=sink2, newline="") as f:
+        await f.writelines(f"{i},alice,30,New York\r\n" for i in range(1000))
+    print("writelines -> sink.write calls:", sink2.calls, "| total bytes:", len(sink2.buf))
+
+    # where is a sync fileobj detected?
+    try:
+        f = aiogzip.open(None, "rb", fileobj=io.BytesIO(b""))
+        print("construct with BytesIO: accepted;", "isinstance WithAsyncRead:", isinstance(io.BytesIO(), aiogzip.WithAsyncRead))
+        await f.open(); print("open(): accepted")
+        await f.read()
+    except Exception as e:
+        print("  fails at read:", type(e).__name__, e, "| cause:", repr(e.__cause__))
+    try:
+        f = aiogzip.open(None, "wb", fileobj=io.BytesIO())
+        await f.open()
+    except Exception as e:
+        print("  write-mode BytesIO fails at open():", type(e).__name__, e)
+
+    # stdin/stdout piping, asyncio StreamReader as fileobj
+    r = asyncio.StreamReader(); r.feed_data(gzip.compress(b"a\nb\n")); r.feed_eof()
+    async with aiogzip.open(None, "rt", fileobj=r) as f:
+        print("asyncio.StreamReader as fileobj:", [l async for l in f])
+asyncio.run(main())

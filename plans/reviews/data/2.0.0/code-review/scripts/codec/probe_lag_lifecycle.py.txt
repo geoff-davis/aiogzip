@@ -1,0 +1,124 @@
+import gzip, zlib, random, struct, sys
+import aiogzip
+from aiogzip import GzipDecoder, GzipEncoder
+from aiogzip import _engine
+print(aiogzip.engine_info())
+rng = random.Random(7)
+
+print("== A. output lag: bytes a feed() withholds vs an unbounded zlib reference on the same prefix")
+worst = (0, None)
+for strategy, payload in [(0, bytes(3_000_000)), (zlib.Z_HUFFMAN_ONLY, bytes(600_000)), (0, (b"abcdefgh" * 200_000)), (zlib.Z_RLE, b"x" * 900_000)]:
+    c = zlib.compressobj(6, zlib.DEFLATED, -15, 9, strategy)
+    body = c.compress(payload) + c.flush()
+    wire = b"\x1f\x8b\x08\x00" + bytes(4) + b"\x00\xff" + body + struct.pack("<II", zlib.crc32(payload), len(payload))
+    cuts = list(range(10, min(len(wire), 400))) + [rng.randrange(10, len(wire)) for _ in range(300)]
+    for cut in cuts:
+        ref = zlib.decompressobj(-15).decompress(wire[10:cut])
+        for ocs in (4096, 65536, 1 << 20):
+            d = GzipDecoder(output_chunk_size=ocs)
+            got = b"".join(d.feed(wire[:cut]))
+            lag = len(ref) - len(got)
+            assert lag >= 0 and ref.startswith(got)
+            if lag > worst[0]: worst = (lag, (strategy, len(payload), cut, ocs))
+            got += b"".join(d.feed(wire[cut:])) + b"".join(d.finish())
+            assert got == payload
+print(" worst lag bytes:", worst)
+
+print("== B. sync-flush message protocol inside one member: each feed returns the whole message?")
+enc = GzipEncoder(mtime=0)
+dec = GzipDecoder(output_chunk_size=65536)
+head = b"".join(enc.start())
+bad = 0
+for i in range(300):
+    msg = rng.choice([bytes(rng.randrange(1, 2_000_000)), rng.randbytes(rng.randrange(1, 5000)), b"ab" * rng.randrange(1, 400_000)])
+    w = head + b"".join(enc.feed(msg)) + b"".join(enc.flush()); head = b""
+    got = b"".join(dec.feed(w))
+    if got != msg: bad += 1; print("  message", i, "withheld", len(msg) - len(got), "bytes")
+print(" messages not fully delivered at flush boundary:", bad)
+
+print("== C. corruption classes")
+def mk(payload=b"hello world" * 10):
+    return bytearray(gzip.compress(payload, mtime=0))
+def run(w, **kw):
+    d = GzipDecoder(collect_member_info=True, **kw)
+    try:
+        out = b"".join(d.feed(bytes(w))) + b"".join(d.finish())
+        return "OK", out[:20], d.member_count
+    except Exception as ex:
+        st = []
+        for name, fn in (("feed", lambda: d.feed(b"")), ("finish", d.finish)):
+            try: fn(); st.append(name + ":accepted!")
+            except Exception as e2: st.append(f"{name}:{type(e2).__name__}")
+        return type(ex).__name__, str(ex), d.member_count, d.finished, st
+w = mk(); w[-5] ^= 1; print(" bad crc   ", run(w))
+w = mk(); w[-1] ^= 1; print(" bad isize ", run(w))
+w = mk(); w[3] = 0x20; print(" reserved  ", run(w))
+w = mk(); w[2] = 7; print(" method    ", run(w))
+w = mk(); w[12] ^= 0xff; print(" bad body  ", run(w))
+w = mk() + b"\x00\x00junkjunkjunk"; print(" pad+junk  ", run(w))
+w = mk() + b"\x1f"; print(" 1 trailing byte", run(w))
+w = b"\x00" + mk(); print(" leading NUL", run(w))
+w = b""; print(" empty     ", run(w))
+w = b"\x00\x00"; print(" only NULs ", run(w))
+w = mk() + mk(); w[-5] ^= 1; print(" 2nd member bad crc", run(w))
+h = bytearray(b"\x1f\x8b\x08\x02" + bytes(4) + b"\x00\xff"); h += struct.pack("<H", (zlib.crc32(h) & 0xffff) ^ 1)
+print(" bad FHCRC ", run(h + mk()[10:]))
+
+print("== D. lifecycle")
+def state(c, name):
+    r = []
+    for meth in (["feed", "finish"] if isinstance(c, GzipDecoder) else ["start", "feed", "flush", "finish"]):
+        try:
+            op = getattr(c, meth)(b"") if meth == "feed" else getattr(c, meth)()
+            r.append(meth + ":reserved"); op.close()
+        except Exception as e: r.append(f"{meth}:{type(e).__name__}")
+    print("  ", name, r)
+w = bytes(mk(bytes(1_000_000)))
+d = GzipDecoder(output_chunk_size=10); op = d.feed(w); next(op); op.close(); op.close()
+print("   next after close ->", next(op, "StopIteration")); state(d, "decoder after early close")
+d = GzipDecoder(); op = d.feed(w)
+try: d.feed(b"")
+except RuntimeError as e: print("   overlap:", e)
+d.discard(); d.discard()
+try: next(op)
+except RuntimeError as e: print("   next after discard:", e)
+op.close(); state(d, "decoder after discard")
+d = GzipDecoder(); op = d.feed(w[:50]); list(op)
+d.discard()
+try: print("   exhausted op after discard:", next(op, "StopIteration"))
+except RuntimeError as e: print("   exhausted op after discard raises RuntimeError:", e)
+d = GzipDecoder(); bad = bytearray(w); bad[40] ^= 0xff; op = d.feed(bytes(bad))
+try: list(op)
+except Exception as e: print("   failure:", type(e).__name__)
+print("   next after failure ->", next(op, "StopIteration")); state(d, "decoder after failure")
+d = GzipDecoder(); list(d.feed(w)); list(d.finish()); state(d, "decoder after finish")
+e = GzipEncoder(output_chunk_size=3); op = e.start(); next(op)
+print("   started after 1 of 4 header chunks:", e.started); op.close(); state(e, "encoder after start closed early")
+e = GzipEncoder(); op = e.start()
+try: e.feed(b"x")
+except Exception as ex: print("   feed before start advanced:", type(ex).__name__, ex)
+e = GzipEncoder(output_chunk_size=4); list(e.start()); op = e.finish(); chunks = [next(op) for _ in range(3)]
+print("   finish: got", sum(map(len, chunks)), "bytes, finished =", e.finished, "; valid gzip already:", gzip.decompress(e and b"\x1f\x8b\x08\x00" + b"".join(chunks)[0:0] or b"") if False else "n/a")
+list(op); print("   after exhaustion finished =", e.finished); state(e, "encoder after finish")
+e = GzipEncoder(strict_size=True); list(e.start()); e._input_size = 0xFFFFFFFF - 1
+list(e.feed(b"x")); print("   strict_size: 2**32-1 total accepted, input_size =", e.input_size)
+try: e.feed(b"y")
+except OSError as ex: print("   strict_size: next byte rejected at call time; encoder still usable:", end=" "); list(e.feed(b"")); print("yes")
+print("   trailer ISIZE for 2**32+5:", struct.unpack("<II", aiogzip._common._build_gzip_trailer(0, 2**32 + 5)))
+
+print("== E. tiny-member work count (deterministic, not timing)")
+one = gzip.compress(b"x" * 20, mtime=0)
+n = 256 * 1024 // len(one)
+wire = one * n
+calls = [0, 0]
+orig = _engine.inflate_step
+def counting(engine, data, **kw):
+    calls[0] += 1; calls[1] += len(data); return orig(engine, data, **kw)
+_engine.inflate_step = counting
+d = GzipDecoder(); out = b"".join(d.feed(wire)) + b"".join(d.finish())
+_engine.inflate_step = orig
+print(f"   {n} members of {len(one)} B in one {len(wire)} B feed: inflate calls={calls[0]}, bytes handed to inflate={calls[1]} ({calls[1] / len(wire):.0f}x the input)")
+calls = [0, 0]; _engine.inflate_step = counting
+d = GzipDecoder(); out = b"".join(b"".join(d.feed(wire[i:i + 4096])) for i in range(0, len(wire), 4096)) + b"".join(d.finish())
+_engine.inflate_step = orig
+print(f"   same, fed in 4 KiB chunks: bytes handed to inflate={calls[1]} ({calls[1] / len(wire):.0f}x the input)")

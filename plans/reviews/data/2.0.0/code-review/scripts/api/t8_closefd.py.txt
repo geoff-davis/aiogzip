@@ -1,0 +1,34 @@
+import asyncio, gzip, os, gc, warnings
+import aiogzip
+P = os.path.join(os.path.dirname(__file__), "ok.gz")
+def nfds(): return len(os.listdir("/proc/self/fd"))
+async def main():
+    base = nfds()
+    for i in range(50):
+        async with aiogzip.open(P, "rb", closefd=False) as f:
+            await f.read()
+    print("open(path, 'rb', closefd=False) x50: fd growth =", nfds() - base)
+    base = nfds()
+    for i in range(50):
+        await aiogzip.read(P, closefd=False)
+    print("read(path, closefd=False) x50: fd growth =", nfds() - base)
+    base = nfds()
+    for i in range(50):
+        await aiogzip.verify(P, closefd=False)
+    print("verify(path, closefd=False) x50: fd growth =", nfds() - base)
+    q = P + ".out"
+    base = nfds()
+    for i in range(20):
+        await aiogzip.write(q, b"hello" * 10, closefd=False)
+    print("write(path, closefd=False) x20: fd growth =", nfds() - base, "| file bytes on disk:", os.path.getsize(q))
+    try:
+        print("  readable:", gzip.open(q).read()[:5])
+    except Exception as e:
+        print("  reading it back:", repr(e))
+    gc.collect()
+    print("after gc: fd growth =", nfds() - base)
+    try:
+        open(P, "rb", closefd=False)
+    except ValueError as e:
+        print("builtin open:", e)
+asyncio.run(main())

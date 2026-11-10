@@ -1,0 +1,203 @@
+# aiogzip: what to build after 2.0.0 — ranked shortlist
+
+Nothing in the repository was modified, no benchmarks were run, and git/gh use was read-only. Probe scripts are in `scripts/features/` (`mistakes.py`, `probes.py`, `probes2.py`, `probes3.py`, `typing_snippet.py`, `typing2.py`). Quoted output below comes from those runs against the checkout (`2.0.1.dev0`, zlib-ng 1.0.0, aiofiles 25.1.0).
+
+Overall read: the basics are in good shape. `with`/`for` misuse, wrong mode, str-vs-bytes, typo'd kwargs ("Did you mean 'compresslevel'?"), truncated files and same-handle overlap all give clear errors. The gaps are at the edges: in-memory data, sources that are not `read(n)` objects, wrong-kind file objects, and typing of paths and kwargs.
+
+Ranks are overall (1 = do first), grouped by kind.
+
+## Functionality
+
+### Rank 2 — One-shot `compress()` / `decompress()` for in-memory bytes
+```python
+blob = await aiogzip.compress(payload, mtime=0)
+data = await aiogzip.decompress(blob, max_decompressed_size=50 * 2**20)
+# sync twins on the codec module, same options
+data = aiogzip.codec.decompress(blob, max_decompressed_size=50 * 2**20)
+```
+- **Who and evidence:** anyone handling a gzipped HTTP body, queue message or cache value. `docs/index.md` explicitly says these helpers do not exist. `aiogzip.compress(b"x")` gives `AttributeError: module 'aiogzip' has no attribute 'compress'`. Today's glue is a one-item async generator around `decompress_chunks`, or `b"".join(d.feed(x)) + b"".join(d.finish())`.
+- **Why it beats the stdlib:** the usual alternative, `await asyncio.to_thread(gzip.decompress, data)`, has no output cap (recall). aiogzip already has the bounded inflater and the executor-offload policy.
+- **Size:** small. `__init__.py`, `_codec_async.py`, `codec.py`. The sync twins also cover the "safer draining helpers" item in b2 plan §18.
+- **Risk:** low. Accept the same `bytes | bytearray | memoryview` as `write()`; keep exact-`bytes` in the codec.
+- **Release:** 2.1.
+
+### Rank 4 — Reader adapter for `AsyncIterable[bytes]` sources
+```python
+async with client.stream("GET", url) as resp:              # httpx
+    src = aiogzip.IterableReader(resp.aiter_raw())         # name negotiable
+    async with aiogzip.open(None, "rt", fileobj=src) as f:
+        async for batch in f.iter_batches():
+            ...
+```
+- **Who and evidence:** users who want lines or text from a stream that only offers async iteration. `decompress_chunks` yields raw byte chunks only. Passing an async generator as `fileobj` fails at first read with `OSError: Error reading from file: 'async_generator' object has no attribute 'read'`.
+- **Glue today:** I had to write a 10-line `IterReader` class with a naive `bytes +=` buffer to get 20,000 lines out. Sources that already have async `read(n)` work directly; I confirmed `asyncio.StreamReader` locally.
+- **Size:** small to medium. One new private module plus the export.
+- **Design note:** give it a synchronous `tell()` so it qualifies for the custom-source "no input consumed" proof in `docs/recipes.md`, and pass `aclose()` through. A cancelled `__anext__` must leave it terminal.
+- **Release:** 2.1.
+
+### Rank 6 — `iter_batches()` on the binary file, plus `iter_chunks(size)`
+```python
+async with aiogzip.open(path, "rb") as f:
+    async for lines in f.iter_batches():       # list[bytes]
+        ...
+    async for chunk in f.iter_chunks(1 << 20): # replaces `while chunk := await f.read(n)`
+        ...
+```
+- **Who and evidence:** the resumable-processing recipe in `docs/index.md` sends users to the binary layer for exact `tell()` offsets. That is where they lose the batched path the performance guide recommends. `hasattr(binary_file, "iter_batches")` is `False`; only the text class has it.
+- **Size:** small. `_binary.py`, mirroring the text implementation over the existing `readlines(hint)`.
+- **Risk:** adds a method next to the hot path but does not change it. Per `CLAUDE.md`, benchmark before and after.
+- **Release:** 2.1.
+
+### Rank 7 — In-memory seek checkpoints (first stage of #72)
+```python
+async with aiogzip.open("big.tar.gz", "rb", checkpoint_spacing=4 * 2**20) as f:
+    await f.read(500 * 2**20)
+    await f.seek(120 * 2**20)   # restores nearest snapshot, replays <= 4 MiB
+```
+- **Why this shape:** #72 sketches "dictionary snapshot + bit offset". That needs `inflatePrime` and block-boundary stops, which Python's `zlib` does not expose (recall of zran's design; locally, neither engine's decompress object has a prime method).
+- **What does work:** `Decompress.copy()` exists on both stdlib zlib and zlib-ng. In my probe a mid-stream snapshot resumed identically on both engines. So O(spacing) backward seeks within one handle are possible in pure Python.
+- **Who:** tar-style access, text `seek`/`tell`, and non-seekable sources (it complements the replay cache).
+- **Size:** medium to large. `_engine.py` (a copy hook), `codec.py` (snapshot of CRC, size and member state), `_binary.py` seek.
+- **Risk:** opt-in parameter, default off. Memory per checkpoint is unmeasured (the 32 KiB window plus inflate state). Must respect the file-state model; needs a model update.
+- **Limit:** the index is not serializable. Persistent indexes are the next item.
+- **Release:** 2.1 or 2.2.
+
+### Rank 9 — Member-chunked writing plus a persistent member index (second stage of #72)
+```python
+async with aiogzip.open("events.jsonl.gz", "wt", member_size=4 * 2**20) as f:
+    await f.writelines(lines)                 # new member about every 4 MiB
+info = await aiogzip.inspect("events.jsonl.gz")   # already returns member offsets
+async with aiogzip.open("events.jsonl.gz", "rb", index=info) as f:
+    await f.seek(saved_offset)                # O(member), valid in a new process
+```
+- **Why:** member boundaries are byte-aligned restart points that need no inflate-state capture. `inspect()` already returns `compressed_offset` and `uncompressed_size` per member, so it is already a coarse index.
+- **What it fixes:** the documented O(n) resume cost. It also sets up parallel per-member compression later, since each member is an independent `GzipEncoder`. Output stays ordinary gzip.
+- **Neighbours:** pgzip records member positions in FEXTRA and BGZF uses a `BC` subfield with blocks of at most 64 KiB (both verified by search). b2 plan §18 lists "validated-member events and coarse index" with the constraint to bind an index to the exact object.
+- **Size:** large. Writer rotation in `_binary.py`/`_text.py`, index-aware seek, docs.
+- **Risk:** compression-ratio cost of resetting per member is unmeasured. Arbitrary foreign single-member files still need a C-level zran; point those users to indexed_gzip or rapidgzip.
+- **Release:** 2.2 or later.
+
+### Rank 10 — Native file layer without aiofiles (already deferred; detail added)
+- **Finding:** `_opening.py` and `_source_io.py` already bypass aiofiles' coroutine methods. They call `aiofiles.threadpool.sync_open` (absent from the stubs, hence a `cast`), read the private `file._file`, `file._loop` and `file._executor`, and match exact aiofiles types in `_is_native_source`.
+- **Consequence:** the dependency is mostly a container for a sync file and an executor, and the coupling to aiofiles privates is a breakage risk in its own right.
+- **Proposal:** a small internal native-file class would remove both. No new public API.
+- **Size:** medium.
+- **Risk:** `raw()` currently returns an aiofiles `AsyncBufferedReader` (observed). Changing that type is visible, so keep aiofiles handles when it is installed, or leave the dependency change for a major release.
+- **Release:** 2.1 at the earliest. It is a precondition for #71.
+
+### Rank 12 — AnyIO/Trio (#71)
+- Keep deferred. It depends on rank 10, because aiofiles is asyncio-only and AnyIO ships its own `open_file`/`wrap_file`/`Path` (verified).
+- It also needs the cancellation audit the issue describes. I found no demand signal: no user-filed feature requests in the tracker.
+- **Size:** large.
+
+## Developer experience
+
+### Rank 1 — Error and diagnostic pass (fits 2.0.x)
+No API change. Messages and `repr()` are outside the freeze per `docs/stability.md`. Target behaviour:
+```text
+TypeError: fileobj.read() returned bytes, not an awaitable; aiogzip needs an async
+  file object. Wrap a sync file with aiofiles.threadpool.wrap(f), or use gzip.open().
+gzip.BadGzipFile: Not a gzipped file (b'(\xb5'): looks like Zstandard
+  note: while reading 'shard-0042.gz'
+```
+Observed today:
+- **Sync file object, read mode:** `OSError: Error reading from file: 'bytes' object can't be awaited`, and only at the first read. Construction and `open()` both succeed; `isinstance(io.BytesIO(), aiogzip.WithAsyncRead)` is `True`.
+- **Sync file object, write mode:** a bare `TypeError: 'int' object can't be awaited` out of `open()`.
+- **A fix exists but is undocumented:** `aiofiles.threadpool.wrap(io.BytesIO(data))` works as `fileobj` (confirmed locally).
+- **File object passed positionally** (the `gzip.open(fileobj)` habit): `TypeError: Filename must be a string, bytes, or PathLike object`, with no pointer to `fileobj=`.
+- **Corrupt-file errors do not name the file:** `BadGzipFile: Error decompressing gzip data: Not a gzipped file`, with `filename` `None` and no notes. With many shards open you cannot tell which one failed.
+- **No magic bytes:** the stdlib prints `Not a gzipped file (b'no')`. A zstd file gets the same generic text.
+- **Reprs:** `GzipEncoder`/`GzipDecoder` use the default `<... object at 0x...>`. The file repr shows `closed=False` before `open()`, and the text class prints `PosixPath(...)` where the binary class prints a `str`.
+
+Details:
+- **Size:** small. `_binary.py` open/read error sites, `_common.py`, `codec.py` reprs.
+- **Risk:** keep exception types as they are. Note the changed messages in the behaviour-exception ledger if the maintainer counts them as observable.
+
+### Rank 3 — Typing fixes
+```python
+aiogzip.open(pathlib.PurePosixPath("x.gz"), "rb")   # runtime OK, mypy: no overload matches
+aiogzip.open(p, "rb", compress_level=3)             # mypy --strict: Success, reveals Binary | Text
+```
+- **Paths:** `_Filename` is `str | bytes | Path | None`. Runtime accepts any `os.PathLike` (a custom `__fspath__` object and `PurePosixPath` both verified), but mypy rejects them with a 6-line overload dump. Widening the annotation is typing-only.
+- **Fallback overload:** `(mode: str, **kwargs: Any)` swallows every mistake. A typo'd keyword, or `encoding=` with `"rb"`, passes `mypy --strict` and silently widens the result to the union. Runtime then raises. Listing the keywords explicitly in the fallback fixes this.
+- **Size:** small. `__init__.py` and the typing contract tests.
+- **Release:** the path widening fits 2.0.x as an annotation bug. The fallback tightening makes some already-broken code fail type checking and the stability page freezes "overload behavior", so do it in 2.1 with a changelog note.
+
+### Rank 5 — Handle parity: `await open()`, `aclose()`, `mode`
+```python
+f = await aiogzip.open(path, "rb")          # aiofiles habit
+async with contextlib.aclosing(f):
+    print(f.mode)
+```
+- **Observed:** `TypeError: 'AsyncGzipBinaryFile' object can't be awaited`; `AttributeError: ... has no attribute 'aclose'`; no `mode` attribute, although the repr prints one.
+- **Neighbours:** AnyIO documents `async with await open_file(...)` (verified). aiofiles accepts both awaiting and `async with` (recall).
+- **Size:** small. `_binary.py`, `_text.py`.
+- **Risk:** `async with await aiogzip.open(...)` needs `__aenter__` to accept an already-open handle. Today a second `open()` raises `ValueError`, and that is documented, so the relaxation needs a file-state-model entry.
+- **Release:** 2.1.
+
+### Rank 8 — `ResourceWarning` for handles never closed
+```text
+ResourceWarning: unclosed AsyncGzipBinaryFile name='leak.gz' mode='wb';
+  the gzip member was never finalized and the output is incomplete
+```
+- **Observed:** a writer that was opened, written to and dropped left a file that reads back as `b''`. The only warning was CPython's `unclosed file <_io.FileIO ...>`, which does not mention gzip and is hidden by default.
+- **Proposal:** a warn-only `__del__` that changes no state, so the "never depend on finalizers" rule holds.
+- **Size:** small.
+- **Risk:** test suites running with `-W error` will see new failures.
+- **Release:** 2.1.
+
+### Rank 11 — CLI and recipe gaps
+```bash
+python -m aiogzip verify --max-decompressed-size 1G a.gz b.gz
+python -m aiogzip info        # version, engine_info(), Python, platform
+```
+- **CLI today:** two subcommands, one path each, no size cap, no stdin, no engine report, and no console script. The help output itself is clear.
+- **Missing recipes (2.0.x docs):** httpx, aiohttp and aiobotocore bodies; wrapping a sync file or `BytesIO`.
+- **Overstated claim:** `docs/index.md` says "Full compatibility with `tarfile` for reading `.tar.gz` archives". The test behind it (`tests/test_binary_io.py::test_tarfile_like_iteration`) parses 512-byte headers by hand. `tarfile.open(fileobj=handle)` fails with `TypeError: object of type 'coroutine' has no len()`. The README wording, "tarfile-style access patterns", is the accurate one.
+- **Size:** small.
+- **Release:** CLI flags in 2.1; docs in 2.0.x.
+
+## The three I would do first
+1. **Error and diagnostic pass (rank 1).** It is the only item that ships in 2.0.1, costs little, and fixes the most confusing behaviour I hit: the sync-file-object errors and corrupt-file errors that do not name the file.
+2. **One-shot `compress()`/`decompress()` (rank 2).** It is the most visible missing convenience (the docs apologise for it), it is small, and the bounded decompress is a real advantage over `to_thread(gzip.decompress)`.
+3. **Typing fixes (rank 3).** The path widening can go out with 2.0.1. The swallowed-kwargs overload undermines the "typed concrete classes" selling point and is cheap to fix in 2.1.
+
+Ranks 4 to 6 make a coherent 2.1 together with these. For #72, decide between the two stages before any design work: the issue's bit-offset sketch does not look buildable on Python's zlib, but `copy()` checkpoints and member indexes are.
+
+## Considered and rejected
+- **Default or opt-in write buffering:** 1,000 tiny text writes produced 3 sink writes and the same 2,402 bytes as one-shot gzip, so there is no sink-side trap; #86 is closed.
+- **zstd or other formats, or `compression="infer"`:** out of scope for a gzip library; Python 3.14 has `compression.zstd` (verified), and fsspec's sync `open` infers compression.
+- **ISA-L engine:** already decided against in `docs/adr-isal.md`; nothing new found.
+- **Multi-threaded compression now:** python-isal and python-zlib-ng ship threaded `open` functions and pgzip parallelises by block (verified), but it needs benchmark evidence and falls out of rank 9 later.
+- **Async tar reader:** belongs in a separate package; fix the doc claim instead.
+- **Writing FCOMMENT/FEXTRA headers:** niche unless the member index needs them.
+- **`read_text()`/`write_text()` helpers:** two lines with `open()`; low value next to the bytes one-shots.
+- **A compressed-position accessor for progress bars:** `f.raw().tell()` already works for path-opened files, coarsely.
+- **`inspect()` limits and broader resource budgets:** already in the deferred list; I have nothing to add.
+- **True zran on foreign files:** needs a C extension; indexed_gzip (`build_full_index`, `export_index`/`import_index`, `spacing`) and rapidgzip (`parallelization`, index export/import) already do it (verified).
+
+## Provenance of facts about other libraries
+- **Verified by web search this session:**
+  - indexed_gzip and rapidgzip index APIs.
+  - httpx `aiter_raw()` yields undecoded bytes and `aiter_bytes()` decodes (via third-party mirrors of the docs).
+  - aiobotocore `StreamingBody` has async `read`, `iter_chunks` and `iter_lines`, and the API changed across versions.
+  - aiohttp `StreamReader` has `read`, `readline`, `iter_chunked` and `iter_any`.
+  - AnyIO `open_file`, `wrap_file` and `Path`.
+  - python-isal `igzip_threaded`, with reading limited to one thread.
+  - pgzip threads, block size and FEXTRA index.
+  - python-zlib-ng `gzip_ng_threaded.open` exists; its signature was not confirmed.
+  - `compression.zstd` was added in Python 3.14.
+  - BGZF `BC` field and Biopython virtual offsets.
+  - fsspec `compression="infer"` on the sync `open`.
+- **Verified locally:**
+  - `Decompress.copy()` on zlib and zlib-ng, and no prime method on either.
+  - Raw restart at a `Z_FULL_FLUSH` point without a dictionary.
+  - `aiofiles.threadpool.wrap(BytesIO)` and `asyncio.StreamReader` as `fileobj`.
+- **Recalled, not verified:**
+  - `gzip.decompress` has no output limit.
+  - The version in which `gzip.compress` gained `mtime`.
+  - `Decompress.decompress()` takes no flush-mode argument, and zran needs `inflatePrime` and `Z_BLOCK`.
+  - aiohttp's `auto_decompress=False`.
+  - `await aiofiles.open()` as a supported form.
+  - smart_open being sync-only (the search found no async support).
+  - fsspec `open_async` details beyond the repository's own recipe.

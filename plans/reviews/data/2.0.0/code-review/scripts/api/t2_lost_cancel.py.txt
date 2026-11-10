@@ -1,0 +1,65 @@
+"""Cancellation delivered while the streaming driver awaits source.aclose()
+after an ordinary failure is swallowed; the task is not cancelled."""
+import asyncio, gzip
+import aiogzip
+
+async def run(kind):
+    in_cleanup = asyncio.Event()
+    release = asyncio.Event()
+
+    async def source():
+        try:
+            if kind == "decompress":
+                yield b"this is not gzip data at all"   # -> BadGzipFile
+            else:
+                yield "not bytes"                        # -> TypeError
+            yield b"never"
+        finally:
+            in_cleanup.set()
+            await release.wait()      # e.g. awaiting a transport's wait_closed()
+
+    async def worker():
+        api = aiogzip.decompress_chunks if kind == "decompress" else aiogzip.compress_chunks
+        try:
+            async for _ in api(source()):
+                pass
+        except asyncio.CancelledError:
+            return "worker saw CancelledError (correct)"
+        except Exception as e:
+            # swallow-and-continue is common: log the bad stream, carry on
+            await asyncio.sleep(0)   # a real checkpoint; still not cancelled
+            return f"worker saw only {type(e).__name__}; cancellation LOST; task.cancelling()={asyncio.current_task().cancelling()}"
+
+    t = asyncio.create_task(worker())
+    await in_cleanup.wait()
+    t.cancel()
+    await asyncio.sleep(0)
+    release.set()
+    try:
+        print(kind, "->", await t, "| task.cancelled() =", t.cancelled())
+    except asyncio.CancelledError:
+        print(kind, "-> task cancelled (correct)")
+
+async def scan_control():
+    # Same shape through verify(): BC14 says the cancellation must win.
+    in_cleanup = asyncio.Event(); release = asyncio.Event()
+    class Src:
+        async def read(self, n=-1): return b"not gzip"
+        async def close(self):
+            in_cleanup.set(); await release.wait()
+    async def worker():
+        try:
+            await aiogzip.verify(None, fileobj=Src(), closefd=True)
+        except asyncio.CancelledError as e:
+            return f"CancelledError with context {type(e.__context__).__name__}"
+        except Exception as e:
+            return f"only {type(e).__name__}"
+    t = asyncio.create_task(worker())
+    await in_cleanup.wait(); t.cancel(); await asyncio.sleep(0); release.set()
+    print("verify control ->", await t)
+
+async def main():
+    await run("decompress")
+    await run("compress")
+    await scan_control()
+asyncio.run(main())

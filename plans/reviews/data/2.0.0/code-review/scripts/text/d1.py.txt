@@ -1,0 +1,145 @@
+"""Differential read test: AsyncGzipTextFile vs io.TextIOWrapper(gzip.GzipFile)."""
+import asyncio, gzip, io, os, random, sys, tempfile, collections
+
+from aiogzip import AsyncGzipTextFile
+
+D = tempfile.mkdtemp(prefix="rt-", dir=os.path.dirname(os.path.abspath(__file__)))
+fails = collections.Counter()
+examples = {}
+
+
+def fail(kind, detail):
+    fails[kind] += 1
+    if kind not in examples:
+        examples[kind] = detail
+
+
+def ref_open(raw, enc, nl, errors="strict"):
+    return io.TextIOWrapper(io.BytesIO(raw), encoding=enc, newline=nl, errors=errors)
+
+
+async def run_ops(path, raw, enc, nl, cs, ops, errors, tag):
+    ref = ref_open(raw, enc, nl, errors)
+    async with AsyncGzipTextFile(path, "rt", encoding=enc, newline=nl, chunk_size=cs, errors=errors) as f:
+        for i, op in enumerate(ops):
+            name, arg = op
+            try:
+                if name == "read":
+                    a, b = await f.read(arg), ref.read(arg)
+                elif name == "readline":
+                    a, b = await f.readline(arg), ref.readline(arg)
+                elif name == "readlines":
+                    a = await f.readlines(arg)
+                    b = []; tot = 0
+                    while True:
+                        ln = ref.readline()
+                        if not ln: break
+                        b.append(ln); tot += len(ln)
+                        if tot >= arg: break
+                elif name == "anext":
+                    try:
+                        a = await f.__anext__()
+                    except StopAsyncIteration:
+                        a = ""
+                    b = ref.readline()
+                elif name == "roundtrip":
+                    c = await f.tell()
+                    nlb = f.newlines
+                    rest = await f.read()
+                    await f.seek(c)
+                    c2 = await f.tell()
+                    rest2 = await f.read()
+                    await f.seek(c)
+                    if rest != rest2:
+                        fail("roundtrip-rest", (tag, ops[: i + 1], rest, rest2))
+                    pos = ref.tell()
+                    b = ref.read()
+                    ref.seek(pos)
+                    a = rest
+                elif name == "readall":
+                    a, b = await f.read(), ref.read()
+                    if f.newlines != ref.newlines:
+                        fail("newlines-at-eof", (tag, ops[: i + 1], f.newlines, ref.newlines))
+            except Exception as e:  # noqa
+                fail("exception-" + type(e).__name__, (tag, ops[: i + 1], repr(e)))
+                return
+            if a != b:
+                fail("mismatch-" + name, (tag, ops[: i + 1], a, b))
+                return
+
+
+TEXT_ALPHABET = ["a", "b", "\n", "\r", "\r\n", "\n", "\r", "é", "漢", "😀", "\x85", " ", "\x0c", "x", "\r\r", "\n\n"]
+ASCII_ALPHABET = ["a", "b", "\n", "\r", "\r\n", "\n", "\r", "x", "\x0c", "\x1c", "\r\r", "\n\n", "yz"]
+JP_ALPHABET = ["a", "b", "\n", "\r", "\r\n", "漢", "字", "カ", "x", "\r\r"]
+
+
+def make_text(rng, alphabet, n):
+    return "".join(rng.choice(alphabet) for _ in range(n))
+
+
+def rand_ops(rng):
+    ops = []
+    for _ in range(rng.randint(1, 12)):
+        k = rng.random()
+        if k < 0.25:
+            ops.append(("read", rng.choice([1, 1, 2, 3, 5, 9, 17])))
+        elif k < 0.45:
+            ops.append(("readline", -1))
+        elif k < 0.6:
+            ops.append(("readline", rng.choice([1, 2, 3, 7])))
+        elif k < 0.7:
+            ops.append(("readlines", rng.choice([1, 2, 5, 11])))
+        elif k < 0.85:
+            ops.append(("anext", None))
+        else:
+            ops.append(("roundtrip", None))
+    ops.append(("roundtrip", None))
+    ops.append(("readall", None))
+    return ops
+
+
+async def main():
+    seed = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+    iters = int(sys.argv[2]) if len(sys.argv) > 2 else 300
+    rng = random.Random(seed)
+    global MODE
+    MODE = sys.argv[3] if len(sys.argv) > 3 else "strict"
+    encs = [
+        ("utf-8", TEXT_ALPHABET), ("utf-16", TEXT_ALPHABET), ("utf-16-le", TEXT_ALPHABET),
+        ("utf-32", TEXT_ALPHABET), ("utf-8-sig", TEXT_ALPHABET), ("shift_jis", JP_ALPHABET),
+        ("iso2022_jp", JP_ALPHABET), ("euc_jp", JP_ALPHABET), ("latin-1", ASCII_ALPHABET),
+        ("utf-7", TEXT_ALPHABET), ("hz", ["a", "\n", "\r", "\r\n", "汉", "字", "b"]),
+        ("gb18030", TEXT_ALPHABET), ("cp1252", ASCII_ALPHABET),
+    ]
+    n = 0
+    for it in range(iters):
+        enc, alpha = rng.choice(encs)
+        nl = rng.choice([None, "", "\n", "\r", "\r\n"])
+        cs = rng.choice([1, 1, 2, 3, 4, 5, 7, 8, 16, 64])
+        text = make_text(rng, alpha, rng.randint(0, 40))
+        raw = text.encode(enc)
+        ERR = "strict"
+        if MODE == "errors":
+            b = bytearray(raw)
+            for _ in range(rng.randint(1, 4)):
+                b.insert(rng.randint(0, len(b)), rng.choice([0xff, 0x80, 0xfe, 0x1b, 0xd8, 0x0d, 0x0a, 0xe6]))
+            raw = bytes(b)
+            ERR = rng.choice(["replace", "ignore", "backslashreplace", "surrogateescape"])
+            try:
+                raw.decode(enc, ERR)
+            except Exception:
+                continue
+        path = os.path.join(D, "f.gz")
+        with gzip.open(path, "wb") as g:
+            g.write(raw)
+        for _ in range(6):
+            ops = rand_ops(rng)
+            await run_ops(path, raw, enc, nl, cs, ops, ERR, (enc, nl, cs, raw, ERR))
+            n += 1
+    print("runs", n)
+    for k, v in fails.items():
+        print("FAIL", k, v)
+        print("   example:", examples[k])
+
+
+asyncio.run(main())

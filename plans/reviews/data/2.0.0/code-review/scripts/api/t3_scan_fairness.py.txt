@@ -1,0 +1,62 @@
+"""verify()/inspect() over an always-ready custom fileobj never yields to the loop
+when each read chunk expands to < 1 MiB (counts sibling-task turns, no timing)."""
+import asyncio, gzip, os, io
+import aiogzip
+
+class Ready:
+    def __init__(self, data): self.b = io.BytesIO(data); self.reads = 0
+    async def read(self, n=-1):
+        self.reads += 1
+        return self.b.read(n)
+
+async def count(coro_factory):
+    ticks = 0
+    done = False
+    async def sibling():
+        nonlocal ticks
+        while not done:
+            ticks += 1
+            await asyncio.sleep(0)
+    t = asyncio.create_task(sibling())
+    await asyncio.sleep(0)
+    start = ticks
+    r = await coro_factory()
+    got = ticks - start
+    done = True
+    await t
+    return got, r
+
+async def main():
+    payload = os.urandom(48 * 1024 * 1024)          # incompressible: ratio ~1
+    blob = gzip.compress(payload, 1, mtime=0)
+    text = gzip.compress(b"some fairly ordinary log line of text 12345\n" * 3_000_000, 6, mtime=0)  # ~130 MB out
+    for name, data in [("random 48MiB", blob), ("text 129MiB out", text)]:
+        src = Ready(data)
+        ticks, r = await count(lambda: aiogzip.verify(None, fileobj=src))
+        print(f"verify {name}: source reads={src.reads}, sibling turns during scan={ticks}, out={r.uncompressed_size}")
+        src = Ready(data)
+        ticks, r = await count(lambda: aiogzip.inspect(None, fileobj=src))
+        print(f"inspect {name}: source reads={src.reads}, sibling turns during scan={ticks}")
+        # controls: same bytes through the other drivers
+        async def gen():
+            b = io.BytesIO(data)
+            while c := b.read(64 * 1024):
+                yield c
+        async def dc():
+            n = 0
+            async for c in aiogzip.decompress_chunks(gen()): n += len(c)
+            return n
+        ticks, n = await count(dc)
+        print(f"decompress_chunks {name}: sibling turns={ticks}")
+        src = Ready(data)
+        async def rd():
+            n = 0
+            async with aiogzip.open(None, "rb", fileobj=src) as f:
+                while c := await f.read(64 * 1024): n += len(c)
+            return n
+        ticks, n = await count(rd)
+        print(f"open().read(64K) loop {name}: sibling turns={ticks}")
+        src = Ready(data)
+        ticks, n = await count(lambda: aiogzip.read(None, fileobj=src))
+        print(f"aiogzip.read() {name}: sibling turns={ticks}")
+asyncio.run(main())

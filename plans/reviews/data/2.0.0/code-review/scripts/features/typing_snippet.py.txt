@@ -1,0 +1,61 @@
+import os
+import pathlib
+from typing import AsyncIterator
+
+import aiogzip
+
+
+class Reader:
+    async def read(self, size: int = -1) -> bytes:
+        return b""
+
+
+async def main(p: pathlib.Path, pl: "os.PathLike[str]", dyn: str) -> None:
+    async with aiogzip.open(p) as f0:
+        reveal_type(f0)
+        reveal_type(await f0.read())
+    async with aiogzip.open(p, "rt") as f1:
+        reveal_type(f1)
+        async for line in f1:
+            reveal_type(line)
+        async for batch in f1.iter_batches():
+            reveal_type(batch)
+        reveal_type(f1.buffer)
+    async with aiogzip.open(p, "wb") as f2:
+        await f2.write("oops")
+    async with aiogzip.open(p, "wt") as f3:
+        await f3.write(b"oops")
+    async with aiogzip.open(p, dyn) as f4:
+        reveal_type(f4)
+        data = await f4.read()
+        reveal_type(data)
+    async with aiogzip.open(pl, "rb") as f5:
+        pass
+    async with aiogzip.open(pathlib.PurePosixPath("x"), "rb") as f6:
+        pass
+    async with aiogzip.open(None, "rb", fileobj=Reader()) as f7:
+        reveal_type(f7)
+    async with aiogzip.open(p, "rb", encoding="utf-8") as f8:
+        pass
+    async with aiogzip.open(p, mode="rt") as f9:
+        reveal_type(f9)
+    f10 = aiogzip.open(p, "rb")
+    data2 = f10.read()
+    reveal_type(data2)
+    data2.decode()
+    with aiogzip.open(p, "rb") as f11:
+        pass
+    reveal_type(await aiogzip.read(p))
+    reveal_type(aiogzip.decompress_chunks(aiogzip.compress_chunks(src())))
+    async for c in aiogzip.decompress_chunks(b"raw"):
+        pass
+    op = aiogzip.GzipDecoder().feed(bytearray(b"x"))
+    reveal_type(op)
+    info = await aiogzip.inspect(p)
+    reveal_type(info.members[0].mtime)
+    reveal_type(f1.mtime)
+    reveal_type(f1.name)
+
+
+async def src() -> AsyncIterator[bytes]:
+    yield b""

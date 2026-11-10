@@ -1,0 +1,23 @@
+import asyncio, gzip, io, os, tempfile
+from aiogzip import AsyncGzipTextFile
+d = tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))
+p = os.path.join(d, "f.gz")
+async def attempt(label, coro):
+    try: print(f"{label}: -> {await coro!r:.200}")
+    except BaseException as e: print(f"{label}: raised {type(e).__name__}: {e}")
+async def main():
+    async with AsyncGzipTextFile(p, "wt") as f:
+        await f.write("abc")
+        await attempt("wt seek(0) after write", f.seek(0))
+        await attempt("wt seek(3)", f.seek(3))
+        await attempt("wt seek(10)", f.seek(10))
+        await attempt("wt seek(tell())", f.seek(await f.tell()))
+        await attempt("wt seek(0, SEEK_CUR)", f.seek(0, 1))
+        await attempt("write", f.write("def"))
+    print(gzip.open(p, "rb").read())
+    b = io.BytesIO(); g = gzip.GzipFile(fileobj=b, mode="wb"); t = io.TextIOWrapper(g); t.write("abc")
+    for off in (3, 10):
+        try: print("ref seek", off, t.seek(off))
+        except Exception as e: print("ref seek", off, type(e).__name__, e)
+    t.close(); print(gzip.decompress(b.getvalue()) if False else "ref done")
+asyncio.run(main())

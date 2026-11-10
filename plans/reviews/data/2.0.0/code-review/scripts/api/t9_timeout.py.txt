@@ -1,0 +1,30 @@
+import asyncio, sys, aiogzip
+async def main():
+    release = asyncio.Event()
+    async def source():
+        try:
+            yield b"not gzip"
+            yield b"x"
+        finally:
+            await release.wait()         # slow transport shutdown, never returns in time
+    asyncio.get_running_loop().call_later(0.3, release.set)
+    try:
+        async with asyncio.timeout(0.05):
+            async for _ in aiogzip.decompress_chunks(source()):
+                pass
+    except TimeoutError as e:
+        print("TimeoutError (deadline honoured)", repr(e.__cause__ or e.__context__))
+    except Exception as e:
+        print(sys.version_info[:2], "deadline swallowed; got", type(e).__name__, "| context:", repr(e.__context__), "| cause:", repr(e.__cause__))
+    # KeyboardInterrupt-like BaseException from source cleanup after a failure
+    class Boom(BaseException): pass
+    async def source2():
+        try:
+            yield b"not gzip"; yield b"x"
+        finally:
+            raise Boom("raised by source cleanup")
+    try:
+        async for _ in aiogzip.decompress_chunks(source2()): pass
+    except BaseException as e:
+        print("BaseException from source.aclose() after failure ->", type(e).__name__, "| notes:", getattr(e, "__notes__", None))
+asyncio.run(main())

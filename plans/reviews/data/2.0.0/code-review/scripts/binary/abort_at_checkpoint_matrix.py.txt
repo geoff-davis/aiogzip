@@ -1,0 +1,62 @@
+"""Exceptional exit while each call type is parked at a codec checkpoint / executor (not a source call)."""
+import asyncio, gzip, io, os
+from aiogzip import AsyncGzipBinaryFile
+
+class Src:
+    def __init__(self, data):
+        self.b = io.BytesIO(data); self.closed = False; self.after_close = []
+    async def read(self, n=-1):
+        if self.closed: self.after_close.append("read")
+        return self.b.read(n)
+    async def seek(self, o, w=0):
+        if self.closed: self.after_close.append("seek")
+        return self.b.seek(o, w)
+    async def write(self, d):
+        if self.closed: self.after_close.append("write")
+        return self.b.write(d)
+    def seekable(self): return True
+    def tell(self): return self.b.tell()
+    async def close(self): self.closed = True
+
+async def run(label, mode, op, prep=None, data=None):
+    src = Src(data or b"")
+    f = AsyncGzipBinaryFile(None, mode, fileobj=src, closefd=True)
+    task = None
+    try:
+        async with f:
+            if prep: await prep(f)
+            task = asyncio.create_task(op(f))
+            for _ in range(200):
+                await asyncio.sleep(0)
+                if (f._read_call_active or f._write_call_active) and f._source_owner is None: break
+            else:
+                print(label, "never parked outside a source call");
+            raise RuntimeError("body")
+    except RuntimeError:
+        pass
+    try:
+        r = await task
+        print(f"{label}: RETURNED {r if isinstance(r,int) else len(r)}", end="")
+    except BaseException as e:
+        print(f"{label}: {type(e).__name__}: {str(e)[:70]}", end="")
+    print(f" | closed={f.closed} health={f._read_health.name} touched-after-close={src.after_close}")
+
+async def main():
+    lines = (b"x" * 1023 + b"\n") * (8 * 1024)
+    wire = gzip.compress(lines)
+    big = gzip.compress(b"A" * (8 << 20))
+    await run("read(-1)", "rb", lambda f: f.read(), data=wire)
+    await run("read(5MiB)", "rb", lambda f: f.read(5 << 20), data=wire)
+    await run("readinto", "rb", lambda f: f.readinto(bytearray(5 << 20)), data=wire)
+    await run("read1", "rb", lambda f: f.read1(), data=wire)
+    await run("peek(5MiB)", "rb", lambda f: f.peek(5 << 20), data=wire)
+    await run("readline (no newline)", "rb", lambda f: f.readline(), data=big)
+    await run("readline (newline)", "rb", lambda f: f.readline(), data=wire)
+    await run("readlines", "rb", lambda f: f.readlines(), data=wire)
+    await run("seek(fwd)", "rb", lambda f: f.seek(7 << 20), data=wire)
+    await run("seek(0,END)", "rb", lambda f: f.seek(0, 2), data=wire)
+    await run("seek(-1,END)", "rb", lambda f: f.seek(-1, 2), data=wire)
+    async def anext(f): return await f.__anext__()
+    await run("anext", "rb", anext, data=wire)
+    await run("write(8MiB)", "wb", lambda f: f.write(os.urandom(8 << 20)))
+asyncio.run(main())

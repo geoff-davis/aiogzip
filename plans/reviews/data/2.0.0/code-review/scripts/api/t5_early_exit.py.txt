@@ -1,0 +1,53 @@
+import asyncio, gzip, os, gc, sys, warnings
+import aiogzip
+import aiogzip._codec_async as ca
+
+events = []
+orig = ca._drive_operation
+
+def source_factory(blob, step):
+    async def source():
+        try:
+            for i in range(0, len(blob), step):
+                events.append(f"pull@{i}")
+                yield blob[i:i+step]
+        finally:
+            events.append("source finally")
+    return source()
+
+async def early(kind, explicit):
+    events.clear()
+    payload = os.urandom(600_000)
+    data = gzip.compress(payload, mtime=0) if kind == "d" else payload
+    api = aiogzip.decompress_chunks if kind == "d" else aiogzip.compress_chunks
+    stream = api(source_factory(data, 100_000), output_chunk_size=1000)
+    n = 0
+    async for chunk in stream:
+        n += 1
+        if n == 3:
+            break
+    events.append("consumer broke")
+    if explicit:
+        await stream.aclose()
+        events.append("aclose returned")
+    else:
+        del stream
+    events.append("before next loop turn")
+    await asyncio.sleep(0); await asyncio.sleep(0)
+    events.append("after loop turns")
+    print(kind, "explicit" if explicit else "implicit", events)
+
+async def main():
+    for kind in "dc":
+        for explicit in (True, False):
+            await early(kind, explicit)
+
+# 1) asyncio.run
+asyncio.run(main())
+# 2) manual loop without shutdown_asyncgens, explicit aclose only
+print("--- manual loop, explicit aclose, loop.close() right after")
+loop = asyncio.new_event_loop()
+loop.run_until_complete(early("d", True))
+loop.close()
+gc.collect()
+print("done")

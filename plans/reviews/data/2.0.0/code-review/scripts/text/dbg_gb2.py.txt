@@ -1,0 +1,18 @@
+import asyncio, gzip, io, os, tempfile, codecs
+from aiogzip import AsyncGzipTextFile
+d = tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))
+p = os.path.join(d, "f.gz")
+raw = b'\x810\x1b\xff\x815'
+async def main():
+    with gzip.open(p, "wb") as g: g.write(raw)
+    print("ref", repr(io.TextIOWrapper(io.BytesIO(raw), encoding="gb18030", errors="surrogateescape", newline="").read()))
+    dec = codecs.getincrementaldecoder("gb18030")("surrogateescape")
+    for i in range(0, len(raw), 2):
+        out = dec.decode(raw[i:i+2]); print("chunk", raw[i:i+2], "->", repr(out), "state", dec.getstate())
+    print("final ->", repr(dec.decode(b"", True)), dec.getstate())
+    async with AsyncGzipTextFile(p, "rt", encoding="gb18030", errors="surrogateescape", chunk_size=2, newline="") as f:
+        a = await f.readlines(1); print("readlines(1)", a)
+        c = await f.tell(); print("tell", c if c >= 0 else "cookie", f._decode_cookie(c) if c < 0 else "", "live state", f._decoder.getstate(), "pos", f._binary_file._position)
+        print("rest", repr(await f.read()))
+        await f.seek(c); print("after seek rest", repr(await f.read()))
+asyncio.run(main())

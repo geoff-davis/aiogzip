@@ -1,0 +1,24 @@
+"""Minimal: one message ended with Z_PARTIAL_FLUSH; feed() withholds its tail until unrelated later input."""
+import zlib
+import aiogzip
+from aiogzip import GzipDecoder
+print(aiogzip.engine_info())
+header = b"\x1f\x8b\x08\x00" + bytes(4) + b"\x00\xff"
+for strategy in (zlib.Z_RLE, zlib.Z_DEFAULT_STRATEGY, zlib.Z_HUFFMAN_ONLY):
+    for size in range(262_100, 262_200):
+        msg = b"x" * size
+        c = zlib.compressobj(6, zlib.DEFLATED, -15, 9, strategy)
+        wire = c.compress(msg) + c.flush(zlib.Z_PARTIAL_FLUSH)
+        assert zlib.decompressobj(-15).decompress(wire) == msg      # an unbounded inflate has the whole message
+        d = GzipDecoder()
+        got = b"".join(d.feed(header + wire))
+        if got != msg:
+            again = b"".join(d.feed(b""))
+            nxt = c.compress(b"NEXT") + c.flush(zlib.Z_PARTIAL_FLUSH)
+            later = b"".join(d.feed(nxt))
+            print(f"strategy={strategy} message={size} B wire={len(wire)} B: feed() returned {len(got)} B "
+                  f"(short by {size - len(got)}); feed(b'') returned {len(again)} B; "
+                  f"the next message's feed returned {later[:8]!r}... ({len(later)} B)")
+            break
+    else:
+        print(f"strategy={strategy}: no case in range")

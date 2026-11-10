@@ -1,0 +1,41 @@
+import zlib, struct, random, sys
+import aiogzip
+from aiogzip import GzipDecoder
+from zlib_ng import zlib_ng
+print(aiogzip.engine_info())
+rng = random.Random(3)
+payload = b"x" * 900_000
+c = zlib.compressobj(6, zlib.DEFLATED, -15, 9, zlib.Z_RLE)
+body = c.compress(payload) + c.flush()
+cut = 153 - 10
+ref = zlib.decompressobj(-15).decompress(body[:cut])
+ng = zlib_ng.decompressobj(-15)
+ng_unbounded = ng.decompress(body[:cut])
+print("stdlib unbounded:", len(ref), "zlib-ng unbounded:", len(ng_unbounded))
+for eng in (zlib, zlib_ng):
+    o = eng.decompressobj(-15); tot = 0; data = body[:cut]; steps = 0
+    while data:
+        out = o.decompress(data, max_length=65536); tot += len(out); data = o.unconsumed_tail; steps += 1
+    extra = o.decompress(b"", max_length=65536)
+    print(eng.__name__, "bounded loop until tail empty:", tot, "then decompress(b'') yields", len(extra), "more")
+
+print("sync-flush boundaries, hand-built, all strategies")
+worst = 0; n = 0
+for trial in range(400):
+    strategy = rng.choice([0, zlib.Z_HUFFMAN_ONLY, zlib.Z_RLE, zlib.Z_FIXED, zlib.Z_FILTERED])
+    c = zlib.compressobj(rng.choice([1, 6, 9]), zlib.DEFLATED, -15, 9, strategy)
+    d = GzipDecoder(output_chunk_size=rng.choice([1024, 65536, 1 << 20]))
+    pre = b"\x1f\x8b\x08\x00" + bytes(4) + b"\x00\xff"
+    for m in range(6):
+        k = rng.choice([1, 65535, 65536, 65537, 262143, 262144, 262145, rng.randrange(1, 1_500_000)])
+        msg = rng.choice([bytes(k), b"x" * k, (b"ab" * k)[:k], (rng.randbytes(40) * (k // 40 + 1))[:k]])
+        w = pre + c.compress(msg) + c.flush(zlib.Z_SYNC_FLUSH); pre = b""
+        got = b"".join(d.feed(w)); n += 1
+        if got != msg:
+            worst = max(worst, len(msg) - len(got))
+        # realign reference: whatever was withheld must come out with the next feed
+        if got != msg:
+            rest = b"".join(d.feed(b""))
+            print("  withheld", len(msg) - len(got), "bytes at a sync-flush boundary; feed(b'') then gives", len(rest), "strategy", strategy, "len", k)
+            break
+print("messages", n, "worst withheld at flush boundary", worst)

@@ -1,0 +1,16 @@
+import zlib, gzip
+from aiogzip import GzipDecoder
+class Evil(bytes):
+    def __buffer__(self, flags): raise AssertionError("override invoked")
+    def __getitem__(self, i): raise AssertionError("getitem override invoked")
+    def __len__(self): return 3
+e = Evil(b"real payload")
+print("bytes.__getitem__(obj, slice(None)) ->", bytes.__getitem__(e, slice(None)), type(bytes.__getitem__(e, slice(None))))
+# truncated stream: decodable bytes lost before the truncation error
+msg = b"x" * 262165
+c = zlib.compressobj(6, zlib.DEFLATED, -15); wire = c.compress(msg) + c.flush(zlib.Z_PARTIAL_FLUSH)
+d = GzipDecoder(); got = b"".join(d.feed(b"\x1f\x8b\x08\x00" + bytes(4) + b"\x00\xff" + wire))
+try:
+    got += b"".join(d.finish())
+except gzip.BadGzipFile as ex:
+    print("truncated stream: recovered", len(got), "of", len(zlib.decompressobj(-15).decompress(wire)), "decodable bytes before:", ex)

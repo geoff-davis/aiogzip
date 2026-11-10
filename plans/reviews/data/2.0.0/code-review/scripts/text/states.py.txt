@@ -1,0 +1,18 @@
+import codecs
+samples = {
+ "iso2022_jp": "a漢字b", "iso2022_jp_1": "a漢字b", "iso2022_jp_2": "a漢字éb한", "iso2022_jp_2004": "a漢字b",
+ "iso2022_jp_3": "a漢字b", "iso2022_jp_ext": "aｱ漢b", "iso2022_kr": "a한글b", "hz": "a汉字b",
+ "shift_jis": "a漢b", "euc_jp": "a漢b", "big5hkscs": "a漢b", "gb18030": "a漢b", "utf-7": "a漢b",
+ "utf-16": "ab", "utf-32": "ab", "utf-8-sig": "ab", "shift_jis_2004": "a漢か゚b", "euc_jis_2004": "aか゚b", "cp932": "a漢",
+}
+for enc, text in samples.items():
+    raw = text.encode(enc)
+    d = codecs.getincrementaldecoder(enc)()
+    flags = set(); mx = 0
+    flags.add(d.getstate()[1])
+    for i in range(len(raw)):
+        d.decode(raw[i:i+1])
+        st = d.getstate()
+        flags.add(st[1]); mx = max(mx, len(st[0]))
+    bad = [f for f in flags if not -2**31 <= f < 2**31]
+    print(f"{enc:16} flags={sorted(flags)} maxpending={mx} OUT_OF_INT32={bad}")
