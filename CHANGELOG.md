@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- A custom `fileobj` whose `read()` returns `bytearray` or `memoryview` works
+  again for reading, as it did in 1.x. In 2.0.0 the first read failed with a
+  decompression error and left the reader broken. `inspect()` and `verify()`
+  accept the same sources. (#174)
+- Text `tell()` in write mode returns the encoded byte position for every
+  encoding. For `utf-8-sig`, `utf-16`, `utf-32` and stateful encodings it
+  returned a large negative number. (#175)
+- Text `writelines()` writes every line before one that fails to encode, and
+  the `UnicodeEncodeError` describes that line. Earlier lines in the same
+  internal batch were dropped, so the amount lost depended on `chunk_size`.
+  (#176)
+- `seek()` raises `TypeError` for a non-integer offset and leaves the position
+  unchanged. A read-mode binary handle accepted a `float`, after which every
+  read failed until `seek(0)`. (#177)
+- `compress_chunks()` and `decompress_chunks()` no longer lose a cancellation
+  or timeout that arrives while they close the source after a failure or an
+  early `aclose()`. The cancellation propagates with the stream failure as
+  its context, as `verify()` already did. Another error raised by that close
+  is now recorded as a note on the stream failure. (#173)
+- A read-mode `seek(-n, os.SEEK_END)` that is in flight when the `async with`
+  body raises now fails with the documented `read aborted` error. It could
+  rewind and read a custom source after the file was closed, return a
+  position and revive the reader when the close had failed, or raise
+  `ValueError: seek of closed file` for a path-opened file. (#172)
+
 ### Documentation
 
 - The README and docs home page CI badge reports `main` only, so a

@@ -3,6 +3,7 @@
 import asyncio
 import gzip
 import io
+import operator
 import os
 import warnings
 from enum import Enum, auto
@@ -551,6 +552,9 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        # A float offset would otherwise become the position and break every
+        # later read; reject it before any state changes.
+        offset = operator.index(offset)
         if self._writing_mode:
             if self._write_broken:
                 self._raise_write_broken()
@@ -579,6 +583,7 @@ class AsyncGzipBinaryFile:
 
         position_before = self._position
         rewound = False
+        aborts = self._read_aborts
         with self._recovery_read_call:
             try:
                 # A fresh decoder over the rewound source is the one supported
@@ -614,6 +619,12 @@ class AsyncGzipBinaryFile:
                         if self._eof:
                             break
                         await self._fill_buffer()
+                    if self._read_aborts != aborts:
+                        # An exceptional context exit aborted this call while
+                        # the drain was parked on codec work. The abort also
+                        # sets EOF, so the loop ended; never rewind and
+                        # revive the aborted reader (BC9).
+                        self._raise_read_aborted()
                     target = self._position + offset
                     if target < 0:
                         target = 0
@@ -1598,13 +1609,15 @@ class AsyncGzipBinaryFile:
             and self._buffer.find(b"\n", self._buffer_offset) == -1
         )
 
+    def _raise_read_aborted(self) -> NoReturn:
+        raise OSError(
+            "read aborted because the gzip file was closed while the call was active"
+        )
+
     def _check_read_call_not_aborted(self) -> None:
         """Prevent a context-aborted read from publishing partial success."""
         if self._is_closed or not self._can_restore_failed_read():
-            raise OSError(
-                "read aborted because the gzip file was closed while "
-                "the call was active"
-            )
+            self._raise_read_aborted()
 
     def _finish_read_call(self) -> None:
         """Release a read reservation, discarding only after an abortive exit."""
@@ -1780,10 +1793,7 @@ class AsyncGzipBinaryFile:
                 # Context exit aborted the reader while the seek settled. A
                 # native seek is awaited rather than cancelled, so it returns
                 # normally; never revive the aborted reader with a new decoder.
-                raise OSError(
-                    "read aborted because the gzip file was closed while "
-                    "the call was active"
-                )
+                self._raise_read_aborted()
         elif self._cache_rewindable_reads:
             self._replay_offset = 0
         else:
@@ -1836,6 +1846,10 @@ class AsyncGzipBinaryFile:
                 chunk = cast(
                     bytes, await self._call_custom_source("read", self._chunk_size)
                 )
+                # The codec takes only bytes; a custom source may return
+                # another buffer type, as it could in 1.x.
+                if isinstance(chunk, (bytearray, memoryview)):
+                    chunk = bytes(chunk)
         except OSError:
             raise
         except Exception as e:
