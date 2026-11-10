@@ -18,6 +18,9 @@ repair gate, and local tests do not establish release readiness.
 - [T08 release preparation record](reviews/v2.0.0-t08-release-prep.md)
 - [Post-release record](reviews/v2.0.0-post-release.md) (T09 and T10), with
   the [T09 reviews](reviews/data/2.0.0/t09/)
+- [Post-release code review](reviews/v2.0.0-code-review.md) (2026-11-09):
+  seven bugs filed for 2.0.1 (#171–#177), with the
+  [reviewers' reports and scripts](reviews/data/2.0.0/code-review/)
 
 Each release's artifact hashes are recorded under
 [release artifact records](releases/README.md); the publish workflow uploads

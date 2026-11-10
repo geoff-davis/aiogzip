@@ -1,0 +1,18 @@
+import asyncio, gzip, io, os, tempfile
+from aiogzip import AsyncGzipTextFile
+d = tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))
+p = os.path.join(d, "f.gz")
+async def main():
+    for enc, text in (("iso2022_kr", "가나다라마바사\n" * 3),):
+        with gzip.open(p, "wt", encoding=enc, newline="") as g: g.write(text)
+        for cs in (3, 5, 262144):
+            async with AsyncGzipTextFile(p, "rt", encoding=enc, chunk_size=cs) as f:
+                n = 0
+                try:
+                    while await f.read(1):
+                        n += 1
+                        await f.tell()
+                    print(enc, "cs", cs, "ok")
+                except Exception as e:
+                    print(enc, "cs", cs, "after", n, "chars: tell raised", type(e).__name__, e)
+asyncio.run(main())

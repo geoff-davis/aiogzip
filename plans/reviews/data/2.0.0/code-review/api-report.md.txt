@@ -1,0 +1,106 @@
+Review of the async drivers and public surface (`_streaming.py`, `_inspection.py`, `_codec_async.py`, `__init__.py`, `__main__.py`, `_common.py`, packaging/typing). I read every line of those files plus `codec.py`, `_opening.py`, `_source_io.py`, `_metadata.py`. Nothing in the repo was modified. Scripts are in `scripts/api/` (called SCRATCH below), run with `uv run python` on CPython 3.14.2.
+
+No data-corruption bug found in my slice. The findings are a lost cancellation, a fairness gap, a typing defect and several CLI/diagnostic problems. Everything marked VERIFIED was reproduced by running code; INFERRED was reasoned only.
+
+## Correctness findings
+
+**C1. Streaming drivers swallow a cancellation (or any BaseException) delivered during source cleanup after an ordinary failure. VERIFIED.**
+- Where: `src/aiogzip/_streaming.py:212-223` (`_close_async_iterator`, `except BaseException: if not failed: raise`), called from the `finally` at lines 104-106 and 207-209.
+- Sequence: the source is an async generator suspended at `yield` whose `finally` awaits (for example a transport shutdown). The codec or driver fails with an ordinary exception (`BadGzipFile` on corrupt input, `TypeError` on a non-bytes item, the size limit). The driver awaits `iterator.aclose()`; `task.cancel()` arrives during that await; the `CancelledError` is discarded and the ordinary error propagates.
+- Results:
+  - `SCRATCH/t2_lost_cancel.py`: for both `decompress_chunks` and `compress_chunks`, the worker saw only `BadGzipFile` / `TypeError`, `task.cancelled()` was False, and `task.cancelling()` stayed at 1.
+  - Same script, control: the same shape through `verify(..., closefd=True)` gives `CancelledError` with context `BadGzipFile`, the BC14 rule. So the streaming path contradicts the precedence that `_scan_gzip` and `_acquire_path` follow.
+  - `SCRATCH/t9_timeout.py`: an `asyncio.timeout()` that expires in that window surfaces as `BadGzipFile`, not `TimeoutError`. A custom `BaseException` raised by the source's cleanup is dropped with no note.
+- Severity: low to medium. The window is narrow, but a task that catches the stream error keeps running after being cancelled. I found no ledger entry making this deliberate.
+- Fix: apply the `_scan_gzip` rule. A non-`Exception` cleanup error outranks an `Exception` failure; otherwise note it with `_note_cleanup_failure`.
+
+**C2. `inspect()` / `verify()` never yield to the event loop for an always-ready custom `fileobj` when each read chunk expands to under 1 MiB. VERIFIED.**
+- Where: `src/aiogzip/_inspection.py:119-124`. `_drive_operation` is called with no `budget`, so the inline counters (`_codec_async.py:133-141`) restart at zero for every chunk. The scan also has no source-item checkpoint like `_streaming.py:72-77`.
+- Result (`SCRATCH/t3_scan_fairness.py`, counting sibling-task turns, no timing): 48 MiB of incompressible data through an in-memory async reader took 194 reads with 0 sibling turns for both `verify` and `inspect`. `decompress_chunks` on the same bytes gave 45 turns.
+- With the default 256 KiB chunk, any stream with ratio below about 4 behaves this way. The scan also cannot be cancelled or timed out until it finishes.
+- Native aiofiles and path sources are unaffected, because each read is an executor hop.
+- Severity: low to medium, limited to in-memory or buffered custom sources. Not recorded as deliberate; the docs promise fairness only for the chunk APIs.
+- Fix: give `_scan_gzip` a `_StreamBudget` and the same source-item checkpoint.
+- For the `_binary.py` reviewer: `open(None, "rb", fileobj=...)` with a 64 KiB read loop and `aiogzip.read()` showed the same 0 turns in that script.
+
+**C3. `WithAsyncWrite` cannot be satisfied by a real binary sink under a type checker, so `aiogzip.write(None, data, fileobj=<aiofiles handle>)` fails `mypy --strict`. VERIFIED.**
+- Where: `src/aiogzip/_common.py:300-304` and `:311-313`. The protocol declares `write(self, data: Union[str, bytes])`, so an implementer must accept `str`.
+- Result (`SCRATCH/typing_snip2.py`, mypy 2.4.0, types-aiofiles 25.1.0.20260518): errors for
+  - an aiofiles `"wb"` handle (`AsyncBufferedIOBase`),
+  - a custom sink `write(self, b: bytes)`,
+  - a positional-only `write(self, data: bytes, /)`,
+  - a sink returning `None`. This last one is correctly rejected; at runtime it raises `OSError: ... invalid byte count (None)`.
+- All of the first three work at runtime (`SCRATCH/t4_sink.py`).
+- `open(None, "wb", fileobj=aiofiles_handle)` type-checks only by accident: `_FileObj` includes `WithAsyncRead` and the aiofiles class has `read`. A write-only bytes sink passed to `open()` matches only the catch-all overload (see C4), so it presumably types as the union — I did not `reveal_type` that case.
+- Severity: medium for typed users; no runtime effect. `tests/_typing_contract.py`, `test_public_api_typing.py` and `test_factory_typing.py` contain no `fileobj` or aiofiles case, which is why this survived.
+- Fix: this touches the frozen protocol annotations, so it needs a decision. Options are `data: bytes, /`, or separate binary and text protocols. Add aiofiles `fileobj` cases to the typing contract.
+
+**C4. The fallback overload `(filename, mode: str, **kwargs: Any)` disables keyword checking for literal modes. VERIFIED.**
+- Where: `src/aiogzip/__init__.py:166-171` and `:250-255`.
+- Result (`SCRATCH/typing_snip.py`): these all pass strict mypy and are typed as the union:
+  - `open("f.gz", "rb", chunksize=5)`
+  - `open("f.gz", "rb", compresslevel="nine")`
+  - `open("f.gz", "rt", encodin="utf-8")`
+  - `open("f.gz", "rb", encoding="utf-8")`, which is a runtime `ValueError`.
+- A typo therefore silently degrades the return type instead of being reported.
+- Fix: give the fallback overload the same explicit keyword list. That keeps `mode: str` returning the union without changing the documented narrowing.
+
+**C5. `filename` is annotated `Union[str, bytes, Path, None]`, but runtime accepts any `os.PathLike`. VERIFIED.**
+- Where: `src/aiogzip/__init__.py:121` and `src/aiogzip/_inspection.py:30`; runtime check at `_common.py:106`.
+- Result (`SCRATCH/typing_snip.py`): mypy rejects a custom `__fspath__` class, `os.PathLike[str]` and `PurePath` for `open`, `read` and `verify`. At runtime `aiogzip.read(P())` works (`SCRATCH/t1_modes.py`).
+- Fix: widen to `os.PathLike[str] | os.PathLike[bytes]`, which is a compatible change.
+
+**C6. `compress_chunks(fast_compress=True)` without zlib-ng defeats warning de-duplication process-wide. VERIFIED.**
+- Where: `src/aiogzip/_streaming.py:132-137`. `warnings.catch_warnings(record=True)` plus `simplefilter("always")` invalidates every module's warning registry on each call.
+- Result (`SCRATCH/t7_warn.py`, with `have_fast_engine` patched to False): three calls from one line emit the fallback warning three times, where `GzipEncoder(fast_compress=True)` emits once. An unrelated `DeprecationWarning` that had already been shown once was shown again after every call.
+- INFERRED: `catch_warnings` also mutates global state, so it is not safe against other threads warning at the same time.
+- Severity: low; log spam for per-request compression on installs without the `fast` extra.
+- Fix: warn directly in `_compress_chunks` with the right `stacklevel` and construct the encoder through a private no-warn path.
+
+**C7. Explicit `await stream.aclose()` does not fully finalize the stream. VERIFIED.**
+- Where: `src/aiogzip/_streaming.py:89-100`, `154-157`, `192-203`. The inner `_drive_operation` async generator is iterated with a bare `async for` and never closed by the outer generator.
+- Result (`SCRATCH/t6_inner_agen.py`): after an early-exit `aclose()`, asyncio's asyncgen hook creates an `async_generator_athrow` task to close the inner generator on a later loop turn. On a loop closed without `shutdown_asyncgens()` this prints `Task was destroyed but it is pending!` and `RuntimeWarning: coroutine method 'aclose' of '_drive_operation' was never awaited`.
+- Functionally harmless, because the outer `finally` has already discarded the codec and closed the source. It does contradict the "starts no background task" and "deterministic cleanup" wording in `docs/streaming.md`.
+- Severity: low. Fix: close the inner driver in the outer generator (`contextlib.aclosing` or an explicit `aclose()` in `finally`).
+
+**C8. CLI (`src/aiogzip/__main__.py`). All VERIFIED by running `uv run python -m aiogzip ...` against files in SCRATCH.**
+- Output errors are reported as stream failures (lines 49-84: the `try` covers the `print` calls). `inspect SCRATCH/many.gz | head -1` on a valid 20,000-member file prints `FAILED: .../many.gz: [Errno 32] Broken pipe` and exits 120.
+- With `PYTHONIOENCODING=ascii`, a valid file whose FNAME is `café` prints half its output, then `ERROR: ... UnicodeEncodeError`, and exits 2.
+- `--json` schemas disagree. `verify --json` gives `{"ok": true, "member_count": ...}`. `inspect --json` success has neither `ok` nor `member_count`, while its failure form has `ok: false`. A consumer checking `["ok"]` gets a `KeyError` on success. `tests/test_cli.py::test_json_matches_inspect_dataclass` pins the current shape, so this needs a decision.
+- Human `inspect` output prints the header FNAME raw (line 61-66). `SCRATCH/esc.gz` emits ESC sequences and a forged second line to the terminal. Fix: print `name=` with `!r`.
+- Stale text: the comment at line 86 mentions "an invalid limit", but the CLI has no limit option. `except (gzip.BadGzipFile, OSError, EOFError)` is redundant, since `BadGzipFile` is an `OSError`.
+- The CLI appears only in `CHANGELOG.md`; neither the README nor `docs/` mentions it.
+
+**C9. Small validation gaps in `_common.py`. VERIFIED with `SCRATCH/t1_modes.py`.**
+- `_normalize_mtime` (lines 157-168): `mtime=float("inf")` raises `OverflowError`, not the documented `ValueError`. `mtime=True` is accepted as 1, despite exact-bool validation elsewhere.
+- `_derive_header_filename` (lines 212-215): an explicit `original_filename="日本.txt"` is silently dropped (no FNAME, no error). That matches `gzip` for inferred names but is surprising for an explicit argument. `".gz"` also becomes an empty name.
+- A `read()` returning `bytearray` gives `TypeError` from `inspect`/`verify` but `OSError("Unexpected error during decompression: gzip codec input must be bytes")` from `aiogzip.read()` (`SCRATCH/t4_sink.py`). The second message blames decompression for a source-contract violation; that belongs to the `_binary.py` reviewer.
+- A `fileobj` with no `read`, or a synchronous `read`, is reported as `OSError("Error reading from file: 'bytes' object can't be awaited")`, because `_inspection.py:112` wraps the `AttributeError`/`TypeError`. An up-front `TypeError` would be clearer.
+
+## Maintainability findings
+
+1. **Two accounting modes in `_drive_operation`** (`_codec_async.py:121-209`). Budget-or-None, local copies written back in `finally`, and `should_offload and budget is None` special cases. Always passing a `_StreamBudget` (the scan creating its own) would remove the branches and fix C2.
+2. **Duplicated pull loops.** `_streaming.py:71-88` and `159-176` are the same checkpoint / `__anext__` / type-check / snapshot / empty-skip sequence. Extract one helper. The `isinstance(..., bytes)` check followed by `_snapshot_bytes_input` tests the type twice.
+3. **Three cleanup-precedence implementations.** `_close_async_iterator`, the `_scan_gzip` finally (`_inspection.py:141-164`) and `_acquire_path` (`_opening.py:77-88`). One shared helper would make C1 impossible.
+4. **Overloads duplicated verbatim** for `AsyncGzipFile` and `open` (`__init__.py:127-171` and `211-255`), plus hand-written literal lists of 32 and 44 modes. I saw no test that generates the permutations and compares them with `_parse_mode_tokens`. `_Filename` and `_ReadFileObj` are defined in both `__init__.py:121-123` and `_inspection.py:30-31`.
+5. **Dead or misleading code.**
+   - `_mode_plus` is stored and never read in `_binary.py:310`; `_text.py:306` only forwards it. `"w+"` silently opens write-only (same as `gzip`); worth one line of docs.
+   - `except asyncio.CancelledError: raise` at `_inspection.py:110-111` is unreachable in effect, because the next clause is `except Exception`.
+   - `_is_native_source(source, "read")` is re-evaluated on every loop iteration (`_inspection.py:104`).
+   - `_common.__all__` (lines 316-340) lists some underscore helpers and omits others (`_MAX_CHUNK_SIZE`, `_check_can_open`, `_format_file_repr`).
+   - `GZIP_WBITS = 31` is unused internally and its comment describes a zlib mode the codec no longer uses. The name is frozen, so only the comment can change.
+6. **Thin docstrings.** `AsyncGzipFile` (`__init__.py:177-192`) says "filename: Path to the file" and omits `None` + `fileobj` and every keyword. `open()` has two lines.
+7. **Missing tests.**
+   - Typing contract for `fileobj` (C3), PathLike (C5) and keyword typos (C4).
+   - Cancellation during `_close_async_iterator` (C1).
+   - Scan fairness with a ready source (C2); `tests/test_stream_fairness.py` covers only the chunk APIs.
+   - CLI broken-pipe and encoding paths (C8).
+8. **CLAUDE.md is stale.** It references `tests/test_aiogzip.py` and `mypy src/aiogzip.py`, neither of which exists, and its "Test Organization" classes now live in `test_regressions.py` and `test_seek_end.py`.
+9. **Packaging (INFERRED, not run).** The sdist ships `tests/` but not `.github/` or `plans/`. `tests/test_version_sync.py:159` reads `.github/workflows/ci.yml` and several tests reference `plans/`, so check they skip cleanly outside a checkout. The `pyproject.toml` metadata otherwise looks correct (PEP 639 license fields, classifiers 3.11-3.15, `py.typed` present).
+
+## Checked and found sound
+
+- **Pull discipline and early exit. VERIFIED** (`SCRATCH/t5_early_exit.py`): after three output chunks only the first source item had been pulled; explicit `aclose()` runs the source's `finally` before returning, for both directions.
+- **Cancellation during an offloaded step. VERIFIED** (`SCRATCH/t10_cancel_offload.py`): the task does not finish until the worker returns, then the source is closed, `CancelledError` propagates, and no second pull happens.
+- **Mode parsing and argument validation against `gzip.open`. VERIFIED** (`SCRATCH/t1_modes.py`, `t4_sink.py`): every invalid mode raises `ValueError`. aiogzip is a permutation-tolerant superset (`"br"` and `"+r"` are accepted where `gzip` rejects them). Text-only arguments in binary mode raise the same message as `gzip`. Exact-bool, chunk-size and limit validation hold. Bytes and PathLike paths work at runtime. `closefd=False` with a path leaks no descriptors (`SCRATCH/t8_closefd.py`). `filename` plus `fileobj` uses the fileobj, as `gzip` does.
+- **Zero-byte `verify`** returns 0 members, as documented. I did not re-examine the BC14-BC18 settlement logic beyond reading it; I found nothing new there.

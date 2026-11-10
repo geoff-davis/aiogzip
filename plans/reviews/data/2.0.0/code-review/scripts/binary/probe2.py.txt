@@ -1,0 +1,68 @@
+import asyncio, gzip, io, os, tempfile
+import aiogzip
+from aiogzip import AsyncGzipBinaryFile
+print("aiogzip", aiogzip.__version__)
+
+class NoneSink:
+    def __init__(self): self.b = io.BytesIO(); self.name = "/tmp/orig-name.txt.gz"
+    async def write(self, data):
+        self.b.write(data)   # returns None, like many async writers
+
+class NSrc:
+    """non-seekable custom source"""
+    def __init__(self, data): self.b = io.BytesIO(data)
+    async def read(self, n=-1): return self.b.read(n)
+
+async def attempt(label, coro):
+    try:
+        r = await coro; print(f"{label}: OK {r!r:.70}")
+    except BaseException as e:
+        print(f"{label}: {type(e).__name__}: {e}")
+
+async def main():
+    s = NoneSink()
+    try:
+        async with AsyncGzipBinaryFile(None, "wb", fileobj=s) as f:
+            await f.write(b"hello")
+        print("None-returning sink OK:", gzip.decompress(s.b.getvalue()), "FNAME flag:", bool(s.b.getvalue()[3] & 8))
+    except Exception as e:
+        print("None-returning sink:", type(e).__name__, e)
+    b = io.BytesIO(); b.name = "/tmp/orig-name.txt.gz"
+    with gzip.GzipFile(fileobj=b, mode="wb") as g: g.write(b"x")
+    print("stdlib FNAME flag with fileobj.name:", bool(b.getvalue()[3] & 8))
+
+    # trailing data parity
+    base = gzip.compress(b"one\n") + gzip.compress(b"two\n")
+    d = tempfile.mkdtemp()
+    for label, tail in (("zero padding", b"\0" * 20), ("garbage", b"garbage!!"), ("truncated member", gzip.compress(b"three\n")[:-5])):
+        p = os.path.join(d, "t.gz"); open(p, "wb").write(base + tail)
+        try:
+            with gzip.open(p) as g: print(label, "stdlib:", g.read())
+        except Exception as e: print(label, "stdlib:", type(e).__name__, e)
+        async with aiogzip.open(p, "rb") as f:
+            await attempt(f"{label} aiogzip read()", f.read())
+            await attempt(f"{label} aiogzip salvage read()", f.read())
+            await attempt(f"{label} aiogzip read() again", f.read())
+            await attempt(f"{label} tell", f.tell())
+
+    # rewind cache cap
+    payload = os.urandom(5000)
+    wire = gzip.compress(payload)
+    f = AsyncGzipBinaryFile(None, "rb", fileobj=NSrc(wire), chunk_size=1000, max_rewind_cache_size=3000)
+    await f.open()
+    print("seekable at open", f.seekable())
+    await attempt("read(10)", f.read(10))
+    await attempt("seek(0)", f.seek(0))
+    await attempt("read(4000)", f.read(4000)); print("seekable after overflow", f.seekable(), "tell", await f.tell())
+    await attempt("seek(0) after overflow", f.seek(0)); print("tell", await f.tell())
+    await attempt("seek(-1, CUR)", f.seek(-1, 1)); print("tell", await f.tell())
+    await attempt("seek(-1, END)", f.seek(-1, 2)); print("tell", await f.tell())
+    rest = await f.read(); print("rest after refused seeks", len(rest))
+    await f.close()
+    # append
+    p = os.path.join(d, "ap.gz")
+    async with aiogzip.open(p, "wb") as f: await f.write(b"first")
+    async with aiogzip.open(p, "ab") as f:
+        print("append tell at open", await f.tell()); await f.write(b"second"); print("tell", await f.tell())
+    print("append result:", gzip.open(p).read())
+asyncio.run(main())

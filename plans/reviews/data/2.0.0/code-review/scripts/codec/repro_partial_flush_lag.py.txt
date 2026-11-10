@@ -1,0 +1,29 @@
+"""A peer that ends messages with Z_PARTIAL_FLUSH (or Z_BLOCK): does feed() deliver the whole message?"""
+import zlib, random, sys
+import aiogzip
+from aiogzip import GzipDecoder
+print(aiogzip.engine_info())
+rng = random.Random(5)
+for flush_name in ("Z_SYNC_FLUSH", "Z_FULL_FLUSH", "Z_PARTIAL_FLUSH", "Z_BLOCK"):
+    flush = getattr(zlib, flush_name)
+    n = bad = 0; worst = 0; example = None
+    for trial in range(300):
+        strategy = rng.choice([0, zlib.Z_HUFFMAN_ONLY, zlib.Z_RLE, zlib.Z_FIXED])
+        c = zlib.compressobj(rng.choice([1, 6, 9]), zlib.DEFLATED, -15, 9, strategy)
+        ocs = rng.choice([1024, 65536, 1 << 20])
+        d = GzipDecoder(output_chunk_size=ocs)
+        ref = zlib.decompressobj(-15)
+        pre = b"\x1f\x8b\x08\x00" + bytes(4) + b"\x00\xff"
+        owed = 0
+        for m in range(5):
+            k = rng.choice([65536, 131072, 262144, 262145, rng.randrange(1, 1_500_000)])
+            msg = rng.choice([bytes(k), b"x" * k, (b"ab" * k)[:k]])
+            body = c.compress(msg) + c.flush(flush)
+            expect = ref.decompress(body)          # what an unbounded inflate can produce from the same bytes
+            got = b"".join(d.feed(pre + body)); pre = b""; n += 1
+            lag = owed + len(expect) - len(got); owed = lag
+            if lag:
+                bad += 1
+                if lag > worst:
+                    worst = lag; example = (strategy, k, ocs, len(body))
+    print(f"{flush_name:16s} messages={n} feeds that withheld decodable output={bad} worst={worst} bytes example(strategy,len,chunk,wire)={example}")

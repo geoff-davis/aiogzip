@@ -1,0 +1,33 @@
+import asyncio, os, gzip, threading
+import aiogzip
+import aiogzip._codec_async as ca
+async def run(kind):
+    ev = []
+    entered = threading.Event(); gate = threading.Event()
+    orig = ca._raw_next_or_done
+    def slow(op, w):
+        if threading.current_thread() is not threading.main_thread():
+            entered.set(); gate.wait(); ev.append("worker finished")
+        return orig(op, w)
+    ca._raw_next_or_done = slow
+    payload = os.urandom(4 * 1024 * 1024)
+    data = payload if kind == "c" else gzip.compress(payload, 1)
+    async def src():
+        try:
+            ev.append("pull 1"); yield data
+            ev.append("pull 2"); yield data
+        finally:
+            ev.append("source closed")
+    api = aiogzip.compress_chunks if kind == "c" else aiogzip.decompress_chunks
+    async def consume():
+        async for _ in api(src()): pass
+    t = asyncio.create_task(consume())
+    await asyncio.to_thread(entered.wait)
+    t.cancel(); await asyncio.sleep(0.05)
+    ev.append(f"task done before worker released: {t.done()}")
+    gate.set()
+    try: await t
+    except asyncio.CancelledError: ev.append("CancelledError")
+    ca._raw_next_or_done = orig
+    print(kind, ev)
+asyncio.run(run("c")); asyncio.run(run("d"))

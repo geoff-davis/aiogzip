@@ -1,0 +1,57 @@
+"""Exceptional context exit while seek(-n, SEEK_END) is parked at a codec
+cooperative checkpoint (asyncio.sleep(0) in _drive_operation), not at a source call."""
+import asyncio, gzip, io, os
+import aiogzip
+from aiogzip import AsyncGzipBinaryFile
+
+class Src:
+    def __init__(self, data, close_fails=False):
+        self.b = io.BytesIO(data); self.closed = False; self.log = []; self.close_fails = close_fails
+    async def read(self, n=-1):
+        self.log.append(f"read(closed={self.closed})"); return self.b.read(n)
+    async def seek(self, o, w=0):
+        self.log.append(f"seek(closed={self.closed})"); return self.b.seek(o, w)
+    def seekable(self): return True
+    def tell(self): return self.b.tell()
+    async def close(self):
+        self.log.append("close")
+        if self.close_fails: raise OSError("close failed")
+        self.closed = True
+
+async def run(close_fails, op):
+    payload = b"A" * (8 * 1024 * 1024)
+    src = Src(gzip.compress(payload), close_fails)
+    f = AsyncGzipBinaryFile(None, "rb", fileobj=src, closefd=True)
+    result = None
+    try:
+        async with f:
+            task = asyncio.create_task(op(f))
+            await asyncio.sleep(0)          # reader runs to its first suspension
+            assert f._read_call_active and f._source_owner is None, "not parked at a codec checkpoint"
+            src.log.append("-- body raises --")
+            raise RuntimeError("body")
+    except RuntimeError as e:
+        print("  body error notes:", getattr(e, "__notes__", None))
+    try:
+        result = await task
+        print("  in-flight call RETURNED:", result)
+    except BaseException as e:
+        print("  in-flight call raised:", type(e).__name__, e)
+    print("  closed:", f.closed, "health:", f._read_health.name, "source log:", src.log)
+    if not f.closed:
+        try:
+            print("  later read on aborted handle:", len(await f.read(10)))
+        except Exception as e:
+            print("  later read:", type(e).__name__, e)
+
+async def main():
+    for close_fails in (False, True):
+        print(f"seek(-3, SEEK_END), close_fails={close_fails}")
+        await run(close_fails, lambda f: f.seek(-3, os.SEEK_END))
+    print("control: seek(0, SEEK_END)")
+    await run(True, lambda f: f.seek(0, os.SEEK_END))
+    print("control: readline()")
+    await run(False, lambda f: f.readline())
+    print("control: read(100)")
+    await run(False, lambda f: f.read(100))
+asyncio.run(main())

@@ -1,0 +1,62 @@
+import asyncio, gzip, io, os, tempfile, random, traceback
+from aiogzip import AsyncGzipTextFile
+d = tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))
+p = os.path.join(d, "f.gz")
+
+async def attempt(label, coro):
+    try:
+        r = await coro
+        print(f"{label}: -> {r!r:.200}")
+    except BaseException as e:
+        print(f"{label}: raised {type(e).__name__}: {e}")
+
+async def main():
+    with gzip.open(p, "wt", newline="") as g: g.write("a\nb\nc\n")
+    # (a) readlines(None)
+    for nl in (None, ""):
+        async with AsyncGzipTextFile(p, "rt", newline=nl) as f:
+            await attempt(f"readlines(None) newline={nl!r}", f.readlines(None))
+    print("ref readlines(None):", io.TextIOWrapper(gzip.GzipFile(p)).readlines(None))
+    # (l) unopened handle
+    for nl in (None, ""):
+        f = AsyncGzipTextFile(p, "rt", newline=nl)
+        await attempt(f"unopened readline(5) newline={nl!r}", f.readline(5))
+        await attempt(f"unopened readline() newline={nl!r}", f.readline())
+        await attempt(f"unopened __anext__ newline={nl!r}", f.__anext__())
+        await attempt(f"unopened readlines() newline={nl!r}", f.readlines())
+    # closed handle iteration
+    async with AsyncGzipTextFile(p, "rt") as f: pass
+    await attempt("closed __anext__", f.__anext__())
+    await attempt("closed readline", f.readline())
+    # write-mode read-ish calls
+    async with AsyncGzipTextFile(p, "wt") as f:
+        await attempt("wt __anext__", f.__anext__())
+        await attempt("wt readline", f.readline())
+        await attempt("wt seek(0)", f.seek(0))
+        await attempt("wt seek(0,2)", f.seek(0, 2))
+        await attempt("wt seek(5)", f.seek(5))
+        await attempt("wt write after seeks", f.write("x"))
+        await attempt("wt tell", f.tell())
+    print("content after wt seeks:", gzip.open(p, "rt").read())
+    # (b) writelines with encode error mid-batch
+    for lines in (["a\n", "b\n", "\ud800", "c\n"], ["a\n", "b\n", 5, "c\n"]):
+        f = AsyncGzipTextFile(p, "wt", newline="")
+        await f.open()
+        await attempt(f"writelines({lines})", f.writelines(lines))
+        await f.close()
+        r = io.BytesIO(); t = io.TextIOWrapper(r, encoding="utf-8", newline="")
+        try: t.writelines(lines)
+        except Exception as e: pass
+        t.flush()
+        print("   aiogzip file:", repr(gzip.open(p, "rb").read()), " TextIOWrapper:", repr(r.getvalue()))
+    # write() return for translated newline, str subclass
+    class S(str): pass
+    async with AsyncGzipTextFile(p, "wt", newline="\r\n") as f:
+        await attempt("write(S('a\\n')) newline=CRLF", f.write(S("a\n")))
+    print("   bytes:", gzip.open(p, "rb").read())
+    # seek past EOF
+    with gzip.open(p, "wt", newline="") as g: g.write("abc\r")
+    async with AsyncGzipTextFile(p, "rt") as f:
+        await attempt("seek(100)", f.seek(100)); await attempt("tell", f.tell()); await attempt("read", f.read()); print("  newlines", f.newlines)
+    r = io.TextIOWrapper(gzip.GzipFile(p)); print("ref seek(100)", r.seek(100), r.tell(), repr(r.read()))
+asyncio.run(main())

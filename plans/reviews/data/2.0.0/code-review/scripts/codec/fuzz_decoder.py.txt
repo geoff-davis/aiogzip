@@ -1,0 +1,112 @@
+"""Differential fuzz of GzipDecoder vs hand-built RFC 1952 members."""
+import gzip, zlib, random, struct, sys, io
+import aiogzip
+from aiogzip import GzipDecoder, GzipEncoder
+
+rng = random.Random(int(sys.argv[1]) if len(sys.argv) > 1 else 1)
+print(aiogzip.engine_info())
+
+def member(payload, *, extra=None, name=None, comment=None, hcrc=False, ftext=False, mtime=0, level=6, strategy=0):
+    flags = (1 if ftext else 0) | (2 if hcrc else 0) | (4 if extra is not None else 0) | (8 if name is not None else 0) | (16 if comment is not None else 0)
+    h = b"\x1f\x8b\x08" + bytes([flags]) + struct.pack("<I", mtime) + b"\x00\xff"
+    if extra is not None: h += struct.pack("<H", len(extra)) + extra
+    if name is not None: h += name + b"\x00"
+    if comment is not None: h += comment + b"\x00"
+    if hcrc: h += struct.pack("<H", zlib.crc32(h) & 0xFFFF)
+    c = zlib.compressobj(level, zlib.DEFLATED, -15, 9, strategy)
+    body = c.compress(payload) + c.flush()
+    return h, body, struct.pack("<II", zlib.crc32(payload), len(payload) & 0xFFFFFFFF)
+
+def rand_payload():
+    k = rng.choice([0, 1, 5, 100, 5000, 70000, 300000, 700000])
+    kind = rng.randrange(3)
+    if kind == 0: return bytes(k)
+    if kind == 1: return rng.randbytes(k)
+    return (b"abc" * (k // 3 + 1))[:k]
+
+def rand_member():
+    kw = {}
+    if rng.random() < .4: kw["extra"] = rng.randbytes(rng.choice([0, 1, 7, 300, 65535]))
+    if rng.random() < .4: kw["name"] = bytes(rng.randrange(1, 256) for _ in range(rng.choice([0, 1, 20])))
+    if rng.random() < .4: kw["comment"] = bytes(rng.randrange(1, 256) for _ in range(rng.choice([0, 1, 20])))
+    kw["hcrc"] = rng.random() < .4; kw["ftext"] = rng.random() < .2
+    kw["mtime"] = rng.choice([0, 1, 0xFFFFFFFF, 1234567])
+    kw["strategy"] = rng.choice([0, zlib.Z_HUFFMAN_ONLY, zlib.Z_RLE, zlib.Z_FIXED])
+    p = rand_payload()
+    return p, kw, member(p, **kw)
+
+def split(data):
+    mode = rng.randrange(4)
+    if mode == 0: return [data]
+    if mode == 1: return [data[i:i+1] for i in range(len(data))] if len(data) < 3000 else [data]
+    cuts = sorted(rng.randrange(len(data) + 1) for _ in range(rng.randrange(1, 12)))
+    out, prev = [], 0
+    for c in cuts + [len(data)]:
+        out.append(data[prev:c]); prev = c
+    return out
+
+def decode(chunks, **kw):
+    d = GzipDecoder(**kw)
+    out = []
+    for c in chunks:
+        for piece in d.feed(c):
+            assert type(piece) is bytes and 0 < len(piece) <= d._output_chunk_size
+            out.append(piece)
+    for piece in d.finish():
+        out.append(piece)
+    return d, b"".join(out)
+
+n_ok = n_trunc = n_limit = 0
+for it in range(400):
+    members = [rand_member() for _ in range(rng.randrange(1, 4))]
+    wire = b""; expect = b""; offs = []; bounds = set()
+    for i, (p, kw, (h, b, t)) in enumerate(members):
+        start = len(wire)
+        wire += h + b + t
+        offs.append((start, len(h + b + t)))
+        pad = rng.choice([0, 0, 1, 3, 600])
+        for q in range(pad + 1): bounds.add(len(wire) + q)
+        wire += bytes(pad)
+        expect += p
+    assert gzip.decompress(wire) == expect
+    ocs = rng.choice([1, 7, 4096, 65536, 256 * 1024, 1 << 20]) if len(expect) < 20000 else rng.choice([4096, 65536, 256*1024, 1 << 20])
+    d, out = decode(split(wire), output_chunk_size=ocs, collect_member_info=True)
+    assert out == expect, (it, "payload mismatch")
+    assert d.finished and d.member_count == len(members) and d.compressed_size == len(wire) and d.uncompressed_size == len(expect)
+    for info, (p, kw, (h, b, t)), (start, size) in zip(d.members, members, offs):
+        assert info.compressed_offset == start and info.compressed_size == size, (it, info, start, size)
+        assert info.uncompressed_size == len(p) and info.mtime == kw["mtime"]
+        assert info.extra == kw.get("extra"), it
+        assert info.original_filename == (kw["name"].decode("latin-1") if "name" in kw else None)
+        assert info.comment == (kw["comment"].decode("latin-1") if "comment" in kw else None)
+        assert info.flags == h[3] and info.crc32 == zlib.crc32(p)
+    n_ok += 1
+    # truncation at random cut points: must fail unless the cut is a member boundary (+padding)
+    for cut in {rng.randrange(len(wire)) for _ in range(25)} | {o for o, _ in offs} | {o + s - 1 for o, s in offs} | {o + s - 8 for o, s in offs} | {o + 1 for o, _ in offs} | {o + 9 for o, _ in offs} | {o + 10 for o, _ in offs}:
+        if cut >= len(wire): continue
+        try:
+            d2, out2 = decode(split(wire[:cut]), output_chunk_size=65536)
+            assert cut == 0 or cut in bounds, (it, "truncated stream accepted", cut, sorted(bounds)[:5])
+            assert expect.startswith(out2)
+        except gzip.BadGzipFile:
+            assert not (cut == 0 or cut in bounds), (it, "valid prefix rejected", cut)
+        n_trunc += 1
+    # limits
+    total = len(expect)
+    for lim in {max(1, total - 1), max(1, total), total + 1, max(1, total // 2), 1}:
+        got = []
+        d3 = GzipDecoder(max_decompressed_size=lim, output_chunk_size=ocs)
+        try:
+            for c in split(wire) + [None]:
+                op = d3.finish() if c is None else d3.feed(c)
+                for piece in op: got.append(piece)
+            assert lim >= total, (it, "limit not enforced", lim, total)
+            assert b"".join(got) == expect
+        except OSError as ex:
+            if isinstance(ex, gzip.BadGzipFile): raise
+            assert lim < total, (it, "limit false positive", lim, total, ex)
+            assert b"".join(got) == expect[:lim], (it, "allowed bytes not all emitted", lim, len(b"".join(got)))
+            assert d3.uncompressed_size == lim
+            assert str(ex).startswith("decompressed output exceeded max_decompressed_size")
+        n_limit += 1
+print("ok", n_ok, "truncation cases", n_trunc, "limit cases", n_limit)

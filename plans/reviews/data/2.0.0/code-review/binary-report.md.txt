@@ -1,0 +1,124 @@
+## Review of the binary file handle slice (`_binary.py`, `_source_io.py`, `_opening.py`, `_common.py`)
+
+I read every line of the four files (plus `_codec_async.py` for the settlement helpers) and ran probes against the working tree, which is 2.0.1.dev0; `src/` differs from the `v2.0.0` tag only in `__init__.py` and `_inspection.py`. One real state-model violation, one undocumented regression from 1.11, and several small items. Nothing in the repo was modified and no timing was measured.
+
+All scripts are in `scripts/binary/`.
+
+## Correctness findings
+
+### 1. `seek(negative, SEEK_END)` rewinds after an exceptional-exit abort (reproduced; real model violation, narrow trigger)
+
+**Where:** `src/aiogzip/_binary.py:604-630` (`seek`, `SEEK_END` branch) with `_rewind_reader` at 1768-1806.
+
+**What goes wrong:** the `SEEK_END` drain loop exits on `self._eof`, which an abort also sets. There is no abort check between the drain and `if target < self._position: await self._rewind_reader()`. `_rewind_reader` samples `_read_aborts` after the abort has already happened, so its BC9 guard sees no change.
+
+**Trigger:** the abort must land while the seek is parked on codec work, not on a source call. That is the `asyncio.sleep(0)` cooperative checkpoint in `_drive_operation` (any feed producing 1 MiB or more of output, so common with compressible data at the default chunk size) or an offloaded feed. `_finish_abort` has nothing to settle there (`_source_owner` and `_source_native_call` are both `None`), so it closes immediately.
+
+**Call sequence:** task A runs `await f.seek(-3, os.SEEK_END)`; the `async with f:` body raises while A is at the checkpoint.
+
+**Observed:**
+- **Custom source, close succeeds:** after `close()` the library calls `source.seek()` and `source.read()` on the closed source. The handle ends CLOSED with `_read_health == HEALTHY`. The call does raise `read aborted…`.
+- **Custom source, close fails** (handle stays OPEN and BROKEN for a retry): the in-flight seek returns `8388605` successfully, health is HEALTHY, and a later `read(10)` returns data. The aborted reader is revived, which BC9 says never happens. On a multi-chunk file the returned "end" would also be wherever the drain stopped (inference).
+- **Path-opened native source:** the call raises `ValueError: seek of closed file` instead of the documented `OSError: read aborted…`.
+- **Control:** `seek(0, SEEK_END)` behaves correctly in the same situation.
+
+**Scripts:** `seek_end_abort.py`, `seek_end_abort_native.py`, `abort_at_checkpoint_matrix.py`. The matrix parks 13 call types at a checkpoint; this is the only one that touches the source after close.
+
+**Fix:** call `self._check_read_call_not_aborted()` after the drain loop, before computing the target, or capture `_read_aborts` at seek entry.
+
+**Why the gates missed it:** the stateful harness parks calls only on source calls, and `tests/test_file_lifecycle.py:367` covers only `seek(0, SEEK_END)`.
+
+**Severity:** low to medium. It needs a concurrent task and an exceptional exit, but it breaks two stated invariants (source never touched after close; abort revives nothing). The text handle's seek paths may share the pattern; I did not check them.
+
+**Related, minor (reproduced in the matrix):** `readline()` on an unterminated line aborted at a checkpoint raises `read stream is broken … seek to 0 to recover` on a closed handle, not `read aborted…`. `_readline_reserved` (973-977) hits `_check_read_usable()` before `_check_read_call_not_aborted()`.
+
+### 2. Custom `fileobj` whose `read()` returns `bytearray` or `memoryview` breaks the reader (reproduced; regression from 1.11)
+
+**Where:** `_binary.py:1405` passes the source chunk straight to `decoder.feed()`, whose strict input rule (`codec.py:80`) rejects non-`bytes`.
+
+**Observed:** the first read raises `OSError: Unexpected error during decompression: gzip codec input must be bytes` and the reader is BROKEN. The same script on a `v1.11.0` source export returns the data for all three types.
+
+**Script:** `bytearray_source.py`.
+
+**Status:** not in `docs/migration.md` or the CHANGELOG, and not pinned by a test. The `cast(bytes, …)` at 1832-1838 hides it from mypy.
+
+**Fix:** in `_read_compressed_chunk`, either coerce (`bytes(chunk)` when `type(chunk) is not bytes`, as `write()` does through `_coerce_byteslike`) or raise a clear `TypeError` naming the source contract, and document it.
+
+**Severity:** medium for anyone wrapping a stream API that returns `bytearray`; the error message points at decompression, not at their source. A source returning `None` is silently treated as EOF by `if not compressed_chunk` (inference).
+
+### 3. Write-mode composites never yield to the event loop between sink writes (reproduced by counting loop turns, not timing)
+
+**Where:** `_binary.py:566-577` (write-mode `seek` zero fill), `1056-1089` (`writelines`), via the inline small-write branch of `_write_reserved` (1158-1163).
+
+**What goes wrong:** the comment there says small writes "bound the inline work by the caller's payload". That holds for `write()` but not for composites that loop thousands of small writes under one reservation. Unlike the read side there is no cooperative checkpoint.
+
+**Observed with a non-suspending custom sink:**
+- `seek(+64 MiB)` gave another task 0 turns (16 sink writes).
+- `writelines()` of 200,000 lines (20 MB) gave 0 turns.
+
+With a path sink the loop yields only at each emitted block.
+
+**Script:** `write_seek_yields.py`.
+
+**Severity:** low to medium (latency, not data). It partly overlaps the deferred "execution/fairness policy" opportunity, but this specific gap is not recorded.
+
+### 4. Non-integer `seek()` offset corrupts the read position (reproduced)
+
+**Where:** `_binary.py:600-634`, and `_consume_bytes`.
+
+**Observed:** `await f.seek(2.0)` returns `2.0`, `tell()` returns `2.0`, and every later `read(n)`, `read()` and `readline()` raises `TypeError: slice indices must be integers` until a `seek(0)`. Stdlib raises `TypeError` at the seek (not run). Write mode fails cleanly.
+
+**Script:** `probe3.py`.
+
+**Fix:** `operator.index(offset)` at entry. Low severity.
+
+### 5. Small parity and contract gaps (all reproduced in `probe1.py` / `probe3.py`; low)
+
+- **`readlines(None)`** raises `TypeError` at `hint > 0` (line 1020) after consuming a line (state is restored). Stdlib accepts `None`, and `read(None)`, `readline(None)` and `peek(None)` are all normalised here. Text `readlines` has the same comparison (not run).
+- **`closefd=False` with a filename** is silently ignored: the file is closed (`_finish_close` 2135-2139 ORs `_owns_file`). Builtin `open` rejects that combination; either reject or document.
+- **Writer with `fileobj`** does not put `fileobj.name` in the header FNAME field although `.name` falls back to it. Stdlib `GzipFile` writes it. This may be intentional; it is not documented.
+- **`flush()` on a never-opened writer** returns `None` (line 2049), while `write()` raises "File not opened".
+
+## Maintainability findings
+
+1. **The four "what is the active call parked on" slots should be one record.** `_source_work`, `_source_native_call`, `_source_owner` and `_source_abort_requested` (354-357) encode a tagged union: idle, custom call, native call. A fourth state, "codec work or checkpoint", is not represented at all, which is the blind spot behind finding 1. They are also named `_source_*` but serve sinks: `_call_custom_sink` (1955-1977), `_NativeSourceCall` for writes, `_is_native_source(sink, "write")`, and the "aiofiles source belongs to a different event loop" message raised for sink and close calls (`_opening.py:36`).
+
+2. **Natural seam for splitting the module: the transport layer.** The rewind-cache and pending-input state (`_compressed_cache`, `_replay_offset`, `_pending_compressed_chunk`, `_cache_rewindable_reads`, `_max_rewind_cache_size`, `_underlying_seekable`) is touched only by `__init__`, `open`, `seekable`, `_mark_closed`, `_rewind_reader` and the block at 1808-2003. I would move `_read_compressed_chunk`, `_poison_source`, the four `_call_*` methods, `_write_all` and the physical half of `_rewind_reader` into a `_SourceTransport` / `_SinkTransport` pair in `_source_io.py` (about 400 lines). The handle would keep health, buffers and the codec. These run per chunk, not per line, so the extra attribute hop should be affordable, but benchmark per CLAUDE.md. A second, weaker seam is the close/abort protocol (1521-1583, 2094-2297, about 330 lines), which touches nearly every field, so I would leave it.
+
+3. **Duplicate pairs worth merging; none are in the hot-path duplication map.**
+   - `_call_custom_source` / `_call_custom_sink` (1865-1898, 1947-1977).
+   - `_call_native_source` / `_call_native_sink` (1900-1945, 1979-2003).
+   - The observer-error selection block in `_close_locked` (2114-2131) and `_abort_active_call_on_exit` (2180-2200), which is identical.
+   - `close_file` selection and native close in `_finish_close` and `_finish_abort`; the latter inlines `_submit_native` because `_close_underlying` cannot report "returned normally".
+   - Write-count validation in `_write_all` (1216-1228) and `_opening._write_initial_header` (96-107).
+   - The two exception ladders in `_decompress_next` (1384-1401, 1416-1434).
+
+4. **`_check_read_call_not_aborted` (1601-1607) is misnamed.** Its predicate is "closed or BROKEN", and its message literal is duplicated at 1783. Which of two messages an aborted call gets depends on check order (see the `readline` note under finding 1). One `_raise_read_aborted()` plus an explicit abort-generation comparison, as `_rewind_reader` already does, would be clearer and would have prevented finding 1.
+
+5. **`_close_on_context_exit` (1521-1583) reads as if the clean-exit block falls through** into the exceptional one; it always returns or raises. Split into two methods. `if body_error is not None` at 1582 is always true.
+
+6. **`seek()` (548-640) is two unrelated functions** (writer zero fill, reader seek) sharing a preamble; split into `_seek_write` and `_seek_read`. The read half's `position_before` / `rewound` restore rule (635-640) deserves a comment naming the three cases it distinguishes.
+
+7. **Dead or misleading bits.**
+   - `_mode_plus` (310) is stored and never read in this module.
+   - `size is None` at 856 is unreachable.
+   - `file_mode_suffix` (336) is a constant.
+   - The encoder-`None` branch of `_BinaryWriteReservation.__exit__` (161-165) is unreachable, since `_encoder` is never cleared after open.
+   - The `mtime` docstring (673) says "None until the first header" but the value stays stale after `seek(0)` (reproduced; matches stdlib, so only the wording is off).
+   - `_common.py` still holds `_build_gzip_header`, `_build_gzip_trailer` and `_derive_header_filename`, used only by `codec.py`, although the architecture note says the codec owns framing; they belong in the codec or `_gzip_header.py`.
+
+8. **Unlisted hot-path duplication.** The seven-fold read preamble (mode, closed, opened, health gate) and the "advance offset, clear when drained" epilogue are presumably deliberate. They carry no `Parity:` comment and no entry in the duplication map; add one or a single parametrised test over all read entry points.
+
+9. **Missing tests.**
+   - Abort while parked on codec work, for every call type; my matrix script is a ready template.
+   - A source returning non-`bytes`.
+   - Non-int seek offsets.
+   - `readlines(None)`.
+
+## Checked and found sound
+
+- **Rewind cache and `max_rewind_cache_size`** (run): cap overflow disables replay and flips `seekable()`; refused backward seeks leave position consistent; replay-then-physical ordering and pending-chunk retention are correct.
+- **Trailing data and members** (run, against stdlib): multi-member, zero padding, trailing garbage, truncated trailer and an empty file all match the documented salvage-then-terminal-error contract. Append mode produces a valid second member.
+- **Write, flush and close ordering** (read; partly run): a sink failure breaks the writer and suppresses the trailer; short-write retry and the `None`-count rejection are unchanged from 1.11.
+- **Native and custom settlement** (read only): `_NativeSourceCall` prevention and completion locking, `_settle_before_cancel`, `_acquire_path` late-open cleanup and the BC13/BC16 close paths match the model; I found no unconsidered await beyond finding 1.
+- **Abort at a codec checkpoint** (run): the other 12 call types, including an offloaded 8 MiB write, raise without touching the source or sink after close.

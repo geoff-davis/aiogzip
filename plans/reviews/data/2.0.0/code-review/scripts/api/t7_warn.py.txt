@@ -1,0 +1,33 @@
+import asyncio, warnings, sys, io
+import aiogzip
+from aiogzip import _engine
+_engine.have_fast_engine = lambda: False   # simulate zlib-ng not installed
+orig = _engine.compressobj
+_engine.compressobj = lambda level, wbits, fast=False: orig(level, wbits, fast=False)
+
+async def empty():
+    return
+    yield b""
+
+def other_library():
+    warnings.warn("unrelated once-per-location deprecation", DeprecationWarning)
+
+shown = []
+def showwarning(message, category, filename, lineno, file=None, line=None):
+    shown.append(f"{category.__name__}@{lineno}: {str(message)[:38]}")
+warnings.showwarning = showwarning
+warnings.simplefilter("default")
+
+for i in range(3):
+    other_library()
+print("baseline: unrelated warning from one location shown", len(shown), "time(s)")
+shown.clear()
+for i in range(3):
+    aiogzip.GzipEncoder(fast_compress=True)            # direct codec: same line
+print("GzipEncoder x3 same line ->", len(shown), "warning(s)")
+shown.clear()
+for i in range(3):
+    aiogzip.compress_chunks(empty(), fast_compress=True)  # same line
+    other_library()
+print("compress_chunks x3 same line (+unrelated each time) ->")
+for s in shown: print("   ", s)

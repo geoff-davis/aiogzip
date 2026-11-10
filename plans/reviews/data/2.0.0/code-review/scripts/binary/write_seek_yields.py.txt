@@ -1,0 +1,35 @@
+"""Count event-loop turns another task gets during one write-mode seek()/writelines() (no timing)."""
+import asyncio, io, os, tempfile
+import aiogzip
+from aiogzip import AsyncGzipBinaryFile
+
+class Sink:
+    def __init__(self): self.n = 0; self.calls = 0
+    async def write(self, d): self.n += len(d); self.calls += 1; return len(d)
+
+async def count(coro_fn):
+    turns = 0; stop = False
+    async def ticker():
+        nonlocal turns
+        while not stop:
+            turns += 1; await asyncio.sleep(0)
+    t = asyncio.create_task(ticker()); await asyncio.sleep(0)
+    start = turns
+    await coro_fn()
+    during = turns - start
+    stop = True; await t
+    return during
+
+async def main():
+    N = 64 * 1024 * 1024
+    s = Sink()
+    f = AsyncGzipBinaryFile(None, "wb", fileobj=s); await f.open()
+    print("custom sink: seek(+64 MiB) -> other-task turns:", await count(lambda: f.seek(N)), "| sink writes:", s.calls)
+    lines = [b"0" * 99 + b"\n"] * 200_000   # 20 MB in one writelines() call
+    c0 = s.calls
+    print("custom sink: writelines(20 MB of small lines) -> turns:", await count(lambda: f.writelines(lines)), "| sink writes:", s.calls - c0)
+    await f.close()
+    p = os.path.join(tempfile.mkdtemp(), "z.gz")
+    async with aiogzip.open(p, "wb") as f:
+        print("path sink: seek(+64 MiB) -> other-task turns:", await count(lambda: f.seek(N)))
+asyncio.run(main())

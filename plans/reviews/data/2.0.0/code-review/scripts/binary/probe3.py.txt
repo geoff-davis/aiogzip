@@ -1,0 +1,25 @@
+import asyncio, gzip, io
+from aiogzip import AsyncGzipBinaryFile
+class Sink:
+    name = "/tmp/orig-name.txt.gz"
+    def __init__(self): self.b = io.BytesIO()
+    async def write(self, d): return self.b.write(d)
+async def main():
+    s = Sink()
+    async with AsyncGzipBinaryFile(None, "wb", fileobj=s) as f:
+        await f.write(b"x"); print("f.name:", f.name)
+    print("aiogzip FNAME flag from fileobj.name:", bool(s.b.getvalue()[3] & 8))
+    b = io.BytesIO(); b.name = Sink.name
+    with gzip.GzipFile(fileobj=b, mode="wb") as g: g.write(b"x")
+    print("stdlib  FNAME flag from fileobj.name:", bool(b.getvalue()[3] & 8))
+    # float seek wedges the reader
+    wire = gzip.compress(b"0123456789")
+    class Src:
+        def __init__(s): s.b = io.BytesIO(wire)
+        async def read(s, n=-1): return s.b.read(n)
+    f = AsyncGzipBinaryFile(None, "rb", fileobj=Src()); await f.open()
+    print("seek(2.0) ->", await f.seek(2.0), "tell ->", await f.tell())
+    for call in (lambda: f.read(3), lambda: f.readline(), lambda: f.read()):
+        try: print("  then", await call())
+        except Exception as e: print("  then", type(e).__name__, e)
+asyncio.run(main())

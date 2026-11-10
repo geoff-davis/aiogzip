@@ -1,0 +1,37 @@
+"""tell() failures/oddities driven by decoder getstate() flags."""
+import asyncio, gzip, io, os, tempfile, traceback
+from aiogzip import AsyncGzipTextFile
+d = tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))
+p = os.path.join(d, "f.gz")
+
+async def main():
+    # 1. iso2022_kr: valid text, tell() mid-file
+    text = "가나다\n" * 5
+    with gzip.open(p, "wt", encoding="iso2022_kr", newline="") as g: g.write(text)
+    for cs in (4, 64, 262144):
+        async with AsyncGzipTextFile(p, "rt", encoding="iso2022_kr", chunk_size=cs) as f:
+            try:
+                line = await f.read(2)
+                print("iso2022_kr cs", cs, "read(2)", repr(line), "tell ->", await f.tell())
+            except Exception as e:
+                print("iso2022_kr cs", cs, "tell raised", type(e).__name__, e)
+    ref = io.TextIOWrapper(gzip.GzipFile(p), encoding="iso2022_kr"); ref.read(2)
+    try: print("ref tell", ref.tell())
+    except Exception as e: print("ref tell raised", type(e).__name__, e)
+    # 2. write-mode tell
+    for enc in ("utf-8", "utf-16", "utf-32", "utf-8-sig", "iso2022_jp"):
+        async with AsyncGzipTextFile(p, "wt", encoding=enc) as f:
+            t0 = await f.tell()
+            await f.write("abc")
+            t1 = await f.tell()
+            b = await f.buffer.tell()
+        r = io.TextIOWrapper(io.BytesIO(), encoding=enc); r0 = r.tell(); r.write("abc"); r1 = r.tell()
+        print(f"write-mode {enc:10} aiogzip tell before/after = {t0!s:.30} / {t1!s:.30}  buffer.tell={b}  TextIOWrapper = {r0}/{r1}")
+    # 3. read-mode tell at position 0
+    for enc in ("utf-16", "utf-8-sig", "iso2022_jp"):
+        with gzip.open(p, "wt", encoding=enc) as g: g.write("abc\n")
+        async with AsyncGzipTextFile(p, "rt", encoding=enc) as f:
+            t0 = await f.tell(); await f.read(); t1 = await f.tell()
+        r = io.TextIOWrapper(gzip.GzipFile(p), encoding=enc); r0 = r.tell(); r.read(); r1 = r.tell()
+        print(f"read-mode {enc:10} tell at 0 / EOF = {t0!s:.30} / {t1!s:.30}   ref {r0} / {r1}")
+asyncio.run(main())

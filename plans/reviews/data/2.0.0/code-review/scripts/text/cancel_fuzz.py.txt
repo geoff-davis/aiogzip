@@ -1,0 +1,65 @@
+"""Cancel text reads at random points (native path source); surviving results must concatenate to the full text."""
+import asyncio, gzip, io, os, random, sys, tempfile, collections
+from aiogzip import AsyncGzipTextFile
+D = tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))
+ALPHA = ["a", "b", "\n", "\r", "\r\n", "é", "漢", "x", "\r\r", "\x85", "longer-run-of-text"]
+stats = collections.Counter(); ex = {}
+
+async def one(rng, it):
+    enc = rng.choice(["utf-8", "utf-16", "shift_jis", "iso2022_jp"])
+    alpha = [c for c in ALPHA if enc in ("utf-8", "utf-16") or c not in ("é", "\x85")]
+    nl = rng.choice([None, "", "\n", "\r", "\r\n"])
+    cs = rng.choice([1, 2, 3, 5, 8, 16])
+    text = "".join(rng.choice(alpha) for _ in range(rng.randint(5, 80)))
+    path = os.path.join(D, "f.gz")
+    with gzip.open(path, "wb") as g: g.write(text.encode(enc))
+    expected = io.TextIOWrapper(io.BytesIO(text.encode(enc)), encoding=enc, newline=nl).read()
+    out = []; log = []
+    f = AsyncGzipTextFile(path, "rt", encoding=enc, newline=nl, chunk_size=cs)
+    await f.open()
+    try:
+        for step in range(60):
+            k = rng.random()
+            if k < 0.3: name, arg = "read", rng.choice([1, 2, 3, 7, 20])
+            elif k < 0.5: name, arg = "readline", -1
+            elif k < 0.6: name, arg = "readline", rng.choice([1, 2, 5])
+            elif k < 0.75: name, arg = "readlines", rng.choice([1, 4, 9])
+            elif k < 0.9: name, arg = "anext", None
+            else: name, arg = "read", -1
+            async def op():
+                if name == "anext":
+                    try: return await f.__anext__()
+                    except StopAsyncIteration: return ""
+                r = await getattr(f, name)(arg)
+                return "".join(r) if isinstance(r, list) else r
+            t = asyncio.ensure_future(op())
+            cancel = rng.random() < 0.5
+            if cancel:
+                for _ in range(rng.randint(0, 6)): await asyncio.sleep(0)
+                t.cancel()
+            try:
+                r = await t
+                log.append((name, arg, r)); out.append(r)
+            except asyncio.CancelledError:
+                log.append((name, arg, "CANCELLED")); stats["cancelled"] += 1
+                # cookie round trip right after a cancellation
+                if rng.random() < 0.5:
+                    c = await f.tell(); rest = await f.read(); await f.seek(c); rest2 = await f.read(); await f.seek(c)
+                    if rest != rest2:
+                        stats["FAIL-roundtrip-after-cancel"] += 1; ex.setdefault("rt", (enc, nl, cs, text, log, rest, rest2)); return
+            except OSError as e:
+                stats["oserror:" + str(e)[:40]] += 1; return
+        out.append(await f.read())
+        got = "".join(out)
+        if got != expected:
+            stats["FAIL-content"] += 1; ex.setdefault("content", (enc, nl, cs, text, log, got, expected))
+        else: stats["ok"] += 1
+    finally:
+        await f.close()
+
+async def main():
+    rng = random.Random(int(sys.argv[1]))
+    for it in range(int(sys.argv[2])): await one(rng, it)
+    print(dict(stats))
+    for k, v in ex.items(): print("EXAMPLE", k, v)
+asyncio.run(main())

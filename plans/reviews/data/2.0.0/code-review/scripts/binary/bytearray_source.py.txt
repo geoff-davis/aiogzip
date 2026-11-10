@@ -1,0 +1,25 @@
+"""A custom fileobj whose async read() returns bytearray/memoryview."""
+import asyncio, gzip, io, sys
+import aiogzip
+print("aiogzip", aiogzip.__version__, aiogzip.__file__)
+
+class Src:
+    def __init__(self, data, kind):
+        self.b = io.BytesIO(data); self.kind = kind
+    async def read(self, n=-1):
+        return self.kind(self.b.read(n))
+
+async def main():
+    wire = gzip.compress(b"hello world\n" * 100)
+    for kind in (bytes, bytearray, memoryview):
+        async with aiogzip.AsyncGzipBinaryFile(None, "rb", fileobj=Src(wire, kind)) as f:
+            try:
+                data = await f.read()
+                print(kind.__name__, "-> OK", len(data))
+            except Exception as e:
+                print(kind.__name__, "->", type(e).__name__, e)
+                try:
+                    await f.read()
+                except Exception as e2:
+                    print("   retry ->", type(e2).__name__, e2)
+asyncio.run(main())

@@ -1,0 +1,87 @@
+import asyncio, gzip, io, os, tempfile, itertools, pathlib
+import aiogzip
+
+d = tempfile.mkdtemp()
+p = os.path.join(d, "a.gz")
+with gzip.open(p, "wb") as f:
+    f.write(b"hello\n")
+
+async def try_open(mode, **kw):
+    try:
+        async with aiogzip.open(p, mode, **kw) as f:
+            return type(f).__name__
+    except BaseException as e:
+        return f"{type(e).__name__}: {e}"
+
+def try_gzip(mode, **kw):
+    try:
+        with gzip.open(p, mode, **kw) as f:
+            return type(f).__name__
+    except BaseException as e:
+        return f"{type(e).__name__}: {e}"
+
+async def main():
+    for mode in ["r","rb","rt","r+","rb+","r+t","rt+","+r","tr","br","U","rU","", "b","t","rr","rbt","R","r ", "ab+", "x+"]:
+        # use a copy path for writes
+        a = await try_open(mode) if mode[:1] in "r+tbUR " or mode in ("","rr","rbt") else "(skipped write)"
+        g = try_gzip(mode) if mode[:1] in "r+tbUR " or mode in ("","rr","rbt") else ""
+        print(repr(mode), "| aiogzip:", a, "| gzip:", g)
+    print("binary+newline='':", await try_open("rb", newline=""))
+    print("binary+encoding:", await try_open("rb", encoding="utf-8"))
+    print("binary+errors None:", await try_open("rb", errors=None))
+    print("mode=None:", await try_open(None))
+    print("mode bytes:", await try_open(b"rb"))
+    print("unknown kw:", await try_open("rb", bogus=1))
+    for m in ["w+","wb+","a+","x+", "w+t"]:
+        q = os.path.join(d, f"w{m.replace('+','p')}.gz")
+        try:
+            async with aiogzip.open(q, m) as f:
+                r = type(f).__name__
+                try:
+                    await f.write(b"x" if "t" not in m else "x")
+                    r += " write-ok"
+                except BaseException as e:
+                    r += f" write {type(e).__name__}: {e}"
+                try:
+                    await f.read()
+                    r += " read-ok"
+                except BaseException as e:
+                    r += f" read {type(e).__name__}: {e}"
+        except BaseException as e:
+            r = f"{type(e).__name__}: {e}"
+        try:
+            with gzip.open(q + "g", m) as f: g = "ok"
+        except BaseException as e:
+            g = f"{type(e).__name__}: {e}"
+        print(repr(m), "| aiogzip:", r, "| gzip:", g)
+    # r+ read/write
+    async with aiogzip.open(p, "r+") as f:
+        print("r+ read:", await f.read(), "readable", f.readable(), "writable", f.writable(), "mode", f.mode if hasattr(f,'mode') else None)
+    # paths
+    print("bytes path:", await try_open("rb") if False else None)
+    try:
+        print("bytes path:", await aiogzip.read(os.fsencode(p)))
+    except BaseException as e: print("bytes path err", repr(e))
+    class P:
+        def __fspath__(self): return p
+    try:
+        print("PathLike:", await aiogzip.read(P()))
+    except BaseException as e: print("PathLike err", repr(e))
+    for bad in ["", b"", 5, None]:
+        try:
+            print(repr(bad), await aiogzip.read(bad))
+        except BaseException as e: print(repr(bad), "->", repr(e))
+    # mtime oddities
+    async def empty():
+        return
+        yield b""
+    for mt in [True, float("inf"), float("nan"), -0.5, 2**32, 1.9]:
+        try:
+            out = b"".join([c async for c in aiogzip.compress_chunks(empty(), mtime=mt)])
+            print("mtime", mt, "->", out[4:8].hex())
+        except BaseException as e:
+            print("mtime", mt, "->", repr(e))
+    for fn in ["日本.txt", "a/b/c.gz", "x.gz", ".gz", b"\xff.gz", "a\nb"]:
+        out = b"".join([c async for c in aiogzip.compress_chunks(empty(), mtime=0, original_filename=fn)])
+        print("fname", repr(fn), "->", out[:3+1].hex(), out[10:30])
+asyncio.run(main())

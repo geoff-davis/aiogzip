@@ -1,0 +1,36 @@
+import asyncio, gzip, io, sys, tarfile
+import aiofiles.threadpool, aiogzip
+
+async def main():
+    data = gzip.compress(b"a\nb\n")
+    try:
+        wrapped = aiofiles.threadpool.wrap(io.BytesIO(data))
+        async with aiogzip.open(None, "rt", fileobj=wrapped) as f:
+            print("aiofiles.threadpool.wrap(BytesIO):", type(wrapped).__name__, [l async for l in f])
+    except Exception as e:
+        print("wrap(BytesIO) failed:", type(e).__name__, e)
+    # can tarfile consume an aiogzip handle?
+    f = aiogzip.open("/dev/null", "rb")
+    try:
+        tarfile.open(fileobj=f, mode="r|")
+    except Exception as e:
+        print("tarfile.open(fileobj=aiogzip handle):", type(e).__name__, e)
+    # BadGzipFile attributes: does the error identify the file?
+    import pathlib, tempfile, os
+    p = pathlib.Path(tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))) / "shard-0042.gz"
+    p.write_bytes(b"not gzip at all")
+    try:
+        await aiogzip.read(p)
+    except gzip.BadGzipFile as e:
+        print("BadGzipFile:", e, "| filename attr:", e.filename, "| notes:", getattr(e, "__notes__", None))
+    try:
+        gzip.open(p).read()
+    except gzip.BadGzipFile as e:
+        print("stdlib   :", e)
+    # ResourceWarning for unclosed reader?
+    import warnings, gc
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        g = aiogzip.open(p, "rb"); await g.open(); del g; gc.collect()
+        print("unclosed reader warnings:", [str(x.message)[:90] for x in w])
+asyncio.run(main())

@@ -1,0 +1,38 @@
+import gzip, zlib, sys, os, subprocess
+from aiogzip import GzipEncoder, GzipDecoder
+
+print("== 1. bytes subclass with __buffer__ override (PEP 688, 3.12+)")
+calls = []
+class Evil(bytes):
+    def __buffer__(self, flags):
+        calls.append(flags)
+        return memoryview(b"SUBSTITUTED")
+e = GzipEncoder(mtime=0)
+wire = b"".join(e.start())
+payload = Evil(b"real payload")
+wire += b"".join(e.feed(payload))
+wire += b"".join(e.finish())
+print(" override invoked:", calls, "| encoded payload:", gzip.decompress(wire),
+      "| input_size:", e.input_size, "| len(payload):", len(payload))
+good = gzip.compress(b"hello")
+calls.clear()
+class Evil2(bytes):
+    def __buffer__(self, flags):
+        calls.append(flags)
+        return memoryview(good)
+d = GzipDecoder()
+out = b"".join(d.feed(Evil2(b"not gzip at all"))) + b"".join(d.finish())
+print(" decoder: override invoked:", calls, "| decoded:", out, "| compressed_size:", d.compressed_size)
+
+print("== 2. mtime edge values")
+for m in (float("inf"), float("nan"), True, 1e300, 4294967295.9):
+    try:
+        GzipEncoder(mtime=m); print(" ", repr(m), "accepted")
+    except Exception as ex:
+        print(" ", repr(m), "->", type(ex).__name__, ex)
+
+print("== 3. AIOGZIP_ENGINE values")
+for v in ("stdlib", " STDLIB ", "zlib", "std", "zlib-ng", "bogus", ""):
+    r = subprocess.run([sys.executable, "-c", "import aiogzip; print(aiogzip.engine_info())"],
+                       env={**os.environ, "AIOGZIP_ENGINE": v}, capture_output=True, text=True)
+    print(" ", repr(v), "->", r.stdout.strip(), r.stderr.strip()[-200:])

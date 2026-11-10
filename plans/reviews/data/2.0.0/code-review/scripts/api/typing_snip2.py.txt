@@ -1,0 +1,34 @@
+import aiofiles
+import aiogzip
+
+
+class SinkB:
+    async def write(self, b: bytes) -> int:          # param not named "data"
+        return len(b)
+
+
+class SinkPos:
+    async def write(self, data: bytes, /) -> int:    # positional-only
+        return len(data)
+
+
+class SinkNone:
+    async def write(self, data: bytes) -> None:      # asyncio-style, returns None
+        return None
+
+
+class SrcN:
+    async def read(self, n: int = -1) -> bytes:      # param not named "size"
+        return b""
+
+
+async def main() -> None:
+    async with aiofiles.open("f.gz", "wb") as w:
+        await aiogzip.write(None, b"x", fileobj=w)          # A
+        async with aiogzip.open(None, "wb", fileobj=w) as g:  # B
+            await g.write(b"x")
+    await aiogzip.write(None, b"x", fileobj=SinkB())        # C
+    await aiogzip.write(None, b"x", fileobj=SinkPos())      # D
+    await aiogzip.write(None, b"x", fileobj=SinkNone())     # E
+    await aiogzip.read(None, fileobj=SrcN())                # F
+    print(isinstance(SinkB(), aiogzip.WithAsyncWrite))

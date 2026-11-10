@@ -1,0 +1,22 @@
+import asyncio, gzip, io, os, tempfile, codecs
+from aiogzip import AsyncGzipTextFile
+d = tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))
+p = os.path.join(d, "f.gz")
+async def case(raw, enc, err, cs, nl=""):
+    with gzip.open(p, "wb") as g: g.write(raw)
+    ref = io.TextIOWrapper(io.BytesIO(raw), encoding=enc, errors=err, newline=nl).read()
+    async with AsyncGzipTextFile(p, "rt", encoding=enc, errors=err, chunk_size=cs, newline=nl) as f:
+        a = await f.read()
+        c = await f.tell()
+        r1 = await f.read()
+        await f.seek(c)
+        r2 = await f.read()
+        r3 = await f.read()
+        print(f"{enc} {err} cs={cs} raw={raw!r}: ref={ref!r} read={a!r} tell={'cookie' if c<0 else c} read@EOF={r1!r} after seek(tell)={r2!r} again={r3!r}")
+async def main():
+    for enc, raw in (("gb18030", "\x85".encode("gb18030")[:3]), ("gb18030", b"a\x81\x30\x81"), ("utf-8", "a漢".encode()[:-1]), ("shift_jis", b"a\x8a"), ("utf-16", "ab".encode("utf-16")[:-1]), ("euc_jp", b"a\x8f\xb0"), ("big5", b"a\xa4"), ("iso2022_jp", b"a\x1b$B4"),("utf-7", b"a+AGE")):
+        for err in ("replace", "ignore", "backslashreplace"):
+            for cs in (2, 64):
+                try: await case(raw, enc, err, cs)
+                except Exception as e: print(enc, err, cs, "EXC", type(e).__name__, e)
+asyncio.run(main())

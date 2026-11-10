@@ -1,0 +1,93 @@
+import asyncio, gzip, io, os, tempfile, traceback
+import aiogzip
+from aiogzip import AsyncGzipBinaryFile
+
+class Src:
+    def __init__(self, data, kind=bytes, seekable=True):
+        self.b = io.BytesIO(data); self.kind = kind; self._seekable = seekable; self.closed=False
+        self.calls=[]
+    async def read(self, n=-1):
+        self.calls.append(("read", self.closed))
+        return self.kind(self.b.read(n))
+    def tell(self): return self.b.tell()
+    async def close(self): self.closed=True
+    def __getattr__(self, name):
+        if name in ("seek","seekable") and self._seekable:
+            if name=="seekable": return lambda: True
+            async def seek(o, w=0):
+                self.calls.append(("seek", self.closed)); return self.b.seek(o,w)
+            return seek
+        raise AttributeError(name)
+
+async def attempt(label, coro):
+    try:
+        r = await coro
+        print(f"{label}: OK {r!r:.80}")
+    except BaseException as e:
+        print(f"{label}: {type(e).__name__}: {e}")
+
+async def main():
+    payload = b"line1\nline2\nline3\n" * 10
+    wire = gzip.compress(payload)
+    for kind in (bytes, bytearray, memoryview):
+        f = AsyncGzipBinaryFile(None, "rb", fileobj=Src(wire, kind))
+        await f.open()
+        await attempt(f"source returns {kind.__name__}", f.read())
+        await f.close()
+    # arg parity
+    d = tempfile.mkdtemp(); p = os.path.join(d, "a.gz")
+    open(p,"wb").write(wire)
+    async with aiogzip.open(p, "rb") as f:
+        await attempt("readlines(None)", f.readlines(None))
+        await attempt("tell", f.tell())
+        await attempt("readlines(0)", f.readlines(0))
+    with gzip.open(p) as g:
+        print("stdlib readlines(None)", len(g.readlines(None)))
+    # empty file
+    pe = os.path.join(d, "e.gz"); open(pe,"wb").close()
+    async with aiogzip.open(pe, "rb") as f:
+        await attempt("empty read", f.read())
+    with gzip.open(pe) as g: print("stdlib empty", g.read())
+    # closed iteration
+    f = aiogzip.open(p, "rb"); await f.open(); await f.close()
+    await attempt("anext closed", f.__anext__())
+    await attempt("readline closed", f.readline())
+    # closefd False with filename
+    f = AsyncGzipBinaryFile(p, "rb", closefd=False); await f.open(); raw = f.raw(); await f.close()
+    print("closefd=False with filename; raw closed:", raw.closed)
+    # flush unopened writer
+    f = AsyncGzipBinaryFile(os.path.join(d,"w.gz"), "wb")
+    await attempt("flush unopened writer", f.flush())
+    await attempt("write unopened writer", f.write(b"x"))
+    # mtime after rewind
+    two = gzip.compress(b"a", mtime=111) + gzip.compress(b"b", mtime=222)
+    p2 = os.path.join(d,"two.gz"); open(p2,"wb").write(two)
+    async with aiogzip.open(p2, "rb") as f:
+        await f.read(); print("mtime after read", f.mtime)
+        await f.seek(0); print("mtime after seek(0)", f.mtime)
+        await f.read(1); print("mtime after read(1)", f.mtime)
+    # misc args
+    async with aiogzip.open(p, "rb") as f:
+        await attempt("peek(0)", f.peek(0))
+        await attempt("peek(None)", f.peek(None))
+        await attempt("read(2.5)", f.read(2.5))
+        await attempt("tell", f.tell())
+        await attempt("readline(2.5)", f.readline(2.5))
+        await attempt("seek(2.5)", f.seek(2.5))
+        await attempt("tell", f.tell())
+        await attempt("read(3)", f.read(3))
+        await attempt("seek(0,7)", f.seek(0,7))
+        await attempt("seek(True)", f.seek(True))
+        await attempt("readinto(bytes)", f.readinto(b"abc"))
+        await attempt("read1(-7)", f.read1(-7))
+    async with aiogzip.open(os.path.join(d,"w.gz"), "wb") as f:
+        await attempt("write str", f.write("x"))
+        await attempt("write b''", f.write(b""))
+        await attempt("seek(1.5)", f.seek(1.5))
+        await attempt("tell", f.tell())
+        await attempt("write after", f.write(b"abc"))
+        await attempt("tell", f.tell())
+        await attempt("seek(-1,1)", f.seek(-1,1))
+        await attempt("seek(0,2)", f.seek(0,2))
+    print(gzip.open(os.path.join(d,"w.gz")).read())
+asyncio.run(main())

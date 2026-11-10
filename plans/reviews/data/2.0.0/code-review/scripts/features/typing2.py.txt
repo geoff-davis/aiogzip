@@ -1,0 +1,8 @@
+import pathlib
+import aiogzip
+
+async def main(p: pathlib.Path) -> None:
+    async with aiogzip.open(p, "rb", compress_level=3) as f:
+        reveal_type(f)
+    async with aiogzip.open(p, "rt", encodin="utf-8") as g:
+        reveal_type(g)

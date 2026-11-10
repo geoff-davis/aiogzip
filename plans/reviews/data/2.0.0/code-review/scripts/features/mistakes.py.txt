@@ -1,0 +1,204 @@
+import asyncio, gzip, os, sys, traceback, warnings, io, pathlib, tempfile
+import aiogzip
+
+D = pathlib.Path(tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__))))
+good = D / "good.txt.gz"
+with gzip.open(good, "wt") as f:
+    f.write("alpha\nbeta\ngamma\n" * 1000)
+plain = D / "plain.txt"; plain.write_text("just text, not gzip\n" * 10)
+trunc = D / "trunc.gz"; trunc.write_bytes(good.read_bytes()[:-20])
+empty = D / "empty.gz"; empty.write_bytes(b"")
+zst = D / "x.zst"; zst.write_bytes(b"\x28\xb5\x2f\xfd" + b"\0" * 20)
+
+async def case(name, coro_fn):
+    print(f"--- {name}")
+    try:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            r = await coro_fn()
+            print("   OK ->", repr(r)[:200])
+            for x in w: print("   WARNING:", x.category.__name__, x.message)
+    except BaseException as e:
+        print(f"   {type(e).__module__}.{type(e).__name__}: {e}")
+        for n in getattr(e, "__notes__", []): print("   note:", n)
+
+async def main():
+    async def forgot_await_read():
+        async with aiogzip.open(good, "rb") as f:
+            data = f.read()
+            return type(data), len(data) if hasattr(data, "__len__") else "no len"
+    await case("forgot await on read()", forgot_await_read)
+
+    async def sync_with():
+        with aiogzip.open(good, "rb") as f: pass
+    await case("with instead of async with", sync_with)
+
+    async def sync_for():
+        async with aiogzip.open(good, "rt") as f:
+            for line in f: pass
+    await case("for instead of async for", sync_for)
+
+    async def await_open():
+        f = await aiogzip.open(good, "rb")
+        return f
+    await case("await aiogzip.open(...) (aiofiles habit)", await_open)
+
+    async def no_ctx():
+        f = aiogzip.open(good, "rb")
+        return await f.read()
+    await case("read without async with / open()", no_ctx)
+
+    async def after_ctx():
+        async with aiogzip.open(good, "rb") as f: pass
+        return await f.read()
+    await case("read after async with exit", after_ctx)
+
+    async def wrong_mode_write():
+        async with aiogzip.open(good, "rb") as f:
+            await f.write(b"x")
+    await case("write on read-mode file", wrong_mode_write)
+
+    async def wrong_mode_read():
+        async with aiogzip.open(D / "o.gz", "wb") as f:
+            await f.read()
+    await case("read on write-mode file", wrong_mode_read)
+
+    async def str_to_binary():
+        async with aiogzip.open(D / "o.gz", "wb") as f:
+            await f.write("hello")
+    await case("str to binary file", str_to_binary)
+
+    async def bytes_to_text():
+        async with aiogzip.open(D / "o.gz", "wt") as f:
+            await f.write(b"hello")
+    await case("bytes to text file", bytes_to_text)
+
+    async def default_mode_expect_text():
+        async with aiogzip.open(good) as f:
+            async for line in f:
+                return line
+    await case("default mode -> bytes lines", default_mode_expect_text)
+
+    async def bad_mode():
+        aiogzip.open(good, "rw")
+    await case("mode 'rw'", bad_mode)
+    async def bad_mode2():
+        aiogzip.open(good, "z")
+    await case("mode 'z'", bad_mode2)
+    async def enc_binary():
+        aiogzip.open(good, "rb", encoding="utf-8")
+    await case("encoding in binary mode", enc_binary)
+    async def typo_kw():
+        aiogzip.open(good, "rb", compress_level=3)
+    await case("typo kwarg compress_level", typo_kw)
+    async def lvl():
+        aiogzip.open(D/"o.gz", "wb", compresslevel=10)
+    await case("compresslevel=10", lvl)
+
+    async def nongzip():
+        async with aiogzip.open(plain, "rb") as f:
+            return await f.read()
+    await case("open non-gzip file", nongzip)
+    async def nongzip_text():
+        async with aiogzip.open(plain, "rt") as f:
+            async for l in f: return l
+    await case("open non-gzip file text iterate", nongzip_text)
+    async def zstf():
+        return await aiogzip.read(zst)
+    await case("zstd file", zstf)
+    async def truncf():
+        return len(await aiogzip.read(trunc))
+    await case("truncated file read()", truncf)
+    async def trunc_iter():
+        n = 0
+        async with aiogzip.open(trunc, "rt") as f:
+            async for l in f: n += 1
+        return n
+    await case("truncated file iterate", trunc_iter)
+    async def emptyf():
+        return await aiogzip.read(empty)
+    await case("empty file", emptyf)
+    async def missing():
+        return await aiogzip.read(D / "nope.gz")
+    await case("missing file", missing)
+    async def isdir():
+        return await aiogzip.read(D)
+    await case("directory", isdir)
+
+    async def sync_fileobj():
+        with open(good, "rb") as raw:
+            async with aiogzip.open(None, "rb", fileobj=raw) as f:
+                return await f.read()
+    await case("sync fileobj", sync_fileobj)
+    async def bytesio():
+        async with aiogzip.open(None, "rb", fileobj=io.BytesIO(good.read_bytes())) as f:
+            return await f.read()
+    await case("BytesIO fileobj", bytesio)
+    async def fileobj_positional():
+        import aiofiles
+        async with aiofiles.open(good, "rb") as raw:
+            async with aiogzip.open(raw, "rb") as f:
+                return len(await f.read())
+    await case("aiofiles handle as first positional (gzip.open habit)", fileobj_positional)
+    async def both():
+        import aiofiles
+        async with aiofiles.open(good, "rb") as raw:
+            async with aiogzip.open(good, "rb", fileobj=raw) as f:
+                return len(await f.read())
+    await case("filename and fileobj both", both)
+
+    async def dchunks_bytes():
+        async for c in aiogzip.decompress_chunks(good.read_bytes()): return c
+    await case("decompress_chunks(bytes)", dchunks_bytes)
+    async def dchunks_synciter():
+        async for c in aiogzip.decompress_chunks([good.read_bytes()]): return c
+    await case("decompress_chunks(list)", dchunks_synciter)
+    async def dchunks_ba():
+        async def src():
+            yield bytearray(good.read_bytes())
+        async for c in aiogzip.decompress_chunks(src()): return len(c)
+    await case("decompress_chunks(yield bytearray)", dchunks_ba)
+    async def has_compress():
+        return aiogzip.compress(b"x")
+    await case("aiogzip.compress()", has_compress)
+    async def read_text():
+        return await aiogzip.read(good, encoding="utf-8")
+    await case("aiogzip.read(encoding=)", read_text)
+    async def write_str():
+        return await aiogzip.write(D/"o.gz", "text")
+    await case("aiogzip.write(str)", write_str)
+
+    async def concurrent():
+        async with aiogzip.open(good, "rb") as f:
+            return await asyncio.gather(f.read(10), f.read(10))
+    await case("concurrent reads", concurrent)
+
+    async def unclosed():
+        f = aiogzip.open(D / "leak.gz", "wb")
+        await f.open()
+        await f.write(b"data" * 100)
+        del f
+        import gc; gc.collect()
+        await asyncio.sleep(0.05)
+        try:
+            return gzip.open(D / "leak.gz").read()[:10]
+        except Exception as e:
+            return f"reading leaked file: {type(e).__name__}: {e}"
+    await case("writer never closed (leak)", unclosed)
+
+    print("--- reprs")
+    f = aiogzip.open(good, "rt")
+    print("  ", repr(f))
+    async with f:
+        print("  ", repr(f)); print("  ", repr(f.buffer))
+        await f.readline()
+        print("   name:", f.name, "mode:", getattr(f, "mode", "<no mode attr>"), "encoding:", f.encoding)
+    print("  ", repr(f))
+    print("  ", repr(aiogzip.engine_info()))
+    info = await aiogzip.inspect(good)
+    print("  ", repr(info)[:300])
+    print("  ", repr(await aiogzip.verify(good)))
+    print("  ", repr(aiogzip.GzipEncoder()), repr(aiogzip.GzipDecoder()))
+    print("  ", repr(aiogzip.decompress_chunks(aiogzip.compress_chunks(None)) if False else "skip"))
+
+asyncio.run(main())

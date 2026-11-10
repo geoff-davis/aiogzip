@@ -1,0 +1,16 @@
+import asyncio, gzip, io, os, tempfile
+from aiogzip import AsyncGzipTextFile
+d = tempfile.mkdtemp(dir=os.path.dirname(os.path.abspath(__file__)))
+p = os.path.join(d, "f.gz")
+async def main():
+    raw = b"\xff" * 30 + b"tail\n"
+    with gzip.open(p, "wb") as g: g.write(raw)
+    exp = raw.decode("utf-8", "backslashreplace")
+    async with AsyncGzipTextFile(p, "rt", errors="backslashreplace", chunk_size=4, newline="") as f:
+        out = ""
+        out += await f.read(5); out += await f.read(40)
+        o = f._buffer_origin
+        print("origin after expanding read:", o.byte_offset, o.chars_to_skip, "buffer offset", f._text_buffer_offset, "buffered", f._buffered_text_len(), "binary pos", f._binary_file._position)
+        c = await f.tell(); rest = await f.read(); await f.seek(c); rest2 = await f.read()
+        print("content ok:", out + rest == exp, " roundtrip ok:", rest == rest2)
+asyncio.run(main())

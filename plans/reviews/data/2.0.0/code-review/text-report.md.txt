@@ -1,0 +1,119 @@
+## Review of `src/aiogzip/_text.py` (text handle), released 2.0 code
+
+I read all 2,324 lines of `_text.py`, all of `_common.py`, the text sections of the state model, the BC1–BC18 ledger and plan §5. The read paths are robust: no data-loss or wrong-text bug showed up in valid input under strict decoding. What I found is in `tell()` for stateful codecs, `writelines()` failure semantics, and a few API-edge errors. Nothing in the repo was modified and no timing was run.
+
+Scripts are in `scripts/text/` (called `$S` below), run with `uv run python` from the repo root on Python 3.14.2 against the checkout (`2.0.1.dev0`).
+
+---
+
+### Correctness findings (most important first)
+
+**C1. Write-mode `tell()` returns a negative cookie for BOM and stateful encodings.** `_text.py:538-562`, `964-972`. Reproduced: `$S/repro_tell.py`.
+- `tell()` decides "plain position" from `self._decoder.getstate()`, even in write mode where the decoder is never fed. Its initial flag is non-zero for utf-16 and utf-32 (2), utf-8-sig (1) and iso2022_jp (4342338), so the plain branch is never taken.
+- Sequence: `AsyncGzipTextFile(p, "wt", encoding="utf-8-sig")`, `write("abc")`, `tell()`. Result is a large negative int before and after the write; `f.buffer.tell()` is 6 and `io.TextIOWrapper` gives 0 then 6. utf-8 is correct (0 then 3).
+- Severity: medium-low. Something like `if await f.tell() > limit: rotate()` never fires for utf-8-sig (common for Excel CSV) or utf-16 output. I found no test of write-mode text `tell()`.
+- Fix: in write mode return `self._binary_file._position` directly.
+- Related, read mode: `tell()` at offset 0 of a utf-16 or utf-8-sig file returns a cookie (stdlib returns 0), and iso2022_jp never yields a plain offset, even at EOF. Round trips still work, but `docs/api.md:286` describes the plain case without mentioning the decoder flag.
+
+**C2. `writelines()` drops earlier good lines in a batch when a later line fails to encode.** `_text.py:2184-2227`. Reproduced: `$S/probe_misc.py`, `$S/write_diff.py`.
+- Lines are joined into `chunk_size` batches and encoded once, so an encode error rejects the whole batch.
+- Sequence: `writelines(["a\n", "b\n", "\ud800", "c\n"])` (utf-8, strict) raises `UnicodeEncodeError`; after `close()` the file is `b''`. `TextIOWrapper` leaves `b'a\nb\n'`.
+- It is inconsistent with the non-`str` branch at 2199-2202, which flushes pending first: `["a\n", "b\n", 5, "c\n"]` leaves `b'a\nb\n'`.
+- The exception's `position` refers to the joined batch, not the offending line. How much is lost depends on `chunk_size` and where the batch boundary falls.
+- Severity: low-medium (the caller already has an exception, but what reached the file is unpredictable). I found no doc or test covering it; `docs/api.md:272` describes batching only.
+- Fix: on `UnicodeEncodeError` from a batch, fall back to writing that batch line by line, or document it.
+- `write_diff.py` (10,000 random call sequences, 14 encodings, 7 error handlers, 5 newline modes) found no other difference except the two below, where aiogzip is better than stdlib. Its utf-7 output is batched differently; I did not check that it decodes identically.
+  - aiogzip emits the final shift sequence for hz and iso2022 at close.
+  - aiogzip restores the encoder (so the BOM is still written) after a failed first write.
+
+**C3. `tell()` raises `struct.error` for ISO-2022-KR.** `_text.py:240` (`_COOKIE_HEADER = ">BQQQiBBI"`), `1096`. Reproduced: `$S/repro_kr.py`, `$S/states.py`.
+- The decoder flag is packed as signed 32-bit, but CJK multibyte decoders return a state int of up to 64 bits. ISO-2022-KR in shifted (SO) state is 4299342658.
+- Sequence: Korean text in iso2022_kr, `chunk_size=3`, `read(1)` twice, `tell()` raises `struct.error: 'i' format requires ...`.
+- With the default chunk size it needs a chunk boundary inside a Hangul run, which is the usual case for files over 256 KiB.
+- `TextIOWrapper.tell()` also fails here (`OverflowError`), so this is not a parity regression, but it is a non-`OSError` escaping `tell()`.
+- Severity: low (rare codec). Fix: encode the flag as a length-prefixed variable-size int.
+- Valid text in the iso2022_jp variants, hz, shift_jis, euc_jp, gb18030, big5hkscs and utf-7/16/32 all fit in int32. With garbage iso2022_jp input and `errors=backslashreplace` the same overflow appeared 14 times in the fuzz.
+
+**C4. `readlines(None)` raises `TypeError`.** `_text.py:1748`, `2088`. Reproduced: `$S/probe_misc.py`.
+- `read(None)` and `readline(None)` are normalised; `readlines(None)` is not. stdlib accepts it.
+- Severity: low. One line: `if hint is None: hint = -1`.
+- Also, `readlines(hint)` stops at `total >= hint`; C `TextIOWrapper` stops at `total > hint`. The docstring states the aiogzip rule, so I take it as deliberate; it differs by one line at an exact boundary (seen in `d1.py`).
+
+**C5. Unopened handle raises a bare `AssertionError`.** `_text.py:1456` (`assert bf is not None` in `_find_line_terminator`). Reproduced: `$S/probe_misc.py`.
+- `readline(5)` in any newline mode, and `readline()` or `__anext__()` with `newline=""` or `"\r\n"`, hit the assert before the reservation's "File not opened" check.
+- The same calls in other modes raise the intended `ValueError`. Under `-O` the assert vanishes and behaviour changes.
+- Severity: low.
+
+**C6. Text write-mode `seek()` is effectively unsupported, with a misleading error.** `_text.py:603`, `620`, `1055`. Reproduced: `$S/probe_wseek.py`.
+- After `write("abc")` on a `"wt"` handle, `seek(3)`, `seek(await f.tell())` and `seek(10)` all raise `OSError: Negative seek in write mode`, because the plain-position path rewinds to 0 first. On a fresh writer `seek(5)` raises "File not open for reading".
+- stdlib allows identity and forward seeks (zero-padding), and binary aiogzip supports forward seek. `docs/errors.md:100` mentions write-mode `seek()` ownership without saying text does not support it.
+- No data was damaged: writes after the failed seeks produced `b'abcdef'`.
+- Severity: low. Either delegate non-negative write-mode seeks to the binary layer or raise a clear `io.UnsupportedOperation`.
+
+**C7. Duplicate character after `seek(tell())` at EOF for a truncated CJK sequence with a non-strict handler.** `_text.py:1071-1075`. Reproduced: `$S/dbg_gb2.py`.
+- CPython's gb18030 decoder with `surrogateescape` keeps a pending byte after `decode(b"", final=True)`.
+- aiogzip's repeated final decode drains it (returning one more character, `'5'`, than `TextIOWrapper`). `tell()` then reports plain EOF; `seek()` there replays, discards one final decode, and the next `read()` returns `'5'` again.
+- Severity: very low (malformed input, non-strict handler, a CPython quirk). Recorded because `_seek_to_plain_position` assumes one final decode leaves the decoder clean.
+
+**C8. Minor, inferred or partly verified.**
+- `write()` type error always says "must be str, not bytes", even for an `int` (`_text.py:851`, `915`; seen in `probe_misc.py`).
+- `seek(cookie)` restores `newlines` as of the buffer origin, so it can transiently report less than at `tell()` time (seen in `d1.py`: `'\r'` before, `None` after, until the next read). Cosmetic.
+- The "custom expanding codec" branch at `_text.py:1322-1327` is reachable with stdlib `errors="backslashreplace"` (`$S/probe_expand.py`). Results and cookies are correct. By inference only: repeated hits never refresh the origin or compact the consumed prefix (`+=`, not `_append_buffer`), so the buffer can grow on mostly-invalid input.
+- Inferred, not reproduced: after a `UnicodeDecodeError` the live origin is stale with an empty buffer, and a second failure in `_read_sized_reserved` (1301-1306) or `_rollback_readlines` would rebuild the buffer over it, giving a wrong cookie. It needs two failures on a path `docs/errors.md:261` says not to retry.
+
+---
+
+### Maintainability findings
+
+**M1. Vestigial code.**
+- `__anext__` generic path (`_text.py:1825-1835`): `search_from = 0; while True:` always returns on the first pass, and the "Back up 1 char" comment describes logic that is gone.
+- `_find_line_terminator(search_from)` is always called with 0; the parameter, its docstring and the unreachable final `else` (1491-1493) can go.
+- `_replay_characters(strict=)` is only ever called with `strict=True` (line 618); the non-strict breaks (1159-1161) are dead.
+- `continue` at 2203 is unreachable, since `_write_batch_reserved(non-str)` always raises.
+- `else: pass` at 860-862 is unreachable.
+- `if self._binary_file is None` guards in `_reset_to_start` and `_seek_to_plain_position` duplicate the check in `seek()`.
+
+**M2. The "publish fresh chunk" stanza is written five times.** `_text.py:1316`, `1332`, `1691`, `1699`, `1710`. Each is `_set_buffer(...)` plus `_set_buffer_origin(origin_offset=fresh_origin[0], ...)` plus an optional `chars_to_skip` assignment, over an anonymous 4-tuple.
+- The three in `_next_fast_line`'s tail differ only in how much of `fresh` is consumed. One `_publish_fresh(fresh, consumed, fresh_origin, origin_chars=0)` would replace all five.
+- This is per refill or long line, not per line, and is not in the hot-path duplication map.
+- `fresh_origin` could be a `_TextBufferOrigin`, as `_next_fast_line` already builds one for the pending origin.
+
+**M3. The "origin is valid when the buffer is empty" invariant is implicit and unevenly kept.**
+- `_consume_buffer`, `_read_sized_reserved`, `_next_fast_line` and `_readline_buffered_reserved` keep `_buffer_origin` exact after emptying the buffer.
+- `read(-1)` (1415), the poison observer (748) and a failed decode leave it stale.
+- It is safe today only because later paths either recapture or are at EOF; the fallback branches at 1305, 1326 and 1340 rely on it.
+- I would state the invariant on `_TextBufferOrigin` and either recapture in `read(-1)` or assert it in the stateful harness.
+
+**M4. `tell()` plain-position policy reads decoder state where it is meaningless.** Splitting it into `_tell_write()` and `_tell_read()` fixes C1 and makes the documented rule match the code.
+
+**M5. Positional rollback tuples.** `_SeekState` is a 10-field tuple (`_text.py:93`, `629-667`) and the readlines state a 3-tuple; adding a field means editing capture, restore and the alias in lockstep. A frozen slotted dataclass for the cold seek path costs nothing measurable. By inference, `list(self._pending_lines)` at 640 is an unnecessary O(lines) copy on every seek: `_pending_lines` is only ever rebound, never mutated in place.
+
+**M6. Missing tests for tricky branches.**
+- write-mode `tell()` with utf-16 and utf-8-sig (C1);
+- `writelines` encode error mid-batch (C2);
+- decoder flags above int32 (C3);
+- `readlines(None)` (C4);
+- an unopened handle on the generic and bounded line paths (C5);
+- the expanding-decoder branch at 1322-1327 under `backslashreplace`, which I did not find exercised by name.
+
+**M7. Small consistency items.**
+- "File not opened…" appears as a literal 11 times and the closed-file message many more; the cold paths (`fileno`, `raw`, `buffer`, `tell`, `seek`, `writelines`) could share a `_require_open()`.
+- Precondition order differs: `read()` checks mode before closed, `readline()` and `readlines()` check closed before mode, and `__anext__` checks neither mode nor open.
+- The magic `7` at 1525 could be a named `_SEEN_ALL`.
+
+**M8. Is there a seam for splitting the module?** Yes, but only at the edges. The reader core (buffer, origin, seek and replay, the four read paths; roughly lines 923-2100) is one state machine and should stay together. Separable pieces:
+1. **Cookie codec** (`_encode_cookie`, `_decode_cookie`, `_COOKIE_*`; about 70 lines) into pure functions in `_text_cookie.py`. It has no hot-path cost and is independently testable, and it is where C3 lives.
+2. **Writer half** (`write`, `_write_reserved`, `_write_batch_reserved`, `writelines`, write-mode `flush`, `_close_text_writer`; about 280 lines). It shares only lifecycle state with the reader. A handle is either a reader or a writer, so a mixin or module-level functions would also remove the unused decoder from writers (C1's root cause).
+3. **Newline state** (`_apply_newline_decoding`, `_finalize_pending_newline_state`, `newlines`, `_SEEN_*`, the regex constants; about 130 lines) is logically pure, but it is on the per-chunk path, so I would only move it with a benchmark.
+4. **Lifecycle and delegating properties** (open, close, context managers, the reservations) could stay as the `_text.py` shell.
+
+Items 1 and 2 take about 350 lines out with no hot-path risk. I would not go further.
+
+---
+
+### Checked and found sound
+
+- **Read-path parity (ran):** `d1.py`, 12,600 random op sequences (`read(n)`, `readline()`, `readline(limit)`, `readlines(hint)`, `__anext__`, `seek(tell())`, final `read()` and `newlines`) across 13 encodings, all five newline modes and chunk sizes 1–64. Zero differences from `TextIOWrapper` in strict mode, apart from the C4 hint rule. `d2.py` (480 runs, 1,000-byte to 1 MiB chunks, lines over 256K characters, crossing the compaction threshold and line-batch window) was also clean.
+- **Non-strict decoding (ran):** 8,352 runs with invalid bytes under `replace`, `ignore`, `backslashreplace` and `surrogateescape` showed only C3, C7 and garbage-ISO-2022 cases where `TextIOWrapper` is itself inconsistent.
+- **Cancellation (ran):** `cancel_fuzz.py`, 1,500 files with 11,952 cancelled reads on a native path source at random points. Surviving results always concatenated to the exact text, and `seek(tell())` after a cancel always round-tripped.
+- **By reading:** CR/LF carry logic in `_readline_buffered_reserved`, `_apply_newline_decoding` counting, cookie serialisation (the version byte protects against leading-zero loss), and `tell()` concurrent with `read(-1)` (binary `_position` only moves at publication).

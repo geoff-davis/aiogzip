@@ -1,0 +1,81 @@
+## Codec core review: `codec.py`, `_codec_buffer.py`, `_gzip_header.py`, `_engine.py`, `_metadata.py`
+
+I read every line of the five files, plus `_common.py` (the validators and header/trailer builders the encoder calls). I found no data-corruption or integrity bug. There are two real behaviour defects in the decoder, one false documented guarantee, and a few small validation gaps.
+
+Scripts are in `scripts/codec/`. I ran them with `uv run python` from the repo root on Python 3.14.2, with zlib-ng active by default and again with `AIOGZIP_ENGINE=stdlib` where noted. I took no timings and changed nothing in the repo.
+
+---
+
+### Correctness findings (most important first)
+
+**C1. `GzipDecoder.feed()` can withhold decodable output until later, unrelated input arrives (reproduced, both engines).**
+- **Where:** `src/aiogzip/codec.py:681-699` (body state), with `_engine.inflate_step` at `_engine.py:131-164`.
+- **What goes wrong:** when a bounded inflate step fills its `max_length` and the engine has consumed all its input, `unconsumed_tail` is empty, so `_inflate_input` becomes `None`. If `_pending` is also empty, the loop breaks at line 683-684. The engine can still hold output it could produce with no further input (a match in progress, or codes already in its bit buffer). Nothing calls `decompress(b"", max_length)` to drain it.
+- **Concrete input:** one member, payload `b"x" * 262165`, raw deflate at level 6, message ended with `Z_PARTIAL_FLUSH`, fed in one `feed()`.
+- **Script:** `repro_withheld_output_min.py`. Output, identical on both engines:
+  `strategy=0 message=262165 B wire=271 B: feed() returned 262144 B (short by 21); feed(b'') returned 0 B; the next message's feed returned b'xxxxxxxx'... (25 B)`
+- **Breadth:** `repro_partial_flush_lag.py` over 1,500 messages per flush mode:
+
+  | Flush mode ending each message | Feeds that withheld output | Worst case |
+  | --- | --- | --- |
+  | `Z_SYNC_FLUSH` | 0 | 0 |
+  | `Z_FULL_FLUSH` | 0 | 0 |
+  | `Z_PARTIAL_FLUSH` | 39 | 1 byte |
+  | `Z_BLOCK` | 408 | 275 bytes |
+
+  `probe_lag_lifecycle.py` (section A) cut streams at arbitrary byte offsets and saw up to 1,025 bytes withheld. `probe_lag2.py` confirms the mechanism on both raw engines: `bounded loop until tail empty: 131072 then decompress(b'') yields 1025 more`.
+- **Second consequence (reproduced, `probe_fix_and_trunc.py`):** on a truncated stream, `finish()` raises without first emitting those bytes: `recovered 262144 of 262165 decodable bytes before: ... ended before the deflate stream completed`. The docs call payload from a failed member "recovery data", and here its tail is lost.
+- **Not affected:** complete streams (the trailer always follows as input) and aiogzip's own `flush()`, which is `Z_SYNC_FLUSH`. The differential fuzz confirms complete streams always decode fully.
+- **Severity:** low to medium. It needs a single feed that produces at least one inflate batch (64-256 KiB) of output, and a peer that ends messages with partial flush or `Z_BLOCK`, or a reader tailing a growing file. A request/response protocol in that situation would stall waiting for the last bytes.
+- **Fix direction (inference, not implemented):** when a step is not at EOF, retains nothing and returned exactly `max_length` bytes, run another step with empty input before breaking. This needs care with the `data and not consumed and not output` no-progress guard at `_engine.py:157`. Add a regression test using the repro above.
+
+**C2. Many tiny members in one feed cost quadratic work per 256 KiB window (work count reproduced; no timing taken).**
+- **Where:** `codec.py:685-697` with `_engine.py:140-144` and `_codec_buffer.py:190-196`.
+- **What goes wrong:** each member's inflate is handed the whole remaining window. At EOF, zlib copies the remainder into `unused_data`, `_normalized_retained` runs `data.endswith(first)` over it, the remainder is prepended, and the next `pop_window` slices it again.
+- **Script:** `probe_lag_lifecycle.py` (section E), which counts bytes handed to `inflate_step`:
+  - `11397 members of 23 B in one 262131 B feed: inflate calls=11397, bytes handed to inflate=1493770599 (5699x the input)`
+  - `same, fed in 4 KiB chunks: bytes handed to inflate=23395102 (89x the input)`
+- **Inference:** each of those bytes is also touched by the zlib copy, the `endswith` compare and the `pop_window` slice, so roughly three passes.
+- **Severity:** low for ordinary files; BGZF-sized members are unaffected. It is a CPU amplification on untrusted input: about 1.5 GB of memory traffic per 256 KiB of crafted input, zero output, so `max_decompressed_size` never trips. `verify()` and `inspect()` inherit it.
+- **Relation to known deferrals:** it overlaps the deferred "broader resource policy" (member budgets) in b2 plan §18, but the cause is algorithmic, not a missing budget.
+- **Fix direction (inference):** hand a small window to inflate at the start of each member and grow it only while the member continues, or drop the `endswith` validation on the trusted stdlib and zlib-ng paths.
+
+**C3. A `bytes` subclass can substitute the data the codec sees, contradicting `docs/codec.md` (reproduced).**
+- **Where:** `codec.py:74-80`, `_snapshot_bytes_input` uses `memoryview(data).tobytes()`.
+- **What goes wrong:** on Python 3.12+ (PEP 688), a `bytes` subclass can define `__buffer__`, and `memoryview()` calls it. `docs/codec.md:223-230` says the copy is made "without invoking its overridable Python methods" and that this "prevents subclass overrides from altering compression or accounting".
+- **Script:** `probe_small.py` (section 1):
+  `override invoked: [284] | encoded payload: b'SUBSTITUTED' | input_size: 11 | len(payload): 12`. The decoder side is the same: the override ran and supplied different compressed bytes.
+- **Severity:** low. It needs a deliberately odd subclass, and the snapshot is still taken once and used consistently, so the stream stays internally valid. The documented guarantee is false on four of the five supported Pythons.
+- **Fix:** `bytes.__getitem__(data, slice(None))` returns an exact `bytes` from the raw storage without calling `__buffer__`, `__getitem__` or `__len__` overrides (checked in `probe_fix_and_trunc.py`). No test covers `__buffer__` anywhere in `tests/`.
+
+**C4. Small validation gaps (all reproduced in `probe_small.py`).**
+- **`mtime=float("inf")`** raises `OverflowError: cannot convert float infinity to integer`, not the documented `ValueError` (`_common.py:157-168`; `int()` runs before the range check). `nan` raises `ValueError`, but with Python's raw message.
+- **`mtime=True`** is accepted as 1, although `compresslevel`, `output_chunk_size` and the boolean options all reject stand-ins.
+- **`AIOGZIP_ENGINE`** (`_engine.py:41`): any value other than `stdlib` is silently ignored. `std`, `zlib` and `bogus` all left zlib-ng active. A typo therefore defeats the "force stdlib for reproducibility" switch with no signal. Warn on unrecognised non-empty values, or accept and verify `zlib-ng`.
+- **Severity:** cosmetic to low.
+
+---
+
+### Maintainability findings
+
+1. **`_engine._normalized_retained` (`_engine.py:68-128`)** is about 60 lines that reconcile split, overlapping or accumulated leftover fields. No selectable engine produces those shapes: stdlib and zlib-ng only hit the two fast paths at lines 79-86. The overlap-merge at 111-126 is exercised only by fake engines in `tests/test_codec_engine_accounting.py`, and its `max(candidates, key=len)` is a guess. I would reduce it to the real cases and raise on anything else; this also removes most of C2's per-member `endswith` cost.
+2. **The decoder state is three bare strings plus a hidden fourth state.** `_eof_after_output` (`codec.py:464, 650-652, 703-707`) means "body finished, still draining output". `_process` (644-736) is a 90-line function mixing draining, three states and finalisation checks. A small enum with an explicit draining state, and the finalising block (722-736) pulled into its own method, would make C1's fix easier to place.
+3. **The fixed-header checks are duplicated without a parity marker.** The fast path at `_gzip_header.py:261-311` repeats `_advance_fixed` (143-171) for magic, method, reserved flags and mtime. It has no `Parity:` comment and is missing from the duplication map in `docs/contributing.md`. Keep the duplication, but add the comment and a map row pointing at `tests/test_gzip_header_parser.py`.
+4. **`GzipDecoder._release_state` (`codec.py:520-532`)** hand-lists the mutable fields that `__init__` (461-483) also lists, so a new field can be missed silently. A single "mutable member state" object, or a test that every non-counter attribute is reset after `discard()`, would pin it.
+5. **Dead or test-only code:**
+   - `_ParsedHeader.size` (`_gzip_header.py:26`) and `_GzipHeaderParser.size` (79-82) are never read in `src/`.
+   - `_OutputCursor.__len__` (`_codec_buffer.py:230-233`) is never called in `src/`.
+   - `_engine.decompress_engine_name()` (225-227) is used only by tests and duplicates `engine_info()`.
+   - The comment at `_engine.py:191` ("constants _binary.py needs") is stale; `codec.py` is the consumer.
+6. **`GzipDecoder.members` (`codec.py:486-488`)** builds a new tuple on every access, so reading `decoder.members[-1]` after each member is quadratic. Cache the tuple and invalidate on append, or document the cost.
+7. **The "unusable after a prior failure" message (`codec.py:205`)** is also what callers see after a deliberate `discard()` or `close()`. Full messages are not frozen, so it can distinguish the cases.
+8. **Missing tests for tricky branches:** a drain-with-empty-input case (C1), a `__buffer__`-overriding subclass (C3), a many-tiny-members work bound (C2), and `mtime` of `inf` and `bool` (C4).
+
+---
+
+### Checked and found sound
+
+- **RFC 1952 framing (verified by running).** `fuzz_decoder.py` ran 400 random streams per engine: every combination of FEXTRA (including 0 and 65535 bytes), FNAME, FCOMMENT (including empty), FHCRC and FTEXT; one to three members; 0-600 bytes of NUL padding; several deflate strategies; random and byte-wise splits. Payload, counters and every `GzipMemberInfo` field (offsets, sizes, flags, Latin-1 strings, CRC) matched. Result: `ok 400 truncation cases 14019 limit cases 1834` on zlib-ng and `ok 400 truncation cases 14408 limit cases 1855` on stdlib.
+- **Truncation and limits (verified, same script).** Every strict prefix raised `BadGzipFile` unless it ended exactly on a member boundary or inside padding. `max_decompressed_size` was exact at total−1, total and total+1: all allowed bytes emitted first, then the stable-prefix `OSError`, with `uncompressed_size == limit`.
+- **Corruption and lifecycle (verified, `probe_lag_lifecycle.py` sections C and D).** Bad CRC, ISIZE, FHCRC, method, reserved flags, leading NULs, junk after padding and a lone trailing byte all raise `BadGzipFile` and leave the decoder unusable, with earlier members retained. Early `close()`, `discard()`, overlapping calls, post-finish calls and partial `start()`/`finish()` all behave as `docs/codec.md` describes. `strict_size` accepts exactly 2**32−1 bytes, rejects the next at call time and leaves the encoder usable.
+- **By reading only (inference):** ISIZE and CRC masking, operator precedence at `codec.py:611`, `_InputQueue` span reuse and offset arithmetic, the header-limit boundary, FHCRC coverage across the fast and slow paths, and the `__next__` / `_advance_raw` parity. I did not run a real 4 GiB payload.

@@ -1,0 +1,40 @@
+import asyncio, aiogzip, aiofiles, tempfile, os, gzip
+async def main():
+    p = os.path.join(tempfile.mkdtemp(), "a.gz")
+    async with aiofiles.open(p, "wb") as w:
+        await aiogzip.write(None, b"hello", fileobj=w)
+    print("runtime A ok:", gzip.open(p).read())
+    class SinkB:
+        def __init__(self): self.buf = bytearray()
+        async def write(self, b): self.buf += b; return len(b)
+    s = SinkB(); await aiogzip.write(None, b"hello", fileobj=s)
+    print("runtime C ok:", gzip.decompress(bytes(s.buf)))
+    class SinkNone(SinkB):
+        async def write(self, b): self.buf += b
+    s = SinkNone()
+    try:
+        await aiogzip.write(None, b"hello", fileobj=s); print("runtime E ok")
+    except Exception as e: print("runtime E:", repr(e))
+    # inspect vs read on a bytearray-returning source
+    class BA:
+        def __init__(self, d): self.d = bytearray(d);
+        async def read(self, n=-1):
+            out, self.d = self.d[:n], self.d[n:]; return out
+    blob = gzip.compress(b"hello")
+    for name, fn in [("read", aiogzip.read), ("verify", aiogzip.verify), ("inspect", aiogzip.inspect)]:
+        try: print(name, "bytearray source ->", await fn(None, fileobj=BA(blob)))
+        except Exception as e: print(name, "bytearray source ->", repr(e))
+    class NoRead: pass
+    class SyncRead:
+        def read(self, n=-1): return b""
+    for obj in (NoRead(), SyncRead(), object()):
+        for name, fn in [("read", aiogzip.read), ("verify", aiogzip.verify)]:
+            try: print(name, type(obj).__name__, "->", await fn(None, fileobj=obj))
+            except Exception as e: print(name, type(obj).__name__, "->", repr(e))
+    # filename + fileobj both
+    try: print("both ->", await aiogzip.verify("/nonexistent/zzz.gz", fileobj=BA(blob) if False else type("R",(),{"read": (lambda self, n=-1, _b=[blob]: asyncio.sleep(0, _b.pop() if _b else b""))})()))
+    except Exception as e: print("both ->", repr(e))
+    for bad in [dict(closefd=1), dict(chunk_size=0), dict(chunk_size=True), dict(max_decompressed_size=0), dict(chunk_size=2**28)]:
+        try: await aiogzip.verify(p, **bad); print(bad, "accepted")
+        except Exception as e: print(bad, "->", repr(e))
+asyncio.run(main())
