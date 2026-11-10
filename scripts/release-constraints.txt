@@ -2,5 +2,5 @@
 # the build backend through uv's build constraints and twine through uv tool
 # run. The publish workflow pins uv itself. Change these deliberately, as
 # part of release preparation, never implicitly.
-flit_core==4.1.0
+flit_core==4.2.0
 twine==7.0.0
