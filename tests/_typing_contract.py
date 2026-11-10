@@ -23,6 +23,10 @@ DIAGNOSTIC = re.compile(
     r"^(?P<path>(?:[A-Za-z]:)?[^:\n]+):(?P<line>\d+):(?:\d+:)?"
     r"(?P<rest> (?:error|warning)\b.*)$"
 )
+# Codes a checker has renamed, old name to current name. The lockfile pins one
+# checker version and CI installs the newest, so both names are in use; the
+# markers carry the current name.
+RENAMED = {"ty": {"unresolved-attribute": "missing-attribute"}}
 # What any error or warning line looks like, parsed or not.
 SEVERITY = re.compile(r"(?:^|:\s)(?:error|warning)\b")
 CODE = {
@@ -74,7 +78,8 @@ def reported(output: str, checker: str, path_argument: str) -> set[tuple[int, st
         assert same, f"{checker}: other file: {text}"
         code = CODE[checker].search(match["rest"])
         assert code is not None, f"{checker}: no error code: {text}"
-        found.add((int(match["line"]), code["code"]))
+        name = RENAMED.get(checker, {}).get(code["code"], code["code"])
+        found.add((int(match["line"]), name))
     return found
 
 
