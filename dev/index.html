@@ -985,7 +985,7 @@ use async with.").</p>
 <li>✅ <code>peek()</code> and <code>readinto()</code> for advanced reading patterns</li>
 <li>✅ Reading and writing gzip headers and metadata (e.g., <code>mtime</code>, <code>original_filename</code>)</li>
 <li>✅ Text and binary mode operations with proper encoding/decoding</li>
-<li>✅ Full compatibility with <code>tarfile</code> for reading <code>.tar.gz</code> archives</li>
+<li>✅ <code>tarfile</code>-style sequential reads of <code>.tar.gz</code> data (fixed-size header and member blocks). <code>tarfile.open(fileobj=...)</code> itself needs a synchronous file object, so it cannot take an aiogzip handle</li>
 <li>✅ Seamless integration with <code>aiocsv</code> for CSV processing</li>
 </ul>
 <blockquote>
