@@ -90,3 +90,16 @@ def test_complete_streams_are_unchanged():
             decoder.finish()
         )
         assert got == payload
+
+
+async def test_file_salvage_read_returns_the_whole_decodable_prefix(tmp_path):
+    """BC25: the file reader shares the fix, so the salvage read gains the tail."""
+    from aiogzip import AsyncGzipBinaryFile
+
+    wire, decodable, _ = _message(262_165, zlib.Z_PARTIAL_FLUSH)
+    path = tmp_path / "truncated.gz"
+    path.write_bytes(HEADER + wire)
+    async with AsyncGzipBinaryFile(path, "rb") as handle:
+        with pytest.raises(gzip.BadGzipFile):
+            await handle.read()
+        assert await handle.read() == decodable
