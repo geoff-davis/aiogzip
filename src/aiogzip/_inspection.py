@@ -111,6 +111,8 @@ async def _scan_gzip(
                 raise
             except Exception as error:
                 raise OSError(f"Error reading from file: {error}") from error
+            if isinstance(chunk, (bytearray, memoryview)):
+                chunk = bytes(chunk)
             if not isinstance(chunk, bytes):
                 raise TypeError("binary gzip source read() must return bytes")
             snapshot = _snapshot_bytes_input(chunk)

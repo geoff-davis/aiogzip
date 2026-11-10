@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- A custom `fileobj` whose `read()` returns `bytearray` or `memoryview` works
+  again for reading, as it did in 1.x. In 2.0.0 the first read failed with a
+  decompression error and left the reader broken. `inspect()` and `verify()`
+  accept the same sources. (#174)
+- Text `tell()` in write mode returns the encoded byte position for every
+  encoding. For `utf-8-sig`, `utf-16`, `utf-32` and stateful encodings it
+  returned a large negative number. (#175)
+- Text `writelines()` writes every line before one that fails to encode, and
+  the `UnicodeEncodeError` describes that line. Earlier lines in the same
+  internal batch were dropped, so the amount lost depended on `chunk_size`.
+  (#176)
+- `seek()` raises `TypeError` for a non-integer offset and leaves the position
+  unchanged. A read-mode binary handle accepted a `float`, after which every
+  read failed until `seek(0)`. (#177)
+
 ### Documentation
 
 - The README and docs home page CI badge reports `main` only, so a

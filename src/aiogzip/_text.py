@@ -3,6 +3,7 @@
 import asyncio
 import codecs
 import io
+import operator
 import os
 import re
 import secrets
@@ -518,6 +519,11 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        if self._writing_mode:
+            # A writer never feeds the decoder, whose initial state is
+            # non-zero for BOM and stateful encodings; it says nothing about
+            # the position.
+            return self._binary_file._position
         origin = self._pending_read_origin
         if origin is not None:
             # Local fragments have advanced the decoder, but have not yet
@@ -566,6 +572,7 @@ class AsyncGzipTextFile:
             raise ValueError("I/O operation on closed file.")
         if self._binary_file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        offset = operator.index(offset)
         if self._read_call_active:
             self._check_text_read_call_available()
         if whence == os.SEEK_CUR:
@@ -919,6 +926,29 @@ class AsyncGzipTextFile:
         elif self._newline in ("\n", "\r", "\r\n"):
             text_to_encode = text_to_encode.replace("\n", self._newline)
         return await self._write_reserved(data, text_to_encode)
+
+    async def _write_lines_reserved(self, lines: List[str]) -> None:
+        """Write one ``writelines()`` batch, keeping the lines before a bad one."""
+        try:
+            await self._write_batch_reserved("".join(lines))
+        except UnicodeEncodeError:
+            binary_file = self._binary_file
+            assert binary_file is not None
+            try:
+                binary_file._check_write_usable()
+            except OSError:
+                sink_failed = True
+            else:
+                sink_failed = False
+            if sink_failed:
+                # The error came from the sink, after the encoder.
+                raise
+            # The batch failed in the encoder, which wrote nothing and was
+            # restored. Write line by line so that everything before the
+            # offending line is kept and the error describes that line, as
+            # separate write() calls would.
+            for line in lines:
+                await self._write_batch_reserved(line)
 
     def _buffered_text_len(self) -> int:
         """Return the number of unread characters in the decoded text buffer."""
@@ -2193,19 +2223,19 @@ class AsyncGzipTextFile:
                     break
                 except BaseException:
                     if pending or pending_empty:
-                        await self._write_batch_reserved("".join(pending))
+                        await self._write_lines_reserved(pending)
                     raise
 
                 if not isinstance(line, str):
                     if pending or pending_empty:
-                        await self._write_batch_reserved("".join(pending))
+                        await self._write_lines_reserved(pending)
                     await self._write_batch_reserved(line)
                     continue
 
                 length = len(line)
                 if length >= self._chunk_size:
                     if pending or pending_empty:
-                        await self._write_batch_reserved("".join(pending))
+                        await self._write_lines_reserved(pending)
                         pending = []
                         pending_chars = 0
                         pending_empty = False
@@ -2216,7 +2246,7 @@ class AsyncGzipTextFile:
                     pending_empty = True
                 else:
                     if pending and pending_chars + length > self._chunk_size:
-                        await self._write_batch_reserved("".join(pending))
+                        await self._write_lines_reserved(pending)
                         pending = []
                         pending_chars = 0
                         pending_empty = False
@@ -2224,7 +2254,7 @@ class AsyncGzipTextFile:
                     pending_chars += length
 
             if pending or pending_empty:
-                await self._write_batch_reserved("".join(pending))
+                await self._write_lines_reserved(pending)
 
     async def flush(self) -> None:
         """

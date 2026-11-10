@@ -3,6 +3,7 @@
 import asyncio
 import gzip
 import io
+import operator
 import os
 import warnings
 from enum import Enum, auto
@@ -551,6 +552,9 @@ class AsyncGzipBinaryFile:
             raise ValueError("I/O operation on closed file.")
         if self._file is None:
             raise ValueError("File not opened. Call await open() or use async with.")
+        # A float offset would otherwise become the position and break every
+        # later read; reject it before any state changes.
+        offset = operator.index(offset)
         if self._writing_mode:
             if self._write_broken:
                 self._raise_write_broken()
@@ -1836,6 +1840,10 @@ class AsyncGzipBinaryFile:
                 chunk = cast(
                     bytes, await self._call_custom_source("read", self._chunk_size)
                 )
+                # The codec takes only bytes; a custom source may return
+                # another buffer type, as it could in 1.x.
+                if isinstance(chunk, (bytearray, memoryview)):
+                    chunk = bytes(chunk)
         except OSError:
             raise
         except Exception as e:
