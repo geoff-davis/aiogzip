@@ -1,13 +1,16 @@
 """Tests for the ``python -m aiogzip`` command-line interface."""
 
+import dataclasses
+import errno
 import gzip
 import json
+import os
 import subprocess
 import sys
 
 import pytest
 
-from aiogzip import __version__
+from aiogzip import GzipInfo, __version__
 from aiogzip.__main__ import main
 
 PAYLOAD = b"hello world\n" * 100
@@ -28,6 +31,13 @@ def corrupt_gz(tmp_path, good_gz):
     # Zero out the trailer (CRC32 + ISIZE) so the payload decodes but fails
     # integrity validation.
     path.write_bytes(raw[:-8] + b"\x00" * 8)
+    return path
+
+
+def _named_gz(path, name: bytes, payload: bytes = b"x"):
+    """Write a one-member gzip file whose FNAME field (FLG bit 3) is ``name``."""
+    body = gzip.compress(payload)
+    path.write_bytes(body[:3] + b"\x08" + body[4:10] + name + b"\x00" + body[10:])
     return path
 
 
@@ -78,6 +88,10 @@ class TestInspectCommand:
     def test_json_matches_inspect_dataclass(self, good_gz, capsys):
         assert main(["inspect", str(good_gz), "--json"]) == 0
         data = json.loads(capsys.readouterr().out)
+        # 2.0.2 (review C8): success carries "ok": true, as verify --json
+        # does, next to every field of the inspect dataclass.
+        assert data["ok"] is True
+        assert set(data) == {"ok"} | {f.name for f in dataclasses.fields(GzipInfo)}
         assert data["uncompressed_size"] == len(PAYLOAD)
         assert len(data["members"]) == 1
         member = data["members"][0]
@@ -100,6 +114,29 @@ class TestInspectCommand:
     def test_corrupt_exit_one(self, corrupt_gz, capsys):
         assert main(["inspect", str(corrupt_gz)]) == 1
         assert "FAILED" in capsys.readouterr().err
+
+    def test_corrupt_json_reports_error(self, corrupt_gz, capsys):
+        assert main(["inspect", str(corrupt_gz), "--json"]) == 1
+        data = json.loads(capsys.readouterr().out)
+        assert data["ok"] is False
+        assert "CRC" in data["error"]
+
+    def test_human_output_escapes_header_name(self, tmp_path, capsys):
+        # A header name with a terminal escape and a forged second line.
+        path = _named_gz(tmp_path / "esc.gz", b"\x1b[31mred\nFAILED: forged")
+        assert main(["inspect", str(path)]) == 0
+        out = capsys.readouterr().out
+        assert "\x1b" not in out
+        assert len(out.splitlines()) == 2
+        assert out.endswith("name='\\x1b[31mred\\nFAILED: forged'\n")
+
+    def test_human_output_without_name_prints_dash(self, good_gz, capsys):
+        raw = good_gz.read_bytes()
+        assert raw[3] & 0x08  # gzip.open stored a name; drop it
+        end = raw.index(b"\x00", 10) + 1
+        good_gz.write_bytes(raw[:3] + b"\x00" + raw[4:10] + raw[end:])
+        assert main(["inspect", str(good_gz)]) == 0
+        assert capsys.readouterr().out.endswith("name=-\n")
 
 
 class TestUsage:
@@ -173,3 +210,101 @@ class TestUnexpectedFailures:
         monkeypatch.setattr("aiogzip.__main__.verify", interrupted)
         with pytest.raises(KeyboardInterrupt):
             main(["verify", str(good_gz)])
+
+
+class _FailingStdout:
+    """A stdout whose writes fail; it has no file descriptor."""
+
+    encoding = "utf-8"
+
+    def __init__(self, exc: BaseException) -> None:
+        self._exc = exc
+
+    def write(self, text: str) -> int:
+        raise self._exc
+
+    def flush(self) -> None:
+        raise self._exc
+
+    def fileno(self) -> int:
+        raise OSError("no file descriptor")
+
+
+class TestOutputErrors:
+    """Review C8: an output failure is not a failure of the gzip file."""
+
+    @pytest.mark.parametrize("command", ["inspect", "verify"])
+    @pytest.mark.parametrize("json_flag", [[], ["--json"]])
+    def test_closed_stdout_ends_quietly(
+        self, command, json_flag, good_gz, monkeypatch, capsys
+    ):
+        broken = BrokenPipeError(errno.EPIPE, "Broken pipe")
+        monkeypatch.setattr(sys, "stdout", _FailingStdout(broken))
+        assert main([command, *json_flag, str(good_gz)]) == 141
+        assert capsys.readouterr().err == ""
+
+    def test_closed_stdout_on_failure_report_ends_quietly(
+        self, corrupt_gz, monkeypatch, capsys
+    ):
+        broken = BrokenPipeError(errno.EPIPE, "Broken pipe")
+        monkeypatch.setattr(sys, "stdout", _FailingStdout(broken))
+        assert main(["verify", "--json", str(corrupt_gz)]) == 141
+        assert capsys.readouterr().err == ""
+
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            OSError(errno.ENOSPC, "No space left on device"),
+            UnicodeEncodeError("ascii", "\xe9", 0, 1, "ordinal not in range(128)"),
+        ],
+        ids=["oserror", "unicode"],
+    )
+    def test_other_output_error_is_not_a_file_failure(
+        self, exc, good_gz, monkeypatch, capsys
+    ):
+        monkeypatch.setattr(sys, "stdout", _FailingStdout(exc))
+        assert main(["inspect", str(good_gz)]) == 2
+        err = capsys.readouterr().err
+        assert err.startswith(f"ERROR: cannot write output: {type(exc).__name__}: ")
+        assert "FAILED" not in err
+        assert str(good_gz) not in err
+
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="a closed pipe is not reported as BrokenPipeError on Windows",
+    )
+    def test_reader_closing_the_pipe(self, tmp_path):
+        # 20,000 members: the report is far larger than a pipe buffer, so the
+        # child is still writing when the reader goes away (``| head -1``).
+        path = tmp_path / "many.gz"
+        path.write_bytes(gzip.compress(b"") * 20_000)
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "aiogzip", "inspect", str(path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        assert proc.stdout is not None and proc.stderr is not None
+        try:
+            first = proc.stdout.readline()
+            proc.stdout.close()
+            err = proc.stderr.read()
+            returncode = proc.wait(timeout=60)
+        finally:
+            proc.kill()
+            proc.stderr.close()
+        assert b"20000 member(s)" in first
+        assert err == b""
+        assert returncode == 141
+
+    def test_unencodable_name_is_escaped(self, tmp_path):
+        # FNAME is Latin-1 on the wire: this one is "caf\xe9".
+        path = _named_gz(tmp_path / "name.gz", "caf\xe9".encode("latin-1"))
+        proc = subprocess.run(
+            [sys.executable, "-m", "aiogzip", "inspect", str(path)],
+            capture_output=True,
+            env={**os.environ, "PYTHONIOENCODING": "ascii"},
+        )
+        assert proc.returncode == 0
+        assert proc.stderr == b""
+        assert proc.stdout.rstrip().endswith(b"name='caf\\xe9'")
+        assert len(proc.stdout.splitlines()) == 2
