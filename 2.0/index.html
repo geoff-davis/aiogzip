@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -891,10 +891,12 @@
 
 <h1 id="aiogzip">aiogzip ⚡️</h1>
 <p><strong>An asynchronous library for reading and writing gzip-compressed files.</strong></p>
-<p><a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a>
-<a href="https://pypi.org/project/aiogzip/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/aiogzip.svg" /></a>
-<img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/aiogzip.svg" />
-<a href="https://github.com/geoff-davis/aiogzip/actions"><img alt="Tests" src="https://github.com/geoff-davis/aiogzip/workflows/Python%20CI/badge.svg" /></a></p>
+<p><a href="https://pypi.org/project/aiogzip/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/aiogzip.svg" /></a>
+<a href="https://pypi.org/project/aiogzip/"><img alt="Python versions" src="https://img.shields.io/badge/python-3.11%E2%80%933.15-blue" /></a>
+<a href="https://pepy.tech/projects/aiogzip"><img alt="Downloads" src="https://img.shields.io/pepy/dt/aiogzip" /></a>
+<a href="https://github.com/geoff-davis/aiogzip/actions/workflows/ci.yml?query=branch%3Amain"><img alt="Tests" src="https://github.com/geoff-davis/aiogzip/actions/workflows/ci.yml/badge.svg?branch=main" /></a>
+<a href="https://github.com/geoff-davis/aiogzip/tree/python-coverage-comment-action-data"><img alt="Coverage" src="https://raw.githubusercontent.com/geoff-davis/aiogzip/python-coverage-comment-action-data/badge.svg" /></a>
+<a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a></p>
 <p><code>aiogzip</code> provides a fast, simple, and asyncio-native interface for handling <code>.gz</code> files, making it a useful complement to Python's built-in <code>gzip</code> module for asynchronous applications.</p>
 <p>It is designed for high-performance I/O operations, especially for text-based data pipelines, and integrates seamlessly with other <code>async</code> libraries like <code>aiocsv</code>.</p>
 <h2 id="features">Features</h2>
@@ -983,7 +985,7 @@ use async with.").</p>
 <li>✅ <code>peek()</code> and <code>readinto()</code> for advanced reading patterns</li>
 <li>✅ Reading and writing gzip headers and metadata (e.g., <code>mtime</code>, <code>original_filename</code>)</li>
 <li>✅ Text and binary mode operations with proper encoding/decoding</li>
-<li>✅ Full compatibility with <code>tarfile</code> for reading <code>.tar.gz</code> archives</li>
+<li>✅ <code>tarfile</code>-style sequential reads of <code>.tar.gz</code> data (fixed-size header and member blocks). <code>tarfile.open(fileobj=...)</code> itself needs a synchronous file object, so it cannot take an aiogzip handle</li>
 <li>✅ Seamless integration with <code>aiocsv</code> for CSV processing</li>
 </ul>
 <blockquote>
@@ -1096,10 +1098,10 @@ For asynchronous byte sources, use <a href="streaming/"><code>compress_chunks()<
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>
