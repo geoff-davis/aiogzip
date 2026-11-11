@@ -1,6 +1,5 @@
 """Async gzip file reader/writer public API."""
 
-from pathlib import Path
 from typing import Any, AsyncIterable, AsyncIterator, Literal, Optional, Union, overload
 
 from ._binary import AsyncGzipBinaryFile, ConcurrentOperationError
@@ -17,6 +16,7 @@ from ._common import (
     WithAsyncReadWrite,
     WithAsyncWrite,
     ZlibEngine,
+    _Filename,
 )
 from ._engine import EngineInfo, engine_info
 from ._inspection import (
@@ -118,7 +118,6 @@ _BinaryMode = Literal[
     "+bx",
 ]
 
-_Filename = Union[str, bytes, Path, None]
 _FileObj = Optional[Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]]
 _ReadFileObj = Optional[Union[WithAsyncRead, WithAsyncReadWrite]]
 _WriteFileObj = Optional[Union[WithAsyncWrite, WithAsyncReadWrite]]

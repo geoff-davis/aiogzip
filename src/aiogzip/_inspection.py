@@ -2,7 +2,6 @@
 
 import asyncio
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Optional, Tuple, Union, cast
 
 import aiofiles
@@ -17,6 +16,7 @@ from ._codec_async import (
 from ._common import (
     WithAsyncRead,
     WithAsyncReadWrite,
+    _Filename,
     _validate_chunk_size,
     _validate_filename,
     _validate_optional_bool,
@@ -33,7 +33,6 @@ from .codec import GzipDecoder, _AsyncDrivableOperation, _snapshot_bytes_input
 
 __all__ = ["GzipInfo", "GzipMemberInfo", "VerificationResult"]
 
-_Filename = Union[str, bytes, Path, None]
 _ReadFileObj = Optional[Union[WithAsyncRead, WithAsyncReadWrite]]
 
 

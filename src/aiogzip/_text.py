@@ -9,7 +9,6 @@ import re
 import secrets
 import struct
 from dataclasses import dataclass
-from pathlib import Path
 from typing import (
     Any,
     AsyncIterator,
@@ -28,6 +27,7 @@ from ._common import (
     WithAsyncReadWrite,
     WithAsyncWrite,
     _check_can_open,
+    _Filename,
     _format_file_repr,
     _normalize_mtime,
     _parse_mode_tokens,
@@ -260,7 +260,7 @@ class AsyncGzipTextFile:
 
     def __init__(
         self,
-        filename: Union[str, bytes, Path, None],
+        filename: _Filename,
         mode: str = "rt",
         chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
         encoding: Optional[str] = "utf-8",
@@ -725,7 +725,7 @@ class AsyncGzipTextFile:
         return self._binary_file.raw()
 
     @property
-    def name(self) -> Union[str, bytes, Path, None]:
+    def name(self) -> _Filename:
         """Return the name of the file.
 
         This property provides compatibility with the standard file API.
@@ -733,7 +733,8 @@ class AsyncGzipTextFile:
         underlying file object's ``name`` attribute when available.
 
         Returns:
-            The filename as str, bytes, or Path, or None if no name is available.
+            The filename as str, bytes, or an os.PathLike object, or None if no
+            name is available.
         """
         if self._filename is not None:
             return self._filename

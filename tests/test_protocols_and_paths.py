@@ -1,7 +1,12 @@
 # pyrefly: ignore
 # pyrefly: disable=all
+import gzip
+import os
 from typing import Union
 
+import pytest
+
+import aiogzip
 from aiogzip import (
     AsyncGzipBinaryFile,
     AsyncGzipFile,
@@ -171,3 +176,84 @@ class TestNameProperty:
         async with f:
             await f.write(b"test")
         assert f.name == temp_file
+
+
+class _FsPath:
+    """A minimal os.PathLike that is not a pathlib class."""
+
+    def __init__(self, path):
+        self._path = path
+
+    def __fspath__(self):
+        return self._path
+
+
+class TestPathLikeSupport:
+    """Every public filename accepts os.PathLike[str] and os.PathLike[bytes],
+    which is what the annotations promise."""
+
+    @pytest.mark.parametrize("as_bytes", [False, True], ids=["str", "bytes"])
+    async def test_path_like_round_trip(self, temp_file, as_bytes):
+        raw = os.fsencode(temp_file) if as_bytes else temp_file
+        path = _FsPath(raw)
+
+        await aiogzip.write(path, b"one\n")
+        async with aiogzip.open(path, "ab") as binary:
+            assert binary.name is path
+            await binary.write(b"two\n")
+        async with AsyncGzipTextFile(path, "at", newline="") as text:
+            assert text.name is path
+            await text.write("three\n")
+
+        assert await aiogzip.read(path) == b"one\ntwo\nthree\n"
+        async with AsyncGzipFile(path, "rt") as text:
+            assert await text.read() == "one\ntwo\nthree\n"
+        async with AsyncGzipBinaryFile(path, "rb") as binary:
+            assert await binary.read() == b"one\ntwo\nthree\n"
+        assert (await aiogzip.verify(path)).member_count == 3
+        info = await aiogzip.inspect(path)
+        assert info.members[0].original_filename == os.path.basename(
+            temp_file
+        ).removesuffix(".gz")
+
+    async def test_pure_path(self, temp_file):
+        from pathlib import PurePath
+
+        path = PurePath(temp_file)
+        await aiogzip.write(path, b"payload")
+        assert await aiogzip.read(path) == b"payload"
+        assert (await aiogzip.verify(path)).member_count == 1
+
+
+class TestBinarySink:
+    """A fileobj sink's write() receives only exact bytes, in binary and text
+    mode, so ``WithAsyncWrite.write`` takes ``bytes``."""
+
+    class Sink:
+        def __init__(self):
+            self.calls = []
+
+        async def write(self, b: bytes, /) -> int:
+            self.calls.append(b)
+            return len(b)
+
+    async def test_binary_writes_pass_bytes(self):
+        sink = self.Sink()
+        await aiogzip.write(None, bytearray(b"payload"), fileobj=sink)
+        async with aiogzip.open(None, "wb", fileobj=sink) as f:
+            await f.write(memoryview(b"more"))
+            await f.flush()
+        assert sink.calls
+        assert all(type(call) is bytes for call in sink.calls)
+        assert gzip.decompress(b"".join(sink.calls)) == b"payloadmore"
+
+    async def test_text_writes_pass_bytes(self):
+        sink = self.Sink()
+        async with aiogzip.open(None, "wt", fileobj=sink, encoding="utf-16") as f:
+            await f.write("héllo\n")
+            await f.flush()
+            await f.writelines(["a\n", "b\n"])
+        assert sink.calls
+        assert all(type(call) is bytes for call in sink.calls)
+        text = gzip.decompress(b"".join(sink.calls)).decode("utf-16")
+        assert text.replace(os.linesep, "\n") == "héllo\na\nb\n"

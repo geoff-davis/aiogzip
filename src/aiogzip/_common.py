@@ -3,7 +3,6 @@
 import os
 import struct
 import time
-from pathlib import Path
 from typing import (
     Any,
     Optional,
@@ -28,6 +27,11 @@ GZIP_OS_UNKNOWN = 255
 _COMPRESS_LEVEL_FAST = 1
 _COMPRESS_LEVEL_BEST = 9
 _MAX_GZIP_MTIME = 0xFFFFFFFF
+
+# Every public ``filename`` parameter. The runtime check in
+# ``_validate_filename`` accepts any ``os.PathLike``, so the annotation does
+# too; ``pathlib.Path`` is an ``os.PathLike[str]``.
+_Filename = Union[str, bytes, os.PathLike[str], os.PathLike[bytes], None]
 
 # Safety cap for chunk_size and peek() arguments (128 MiB). Prevents a caller
 # from accidentally allocating gigabytes when passing an unsanitized integer
@@ -89,7 +93,7 @@ def _format_file_repr(obj: Any) -> str:
         return f"<aiogzip.{cls_name} [uninitialized]>"
 
 
-def _validate_filename(filename: Union[str, bytes, Path, None], fileobj: Any) -> None:
+def _validate_filename(filename: _Filename, fileobj: Any) -> None:
     """Validate filename parameter.
 
     Args:
@@ -303,7 +307,7 @@ class WithAsyncRead(Protocol):
 class WithAsyncWrite(Protocol):
     """Protocol for async file-like objects that can be written."""
 
-    async def write(self, data: Union[str, bytes]) -> int: ...
+    async def write(self, data: bytes, /) -> int: ...
 
 
 @runtime_checkable
@@ -311,7 +315,7 @@ class WithAsyncReadWrite(Protocol):
     """Protocol for async file-like objects that can be read and written."""
 
     async def read(self, size: int = -1) -> Union[str, bytes]: ...
-    async def write(self, data: Union[str, bytes]) -> int: ...
+    async def write(self, data: bytes, /) -> int: ...
     async def close(self) -> None: ...
 
 

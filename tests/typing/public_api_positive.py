@@ -1,8 +1,11 @@
 """Positive static assertions for the frozen aiogzip 2.0 public API."""
 
+import os
 from collections.abc import AsyncIterator, Iterator
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Union, assert_type
+
+import aiofiles
 
 import aiogzip
 
@@ -26,6 +29,28 @@ class ReaderWriter:
 
     async def close(self) -> None:
         return None
+
+
+class BytesSink:
+    """A binary sink: it accepts only bytes, under its own parameter name."""
+
+    async def write(self, b: bytes) -> int:
+        return len(b)
+
+
+class PositionalBytesSink:
+    async def write(self, data: bytes, /) -> int:
+        return len(data)
+
+
+class StrPath:
+    def __fspath__(self) -> str:
+        return "payload.gz"
+
+
+class BytesPath:
+    def __fspath__(self) -> bytes:
+        return b"payload.gz"
 
 
 path = Path("payload.gz")
@@ -68,6 +93,60 @@ async def whole_file_contract() -> None:
     assert_type(await aiogzip.write(path, memoryview(b"payload")), None)
     assert_type(await aiogzip.inspect(path), aiogzip.GzipInfo)
     assert_type(await aiogzip.verify(path), aiogzip.VerificationResult)
+
+
+async def path_contract(
+    str_path_like: os.PathLike[str], bytes_path_like: os.PathLike[bytes]
+) -> None:
+    # Every public filename accepts what the runtime does: any os.PathLike.
+    pure = PurePosixPath("payload.gz")
+    assert_type(aiogzip.open(pure, "rb"), aiogzip.AsyncGzipBinaryFile)
+    assert_type(aiogzip.open(StrPath(), "rt"), aiogzip.AsyncGzipTextFile)
+    assert_type(aiogzip.open(BytesPath(), "wb"), aiogzip.AsyncGzipBinaryFile)
+    assert_type(aiogzip.open(str_path_like), aiogzip.AsyncGzipBinaryFile)
+    assert_type(aiogzip.open(bytes_path_like, "wt"), aiogzip.AsyncGzipTextFile)
+    assert_type(aiogzip.AsyncGzipFile(pure, "rt"), aiogzip.AsyncGzipTextFile)
+    assert_type(aiogzip.AsyncGzipFile(StrPath()), aiogzip.AsyncGzipBinaryFile)
+    assert_type(aiogzip.AsyncGzipBinaryFile(pure), aiogzip.AsyncGzipBinaryFile)
+    assert_type(aiogzip.AsyncGzipTextFile(BytesPath()), aiogzip.AsyncGzipTextFile)
+    assert_type(await aiogzip.read(pure), bytes)
+    assert_type(await aiogzip.read(StrPath()), bytes)
+    assert_type(await aiogzip.read(str_path_like), bytes)
+    assert_type(await aiogzip.read(bytes_path_like), bytes)
+    assert_type(await aiogzip.write(pure, b"payload"), None)
+    assert_type(await aiogzip.write(BytesPath(), b"payload"), None)
+    assert_type(await aiogzip.inspect(pure), aiogzip.GzipInfo)
+    assert_type(await aiogzip.inspect(str_path_like), aiogzip.GzipInfo)
+    assert_type(await aiogzip.verify(pure), aiogzip.VerificationResult)
+    assert_type(await aiogzip.verify(StrPath()), aiogzip.VerificationResult)
+    assert_type(await aiogzip.verify(str_path_like), aiogzip.VerificationResult)
+    assert_type(
+        aiogzip.open(pure).name,
+        str | bytes | os.PathLike[str] | os.PathLike[bytes] | None,
+    )
+
+
+async def fileobj_contract() -> None:
+    # A sink only ever receives bytes, so a binary-only write() satisfies it.
+    async with aiofiles.open(path, "wb") as handle:
+        assert_type(await aiogzip.write(None, b"payload", fileobj=handle), None)
+        assert_type(
+            aiogzip.open(None, "wb", fileobj=handle), aiogzip.AsyncGzipBinaryFile
+        )
+        assert_type(aiogzip.open(None, "wt", fileobj=handle), aiogzip.AsyncGzipTextFile)
+    for sink in (BytesSink(), PositionalBytesSink(), Writer(), ReaderWriter()):
+        assert_type(await aiogzip.write(None, b"payload", fileobj=sink), None)
+    assert_type(
+        aiogzip.open(None, "wb", fileobj=BytesSink()), aiogzip.AsyncGzipBinaryFile
+    )
+    assert_type(
+        aiogzip.open(None, "wb", fileobj=PositionalBytesSink()),
+        aiogzip.AsyncGzipBinaryFile,
+    )
+    assert_type(
+        aiogzip.AsyncGzipFile(None, "wt", fileobj=BytesSink()),
+        aiogzip.AsyncGzipTextFile,
+    )
 
 
 def streaming_contract() -> None:
@@ -125,6 +204,9 @@ def dataclass_contract(
 def protocol_contract() -> None:
     reader: aiogzip.WithAsyncRead = Reader()
     writer: aiogzip.WithAsyncWrite = Writer()
+    bytes_writer: aiogzip.WithAsyncWrite = BytesSink()
+    positional_writer: aiogzip.WithAsyncWrite = PositionalBytesSink()
+    del bytes_writer, positional_writer
     reader_writer: aiogzip.WithAsyncReadWrite = ReaderWriter()
     del reader, writer, reader_writer
 
