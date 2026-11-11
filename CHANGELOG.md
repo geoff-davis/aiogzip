@@ -20,9 +20,9 @@ All notable changes to this project will be documented in this file.
   `ValueError("File not opened. ...")` in every newline mode. Some modes
   raised a bare `AssertionError`.
 - A text `seek()` in write mode returns the current position when asked to
-  seek there, and raises `io.UnsupportedOperation` with a clear message for
-  any other target. Every target failed with a misleading `OSError` once
-  anything had been written.
+  seek there or to the end (`seek(0, os.SEEK_END)`), and raises
+  `io.UnsupportedOperation` with a clear message for any other target. Every
+  target failed with a misleading `OSError` once anything had been written.
 - `compress_chunks(fast_compress=True)` without zlib-ng warns once per call
   site. It warned on every call and made Python show unrelated once-only
   warnings again.

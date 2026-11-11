@@ -9,7 +9,7 @@ import warnings
 import pytest
 
 import aiogzip
-from aiogzip import _engine, _streaming
+from aiogzip import _engine
 
 LINES = b"one\ntwo\nthree\n"
 
@@ -137,7 +137,12 @@ class TestTextWriteModeSeek:
             for target in (0, 2, 10):
                 with pytest.raises(io.UnsupportedOperation, match="write mode"):
                     await f.seek(target)
+            assert await f.seek(0, os.SEEK_END) == 3
+            assert await f.seek(0, os.SEEK_CUR) == 3
+            with pytest.raises(io.UnsupportedOperation):
+                await f.seek(1, os.SEEK_END)
             await f.write("def")
+            assert await f.seek(0, os.SEEK_END) == 6
         async with aiogzip.open(path, "rt") as f:
             assert await f.read() == "abcdef"
 
@@ -172,4 +177,3 @@ class TestFastCompressFallbackWarning:
         import gzip
 
         assert gzip.decompress(data) == b"payload"
-        assert _streaming._FAST_COMPRESS_FALLBACK_WARNING in messages

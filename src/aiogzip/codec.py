@@ -261,6 +261,10 @@ class GzipEncoder(_CodecBase):
     This class performs no I/O or executor offload and is not thread-safe.
     """
 
+    # How far up the stack the zlib-ng fallback warning points: the code
+    # that constructed the encoder.
+    _fallback_warning_stacklevel = 2
+
     def __init__(
         self,
         *,
@@ -284,7 +288,10 @@ class GzipEncoder(_CodecBase):
         self._strict_size = validated_strict_size
         self._output_chunk_size = output_chunk_size
         if self._fast_compress and not _engine.have_fast_engine():
-            warnings.warn(_FAST_COMPRESS_FALLBACK_WARNING, stacklevel=2)
+            warnings.warn(
+                _FAST_COMPRESS_FALLBACK_WARNING,
+                stacklevel=self._fallback_warning_stacklevel,
+            )
         self._engine: ZlibEngine = _engine.compressobj(
             compresslevel,
             -_engine.MAX_WBITS,

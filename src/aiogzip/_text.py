@@ -584,6 +584,9 @@ class AsyncGzipTextFile:
         if whence == os.SEEK_END:
             if offset != 0:
                 raise io.UnsupportedOperation("can't do nonzero end-relative seeks")
+            if self._mode_op != "r":
+                # A writer is always at its end.
+                return await self.tell()
             await self.read()
             return await self.tell()
         if whence != os.SEEK_SET:
