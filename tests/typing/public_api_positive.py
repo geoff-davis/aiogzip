@@ -120,10 +120,17 @@ async def path_contract(
     assert_type(await aiogzip.verify(pure), aiogzip.VerificationResult)
     assert_type(await aiogzip.verify(StrPath()), aiogzip.VerificationResult)
     assert_type(await aiogzip.verify(str_path_like), aiogzip.VerificationResult)
-    assert_type(
-        aiogzip.open(pure).name,
-        str | bytes | os.PathLike[str] | os.PathLike[bytes] | None,
-    )
+
+
+def name_contract() -> None:
+    # The name annotation is as released; widening it would break callers.
+    assert_type(aiogzip.open(path).name, str | bytes | Path | None)
+    assert_type(aiogzip.open(path, "rt").name, str | bytes | Path | None)
+    binary_name: str | bytes | Path | None = aiogzip.AsyncGzipBinaryFile(
+        PurePosixPath("payload.gz")
+    ).name
+    text_name: str | bytes | Path | None = aiogzip.AsyncGzipTextFile(StrPath()).name
+    del binary_name, text_name
 
 
 async def fileobj_contract() -> None:
@@ -204,11 +211,25 @@ def dataclass_contract(
 def protocol_contract() -> None:
     reader: aiogzip.WithAsyncRead = Reader()
     writer: aiogzip.WithAsyncWrite = Writer()
-    bytes_writer: aiogzip.WithAsyncWrite = BytesSink()
-    positional_writer: aiogzip.WithAsyncWrite = PositionalBytesSink()
-    del bytes_writer, positional_writer
     reader_writer: aiogzip.WithAsyncReadWrite = ReaderWriter()
     del reader, writer, reader_writer
+
+
+async def protocol_consumer_contract(
+    writer: aiogzip.WithAsyncWrite, reader_writer: aiogzip.WithAsyncReadWrite
+) -> None:
+    # The public protocols are as released: write() takes str or bytes, and
+    # ``data`` by keyword. Both remain valid sinks.
+    assert_type(await writer.write(data=b"payload"), int)
+    assert_type(await writer.write("payload"), int)
+    assert_type(await reader_writer.write(data="payload"), int)
+    assert_type(await reader_writer.write(b"payload"), int)
+    assert_type(await aiogzip.write(None, b"payload", fileobj=writer), None)
+    assert_type(await aiogzip.write(None, b"payload", fileobj=reader_writer), None)
+    assert_type(aiogzip.open(None, "wb", fileobj=writer), aiogzip.AsyncGzipBinaryFile)
+    assert_type(
+        aiogzip.open(None, "wt", fileobj=reader_writer), aiogzip.AsyncGzipTextFile
+    )
 
 
 def diagnostic_contract() -> None:

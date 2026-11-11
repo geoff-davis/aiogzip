@@ -17,6 +17,7 @@ from ._common import (
     WithAsyncWrite,
     ZlibEngine,
     _Filename,
+    _WithAsyncBinaryWrite,
 )
 from ._engine import EngineInfo, engine_info
 from ._inspection import (
@@ -118,9 +119,13 @@ _BinaryMode = Literal[
     "+bx",
 ]
 
-_FileObj = Optional[Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]]
+_FileObj = Optional[
+    Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite, _WithAsyncBinaryWrite]
+]
 _ReadFileObj = Optional[Union[WithAsyncRead, WithAsyncReadWrite]]
-_WriteFileObj = Optional[Union[WithAsyncWrite, WithAsyncReadWrite]]
+_WriteFileObj = Optional[
+    Union[WithAsyncWrite, WithAsyncReadWrite, _WithAsyncBinaryWrite]
+]
 
 
 @overload

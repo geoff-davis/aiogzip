@@ -7,6 +7,7 @@ import operator
 import os
 import warnings
 from enum import Enum, auto
+from pathlib import Path
 from typing import (
     Any,
     Awaitable,
@@ -45,6 +46,7 @@ from ._common import (
     _validate_optional_bool,
     _validate_optional_positive_int,
     _validate_original_filename,
+    _WithAsyncBinaryWrite,
 )
 from ._opening import (
     _acquire_path,
@@ -281,7 +283,12 @@ class AsyncGzipBinaryFile:
         mtime: Optional[Union[int, float]] = None,
         original_filename: Optional[Union[str, bytes]] = None,
         fileobj: Optional[
-            Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]
+            Union[
+                WithAsyncRead,
+                WithAsyncWrite,
+                WithAsyncReadWrite,
+                _WithAsyncBinaryWrite,
+            ]
         ] = None,
         closefd: Optional[bool] = None,
         max_decompressed_size: Optional[int] = None,
@@ -655,7 +662,7 @@ class AsyncGzipBinaryFile:
         return self._file
 
     @property
-    def name(self) -> _Filename:
+    def name(self) -> Union[str, bytes, Path, None]:
         """Return the name of the file.
 
         This property provides compatibility with the standard file API.
@@ -663,11 +670,13 @@ class AsyncGzipBinaryFile:
         underlying file object's ``name`` attribute when available.
 
         Returns:
-            The filename as str, bytes, or an os.PathLike object, or None if no
-            name is available.
+            The filename as it was given (str, bytes, Path or another
+            os.PathLike object), or None if no name is available.
         """
         if self._filename is not None:
-            return self._filename
+            # A non-Path os.PathLike is returned as given. The annotation
+            # stays as released so existing typed callers keep checking.
+            return cast(Union[str, bytes, Path], self._filename)
         candidate = (
             self._external_file if self._external_file is not None else self._file
         )

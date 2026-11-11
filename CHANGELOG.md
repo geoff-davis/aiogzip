@@ -49,12 +49,13 @@ All notable changes to this project will be documented in this file.
 - Type annotations accept any `os.PathLike` as a filename, as the runtime
   always has: `open()`, `AsyncGzipFile`, the file classes, `read()`,
   `write()`, `inspect()` and `verify()` rejected `PurePath` and custom
-  `__fspath__` objects under a type checker. The `name` properties' return
-  annotation widens to match.
-- `WithAsyncWrite` and `WithAsyncReadWrite` declare `write(data: bytes, /)`.
-  They declared `write(data: str | bytes)`, so a binary sink such as an
-  aiofiles `"wb"` handle failed `mypy --strict` as a `fileobj`, although
-  aiogzip only ever writes `bytes` to a sink.
+  `__fspath__` objects under a type checker.
+- Type annotations accept a bytes-only sink as a `fileobj` for writing, in
+  `open()`, `AsyncGzipFile`, the file classes and `write()`. A binary sink
+  such as an aiofiles `"wb"` handle or a custom `write(self, b: bytes)`
+  failed `mypy --strict`, although aiogzip only ever writes `bytes` to a
+  sink. The public `WithAsyncWrite` and `WithAsyncReadWrite` protocols are
+  unchanged.
 
 ## [2.0.1] - 2026-11-10
 

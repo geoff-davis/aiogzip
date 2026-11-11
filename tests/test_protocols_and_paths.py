@@ -227,7 +227,7 @@ class TestPathLikeSupport:
 
 class TestBinarySink:
     """A fileobj sink's write() receives only exact bytes, in binary and text
-    mode, so ``WithAsyncWrite.write`` takes ``bytes``."""
+    mode, so a bytes-only ``write()`` is a valid ``fileobj``."""
 
     class Sink:
         def __init__(self):

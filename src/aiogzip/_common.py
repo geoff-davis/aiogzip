@@ -307,7 +307,7 @@ class WithAsyncRead(Protocol):
 class WithAsyncWrite(Protocol):
     """Protocol for async file-like objects that can be written."""
 
-    async def write(self, data: bytes, /) -> int: ...
+    async def write(self, data: Union[str, bytes]) -> int: ...
 
 
 @runtime_checkable
@@ -315,8 +315,21 @@ class WithAsyncReadWrite(Protocol):
     """Protocol for async file-like objects that can be read and written."""
 
     async def read(self, size: int = -1) -> Union[str, bytes]: ...
-    async def write(self, data: bytes, /) -> int: ...
+    async def write(self, data: Union[str, bytes]) -> int: ...
     async def close(self) -> None: ...
+
+
+class _WithAsyncBinaryWrite(Protocol):
+    """What a ``fileobj`` sink must provide; an input annotation only.
+
+    A sink is only ever given ``bytes``, positionally, so a binary sink (an
+    aiofiles ``"wb"`` handle, ``write(self, b: bytes)``) is accepted although
+    it does not satisfy the public :class:`WithAsyncWrite`, whose ``write``
+    also takes ``str`` and a ``data`` keyword. Every ``WithAsyncWrite`` and
+    ``WithAsyncReadWrite`` satisfies this protocol.
+    """
+
+    async def write(self, data: bytes, /) -> int: ...
 
 
 __all__ = [
