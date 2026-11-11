@@ -121,6 +121,21 @@ def _encodable(text: str, stream: TextIO) -> str:
         return text
 
 
+def _discard_stdout() -> None:
+    """Point stdout at devnull after a failed write.
+
+    The failed text is still buffered, so the flush at interpreter exit would
+    fail again, print "Exception ignored" and change the exit status to 120.
+    This is the remedy in the Python documentation's note on SIGPIPE.
+    """
+    with contextlib.suppress(OSError, ValueError):
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        try:
+            os.dup2(devnull, sys.stdout.fileno())
+        finally:
+            os.close(devnull)
+
+
 def _emit(status: int, out: str, err: str) -> int:
     """Write the report and return ``status``, unless the output itself fails."""
     if err:
@@ -134,18 +149,12 @@ def _emit(status: int, out: str, err: str) -> int:
         # Flush here, so a closed pipe is seen now and not at interpreter exit.
         stdout.flush()
     except BrokenPipeError:
-        # The reader went away. As the Python documentation's note on SIGPIPE
-        # advises, point stdout at devnull so the flush at interpreter exit
-        # does not fail again.
-        with contextlib.suppress(OSError, ValueError):
-            devnull = os.open(os.devnull, os.O_WRONLY)
-            try:
-                os.dup2(devnull, sys.stdout.fileno())
-            finally:
-                os.close(devnull)
+        # The reader went away: end quietly.
+        _discard_stdout()
         return _EXIT_CLOSED_STDOUT
     except (OSError, ValueError) as exc:
         # ValueError covers UnicodeEncodeError and a closed stream object.
+        _discard_stdout()
         with contextlib.suppress(OSError, ValueError):
             print(
                 f"ERROR: cannot write output: {type(exc).__name__}: {exc}",

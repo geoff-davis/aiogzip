@@ -308,3 +308,24 @@ class TestOutputErrors:
         assert proc.stderr == b""
         assert proc.stdout.rstrip().endswith(b"name='caf\\xe9'")
         assert len(proc.stdout.splitlines()) == 2
+
+    @pytest.mark.skipif(
+        not os.path.exists("/dev/full"), reason="needs /dev/full (Linux)"
+    )
+    @pytest.mark.parametrize("json_flag", [[], ["--json"]])
+    def test_full_device_exits_two_without_exit_flush_noise(self, json_flag, good_gz):
+        # The failed report stays in stdout's buffer; unless stdout is
+        # neutralized, the interpreter's exit flush fails again, prints
+        # "Exception ignored" and turns the status into 120.
+        with open("/dev/full", "wb") as full:
+            proc = subprocess.run(
+                [sys.executable, "-m", "aiogzip", "inspect", *json_flag, str(good_gz)],
+                stdout=full,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        assert proc.returncode == 2
+        assert proc.stderr.startswith("ERROR: cannot write output: OSError: ")
+        assert len(proc.stderr.splitlines()) == 1
+        assert "Exception ignored" not in proc.stderr
+        assert "FAILED" not in proc.stderr
