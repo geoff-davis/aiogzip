@@ -48,6 +48,10 @@ Prepare a new release of aiogzip. This skill handles changelog generation, versi
 ### 4. Bump version
 
 - Update `__version__` in `src/aiogzip/__init__.py` to the new version.
+- Refresh the installed package metadata with `uv sync --all-extras
+  --reinstall-package aiogzip` before running the suite. Otherwise
+  `tests/test_public_api_contract.py` compares the new `__version__` with
+  the old installed metadata and fails.
 - Update the current-version line in CLAUDE.md's **Version History** section
   (`- **<old> (current)** - ...` → `- **<version> (current)** - ...`), and
   refresh its "Recent work includes ..." summary if this release adds
@@ -65,8 +69,11 @@ Prepare a new release of aiogzip. This skill handles changelog generation, versi
   - Match the publish workflow's build job exactly, or the hashes will not
     match: uv `0.9.22` (`uv --version`; the version is pinned in
     `.github/workflows/publish.yml`; if the local uv differs, install that
-    version into a scratch directory with `uv pip install --target <dir>
-    uv==0.9.22` and put `<dir>/bin` first on `PATH`), Python 3.14
+    version into a scratch venv with `uv venv <dir> && uv pip install
+    --python <dir>/bin/python uv==0.9.22`, symlink `<dir>/bin/uv` into an
+    otherwise empty directory and put that directory first on `PATH`;
+    `uv pip install --target` fails for uv itself with "Failed to read
+    metadata"), Python 3.14
     (`uv run python --version`; a different project venv interpreter means
     stop and fix the venv), and
     `export SOURCE_DATE_EPOCH="$(TZ=UTC date -d <changelog release date> +%s)"`.
