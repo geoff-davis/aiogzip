@@ -46,6 +46,15 @@ All notable changes to this project will be documented in this file.
   stream finishes its cleanup before returning. An internal generator was
   left for the event loop to close on a later turn, which could log `Task was
   destroyed but it is pending!` when the loop was closed straight after.
+- Type annotations accept any `os.PathLike` as a filename, as the runtime
+  always has: `open()`, `AsyncGzipFile`, the file classes, `read()`,
+  `write()`, `inspect()` and `verify()` rejected `PurePath` and custom
+  `__fspath__` objects under a type checker. The `name` properties' return
+  annotation widens to match.
+- `WithAsyncWrite` and `WithAsyncReadWrite` declare `write(data: bytes, /)`.
+  They declared `write(data: str | bytes)`, so a binary sink such as an
+  aiofiles `"wb"` handle failed `mypy --strict` as a `fileobj`, although
+  aiogzip only ever writes `bytes` to a sink.
 
 ## [2.0.1] - 2026-11-10
 
