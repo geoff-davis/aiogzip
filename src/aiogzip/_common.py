@@ -158,8 +158,10 @@ def _normalize_mtime(mtime: Optional[Union[int, float]]) -> Optional[int]:
     """Validate and normalize mtime values."""
     if mtime is None:
         return None
-    if not isinstance(mtime, (int, float)):
+    if isinstance(mtime, bool) or not isinstance(mtime, (int, float)):
         raise TypeError("mtime must be an int or float if provided")
+    if mtime != mtime or mtime in (float("inf"), float("-inf")):
+        raise ValueError("mtime must be a finite number")
     if mtime < 0:
         raise ValueError("mtime must be non-negative")
     normalized = int(mtime)

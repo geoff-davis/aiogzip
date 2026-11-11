@@ -1008,6 +1008,8 @@ class AsyncGzipBinaryFile:
 
     async def readlines(self, hint: int = -1) -> List[bytes]:
         """Read and return a list of lines from the binary stream."""
+        if hint is None:
+            hint = -1
         if self._mode_op != "r":
             raise OSError("File not open for reading")
         if self._is_closed:

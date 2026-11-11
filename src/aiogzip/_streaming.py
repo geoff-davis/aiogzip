@@ -20,6 +20,7 @@ from ._common import (
 )
 from ._opening import _settle_cleanup_failure
 from .codec import (
+    _FAST_COMPRESS_FALLBACK_WARNING,
     GzipDecoder,
     GzipEncoder,
     _AsyncDrivableOperation,
@@ -131,11 +132,14 @@ def _compress_chunks(
         "output_chunk_size": output_chunk_size,
     }
     if validated_fast_compress and not _engine.have_fast_engine():
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            encoder = GzipEncoder(**options)
-        for warning in caught:
-            warnings.warn(str(warning.message), warning.category, stacklevel=3)
+        # Without zlib-ng the request selects stdlib either way. Build the
+        # encoder without it and warn from here, so the warning names the
+        # caller and Python's once-per-location filter still applies.
+        # Capturing the encoder's own warning needed catch_warnings(), which
+        # resets every module's warning registry on each call.
+        options["fast_compress"] = False
+        encoder = GzipEncoder(**options)
+        warnings.warn(_FAST_COMPRESS_FALLBACK_WARNING, stacklevel=3)
     else:
         encoder = GzipEncoder(**options)
     return _compress_chunks_impl(source, encoder)

@@ -37,6 +37,11 @@ from ._metadata import GzipMemberInfo
 
 __all__ = ["CodecOperation", "GzipDecoder", "GzipEncoder"]
 
+_FAST_COMPRESS_FALLBACK_WARNING = (
+    "fast_compress=True requested but zlib-ng is not available; "
+    "falling back to stdlib zlib. Install the extra with "
+    "'pip install aiogzip[fast]' to enable faster compression."
+)
 _INFLATE_INPUT_WINDOW = 256 * 1024
 _INFLATE_OUTPUT_MIN_BATCH = 64 * 1024
 _INFLATE_OUTPUT_BATCH = 256 * 1024
@@ -279,12 +284,7 @@ class GzipEncoder(_CodecBase):
         self._strict_size = validated_strict_size
         self._output_chunk_size = output_chunk_size
         if self._fast_compress and not _engine.have_fast_engine():
-            warnings.warn(
-                "fast_compress=True requested but zlib-ng is not available; "
-                "falling back to stdlib zlib. Install the extra with "
-                "'pip install aiogzip[fast]' to enable faster compression.",
-                stacklevel=2,
-            )
+            warnings.warn(_FAST_COMPRESS_FALLBACK_WARNING, stacklevel=2)
         self._engine: ZlibEngine = _engine.compressobj(
             compresslevel,
             -_engine.MAX_WBITS,

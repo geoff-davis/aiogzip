@@ -237,8 +237,10 @@ class AsyncGzipTextFile:
     _SEEN_CR = 1
     _SEEN_LF = 2
     _SEEN_CRLF = 4
-    _COOKIE_VERSION = 1
-    _COOKIE_HEADER = struct.Struct(">BQQQiBBI")
+    _COOKIE_VERSION = 2
+    # The decoder flag follows the header as a length-prefixed signed integer:
+    # CJK decoders report states wider than 32 bits (ISO-2022-KR, for one).
+    _COOKIE_HEADER = struct.Struct(">BQQQBBBI")
     # When the decoded-text head offset crosses this, drop the consumed
     # prefix so the Python str buffer does not grow unbounded. Smaller
     # than the binary buffer because each char can cost 1-4 bytes of
@@ -586,6 +588,15 @@ class AsyncGzipTextFile:
             return await self.tell()
         if whence != os.SEEK_SET:
             raise ValueError("Invalid whence value")
+        if self._mode_op != "r":
+            # A text writer cannot be repositioned. Only the seek that moves
+            # nowhere succeeds, as it does for io.TextIOWrapper.
+            position = await self.tell()
+            if offset == position:
+                return position
+            raise io.UnsupportedOperation(
+                "text seek in write mode supports only the current position"
+            )
 
         binary_file = self._binary_file
         with self._read_call:
@@ -1123,17 +1134,20 @@ class AsyncGzipTextFile:
     ) -> int:
         """Serialize the current text state into an opaque int cookie."""
         decoder_bytes, decoder_flag = decoder_state
+        flag_bytes = decoder_flag.to_bytes(
+            decoder_flag.bit_length() // 8 + 1, "big", signed=True
+        )
         payload = self._COOKIE_HEADER.pack(
             self._COOKIE_VERSION,
             self._cookie_nonce,
             origin_offset,
             chars_to_skip,
-            decoder_flag,
+            len(flag_bytes),
             int(trailing_cr),
             seen_newlines,
             len(decoder_bytes),
         )
-        payload += decoder_bytes
+        payload += flag_bytes + decoder_bytes
         return -(int.from_bytes(payload, "big") + 1)
 
     def _decode_cookie(
@@ -1153,19 +1167,25 @@ class AsyncGzipTextFile:
             nonce,
             origin_offset,
             chars_to_skip,
-            decoder_flag,
+            flag_len,
             trailing_cr,
             seen_newlines,
             decoder_len,
         ) = self._COOKIE_HEADER.unpack(raw[: self._COOKIE_HEADER.size])
-        decoder_bytes = raw[self._COOKIE_HEADER.size :]
+        flag_end = self._COOKIE_HEADER.size + flag_len
+        decoder_bytes = raw[flag_end:]
 
         if (
             version != self._COOKIE_VERSION
             or nonce != self._cookie_nonce
+            or flag_len == 0
+            or len(raw) < flag_end
             or len(decoder_bytes) != decoder_len
         ):
             raise OSError("Cannot seek to invalid text cookie for this stream")
+        decoder_flag = int.from_bytes(
+            raw[self._COOKIE_HEADER.size : flag_end], "big", signed=True
+        )
 
         return (
             origin_offset,
@@ -1483,7 +1503,9 @@ class AsyncGzipTextFile:
         search_start = self._text_buffer_offset + search_from
         base = self._text_buffer_offset
         bf = self._binary_file
-        assert bf is not None
+        if bf is None:
+            # Reached before the read reservation's own check on some paths.
+            raise ValueError("File not opened. Call await open() or use async with.")
 
         if self._newline is None or self._newline == "":
             pos_n = buf.find("\n", search_start)
@@ -2077,8 +2099,8 @@ class AsyncGzipTextFile:
             hint: Optional size hint. If given and greater than 0, reading
                 stops once the decoded lines returned so far total at least
                 hint characters (the line that crosses the hint is still
-                returned whole). If hint is -1 or not given, all remaining
-                lines are read.
+                returned whole). If hint is -1, None or not given, all
+                remaining lines are read.
 
         Returns:
             List[str]: A list of lines from the file, each including any trailing
@@ -2101,6 +2123,8 @@ class AsyncGzipTextFile:
         if self._read_call_active or self._read_poison_seen:
             self._check_text_read_call_usable()
 
+        if hint is None:
+            hint = -1
         state = self._readlines_rollback_state()
         lines: List[str] = []
         try:
