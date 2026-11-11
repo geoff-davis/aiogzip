@@ -5,7 +5,8 @@ stay at the paths they were committed under; this index is the way in.
 
 ## Released: 2.0.0
 
-2.0.0 was published on 2026-10-17; development continues as `2.0.1.dev0`.
+2.0.0 was published on 2026-10-17 and 2.0.1 on 2026-11-10; development
+continues as `2.0.2.dev0`.
 The [2.0.0 plan](RELEASE_2_0_0_PLAN.md) (gates T01–T10) took 2.0.0rc2's
 source unchanged to the stable release, and its gate register is
 authoritative. It was drawn from two read-only readiness reviews:
