@@ -65,7 +65,11 @@ All notable changes to this project will be documented in this file.
   costs about 27 times its size. `inspect()`, `verify()`, the file reader,
   `decompress_chunks()` and `GzipDecoder` share the fix. The decompressed
   bytes are identical; for a multi-member stream the sizes of the chunks
-  that `GzipDecoder` and `decompress_chunks()` yield can differ. (#192)
+  that `GzipDecoder` and `decompress_chunks()` yield can differ. For a
+  corrupt member after the first, more of its valid bytes can be delivered
+  before the error, and a stream that both exceeds `max_decompressed_size`
+  and is corrupt later can report the size limit where it reported
+  `BadGzipFile`; the file reader then offers no salvage read. (#192)
 
 ## [2.0.1] - 2026-11-10
 
