@@ -9,6 +9,7 @@ import random
 
 import pytest
 
+import aiogzip
 from aiogzip import GzipDecoder, _engine
 from aiogzip import codec as codec_module
 
@@ -124,3 +125,64 @@ class TestMediumPriorityEdgeCases:
         blob = gzip.compress(b"", mtime=0) + gzip.compress(b"\0" * 5_000_000, mtime=0)
         with pytest.raises(OSError, match="max_decompressed_size"):
             _decode(blob, len(blob), max_decompressed_size=1_000_000)
+
+
+def _corrupt_after_stored_block(size: int) -> bytes:
+    """An empty member, then a member whose valid stored block of *size*
+    bytes is followed by an invalid block type."""
+    header = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff"
+    stored = (
+        b"\x00" + size.to_bytes(2, "little") + (size ^ 0xFFFF).to_bytes(2, "little")
+    )
+    return gzip.compress(b"", mtime=0) + header + stored + b"a" * size + b"\x06"
+
+
+def _outcome(blob: bytes, chunk: int, **options) -> tuple[int, type, str]:
+    decoder = GzipDecoder(**options)
+    published = 0
+    try:
+        for start in range(0, len(blob), chunk):
+            for item in decoder.feed(blob[start : start + chunk]):
+                published += len(item)
+        for item in decoder.finish():
+            published += len(item)
+    except OSError as error:
+        return published, type(error), str(error)
+    raise AssertionError("the corrupt stream decoded")
+
+
+class TestCorruptStreamOrdering:
+    """BC31: after the first member, a failure is found as it is for
+    fragmented input, because the engine no longer sees the whole window."""
+
+    def test_valid_bytes_before_corrupt_deflate_are_published(self):
+        blob = _corrupt_after_stored_block(5115)
+        published, kind, _ = _outcome(blob, len(blob))
+        assert kind is gzip.BadGzipFile
+        # A full window raised before publishing any of the member.
+        assert 0 < published <= 5115
+
+    def test_limit_is_reported_before_later_corruption(self):
+        blob = _corrupt_after_stored_block(5115)
+        published, kind, message = _outcome(blob, len(blob), max_decompressed_size=5114)
+        assert kind is OSError
+        assert "max_decompressed_size" in message
+        assert published == 5114
+
+    def test_corruption_in_the_first_member_is_found_as_before(self):
+        blob = _corrupt_after_stored_block(5115)[20:]
+        _, kind, _ = _outcome(blob, len(blob), max_decompressed_size=5114)
+        assert kind is gzip.BadGzipFile
+
+    @pytest.mark.asyncio
+    async def test_file_reader_reports_the_limit_and_refuses_salvage(self, tmp_path):
+        path = tmp_path / "corrupt.gz"
+        path.write_bytes(_corrupt_after_stored_block(5115))
+        async with aiogzip.AsyncGzipBinaryFile(
+            path, "rb", max_decompressed_size=5114
+        ) as handle:
+            with pytest.raises(OSError, match="max_decompressed_size"):
+                await handle.read()
+            assert handle._read_health.name == "BROKEN"
+            with pytest.raises(OSError):
+                await handle.read()
