@@ -46,14 +46,14 @@ class TestHighPriorityEdgeCases:
         assert output == b""
         assert decoder.member_count == 11_397
         # Full windows handed about 5,700 times the input to the engine.
-        assert sum(handed) <= 80 * len(blob)
+        assert sum(handed) <= 40 * len(blob)
 
     def test_many_tiny_members_in_one_feed_cost_linear_work(self, handed):
         member = gzip.compress(b"x" * 20, mtime=0)
         blob = member * 5_000
         output, _ = _decode(blob, len(blob))
         assert output == b"x" * 100_000
-        assert sum(handed) <= 80 * len(blob)
+        assert sum(handed) <= 40 * len(blob)
 
     def test_alternating_tiny_and_small_members_stay_proportional(self, handed):
         rng = random.Random(192)
@@ -100,7 +100,9 @@ class TestMediumPriorityEdgeCases:
         expected = [minimum]
         while expected[-1] < full:
             expected.append(min(full, expected[-1] * growth))
-        assert handed[1 : 1 + len(expected)] == expected
+        # The last step up may be cut short by the end of the requeued span.
+        assert handed[1 : len(expected)] == expected[:-1]
+        assert handed[len(expected)] <= full
         assert sum(handed) <= 2 * len(blob)
 
     @pytest.mark.parametrize("chunk", [1, 7, 1024, 4096, 1 << 20])

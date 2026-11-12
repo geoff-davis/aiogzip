@@ -188,12 +188,16 @@ class _InputQueue:
         return self.take(size)
 
     def pop_window(self, max_bytes: int) -> bytes:
-        """Consume one non-empty contiguous window bounded by *max_bytes*."""
+        """Consume the head span, or its first *max_bytes*, without joining.
+
+        A head span shorter than the window is returned alone and whole, so
+        input requeued at a member boundary is handed back without a copy.
+        """
         if max_bytes <= 0:
             raise ValueError("window size must be positive")
-        if self._size <= max_bytes and len(self._spans) == 1:
-            return self._take_head(self._size)
-        return self.take(max_bytes)
+        if not self._spans:
+            return b""
+        return self._take_head(min(max_bytes, len(self._spans[0])))
 
     def consume_leading_zeroes(self) -> int:
         """Consume leading NUL padding without copying complete spans."""

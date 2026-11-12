@@ -62,7 +62,7 @@ All notable changes to this project will be documented in this file.
   the engine examine about 5,700 times the input, with no output for
   `max_decompressed_size` to limit. After the first member, each member now
   starts with a window sized from the member before it, and the same input
-  costs about 50 times its size. `inspect()`, `verify()`, the file reader,
+  costs about 27 times its size. `inspect()`, `verify()`, the file reader,
   `decompress_chunks()` and `GzipDecoder` share the fix. The decompressed
   bytes are identical; for a multi-member stream the sizes of the chunks
   that `GzipDecoder` and `decompress_chunks()` yield can differ. (#192)
