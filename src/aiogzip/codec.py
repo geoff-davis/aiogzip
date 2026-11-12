@@ -43,6 +43,14 @@ _FAST_COMPRESS_FALLBACK_WARNING = (
     "'pip install aiogzip[fast]' to enable faster compression."
 )
 _INFLATE_INPUT_WINDOW = 256 * 1024
+# A member that ends inside its window costs work in proportion to the rest
+# of that window: the engine copies the unused input and the decoder checks
+# and requeues it. A stream of tiny members in full windows therefore cost
+# quadratic work. After the first member, each member starts with a window
+# sized from the member before it and grows it while the member continues,
+# so the surplus handed to the engine stays in proportion to the members.
+_INFLATE_INPUT_MIN_WINDOW = 1024
+_INFLATE_INPUT_WINDOW_GROWTH = 4
 _INFLATE_OUTPUT_MIN_BATCH = 64 * 1024
 _INFLATE_OUTPUT_BATCH = 256 * 1024
 
@@ -469,6 +477,8 @@ class GzipDecoder(_CodecBase):
         self._collect_member_info = validated_collect_member_info
         self._pending = _InputQueue()
         self._inflate_input: bytes | None = None
+        self._inflate_window = _INFLATE_INPUT_WINDOW
+        self._next_member_window = _INFLATE_INPUT_WINDOW
         self._output = _OutputCursor()
         self._eof_after_output = False
         self._engine_output_held = False
@@ -643,6 +653,13 @@ class GzipDecoder(_CodecBase):
                     trailer_isize=trailer_isize,
                 )
             )
+        self._next_member_window = min(
+            _INFLATE_INPUT_WINDOW,
+            max(
+                _INFLATE_INPUT_MIN_WINDOW,
+                2 * (self._consumed_size - self._member_offset),
+            ),
+        )
         self._member_count += 1
         self._header = None
         parser = self._header_parser
@@ -686,15 +703,20 @@ class GzipDecoder(_CodecBase):
                 self._engine = _engine.decompressobj(-_engine.MAX_WBITS)
                 self._member_crc = 0
                 self._member_size = 0
+                self._inflate_window = self._next_member_window
                 self._state = "body"
                 continue
 
             if self._state == "body":
                 if self._inflate_input is None:
                     if self._pending:
-                        self._inflate_input = self._pending.pop_window(
-                            _INFLATE_INPUT_WINDOW
-                        )
+                        window = self._inflate_window
+                        self._inflate_input = self._pending.pop_window(window)
+                        if window < _INFLATE_INPUT_WINDOW:
+                            self._inflate_window = min(
+                                _INFLATE_INPUT_WINDOW,
+                                window * _INFLATE_INPUT_WINDOW_GROWTH,
+                            )
                     elif self._engine_output_held:
                         # The last step filled its output bound with no input
                         # left over, so the engine may hold output it can
