@@ -26,6 +26,18 @@ All notable changes to this project will be documented in this file.
 - `compress_chunks(fast_compress=True)` without zlib-ng warns once per call
   site. It warned on every call and made Python show unrelated once-only
   warnings again.
+- `python -m aiogzip` no longer reports a failure to write its output as a
+  failure of the gzip file. With standard output closed, as in
+  `inspect big.gz | head -1`, it printed `FAILED: big.gz: [Errno 32] Broken
+  pipe` and exited with status 120; it now exits quietly with status 141.
+  Characters that the output encoding cannot represent are backslash-escaped;
+  they stopped the report half way with a `UnicodeEncodeError`. Any other
+  output failure is reported as `ERROR: cannot write output` with status 2.
+- `python -m aiogzip inspect` prints each member's header name with `repr()`,
+  for example `name='data.txt'`. The name was printed raw, so a crafted file
+  could send terminal escape sequences or a forged line to the terminal.
+- `python -m aiogzip inspect --json` includes `"ok": true` on success, as
+  `verify --json` does. Its failure form already had `"ok": false`.
 
 ## [2.0.1] - 2026-11-10
 
