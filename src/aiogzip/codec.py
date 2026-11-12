@@ -653,13 +653,12 @@ class GzipDecoder(_CodecBase):
                     trailer_isize=trailer_isize,
                 )
             )
-        self._next_member_window = min(
-            _INFLATE_INPUT_WINDOW,
-            max(
-                _INFLATE_INPUT_MIN_WINDOW,
-                2 * (self._consumed_size - self._member_offset),
-            ),
-        )
+        window = 2 * (self._consumed_size - self._member_offset)
+        if window >= _INFLATE_INPUT_WINDOW:
+            window = _INFLATE_INPUT_WINDOW
+        elif window < _INFLATE_INPUT_MIN_WINDOW:
+            window = _INFLATE_INPUT_MIN_WINDOW
+        self._next_member_window = window
         self._member_count += 1
         self._header = None
         parser = self._header_parser
