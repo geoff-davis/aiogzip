@@ -140,6 +140,7 @@ async def test_immediate_completion_preserves_codec_budget(monkeypatch):
     assert budget == driver._StreamBudget(
         source_items=2,
         source_bytes=2,
+        inline_input_bytes=2,
         output_bytes=10,
         output_chunks=2,
         no_output_bytes=3,

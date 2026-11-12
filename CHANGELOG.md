@@ -56,6 +56,13 @@ All notable changes to this project will be documented in this file.
   failed `mypy --strict`, although aiogzip only ever writes `bytes` to a
   sink. The public `WithAsyncWrite` and `WithAsyncReadWrite` protocols are
   unchanged.
+- `compress_chunks()` yields to the event loop after each 512 KiB of input
+  that it compresses inline. Source items under 256 KiB are compressed
+  without an executor hop, and the only checkpoints counted source items,
+  source bytes and compressed output, so a source that never suspends could
+  hold the loop while up to 16 MiB of small items, or more when the items
+  are just under 256 KiB, were compressed. The compressed bytes are
+  identical. (#194)
 
 ## [2.0.1] - 2026-11-10
 
