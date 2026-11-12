@@ -16,6 +16,7 @@ reproducible error behaviour or debugging).
 import importlib
 import os
 import sys
+import warnings
 import zlib
 from dataclasses import dataclass
 from typing import Any, Tuple, Type
@@ -38,7 +39,17 @@ def _load_zng() -> Any:
 _zng: Any = _load_zng()
 
 # Whether stdlib has been forced via the environment escape hatch.
-_FORCE_STDLIB = os.environ.get("AIOGZIP_ENGINE", "").strip().lower() == "stdlib"
+_ENGINE_REQUEST = os.environ.get("AIOGZIP_ENGINE", "").strip().lower()
+_FORCE_STDLIB = _ENGINE_REQUEST == "stdlib"
+if _ENGINE_REQUEST not in ("", "stdlib", "zlib-ng"):
+    # A mistyped value would otherwise leave zlib-ng active with no signal,
+    # defeating the switch that exists to force stdlib.
+    warnings.warn(
+        f"Ignoring unrecognized AIOGZIP_ENGINE value "
+        f"{os.environ['AIOGZIP_ENGINE']!r}; expected 'stdlib' or 'zlib-ng'.",
+        RuntimeWarning,
+        stacklevel=1,
+    )
 
 # Whether zlib-ng is available *and* permitted as the active engine.
 _HAVE_ZNG = _zng is not None and not _FORCE_STDLIB

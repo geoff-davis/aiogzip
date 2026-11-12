@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `readlines(None)` reads every remaining line on binary and text handles. It
+  raised `TypeError`, although `read(None)` and `readline(None)` are accepted.
+- `mtime=float("inf")` and `mtime=float("nan")` raise `ValueError` saying that
+  `mtime` must be finite; infinity raised `OverflowError`. `mtime=True` and
+  `mtime=False` raise `TypeError`; they were accepted as 1 and 0.
+- An unrecognized `AIOGZIP_ENGINE` value gives a `RuntimeWarning` at import.
+  A mistyped value such as `std` was ignored silently and left zlib-ng
+  active. The recognized values are `stdlib` and `zlib-ng`.
+- Text `tell()` works for encodings whose decoder state does not fit in 32
+  bits, such as ISO-2022-KR. It raised `struct.error`.
+- `readline()` and iteration on a text handle that was never opened raise
+  `ValueError("File not opened. ...")` in every newline mode. Some modes
+  raised a bare `AssertionError`.
+- A text `seek()` in write mode returns the current position when asked to
+  seek there or to the end (`seek(0, os.SEEK_END)`), and raises
+  `io.UnsupportedOperation` with a clear message for any other target. Every
+  target failed with a misleading `OSError` once anything had been written.
+- `compress_chunks(fast_compress=True)` without zlib-ng warns once per call
+  site. It warned on every call and made Python show unrelated once-only
+  warnings again.
+
 ## [2.0.1] - 2026-11-10
 
 ### Fixed
