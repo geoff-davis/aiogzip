@@ -56,6 +56,16 @@ All notable changes to this project will be documented in this file.
   failed `mypy --strict`, although aiogzip only ever writes `bytes` to a
   sink. The public `WithAsyncWrite` and `WithAsyncReadWrite` protocols are
   unchanged.
+- A gzip stream made of many tiny members no longer costs work in
+  proportion to the square of the input. The decoder handed each member the
+  whole remaining 256 KiB input window: 11,397 empty members in one feed made
+  the engine examine about 5,700 times the input, with no output for
+  `max_decompressed_size` to limit. After the first member, each member now
+  starts with a window sized from the member before it, and the same input
+  costs about 50 times its size. `inspect()`, `verify()`, the file reader,
+  `decompress_chunks()` and `GzipDecoder` share the fix. The decompressed
+  bytes are identical; for a multi-member stream the sizes of the chunks
+  that `GzipDecoder` and `decompress_chunks()` yield can differ. (#192)
 
 ## [2.0.1] - 2026-11-10
 
