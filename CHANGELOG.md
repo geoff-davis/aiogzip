@@ -38,6 +38,14 @@ All notable changes to this project will be documented in this file.
   could send terminal escape sequences or a forged line to the terminal.
 - `python -m aiogzip inspect --json` includes `"ok": true` on success, as
   `verify --json` does. Its failure form already had `"ok": false`.
+- `inspect()` and `verify()` yield to the event loop at bounded intervals
+  when the `fileobj` never suspends, such as an in-memory reader. They could
+  run a whole scan without letting another task run, and could not be
+  cancelled or timed out until they finished. Path sources were unaffected.
+- An early `aclose()` on a `compress_chunks()` or `decompress_chunks()`
+  stream finishes its cleanup before returning. An internal generator was
+  left for the event loop to close on a later turn, which could log `Task was
+  destroyed but it is pending!` when the loop was closed straight after.
 
 ## [2.0.1] - 2026-11-10
 

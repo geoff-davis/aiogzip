@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 from functools import partial
 from typing import Final, TypeVar
@@ -125,7 +125,7 @@ async def _drive_operation(
     offload_threshold: int = _ZLIB_OFFLOAD_THRESHOLD,
     budget: _StreamBudget | None = None,
     first_result: object = None,
-) -> AsyncIterator[bytes]:
+) -> AsyncGenerator[bytes, None]:
     """Pull bounded chunks; ``None`` means no inline result was supplied."""
     completed = False
     advancing_first = first_result is None

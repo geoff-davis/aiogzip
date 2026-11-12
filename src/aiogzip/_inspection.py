@@ -9,8 +9,10 @@ import aiofiles
 
 from ._codec_async import (
     _DECODE_OFFLOAD_THRESHOLD,
+    _cooperative_checkpoint,
     _drive_operation,
     _settle_before_cancel,
+    _StreamBudget,
 )
 from ._common import (
     WithAsyncRead,
@@ -23,6 +25,10 @@ from ._common import (
 from ._metadata import GzipInfo, GzipMemberInfo, VerificationResult
 from ._opening import _acquire_path, _initial_call, _settle_cleanup_failure
 from ._source_io import _is_native_source, _NativeSourceCall
+from ._streaming import (
+    _INLINE_SOURCE_BYTES_CHECKPOINT,
+    _SOURCE_ITEMS_CHECKPOINT,
+)
 from .codec import GzipDecoder, _AsyncDrivableOperation, _snapshot_bytes_input
 
 __all__ = ["GzipInfo", "GzipMemberInfo", "VerificationResult"]
@@ -99,7 +105,17 @@ async def _scan_gzip(
             output_chunk_size=chunk_size,
             collect_member_info=collect_members,
         )
+        # One budget for the whole scan, as in decompress_chunks(): without
+        # it the driver's counters restart for every chunk, and a source that
+        # never suspends (an in-memory reader) starves the event loop.
+        budget = _StreamBudget()
         while True:
+            if (
+                budget.source_items >= _SOURCE_ITEMS_CHECKPOINT
+                or budget.source_bytes >= _INLINE_SOURCE_BYTES_CHECKPOINT
+            ):
+                await _cooperative_checkpoint()
+                budget.reset()
             try:
                 if _is_native_source(source, "read"):
                     chunk = await _read_native(source, chunk_size)
@@ -118,14 +134,17 @@ async def _scan_gzip(
             snapshot = _snapshot_bytes_input(chunk)
             if not snapshot:
                 break
+            budget.source_items += 1
+            budget.source_bytes += len(snapshot)
             async for _ in _drive_operation(
                 cast(_AsyncDrivableOperation, decoder.feed(snapshot)),
                 workload=snapshot,
                 offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
+                budget=budget,
             ):
                 pass
         async for _ in _drive_operation(
-            cast(_AsyncDrivableOperation, decoder.finish())
+            cast(_AsyncDrivableOperation, decoder.finish()), budget=budget
         ):
             pass
         return _ScanResult(

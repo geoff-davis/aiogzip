@@ -1,6 +1,14 @@
 """Private async-iterable gzip streaming implementations."""
 
-from typing import Any, AsyncIterable, AsyncIterator, Optional, Union, cast
+from typing import (
+    Any,
+    AsyncGenerator,
+    AsyncIterable,
+    AsyncIterator,
+    Optional,
+    Union,
+    cast,
+)
 
 from . import _engine
 from ._codec_async import (
@@ -67,6 +75,9 @@ async def _decompress_chunks_impl(
         raise TypeError("source.__aiter__() must return an asynchronous iterator")
     failure: Optional[BaseException] = None
     budget = _StreamBudget()
+    # The driver in use, closed below: an early aclose() would otherwise
+    # leave it to the event loop's asynchronous-generator hook.
+    driver: Optional[AsyncGenerator[bytes, None]] = None
     try:
         while True:
             if (
@@ -86,24 +97,30 @@ async def _decompress_chunks_impl(
             budget.source_bytes += len(snapshot)
             if not snapshot:
                 continue
-            async for output in _drive_operation(
+            driver = _drive_operation(
                 cast(_AsyncDrivableOperation, decoder.feed(snapshot)),
                 workload=snapshot,
                 offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
                 budget=budget,
-            ):
+            )
+            async for output in driver:
                 yield output
 
-        async for output in _drive_operation(
+        driver = _drive_operation(
             cast(_AsyncDrivableOperation, decoder.finish()), budget=budget
-        ):
+        )
+        async for output in driver:
             yield output
     except BaseException as error:
         failure = error
         raise
     finally:
         decoder.discard()
-        await _close_async_iterator(iterator, failure)
+        try:
+            if driver is not None:
+                await driver.aclose()
+        finally:
+            await _close_async_iterator(iterator, failure)
 
 
 class _ChunkStreamEncoder(GzipEncoder):
@@ -157,10 +174,14 @@ async def _compress_chunks_impl(
         raise TypeError("source.__aiter__() must return an asynchronous iterator")
     failure: Optional[BaseException] = None
     budget = _StreamBudget()
+    # The driver in use, closed below: an early aclose() would otherwise
+    # leave it to the event loop's asynchronous-generator hook.
+    driver: Optional[AsyncGenerator[bytes, None]] = None
     try:
-        async for output in _drive_operation(
+        driver = _drive_operation(
             cast(_AsyncDrivableOperation, encoder.start()), budget=budget
-        ):
+        )
+        async for output in driver:
             yield output
 
         while True:
@@ -196,24 +217,30 @@ async def _compress_chunks_impl(
                     raise
                 if first_result is _DONE:
                     continue
-            async for output in _drive_operation(
+            driver = _drive_operation(
                 operation,
                 workload=snapshot,
                 budget=budget,
                 first_result=first_result,
-            ):
+            )
+            async for output in driver:
                 yield output
 
-        async for output in _drive_operation(
+        driver = _drive_operation(
             cast(_AsyncDrivableOperation, encoder.finish()), budget=budget
-        ):
+        )
+        async for output in driver:
             yield output
     except BaseException as error:
         failure = error
         raise
     finally:
         encoder.discard()
-        await _close_async_iterator(iterator, failure)
+        try:
+            if driver is not None:
+                await driver.aclose()
+        finally:
+            await _close_async_iterator(iterator, failure)
 
 
 async def _close_async_iterator(
