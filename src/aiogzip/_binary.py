@@ -35,6 +35,7 @@ from ._common import (
     WithAsyncReadWrite,
     WithAsyncWrite,
     _check_can_open,
+    _Filename,
     _format_file_repr,
     _normalize_mtime,
     _parse_mode_tokens,
@@ -45,6 +46,7 @@ from ._common import (
     _validate_optional_bool,
     _validate_optional_positive_int,
     _validate_original_filename,
+    _WithAsyncBinaryWrite,
 )
 from ._opening import (
     _acquire_path,
@@ -274,14 +276,19 @@ class AsyncGzipBinaryFile:
 
     def __init__(
         self,
-        filename: Union[str, bytes, Path, None],
+        filename: _Filename,
         mode: str = "rb",
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         compresslevel: int = 6,
         mtime: Optional[Union[int, float]] = None,
         original_filename: Optional[Union[str, bytes]] = None,
         fileobj: Optional[
-            Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]
+            Union[
+                WithAsyncRead,
+                WithAsyncWrite,
+                WithAsyncReadWrite,
+                _WithAsyncBinaryWrite,
+            ]
         ] = None,
         closefd: Optional[bool] = None,
         max_decompressed_size: Optional[int] = None,
@@ -663,10 +670,13 @@ class AsyncGzipBinaryFile:
         underlying file object's ``name`` attribute when available.
 
         Returns:
-            The filename as str, bytes, or Path, or None if no name is available.
+            The filename as it was given (str, bytes, Path or another
+            os.PathLike object), or None if no name is available.
         """
         if self._filename is not None:
-            return self._filename
+            # A non-Path os.PathLike is returned as given. The annotation
+            # stays as released so existing typed callers keep checking.
+            return cast(Union[str, bytes, Path], self._filename)
         candidate = (
             self._external_file if self._external_file is not None else self._file
         )

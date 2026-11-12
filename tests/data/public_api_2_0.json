@@ -4,7 +4,7 @@
       "constructor": {
         "parameters": [
           {
-            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "annotation": "Union[str, bytes, os.PathLike[str], os.PathLike[bytes], NoneType]",
             "default": {
               "kind": "required"
             },
@@ -57,7 +57,7 @@
             "name": "original_filename"
           },
           {
-            "annotation": "Union[aiogzip.WithAsyncRead, aiogzip.WithAsyncWrite, aiogzip.WithAsyncReadWrite, NoneType]",
+            "annotation": "Union[aiogzip.WithAsyncRead, aiogzip.WithAsyncWrite, aiogzip.WithAsyncReadWrite, aiogzip._WithAsyncBinaryWrite, NoneType]",
             "default": {
               "kind": "value",
               "value": null
@@ -691,7 +691,7 @@
       "constructor": {
         "parameters": [
           {
-            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "annotation": "Union[str, bytes, os.PathLike[str], os.PathLike[bytes], NoneType]",
             "default": {
               "kind": "required"
             },
@@ -771,7 +771,7 @@
             "name": "original_filename"
           },
           {
-            "annotation": "Union[aiogzip.WithAsyncRead, aiogzip.WithAsyncWrite, aiogzip.WithAsyncReadWrite, NoneType]",
+            "annotation": "Union[aiogzip.WithAsyncRead, aiogzip.WithAsyncWrite, aiogzip.WithAsyncReadWrite, aiogzip._WithAsyncBinaryWrite, NoneType]",
             "default": {
               "kind": "value",
               "value": null
@@ -1834,7 +1834,7 @@
       "signature": {
         "parameters": [
           {
-            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "annotation": "Union[str, bytes, os.PathLike[str], os.PathLike[bytes], NoneType]",
             "default": {
               "kind": "required"
             },
@@ -1978,7 +1978,7 @@
       "signature": {
         "parameters": [
           {
-            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "annotation": "Union[str, bytes, os.PathLike[str], os.PathLike[bytes], NoneType]",
             "default": {
               "kind": "required"
             },
@@ -2030,7 +2030,7 @@
       "signature": {
         "parameters": [
           {
-            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "annotation": "Union[str, bytes, os.PathLike[str], os.PathLike[bytes], NoneType]",
             "default": {
               "kind": "required"
             },
@@ -2063,7 +2063,7 @@
       "signature": {
         "parameters": [
           {
-            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "annotation": "Union[str, bytes, os.PathLike[str], os.PathLike[bytes], NoneType]",
             "default": {
               "kind": "required"
             },
@@ -2124,7 +2124,7 @@
       "signature": {
         "parameters": [
           {
-            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "annotation": "Union[str, bytes, os.PathLike[str], os.PathLike[bytes], NoneType]",
             "default": {
               "kind": "required"
             },
@@ -2176,7 +2176,7 @@
       "signature": {
         "parameters": [
           {
-            "annotation": "Union[str, bytes, pathlib.Path, NoneType]",
+            "annotation": "Union[str, bytes, os.PathLike[str], os.PathLike[bytes], NoneType]",
             "default": {
               "kind": "required"
             },
@@ -2228,7 +2228,7 @@
             "name": "original_filename"
           },
           {
-            "annotation": "Union[aiogzip.WithAsyncWrite, aiogzip.WithAsyncReadWrite, NoneType]",
+            "annotation": "Union[aiogzip.WithAsyncWrite, aiogzip.WithAsyncReadWrite, aiogzip._WithAsyncBinaryWrite, NoneType]",
             "default": {
               "kind": "value",
               "value": null

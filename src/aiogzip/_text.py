@@ -19,6 +19,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    cast,
 )
 
 from ._binary import AsyncGzipBinaryFile, ConcurrentOperationError
@@ -28,6 +29,7 @@ from ._common import (
     WithAsyncReadWrite,
     WithAsyncWrite,
     _check_can_open,
+    _Filename,
     _format_file_repr,
     _normalize_mtime,
     _parse_mode_tokens,
@@ -38,6 +40,7 @@ from ._common import (
     _validate_optional_bool,
     _validate_optional_positive_int,
     _validate_original_filename,
+    _WithAsyncBinaryWrite,
 )
 
 # Keepends line splitters for the single-character terminator modes. Each match
@@ -260,7 +263,7 @@ class AsyncGzipTextFile:
 
     def __init__(
         self,
-        filename: Union[str, bytes, Path, None],
+        filename: _Filename,
         mode: str = "rt",
         chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
         encoding: Optional[str] = "utf-8",
@@ -270,7 +273,12 @@ class AsyncGzipTextFile:
         mtime: Optional[Union[int, float]] = None,
         original_filename: Optional[Union[str, bytes]] = None,
         fileobj: Optional[
-            Union[WithAsyncRead, WithAsyncWrite, WithAsyncReadWrite]
+            Union[
+                WithAsyncRead,
+                WithAsyncWrite,
+                WithAsyncReadWrite,
+                _WithAsyncBinaryWrite,
+            ]
         ] = None,
         closefd: Optional[bool] = None,
         max_decompressed_size: Optional[int] = None,
@@ -733,10 +741,13 @@ class AsyncGzipTextFile:
         underlying file object's ``name`` attribute when available.
 
         Returns:
-            The filename as str, bytes, or Path, or None if no name is available.
+            The filename as it was given (str, bytes, Path or another
+            os.PathLike object), or None if no name is available.
         """
         if self._filename is not None:
-            return self._filename
+            # A non-Path os.PathLike is returned as given. The annotation
+            # stays as released so existing typed callers keep checking.
+            return cast(Union[str, bytes, Path], self._filename)
         if self._external_file is not None:
             return getattr(self._external_file, "name", None)
         if self._binary_file is None:

@@ -83,6 +83,6 @@ def test_negative_public_api_typing(name: str, command: list[str]):
     output = result.stdout + result.stderr
     assert result.returncode != 0, f"{name} unexpectedly accepted negative fixture"
     want = expected(NEGATIVE, name)
-    assert len(want) == 7
+    assert len(want) == 11
     got = reported(output, name, NEGATIVE_ARGUMENT)
     assert got == want, f"{version(name)}:\n{output}"
