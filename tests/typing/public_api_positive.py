@@ -5,8 +5,6 @@ from collections.abc import AsyncIterator, Iterator
 from pathlib import Path, PurePosixPath
 from typing import Union, assert_type
 
-import aiofiles
-
 import aiogzip
 
 
@@ -135,12 +133,12 @@ def name_contract() -> None:
 
 async def fileobj_contract() -> None:
     # A sink only ever receives bytes, so a binary-only write() satisfies it.
-    async with aiofiles.open(path, "wb") as handle:
-        assert_type(await aiogzip.write(None, b"payload", fileobj=handle), None)
-        assert_type(
-            aiogzip.open(None, "wb", fileobj=handle), aiogzip.AsyncGzipBinaryFile
-        )
-        assert_type(aiogzip.open(None, "wt", fileobj=handle), aiogzip.AsyncGzipTextFile)
+    # An aiofiles binary handle has this shape. The fixture does not import
+    # aiofiles: ty cannot resolve it in the minimum-dependencies CI legs.
+    handle = BytesSink()
+    assert_type(await aiogzip.write(None, b"payload", fileobj=handle), None)
+    assert_type(aiogzip.open(None, "wb", fileobj=handle), aiogzip.AsyncGzipBinaryFile)
+    assert_type(aiogzip.open(None, "wt", fileobj=handle), aiogzip.AsyncGzipTextFile)
     for sink in (BytesSink(), PositionalBytesSink(), Writer(), ReaderWriter()):
         assert_type(await aiogzip.write(None, b"payload", fileobj=sink), None)
     assert_type(
