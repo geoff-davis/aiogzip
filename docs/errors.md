@@ -147,9 +147,11 @@ The two parameters are checked at different times:
   that meets an unencodable character, raises `LookupError` (`unknown error
   handler name '...'`) in place of the Unicode error. After a read, or a
   `write()`, the handle is in the state described above for the
-  corresponding Unicode error. `writelines()` differs: it writes none of
-  its lines, including the ones before the failing line, because the
-  line-by-line recovery runs only for `UnicodeEncodeError`.
+  corresponding Unicode error. `writelines()` differs: the batch of lines
+  that contains the failing line is not written at all, including the
+  lines before it in that batch, because the line-by-line recovery runs
+  only for `UnicodeEncodeError`. Batches completed earlier in the same
+  call stay written.
 
 `LookupError` is neither a `ValueError` nor an `OSError`.
 
