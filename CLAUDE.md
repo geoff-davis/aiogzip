@@ -303,14 +303,21 @@ Always include:
   Production/Stable, `docs/stability.md` states the semantic-versioning and
   deprecation policy, and the 1.x line receives security fixes only until
   2027-04-30.
-- **2.0.1 (current release)** - A bug-fix release. It fixes the seven
+- **2.0.1** - A bug-fix release. It fixes the seven
   defects found by the post-release review of 2.0.0 (#171–#177), the
   deferred opening-cleanup interrupt case (#158) and the `bytes` subclass
   snapshot (behavior exceptions BC19–BC27; review record in
   `plans/reviews/v2.0.0-code-review.md`). The public API is unchanged.
-  Development continues as `2.0.2.dev0`.
+- **2.0.2 (current release)** - A bug-fix release. It fixes the
+  lower-priority findings of the same review: validation gaps, the
+  command-line output (a header name is printed with `repr()`), event-loop
+  fairness in `inspect()`, `verify()`, `compress_chunks()`, `writelines()`
+  and the zero-fill `seek()` (#193, #194), the cost of a stream of many
+  tiny gzip members (#192) and two type-annotation gaps (behavior
+  exceptions BC28–BC32). The public API is unchanged. Development continues
+  as `2.0.3.dev0`.
 
 ---
 
-**Last Updated:** 2026-11-10
+**Last Updated:** 2026-11-14
 **Maintainer Notes:** Keep this file updated with new gotchas and best practices!
