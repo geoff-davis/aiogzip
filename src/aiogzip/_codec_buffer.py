@@ -34,12 +34,16 @@ class _Span:
 class _InputQueue:
     """A queue of immutable spans with O(1) length and head removal."""
 
-    __slots__ = ("_size", "_spans", "_spare")
+    __slots__ = ("_size", "_spans", "_spare", "window")
 
-    def __init__(self) -> None:
+    def __init__(self, window: int = 0) -> None:
         self._spans: deque[_Span] = deque()
         self._size = 0
         self._spare: _Span | None = None
+        # The owner's current pop_window() bound. It is kept here because
+        # the decoder is at CPython's limit of 30 inline instance attributes;
+        # one more would slow every attribute access on the decode path.
+        self.window = window
 
     def __len__(self) -> int:
         return self._size
@@ -188,16 +192,12 @@ class _InputQueue:
         return self.take(size)
 
     def pop_window(self, max_bytes: int) -> bytes:
-        """Consume the head span, or its first *max_bytes*, without joining.
-
-        A head span shorter than the window is returned alone and whole, so
-        input requeued at a member boundary is handed back without a copy.
-        """
+        """Consume one non-empty contiguous window bounded by *max_bytes*."""
         if max_bytes <= 0:
             raise ValueError("window size must be positive")
-        if not self._spans:
-            return b""
-        return self._take_head(min(max_bytes, len(self._spans[0])))
+        if self._size <= max_bytes and len(self._spans) == 1:
+            return self._take_head(self._size)
+        return self.take(max_bytes)
 
     def consume_leading_zeroes(self) -> int:
         """Consume leading NUL padding without copying complete spans."""

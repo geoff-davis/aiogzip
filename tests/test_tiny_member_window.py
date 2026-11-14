@@ -1,4 +1,4 @@
-"""The decoder's inflate window follows member sizes (issue #192).
+"""The decoder's inflate window shrinks behind small members (issue #192).
 
 Work is measured by counting the bytes handed to the inflate engine, never by
 timing.
@@ -28,6 +28,13 @@ def handed(monkeypatch):
     return sizes
 
 
+MINIMUM = codec_module._INFLATE_INPUT_MIN_WINDOW
+FULL = codec_module._INFLATE_INPUT_WINDOW
+# The window loses a quarter per member on its way down from the full size,
+# so the windows above the minimum sum to under four full windows.
+DECAY_ALLOWANCE = 4 * FULL
+
+
 def _decode(blob: bytes, chunk: int, **options) -> tuple[bytes, GzipDecoder]:
     decoder = GzipDecoder(**options)
     output = bytearray()
@@ -47,14 +54,15 @@ class TestHighPriorityEdgeCases:
         assert output == b""
         assert decoder.member_count == 11_397
         # Full windows handed about 5,700 times the input to the engine.
-        assert sum(handed) <= 40 * len(blob)
+        assert sum(handed) <= 11_397 * MINIMUM + DECAY_ALLOWANCE
+        assert sum(handed) <= 250 * len(blob)
 
     def test_many_tiny_members_in_one_feed_cost_linear_work(self, handed):
         member = gzip.compress(b"x" * 20, mtime=0)
         blob = member * 5_000
         output, _ = _decode(blob, len(blob))
         assert output == b"x" * 100_000
-        assert sum(handed) <= 40 * len(blob)
+        assert sum(handed) <= 5_000 * MINIMUM + DECAY_ALLOWANCE
 
     def test_alternating_tiny_and_small_members_stay_proportional(self, handed):
         rng = random.Random(192)
@@ -65,7 +73,9 @@ class TestHighPriorityEdgeCases:
         output, _ = _decode(blob, len(blob))
         assert output == b"".join(payloads)
         # Full windows handed about 165 times the input to the engine.
-        assert sum(handed) <= 8 * len(blob)
+        assert sum(handed) <= 4 * len(blob)
+        # The small members do not split the larger ones between them.
+        assert len(handed) == 2000
 
     def test_block_sized_members_are_not_handed_whole_windows(self, handed):
         rng = random.Random(193)
@@ -90,21 +100,42 @@ class TestMediumPriorityEdgeCases:
         _decode(blob + blob, 2 * len(blob))
         assert handed[0] == 2 * len(blob) - 10
 
-    def test_large_member_after_a_tiny_one_grows_its_window(self, handed):
+    def test_window_shrinks_by_a_quarter_per_small_member(self, handed):
+        member = gzip.compress(b"", mtime=0)
+        blob = member * 40_000
+        _decode(blob, len(blob))
+        windows = [FULL]
+        while windows[-1] > MINIMUM:
+            windows.append(max(MINIMUM, windows[-1] - windows[-1] // 4))
+        assert handed[: len(windows)] == windows
+        assert set(handed[len(windows) : 1000]) == {MINIMUM}
+
+    def test_one_small_member_does_not_split_the_next_large_one(self, handed):
+        rng = random.Random(197)
+        large = [rng.randbytes(100_000) for _ in range(8)]
+        blob = b"".join(
+            gzip.compress(b"x" * 20, mtime=0) + gzip.compress(payload, mtime=0)
+            for payload in large
+        )
+        output, _ = _decode(blob, len(blob))
+        assert output == b"".join(b"x" * 20 + payload for payload in large)
+        # One step per member: 16 members, 16 windows.
+        assert len(handed) == 16
+        assert sum(handed) <= 4 * len(blob)
+
+    def test_large_member_after_many_tiny_ones_grows_its_window(self, handed):
         payload = random.Random(195).randbytes(1_500_000)
-        blob = gzip.compress(b"", mtime=0) + gzip.compress(payload, mtime=0)
+        lead = 60
+        blob = gzip.compress(b"", mtime=0) * lead + gzip.compress(payload, mtime=0)
         output, _ = _decode(blob, len(blob))
         assert output == payload
         growth = codec_module._INFLATE_INPUT_WINDOW_GROWTH
-        minimum = codec_module._INFLATE_INPUT_MIN_WINDOW
-        full = codec_module._INFLATE_INPUT_WINDOW
-        expected = [minimum]
-        while expected[-1] < full:
-            expected.append(min(full, expected[-1] * growth))
-        # The last step up may be cut short by the end of the requeued span.
-        assert handed[1 : len(expected)] == expected[:-1]
-        assert handed[len(expected)] <= full
-        assert sum(handed) <= 2 * len(blob)
+        expected = [MINIMUM]
+        while expected[-1] < FULL:
+            expected.append(min(FULL, expected[-1] * growth))
+        assert handed[lead : lead + len(expected)] == expected
+        assert max(handed[lead:]) == FULL
+        assert sum(handed[lead:]) == len(blob) - 20 * lead - 10
 
     @pytest.mark.parametrize("chunk", [1, 7, 1024, 4096, 1 << 20])
     def test_mixed_member_sizes_decode_identically_at_any_chunking(self, chunk):
@@ -127,14 +158,24 @@ class TestMediumPriorityEdgeCases:
             _decode(blob, len(blob), max_decompressed_size=1_000_000)
 
 
-def _corrupt_after_stored_block(size: int) -> bytes:
-    """An empty member, then a member whose valid stored block of *size*
+# The stored block ends exactly where the second window behind small members
+# ends (4 KiB, then 16 KiB, less the 5-byte block header), so the invalid
+# block type is the first byte of the third.
+BLOCK = 5 * MINIMUM - 5
+LIMIT = BLOCK - 1
+# Enough empty members to bring the window down to its minimum.
+LEAD = 60
+
+
+def _corrupt_after_stored_block(lead: int = LEAD) -> bytes:
+    """*lead* empty members, then a member whose valid stored block of BLOCK
     bytes is followed by an invalid block type."""
     header = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff"
     stored = (
-        b"\x00" + size.to_bytes(2, "little") + (size ^ 0xFFFF).to_bytes(2, "little")
+        b"\x00" + BLOCK.to_bytes(2, "little") + (BLOCK ^ 0xFFFF).to_bytes(2, "little")
     )
-    return gzip.compress(b"", mtime=0) + header + stored + b"a" * size + b"\x06"
+    empty = gzip.compress(b"", mtime=0)
+    return empty * lead + header + stored + b"a" * BLOCK + b"\x06"
 
 
 def _outcome(blob: bytes, chunk: int, **options) -> tuple[int, type, str]:
@@ -152,34 +193,38 @@ def _outcome(blob: bytes, chunk: int, **options) -> tuple[int, type, str]:
 
 
 class TestCorruptStreamOrdering:
-    """BC31: after the first member, a failure is found as it is for
+    """BC31: behind small members, a failure is found as it is for
     fragmented input, because the engine no longer sees the whole window."""
 
     def test_valid_bytes_before_corrupt_deflate_are_published(self):
-        blob = _corrupt_after_stored_block(5115)
+        blob = _corrupt_after_stored_block()
         published, kind, _ = _outcome(blob, len(blob))
         assert kind is gzip.BadGzipFile
-        # A full window raised before publishing any of the member.
-        assert 0 < published <= 5115
+        assert 0 < published <= BLOCK
 
     def test_limit_is_reported_before_later_corruption(self):
-        blob = _corrupt_after_stored_block(5115)
-        published, kind, message = _outcome(blob, len(blob), max_decompressed_size=5114)
+        blob = _corrupt_after_stored_block()
+        published, kind, message = _outcome(
+            blob, len(blob), max_decompressed_size=LIMIT
+        )
         assert kind is OSError
         assert "max_decompressed_size" in message
-        assert published == 5114
+        assert published == LIMIT
 
-    def test_corruption_in_the_first_member_is_found_as_before(self):
-        blob = _corrupt_after_stored_block(5115)[20:]
-        _, kind, _ = _outcome(blob, len(blob), max_decompressed_size=5114)
+    @pytest.mark.parametrize("lead", [0, 1])
+    def test_corruption_in_a_full_window_is_found_as_before(self, lead):
+        # The first member has the full window, and one small member before
+        # it takes only a quarter off: the corruption is in the same window.
+        blob = _corrupt_after_stored_block(lead)
+        _, kind, _ = _outcome(blob, len(blob), max_decompressed_size=LIMIT)
         assert kind is gzip.BadGzipFile
 
     @pytest.mark.asyncio
     async def test_file_reader_reports_the_limit_and_refuses_salvage(self, tmp_path):
         path = tmp_path / "corrupt.gz"
-        path.write_bytes(_corrupt_after_stored_block(5115))
+        path.write_bytes(_corrupt_after_stored_block())
         async with aiogzip.AsyncGzipBinaryFile(
-            path, "rb", max_decompressed_size=5114
+            path, "rb", max_decompressed_size=LIMIT
         ) as handle:
             with pytest.raises(OSError, match="max_decompressed_size"):
                 await handle.read()
