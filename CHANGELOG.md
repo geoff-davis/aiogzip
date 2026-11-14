@@ -46,6 +46,13 @@ All notable changes to this project will be documented in this file.
   the 2.0 prerelease in which they were frozen. (#218)
 - The ISA-L decision record has a dated review: the consumption-accounting
   condition for revisiting it is met, and the decision stands. (#218)
+- The docstrings of `AsyncGzipBinaryFile`, `AsyncGzipTextFile`, `open()`,
+  `AsyncGzipFile`, `read()` and `write()` have an `Args` section with an
+  entry for each parameter, so `help()` and the generated API reference show
+  what each one means, its default and range, and the exception raised for
+  an invalid value. The usage examples in the two class docstrings are
+  fenced code blocks and now render as code in the API reference. A test
+  fails if a parameter has no entry. (#217)
 
 ### Maintenance
 

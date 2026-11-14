@@ -3,7 +3,9 @@
 The "Parameters" section of docs/api.md documents every parameter of the two
 file classes under its own heading and lists it in a summary table. A
 parameter added to a constructor without documentation, or a default changed
-without the table, fails here.
+without the table, fails here. So does a parameter of a file class, `open()`,
+`AsyncGzipFile`, `read()` or `write()` that has no entry in the `Args`
+section of its docstring.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 import inspect
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -102,3 +105,47 @@ def test_helper_keyword_parameters_are_listed(name: str) -> None:
     }
     assert HELPER_ROWS[name] == keyword_only
     assert keyword_only <= HEADINGS
+
+
+def _docstring_args(obj: object) -> set[str]:
+    """Return the names that have an entry in a docstring's Args section."""
+    doc = inspect.getdoc(obj)
+    assert doc is not None
+    section = doc.split("\nArgs:\n", 1)[1]
+    section = re.split(r"\n(?=\S)", section, maxsplit=1)[0]
+    return set(re.findall(r"^    (\*{0,2}\w+):", section, flags=re.MULTILINE))
+
+
+def _signature_names(obj: Any) -> set[str]:
+    return {
+        f"**{parameter.name}"
+        if parameter.kind is inspect.Parameter.VAR_KEYWORD
+        else parameter.name
+        for parameter in inspect.signature(obj).parameters.values()
+    }
+
+
+@pytest.mark.parametrize(
+    "obj",
+    [
+        aiogzip.AsyncGzipBinaryFile,
+        aiogzip.AsyncGzipTextFile,
+        aiogzip.open,
+        aiogzip.AsyncGzipFile,
+        aiogzip.read,
+        aiogzip.write,
+    ],
+    ids=lambda obj: obj.__name__,
+)
+def test_docstring_args_match_signature(obj: Any) -> None:
+    assert _docstring_args(obj) == _signature_names(obj)
+
+
+@pytest.mark.parametrize(
+    "obj", [aiogzip.open, aiogzip.AsyncGzipFile], ids=lambda obj: obj.__name__
+)
+def test_factory_docstring_names_every_keyword(obj: Any) -> None:
+    doc = inspect.getdoc(obj)
+    assert doc is not None
+    named = set(re.findall(r"``(\w+)``", doc))
+    assert set(CLASS_PARAMETERS) - {"filename", "mode"} <= named
