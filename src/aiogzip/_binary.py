@@ -25,9 +25,13 @@ import aiofiles
 from . import _engine
 from ._codec_async import (
     _DECODE_OFFLOAD_THRESHOLD,
+    _INLINE_WRITE_BYTES_CHECKPOINT,
+    _INLINE_WRITES_CHECKPOINT,
     _ZLIB_OFFLOAD_THRESHOLD,
+    _cooperative_checkpoint,
     _drive_operation,
     _settle_before_cancel,
+    _WriteBudget,
 )
 from ._common import (
     _MAX_CHUNK_SIZE,
@@ -577,6 +581,17 @@ class AsyncGzipBinaryFile:
             if count > 0:
                 zero_chunk = b"\x00" * min(self._SEEK_ZERO_CHUNK_SIZE, count)
                 remaining = count
+                # Every fill chunk is one inline write of the same size, so
+                # the composite budget reduces to a count of writes. Keeping
+                # that count here spares each 1 KiB write a second coroutine.
+                writes_per_checkpoint = max(
+                    1,
+                    min(
+                        _INLINE_WRITES_CHECKPOINT,
+                        _INLINE_WRITE_BYTES_CHECKPOINT // len(zero_chunk),
+                    ),
+                )
+                writes = 0
                 with self._write_call as encoder:
                     while remaining > 0:
                         chunk = (
@@ -584,7 +599,11 @@ class AsyncGzipBinaryFile:
                             if remaining >= len(zero_chunk)
                             else zero_chunk[:remaining]
                         )
+                        if writes == writes_per_checkpoint:
+                            await self._write_checkpoint_reserved(encoder)
+                            writes = 0
                         await self._write_reserved(chunk, encoder)
+                        writes += 1
                         remaining -= len(chunk)
             return self._position
 
@@ -1078,6 +1097,7 @@ class AsyncGzipBinaryFile:
 
         pending = bytearray()
         iterator = iter(lines)
+        budget = _WriteBudget()
         with self._write_call as encoder:
             while True:
                 try:
@@ -1085,6 +1105,8 @@ class AsyncGzipBinaryFile:
                 except StopIteration:
                     break
                 except BaseException:
+                    # The flush ahead of a propagating failure does not
+                    # checkpoint: a cancellation there would replace it.
                     if pending:
                         await self._write_reserved(bytes(pending), encoder)
                     raise
@@ -1099,17 +1121,21 @@ class AsyncGzipBinaryFile:
                 length = len(data)
                 if length >= self._chunk_size:
                     if pending:
-                        await self._write_reserved(bytes(pending), encoder)
+                        await self._write_composite_reserved(
+                            bytes(pending), encoder, budget
+                        )
                         pending.clear()
-                    await self._write_reserved(data, encoder)
+                    await self._write_composite_reserved(data, encoder, budget)
                 else:
                     if pending and len(pending) + length > self._chunk_size:
-                        await self._write_reserved(bytes(pending), encoder)
+                        await self._write_composite_reserved(
+                            bytes(pending), encoder, budget
+                        )
                         pending.clear()
                     pending.extend(data)
 
             if pending:
-                await self._write_reserved(bytes(pending), encoder)
+                await self._write_composite_reserved(bytes(pending), encoder, budget)
 
     def readable(self) -> bool:
         return self._mode_op == "r"
@@ -1200,6 +1226,49 @@ class AsyncGzipBinaryFile:
         self._position = encoder.input_size
 
         return length
+
+    async def _write_composite_reserved(
+        self, payload: bytes, encoder: GzipEncoder, budget: _WriteBudget
+    ) -> None:
+        """Write one payload of a composite call, yielding once its budget is spent.
+
+        The checkpoint comes before a write and never after the last one, so
+        a composite that stays within its budget runs as it always did.
+        """
+        if budget.spent():
+            await self._write_checkpoint_reserved(encoder)
+            budget.reset()
+        await self._write_reserved(payload, encoder)
+        budget.add(len(payload))
+
+    async def _write_checkpoint_reserved(self, encoder: GzipEncoder) -> None:
+        """Yield between two writes of a composite call that owns the reservation.
+
+        The checkpoint belongs to the member being written. A cancellation
+        delivered here, or an exceptional context exit that closes the file
+        meanwhile, leaves what the same event leaves during a suspended sink
+        write: the writer is broken, the position counts the writes that
+        completed, and the rest of the composite is not written.
+        """
+        try:
+            await _cooperative_checkpoint()
+            if self._is_closed or self._write_broken:
+                self._raise_write_call_aborted("write")
+        except BaseException:
+            self._write_broken = True
+            encoder.discard()
+            raise
+
+    async def _composite_write_checkpoint(self) -> None:
+        """Checkpoint for the text layer, between ``writelines()`` batches.
+
+        Text holds its own reservation and no binary one between batches, so
+        this reserves the binary writer: context exit and overlapping calls
+        see an active binary write, as at every other suspension of a text
+        writer.
+        """
+        with self._write_call as encoder:
+            await self._write_checkpoint_reserved(encoder)
 
     @staticmethod
     def _coerce_byteslike(data: Any) -> bytes:

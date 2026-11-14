@@ -45,6 +45,8 @@ ALLOWLIST = {
     "_close_on_context_exit",
     "_check_write_call_available",
     "_check_write_usable",
+    # the cooperative checkpoint between writelines() batches (BC30)
+    "_composite_write_checkpoint",
 }
 
 

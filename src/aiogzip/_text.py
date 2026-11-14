@@ -23,6 +23,7 @@ from typing import (
 )
 
 from ._binary import AsyncGzipBinaryFile, ConcurrentOperationError
+from ._codec_async import _WriteBudget
 from ._common import (
     _MAX_CHUNK_SIZE,
     WithAsyncRead,
@@ -952,10 +953,27 @@ class AsyncGzipTextFile:
             text_to_encode = text_to_encode.replace("\n", self._newline)
         return await self._write_reserved(data, text_to_encode)
 
-    async def _write_lines_reserved(self, lines: List[str]) -> None:
+    async def _write_batch_budgeted(self, data: str, budget: _WriteBudget) -> None:
+        """Write one ``writelines()`` batch, yielding first if the budget is spent.
+
+        The binary layer owns the checkpoint and its cancellation outcome.
+        The budget counts the encoded bytes that the binary writer accepted.
+        """
+        binary_file = self._binary_file
+        assert binary_file is not None
+        if budget.spent():
+            await binary_file._composite_write_checkpoint()
+            budget.reset()
+        position_before = binary_file._position
+        await self._write_batch_reserved(data)
+        budget.add(binary_file._position - position_before)
+
+    async def _write_lines_reserved(
+        self, lines: List[str], budget: _WriteBudget
+    ) -> None:
         """Write one ``writelines()`` batch, keeping the lines before a bad one."""
         try:
-            await self._write_batch_reserved("".join(lines))
+            await self._write_batch_budgeted("".join(lines), budget)
         except UnicodeEncodeError:
             binary_file = self._binary_file
             assert binary_file is not None
@@ -973,7 +991,7 @@ class AsyncGzipTextFile:
             # offending line is kept and the error describes that line, as
             # separate write() calls would.
             for line in lines:
-                await self._write_batch_reserved(line)
+                await self._write_batch_budgeted(line, budget)
 
     def _buffered_text_len(self) -> int:
         """Return the number of unread characters in the decoded text buffer."""
@@ -2253,6 +2271,7 @@ class AsyncGzipTextFile:
         pending_chars = 0
         pending_empty = False
         iterator = iter(lines)
+        budget = _WriteBudget()
         with self._write_call:
             while True:
                 try:
@@ -2260,31 +2279,35 @@ class AsyncGzipTextFile:
                 except StopIteration:
                     break
                 except BaseException:
+                    # The flush ahead of a propagating failure gets a fresh
+                    # budget, so it does not start with a checkpoint: a
+                    # cancellation there would replace the failure.
                     if pending or pending_empty:
-                        await self._write_lines_reserved(pending)
+                        await self._write_lines_reserved(pending, _WriteBudget())
                     raise
 
                 if not isinstance(line, str):
+                    # As above; the batch write then raises TypeError.
                     if pending or pending_empty:
-                        await self._write_lines_reserved(pending)
+                        await self._write_lines_reserved(pending, _WriteBudget())
                     await self._write_batch_reserved(line)
                     continue
 
                 length = len(line)
                 if length >= self._chunk_size:
                     if pending or pending_empty:
-                        await self._write_lines_reserved(pending)
+                        await self._write_lines_reserved(pending, budget)
                         pending = []
                         pending_chars = 0
                         pending_empty = False
-                    await self._write_batch_reserved(line)
+                    await self._write_batch_budgeted(line, budget)
                 elif not length and type(line) is str:
                     # Only an exact str is known to be empty from its length;
                     # a subclass may override __len__, so it is stored as before.
                     pending_empty = True
                 else:
                     if pending and pending_chars + length > self._chunk_size:
-                        await self._write_lines_reserved(pending)
+                        await self._write_lines_reserved(pending, budget)
                         pending = []
                         pending_chars = 0
                         pending_empty = False
@@ -2292,7 +2315,7 @@ class AsyncGzipTextFile:
                     pending_chars += length
 
             if pending or pending_empty:
-                await self._write_lines_reserved(pending)
+                await self._write_lines_reserved(pending, budget)
 
     async def flush(self) -> None:
         """
