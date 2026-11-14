@@ -181,11 +181,12 @@ def AsyncGzipFile(
     """
     Factory function that returns the appropriate AsyncGzip class based on mode.
 
-    This provides backward compatibility with the original AsyncGzipFile interface
-    while using the new separated binary and text file classes.
+    ``open()`` is the recommended entry point and has identical behavior.
+    ``AsyncGzipFile`` is the older name, kept for existing code.
 
     Args:
-        filename: Path to the file
+        filename: Path to the gzip file (``str``, ``bytes`` or
+            ``os.PathLike``). May be ``None`` when ``fileobj`` is given.
         mode: File mode; any of 'r', 'w', 'a', 'x' with an optional 'b'
             (binary, the default) or 't' (text) suffix
         **kwargs: Additional arguments passed to the appropriate class

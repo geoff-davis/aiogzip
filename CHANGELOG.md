@@ -25,6 +25,20 @@ All notable changes to this project will be documented in this file.
   `repr()` of a file that was never opened says `unopened` where it said
   `closed=False`.
 
+### Documentation
+
+- The docs no longer overstate compatibility with `gzip`. The home page says
+  what is matched (the file format and the familiar file operations, with
+  I/O methods awaited) and links the migration guide for the differences. The
+  `AsyncGzipBinaryFile` docstring no longer calls the class a drop-in
+  replacement for `gzip.open()`, and the `AsyncGzipFile` docstring describes
+  the function as it is now. (#218)
+- The README, codec guide and API reference state the current stability
+  policy instead of describing the codec API and exact boolean options by
+  the 2.0 prerelease in which they were frozen. (#218)
+- The ISA-L decision record has a dated review: the consumption-accounting
+  condition for revisiting it is met, and the decision stands. (#218)
+
 ### Maintenance
 
 - The scripts, benchmark harnesses and tooling tests that each served one

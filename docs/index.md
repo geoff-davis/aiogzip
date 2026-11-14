@@ -20,7 +20,7 @@ It is designed for high-performance I/O operations, especially for text-based da
   acceleration provide competitive text and JSONL throughput without blocking
   the event loop. Direct single-file line iteration can be slower than
   synchronous `gzip`; see the [Performance Guide](performance.md).
-- **Simple API**: Mimics the interface of `gzip.open()`, making it easy to adopt.
+- **Familiar API**: `aiogzip.open()` takes the paths, modes and keyword arguments of `gzip.open()`, and the file methods keep their `gzip` names. I/O methods are coroutines, so they are awaited; see the [migration guide](migration.md).
 - **Separate Binary and Text Modes**: `AsyncGzipBinaryFile` and `AsyncGzipTextFile` provide clear, type-safe handling of data.
 - **Excellent Compression Quality**: Achieves compression ratios nearly identical to the standard `gzip` module.
 - **`aiocsv` Integration**: Read and write compressed CSV files effortlessly.
@@ -109,7 +109,7 @@ use async with.").
 
 ## Compatibility
 
-`aiogzip` provides comprehensive compatibility with the standard `gzip` module's `GzipFile` API, including:
+`aiogzip` reads and writes the same `.gz` format as the standard `gzip` module, and its file objects offer the familiar file operations of `gzip.GzipFile` under the same names. It is an asynchronous API, not a drop-in replacement: methods that perform I/O are coroutines and must be awaited, a `fileobj` must be an async file object, and some methods differ in detail (for example, `peek()` may return fewer bytes than `gzip` does, and `flush()` takes no `zlib_mode`). The [migration guide](migration.md) shows what changes when moving from `gzip.open()`. What is matched includes:
 
 - ✅ `seek()` and `tell()` methods for stream navigation (with the same performance characteristics as `gzip.GzipFile`)
 - ✅ `peek()` and `readinto()` for advanced reading patterns

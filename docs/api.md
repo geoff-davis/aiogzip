@@ -60,8 +60,9 @@ The contract is identical across `AsyncGzipBinaryFile`,
 `AsyncGzipTextFile`, `open()`, `AsyncGzipFile`, the whole-file helpers, the
 async-iterable compressor, and the synchronous codec. Validation happens
 before file acquisition, external file methods, source iteration, zlib-ng
-warning logic, or codec operation reservation. This contract was tightened
-during the alpha series and is frozen for 2.0; it is not a security fix.
+warning logic, or codec operation reservation. This contract is part of the
+public API covered by the [stability policy](stability.md); it is not a
+security fix.
 
 For writers, `strict_size=False` preserves gzip's normal modulo-2³² `ISIZE`;
 `strict_size=True` rejects a member crossing that field's range.
