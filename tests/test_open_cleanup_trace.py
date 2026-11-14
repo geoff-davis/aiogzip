@@ -22,7 +22,7 @@ def test_cleanup_control_flow_matches_b1(tmp_path, engine):
             "warn_default_encoding",
             "-W",
             "error::EncodingWarning",
-            str(root / "scripts/capture_b2_cleanup_trace.py"),
+            str(root / "scripts/capture_open_cleanup_trace.py"),
             "--source-root",
             str(root),
             "--engine",
