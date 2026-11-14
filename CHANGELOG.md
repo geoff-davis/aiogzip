@@ -28,7 +28,7 @@ All notable changes to this project will be documented in this file.
 ### Documentation
 
 - The docs no longer overstate compatibility with `gzip`. The home page says
-  what is matched (the file format, and the method names and semantics, with
+  what is matched (the file format and the familiar file operations, with
   I/O methods awaited) and links the migration guide for the differences. The
   `AsyncGzipBinaryFile` docstring no longer calls the class a drop-in
   replacement for `gzip.open()`, and the `AsyncGzipFile` docstring describes

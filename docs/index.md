@@ -109,7 +109,7 @@ use async with.").
 
 ## Compatibility
 
-`aiogzip` reads and writes the same `.gz` format as the standard `gzip` module, and its file objects use the method names and semantics of `gzip.GzipFile`. It is an asynchronous API, not a drop-in replacement: methods that perform I/O are coroutines and must be awaited, a `fileobj` must be an async file object, and the differences noted below apply. The [migration guide](migration.md) shows what changes when moving from `gzip.open()`. What is matched includes:
+`aiogzip` reads and writes the same `.gz` format as the standard `gzip` module, and its file objects offer the familiar file operations of `gzip.GzipFile` under the same names. It is an asynchronous API, not a drop-in replacement: methods that perform I/O are coroutines and must be awaited, a `fileobj` must be an async file object, and some methods differ in detail (for example, `peek()` may return fewer bytes than `gzip` does, and `flush()` takes no `zlib_mode`). The [migration guide](migration.md) shows what changes when moving from `gzip.open()`. What is matched includes:
 
 - ✅ `seek()` and `tell()` methods for stream navigation (with the same performance characteristics as `gzip.GzipFile`)
 - ✅ `peek()` and `readinto()` for advanced reading patterns
