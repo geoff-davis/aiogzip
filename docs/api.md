@@ -47,6 +47,297 @@ await aiogzip.write("copy.bin.gz", data, mtime=0)
 Both helpers operate in binary mode and load the entire uncompressed payload
 into memory. Use `open()` for streaming large files.
 
+## Parameters
+
+`open()`, `AsyncGzipFile`, `AsyncGzipBinaryFile` and `AsyncGzipTextFile` take
+the same parameters. The text class adds `encoding`, `errors` and `newline`.
+`open()` and `AsyncGzipFile` choose the class from `mode` and pass the other
+arguments to it.
+
+| Parameter | Default | Used when | Accepted by |
+| --- | --- | --- | --- |
+| [`filename`](#filename) | required | reading and writing | binary and text |
+| [`mode`](#mode) | `"rb"` (`"rt"` for `AsyncGzipTextFile`) | reading and writing | binary and text |
+| [`chunk_size`](#chunk_size) | `262144` (256 KiB) | reading and writing | binary and text |
+| [`encoding`](#encoding) | `"utf-8"` | reading and writing | text |
+| [`errors`](#errors) | `"strict"` | reading and writing | text |
+| [`newline`](#newline) | `None` | reading and writing | text |
+| [`compresslevel`](#compresslevel) | `6` | writing | binary and text |
+| [`mtime`](#mtime) | `None` | writing | binary and text |
+| [`original_filename`](#original_filename) | `None` | writing | binary and text |
+| [`fileobj`](#fileobj) | `None` | reading and writing | binary and text |
+| [`closefd`](#closefd) | `None` | reading and writing | binary and text |
+| [`max_decompressed_size`](#max_decompressed_size) | `None` | reading | binary and text |
+| [`max_rewind_cache_size`](#max_rewind_cache_size) | `134217728` (128 MiB) | reading | binary and text |
+| [`strict_size`](#strict_size) | `False` | writing | binary and text |
+| [`fast_compress`](#fast_compress) | `False` | writing | binary and text |
+
+`open()` and `AsyncGzipFile` take `filename` and `mode` positionally and
+everything else by keyword. The two classes also accept the other parameters
+positionally, but their order differs (the text class has `encoding`, `errors`
+and `newline` after `chunk_size`), so pass them by keyword. An unknown keyword
+raises `TypeError`.
+
+### When arguments are checked
+
+Calling `open()`, `AsyncGzipFile` or a class constructs a handle and checks
+its arguments. It does not open or create anything: the file is opened by
+`async with` or `await f.open()`. An invalid argument therefore raises before
+any file is opened, and before any method of a `fileobj` is called. Each
+parameter below names the exception it raises. There are two exceptions to
+the rule:
+
+- An unknown `errors` name is not detected until the first encoding or
+  decoding error.
+- The text class emits the `fast_compress` fallback warning when the handle
+  is opened, not when it is constructed.
+
+A parameter that is used only for writing is ignored by a reader, and a
+parameter that is used only for reading is ignored by a writer. Its value is
+still checked in the other mode, with one exception: `compresslevel` is not
+checked on a reader.
+
+### `filename`
+
+A path as `str`, `bytes` or an `os.PathLike` object such as `pathlib.Path`,
+or `None` when `fileobj` is given.
+
+- With no `fileobj`, the path is opened when the handle is opened.
+- With a `fileobj`, the path is not opened. It is reported by the handle's
+  `name` property and, on a writer, supplies the name stored in the gzip
+  header unless `original_filename` is given.
+- With `filename=None`, `name` falls back to the `name` attribute of the
+  `fileobj`, if it has one.
+
+Raises `ValueError` if `filename` and `fileobj` are both `None`, or if
+`filename` is the empty string. Raises `TypeError` for any other type; if the
+value looks like a file object, the message says to pass it as `fileobj=`.
+
+### `mode`
+
+One of `r` (read), `w` (write, truncating), `x` (write, failing with
+`FileExistsError` if the path exists) or `a` (append), with an optional `b`
+(binary) or `t` (text). The characters may come in any order.
+
+- `open()` and `AsyncGzipFile` default to `"rb"`. They return an
+  `AsyncGzipTextFile` when the mode contains `t` and an `AsyncGzipBinaryFile`
+  otherwise, so `"r"` is binary, as in `gzip.open()`.
+- `AsyncGzipBinaryFile` defaults to `"rb"` and rejects `t`.
+  `AsyncGzipTextFile` defaults to `"rt"` and rejects `b`.
+- Append mode adds a new gzip member after the existing data. See
+  [Append mode and concatenated gzip members](recipes.md#append-mode-and-concatenated-gzip-members).
+- A `+` is accepted and added to the mode used to open the path. It does not
+  make the handle both readable and writable: a handle opened with `r` only
+  reads, and one opened with `w`, `x` or `a` only writes.
+
+Raises `TypeError` if `mode` is not a string. Raises `ValueError` if it is
+empty, has no `r`, `w`, `x` or `a`, has more than one of them, repeats `b`,
+`t` or `+`, has both `b` and `t`, or contains any other character. In a
+binary mode, `open()` and `AsyncGzipFile` raise `ValueError` for an
+`encoding`, `errors` or `newline` other than `None`.
+
+### `chunk_size`
+
+A number of bytes from 1 to 134217728 (128 MiB). The default is 262144
+(256 KiB), also available as `AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE`.
+
+- Reading: the number of compressed bytes requested from the file or
+  `fileobj` in each read. A text reader also asks its binary layer for at
+  most this many decompressed bytes at a time.
+- Writing: `writelines()` joins items smaller than `chunk_size` into batches
+  of at most `chunk_size` (bytes in binary mode, characters in text mode) and
+  writes larger items directly.
+
+`chunk_size` is not a memory limit and does not bound what a `read()`
+returns. See [Choose the Right Chunk Size](performance.md#1-choose-the-right-chunk-size)
+for tuning and
+[Processing untrusted gzip input](recipes.md#processing-untrusted-gzip-input)
+for memory.
+
+Raises `TypeError` if the value is not an `int` (a `bool` or `float` is
+rejected). Raises `ValueError` if it is below 1 or above 128 MiB.
+
+### `encoding`
+
+Text only. The name of the text encoding. The default is `"utf-8"`, and
+`None` means the default.
+
+Raises `ValueError` for the empty string and `LookupError` for an unknown
+encoding.
+
+### `errors`
+
+Text only. The name of the codec error handler, such as `"strict"`,
+`"replace"`, `"ignore"` or `"surrogateescape"`. It applies to decoding on a
+reader and to encoding on a writer. The default is `"strict"`, and `None`
+means the default.
+
+With `"strict"`, undecodable input raises `UnicodeDecodeError` from the read
+and unencodable text raises `UnicodeEncodeError` from the write. The name is
+not checked when the handle is constructed: an unknown name raises
+`LookupError` from the first read or write that meets an encoding or decoding
+error.
+
+### `newline`
+
+Text only. One of `None`, `""`, `"\n"`, `"\r"` or `"\r\n"`, with the same
+meaning as in `io.TextIOWrapper`. The default is `None`.
+
+| `newline` | Reading | Writing |
+| --- | --- | --- |
+| `None` | `\r\n` and `\r` are returned as `\n`; lines end at `\n` | `\n` is written as `os.linesep` |
+| `""` | nothing is translated; lines end at `\n`, `\r` or `\r\n` | nothing is translated |
+| `"\n"` | nothing is translated; lines end at `\n` | nothing is translated |
+| `"\r"` | nothing is translated; lines end at `\r` | `\n` is written as `\r` |
+| `"\r\n"` | nothing is translated; lines end at `\r\n` | `\n` is written as `\r\n` |
+
+Because `newline=None` writes `\n` as `os.linesep`, the same program produces
+`\r\n` on Windows and `\n` elsewhere. Pass `newline=""` or `newline="\n"` to
+write the text unchanged on every platform.
+
+Raises `ValueError` for any other string.
+
+### `compresslevel`
+
+Writing only. An integer from `-1` to `9`. The default is `6`. `0` stores
+the data without compression, `1` is fastest, `9` compresses most, and `-1`
+selects the compression library's default level.
+
+Raises `TypeError` if the value is not an `int` (a `bool` or `float` is
+rejected) and `ValueError` if it is outside `-1` to `9`. A reader ignores
+`compresslevel` and does not check it.
+
+### `mtime`
+
+Writing only. The timestamp stored in the gzip header, in seconds since the
+epoch, from `0` to `4294967295` (2³² − 1). A `float` is truncated to an
+integer. The default, `None`, stores the current time when the handle is
+opened. Pass a fixed value such as `mtime=0` for
+[reproducible gzip output](recipes.md#reproducible-gzip-output).
+
+Raises `TypeError` if the value is not an `int` or `float` (a `bool` is
+rejected). Raises `ValueError` if it is negative, above 2³² − 1, infinite or
+NaN.
+
+A reader checks the value and then ignores it. The `mtime` *property* of a
+reader reports the timestamp read from the stream; see
+[Live member timestamps](#live-member-timestamps).
+
+### `original_filename`
+
+Writing only. The name stored in the gzip header's `FNAME` field, as `str`
+or `bytes`. The default, `None`, takes the name from `filename`; if
+`filename` is also `None`, no name is stored.
+
+In either case the stored name is the final path component with a trailing
+`.gz` removed, so `original_filename="/a/b/c.tar.gz"` stores `c.tar`. A `str`
+is stored as Latin-1; a name that cannot be encoded as Latin-1 is left out.
+Pass `original_filename=""` to store no name. See
+[Reproducible gzip output](recipes.md#reproducible-gzip-output).
+
+Raises `TypeError` if the value is not `str` or `bytes` (an `os.PathLike`
+object is rejected) and `ValueError` if it contains a NUL. A reader checks
+the value and then ignores it.
+
+### `fileobj`
+
+An already-open asynchronous file object to read from or write to in place of
+a path. A reader needs an `async read(size)` method that returns `bytes`; a
+writer needs an `async write(data)` method that returns the number of bytes
+it accepted. `close()`, `seek()` and `seekable()` are used when present. The
+default is `None`.
+
+A synchronous file object such as `io.BytesIO` is not rejected when the
+handle is constructed. It raises `TypeError` (on a writer) when the handle is
+opened, or `OSError` (on a reader) at the first read. See
+[External async file objects](recipes.md#external-async-file-objects).
+
+### `closefd`
+
+Whether closing the handle also closes `fileobj`. It must be `True`, `False`
+or `None`.
+
+- `None` (the default) and `False`: the `fileobj` is left open.
+- `True`: the `fileobj` is closed with the handle.
+
+`closefd` has no effect on a file that the handle opened from a path. That
+file is always closed with the handle. See
+[Opening ownership](recipes.md#opening-ownership) for what happens when
+opening fails.
+
+Raises `TypeError` for any value other than `True`, `False` or `None`; see
+[Exact boolean options](#exact-boolean-options).
+
+### `max_decompressed_size`
+
+Reading only. The largest number of decompressed bytes the reader will
+produce in one pass through the stream, as a positive integer. The limit is
+in bytes in text mode too. The default, `None`, sets no limit. Crossing the
+limit raises `OSError` from the read. A stream of exactly the limit is
+accepted. Set it when reading untrusted input; see [Safety limits](#safety-limits) and
+[Processing untrusted gzip input](recipes.md#processing-untrusted-gzip-input).
+
+Raises `TypeError` if the value is not an `int` or `None` (a `bool` or
+`float` is rejected) and `ValueError` if it is below 1. A writer checks the
+value and then ignores it.
+
+### `max_rewind_cache_size`
+
+Reading only, and only when the source cannot seek. To let such a reader
+`seek()` backward, the handle keeps the compressed bytes it has read so that
+it can replay them. This parameter is the largest size of that cache in
+bytes, as a positive integer. The default is 134217728 (128 MiB). `None`
+sets no limit.
+
+When the next chunk would take the cache over the limit, the cache is
+discarded. From then on `seekable()` returns `False` and a backward `seek()`
+raises `OSError`; forward reading is unaffected. A source that can seek is
+rewound directly and uses no cache. See [Seeking](recipes.md#seeking).
+
+Raises `TypeError` if the value is not an `int` or `None` (a `bool` or
+`float` is rejected) and `ValueError` if it is below 1. A writer checks the
+value and then ignores it.
+
+### `strict_size`
+
+Writing only. The gzip trailer stores the uncompressed size of a member
+modulo 2³². With `False` (the default), a larger member is written and its
+stored size wraps, as the format allows. With `True`, a write that would
+take the member past 4294967295 bytes raises `OSError`.
+
+Raises `TypeError` for any value other than `True` or `False`. A reader
+checks the value and then ignores it.
+
+### `fast_compress`
+
+Writing only. With `True`, the writer compresses with zlib-ng if the
+`aiogzip[fast]` extra is installed. The output is valid gzip but is not
+byte-for-byte identical to the default output. If zlib-ng is not available,
+the writer warns (`UserWarning`) and uses the standard library's zlib. The
+default is `False`. See
+[Optional Faster Codec](performance.md#optional-faster-codec-aiogzipfast-zlib-ng).
+
+Raises `TypeError` for any value other than `True` or `False`. A reader
+checks the value, then ignores it and does not warn.
+
+### Parameters of the whole-file helpers
+
+`read()`, `write()`, `inspect()` and `verify()` take `filename` positionally
+and a subset of the parameters above by keyword. Each has the meaning,
+default, range and exceptions given above. The helpers are coroutines, so an
+invalid argument raises when the call is awaited.
+
+| Function | Keyword parameters |
+| --- | --- |
+| `read(filename)` | `chunk_size`, `fileobj`, `closefd`, `max_decompressed_size`, `max_rewind_cache_size` |
+| `write(filename, data)` | `chunk_size`, `compresslevel`, `mtime`, `original_filename`, `fileobj`, `closefd`, `strict_size`, `fast_compress` |
+| `inspect(filename)` | `chunk_size`, `fileobj`, `closefd`, `max_decompressed_size` |
+| `verify(filename)` | `chunk_size`, `fileobj`, `closefd`, `max_decompressed_size` |
+
+`write()` takes `data` as `bytes`, `bytearray` or `memoryview`.
+`compress_chunks()`, `decompress_chunks()`, `GzipEncoder` and `GzipDecoder`
+document their own parameters in the reference below.
+
 ## Exact boolean options
 
 Public boolean configuration uses exact built-in booleans. `fast_compress`,

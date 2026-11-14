@@ -25,6 +25,17 @@ All notable changes to this project will be documented in this file.
   `repr()` of a file that was never opened says `unopened` where it said
   `closed=False`.
 
+### Documentation
+
+- The API reference has a "Parameters" section that documents every
+  parameter of `open()`, `AsyncGzipFile`, `AsyncGzipBinaryFile` and
+  `AsyncGzipTextFile` in one place: its meaning, default and valid range,
+  whether it is used for reading or writing, and the exception raised for an
+  invalid value. It covers `encoding`, `errors` and `newline`, which the page
+  did not mention, and lists the parameters of `read()`, `write()`,
+  `inspect()` and `verify()`. A test keeps the section in step with the
+  constructor signatures. (#217)
+
 ## [2.0.2] - 2026-11-14
 
 ### Fixed
