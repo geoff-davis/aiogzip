@@ -39,6 +39,15 @@ All notable changes to this project will be documented in this file.
 - The ISA-L decision record has a dated review: the consumption-accounting
   condition for revisiting it is met, and the decision stands. (#218)
 
+### Maintenance
+
+- The scripts, benchmark harnesses and tooling tests that each served one
+  finished 2.0 pre-release gate are removed, so the sdist no longer ships
+  them. The recorded results stay under `plans/`, and the code is available
+  at the `v2.0.2` tag. Library tests and trace scripts that carried a release
+  name (`test_b2_*`, `test_wp5_*`, `capture_b2_*`) are renamed for their
+  subject. (#212)
+
 ## [2.0.2] - 2026-11-14
 
 ### Fixed
