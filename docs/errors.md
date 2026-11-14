@@ -91,8 +91,9 @@ UnicodeEncodeError: 'ascii' codec can't encode character '\xe9' in position 3: o
 `UnicodeDecodeError` when the decompressed bytes are not valid in the handle's
 encoding. After the error:
 
-- The handle is still open and is not terminal. The gzip data itself was
-  valid, so the error says nothing about the file's integrity.
+- The handle is still open and is not terminal. The error is about the text
+  encoding and says nothing about the file's integrity: it can be raised
+  before the member's checksum has been checked.
 - The failed read has consumed the whole chunk of decompressed bytes it was
   decoding. The next read resumes after that chunk and skips text without an
   error, possibly far more than the undecodable bytes themselves. If the
@@ -111,7 +112,7 @@ the same error instead of returning `''`; `seek(0)` rewinds as above.
 
 To read such a file, reopen it with the correct `encoding`, or with an
 `errors` handler such as `"replace"`, which substitutes U+FFFD for each
-undecodable byte and does not raise.
+invalid byte sequence and does not raise.
 
 ### Writing: `UnicodeEncodeError`
 
@@ -144,8 +145,11 @@ The two parameters are checked at different times:
   opens, and reads and writes succeed for as long as the data needs no error
   handling. The first read that meets undecodable bytes, or the first write
   that meets an unencodable character, raises `LookupError` (`unknown error
-  handler name '...'`) in place of the Unicode error. The handle is then in
-  the state described above for the corresponding Unicode error.
+  handler name '...'`) in place of the Unicode error. After a read, or a
+  `write()`, the handle is in the state described above for the
+  corresponding Unicode error. `writelines()` differs: it writes none of
+  its lines, including the ones before the failing line, because the
+  line-by-line recovery runs only for `UnicodeEncodeError`.
 
 `LookupError` is neither a `ValueError` nor an `OSError`.
 
@@ -157,7 +161,7 @@ the operation.
 | Warning | Category | Issued when | How often |
 |---|---|---|---|
 | `fast_compress=True requested but zlib-ng is not available; falling back to stdlib zlib. ...` | `UserWarning` | A writer asks for `fast_compress=True` and zlib-ng is not installed, or `AIOGZIP_ENGINE=stdlib` has disabled it. Compression proceeds with stdlib zlib. | See below. |
-| `Ignoring unrecognized AIOGZIP_ENGINE value '...'; expected 'stdlib' or 'zlib-ng'.` | `RuntimeWarning` | `aiogzip` is first imported with `AIOGZIP_ENGINE` set to a value other than `stdlib` or `zlib-ng` (compared after stripping whitespace and lowercasing). The value is ignored, as if the variable were unset. | Once per process. |
+| `Ignoring unrecognized AIOGZIP_ENGINE value '...'; expected 'stdlib' or 'zlib-ng'.` | `RuntimeWarning` | `aiogzip` is first imported with `AIOGZIP_ENGINE` set to a value other than `stdlib` or `zlib-ng` (compared after stripping whitespace and lowercasing). An empty or whitespace-only value is treated as unset and does not warn. The value is ignored, as if the variable were unset. | Once per process. |
 
 The fallback warning is issued at a different point for each API:
 
