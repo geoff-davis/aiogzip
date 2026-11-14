@@ -23,7 +23,7 @@ _PATH = re.compile(
     r"(?<![\w./-])(?:src|tests|scripts|benchmarks|plans|docs|examples)"
     r"/[\w./-]*[\w/]"
 )
-_TEST_CLASS = re.compile(r"(tests/[\w./-]+\.py)::(\w+)")
+_TEST_CLASS = re.compile(r"(?<![\w./-])(tests/[\w./-]+\.py)::(\w+)")
 
 
 def quoted_paths(text: str) -> list[str]:
@@ -71,3 +71,9 @@ def test_checker_catches_the_stale_commands() -> None:
 
 def test_checker_ignores_paths_outside_the_repository() -> None:
     assert quoted_paths("git worktree add /tmp/aiogzip-baseline/src main") == []
+    outside = (
+        "pytest /tmp/other/tests/test_external.py::External\n"
+        "https://example.com/tests/test_remote.py::Remote\n"
+    )
+    assert quoted_paths(outside) == []
+    assert quoted_test_classes(outside) == []
