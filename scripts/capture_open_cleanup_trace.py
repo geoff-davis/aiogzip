@@ -13,8 +13,8 @@ import tempfile
 import threading
 from pathlib import Path
 
-from capture_b2_open_trace import outcome
 from capture_file_state_trace import git_metadata
+from capture_open_trace import outcome
 
 
 async def capture(package):

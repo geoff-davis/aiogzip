@@ -35,6 +35,26 @@ All notable changes to this project will be documented in this file.
   did not mention, and lists the parameters of `read()`, `write()`,
   `inspect()` and `verify()`. A test keeps the section in step with the
   constructor signatures. (#217)
+- The docs no longer overstate compatibility with `gzip`. The home page says
+  what is matched (the file format and the familiar file operations, with
+  I/O methods awaited) and links the migration guide for the differences. The
+  `AsyncGzipBinaryFile` docstring no longer calls the class a drop-in
+  replacement for `gzip.open()`, and the `AsyncGzipFile` docstring describes
+  the function as it is now. (#218)
+- The README, codec guide and API reference state the current stability
+  policy instead of describing the codec API and exact boolean options by
+  the 2.0 prerelease in which they were frozen. (#218)
+- The ISA-L decision record has a dated review: the consumption-accounting
+  condition for revisiting it is met, and the decision stands. (#218)
+
+### Maintenance
+
+- The scripts, benchmark harnesses and tooling tests that each served one
+  finished 2.0 pre-release gate are removed, so the sdist no longer ships
+  them. The recorded results stay under `plans/`, and the code is available
+  at the `v2.0.2` tag. Library tests and trace scripts that carried a release
+  name (`test_b2_*`, `test_wp5_*`, `capture_b2_*`) are renamed for their
+  subject. (#212)
 
 ## [2.0.2] - 2026-11-14
 
