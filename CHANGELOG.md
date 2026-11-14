@@ -27,6 +27,12 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- The security policy (`SECURITY.md`) covers every entry point that reads
+  untrusted gzip input, not only the file handle: `open()`, `read()`,
+  `decompress_chunks()`, `GzipDecoder`, `inspect()`, `verify()` and the
+  command line. It states that `max_decompressed_size` defaults to no limit
+  everywhere, and describes the rewind cache, member count and metadata, and
+  when integrity is checked. (#219)
 - The API reference has a "Parameters" section that documents every
   parameter of `open()`, `AsyncGzipFile`, `AsyncGzipBinaryFile` and
   `AsyncGzipTextFile` in one place: its meaning, default and valid range,
