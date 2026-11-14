@@ -19,6 +19,7 @@ from ._common import (
     WithAsyncReadWrite,
     _Filename,
     _note_source,
+    _source_name,
     _sync_fileobj_message,
     _validate_chunk_size,
     _validate_filename,
@@ -161,10 +162,7 @@ async def _scan_gzip(
     except BaseException as error:
         failure = error
         if isinstance(error, gzip.BadGzipFile):
-            _note_source(
-                error,
-                filename if filename is not None else getattr(fileobj, "name", None),
-            )
+            _note_source(error, _source_name(filename, fileobj))
         raise
     finally:
         if decoder is not None:

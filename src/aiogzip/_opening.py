@@ -133,9 +133,11 @@ async def _write_initial_header(file: Any, data: bytes) -> None:
             written = await _initial_call(file, "write", data[offset:])
         except TypeError as error:
             sync_message = _sync_fileobj_message(error, "write")
-            if sync_message is None:
-                raise
-            raise TypeError(sync_message) from error
+            if sync_message is not None:
+                # The same exception with a clearer message: a new one would
+                # add a cause that this failure never had.
+                error.args = (sync_message,)
+            raise
         if not isinstance(written, int) or isinstance(written, bool):
             raise OSError(
                 f"underlying file write() returned an invalid byte count ({written!r})"

@@ -116,7 +116,7 @@ def _validate_filename(filename: _Filename, fileobj: Any) -> None:
     if filename is not None:
         if not isinstance(filename, (str, bytes, os.PathLike)):
             message = "Filename must be a string, bytes, or PathLike object"
-            if hasattr(filename, "read") or hasattr(filename, "write"):
+            if _looks_like_file(filename):
                 message += (
                     f", not {type(filename).__name__}; pass a file object as "
                     "fileobj=..."
@@ -144,6 +144,17 @@ def _sync_fileobj_message(error: BaseException, method: str) -> Optional[str]:
     """
     if not isinstance(error, TypeError):
         return None
+    # The text alone does not say where the await failed: an async read()
+    # that awaits a non-awaitable internally raises the same error. Rewrite
+    # only when the innermost frame is aiogzip's own await of the result.
+    traceback = error.__traceback__
+    if traceback is None:
+        return None
+    while traceback.tb_next is not None:
+        traceback = traceback.tb_next
+    module = traceback.tb_frame.f_globals.get("__name__")
+    if not isinstance(module, str) or not module.startswith("aiogzip."):
+        return None
     match = _NOT_AWAITABLE.search(str(error))
     if match is None:
         return None
@@ -159,14 +170,33 @@ def _note_source(error: BaseException, name: object, action: str = "reading") ->
     """Name the file on ``error`` with a note, when a path-like name is known.
 
     The message is left alone: the sans-I/O codec that built it has no
-    filename, and callers match on the message text.
+    filename, and callers match on the message text. The note is best
+    effort: a name whose ``__fspath__`` or ``__repr__`` raises must not
+    replace the error being reported.
     """
-    if isinstance(name, (str, bytes, os.PathLike)):
-        try:
-            shown = os.fspath(name)
-        except Exception:
-            return
-        error.add_note(f"while {action} {shown!r}")
+    try:
+        if isinstance(name, (str, bytes, os.PathLike)):
+            error.add_note(f"while {action} {os.fspath(name)!r}")
+    except Exception:
+        pass
+
+
+def _source_name(filename: object, fileobj: object) -> object:
+    """Return the filename, or the file object's ``name``, without raising."""
+    if filename is not None:
+        return filename
+    try:
+        return getattr(fileobj, "name", None)
+    except Exception:
+        return None
+
+
+def _looks_like_file(value: object) -> bool:
+    """Report whether ``value`` has ``read`` or ``write``, without raising."""
+    try:
+        return hasattr(value, "read") or hasattr(value, "write")
+    except Exception:
+        return False
 
 
 def _validate_chunk_size(chunk_size: int) -> None:

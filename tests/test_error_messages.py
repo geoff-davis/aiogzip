@@ -17,7 +17,7 @@ import aiofiles
 import pytest
 
 import aiogzip
-from aiogzip._common import _sync_fileobj_message
+from aiogzip._common import _NOT_AWAITABLE, _sync_fileobj_message
 
 GZIP_HELLO = gzip.compress(b"hello")
 
@@ -189,7 +189,9 @@ class TestSynchronousFileObject:
             async with aiogzip.open(None, "wb", fileobj=io.BytesIO()):
                 pass
         assert str(caught.value) == f"fileobj.write() returned int, {self.EXPLANATION}"
-        assert isinstance(caught.value.__cause__, TypeError)
+        # The original exception with a clearer message: no cause is added.
+        assert caught.value.__cause__ is None
+        assert caught.value.__context__ is None
 
     @pytest.mark.asyncio
     async def test_the_suggested_wrapper_works(self) -> None:
@@ -219,13 +221,48 @@ class TestSynchronousFileObject:
         ],
     )
     def test_both_interpreter_phrasings_are_recognized(self, text: str) -> None:
-        message = _sync_fileobj_message(TypeError(text), "read")
-        assert message is not None
-        assert message.startswith("fileobj.read() returned bytes, not an awaitable")
+        match = _NOT_AWAITABLE.search(text)
+        assert match is not None
+        assert (match.group(1) or match.group(2)) == "bytes"
 
     def test_other_errors_are_not_recognized(self) -> None:
         assert _sync_fileobj_message(TypeError("boom"), "read") is None
         assert _sync_fileobj_message(ValueError("can't be awaited"), "read") is None
+        # Without a traceback there is no evidence of where the await failed.
+        untraced = TypeError("'bytes' object can't be awaited")
+        assert _sync_fileobj_message(untraced, "read") is None
+
+    @pytest.mark.asyncio
+    async def test_an_await_that_fails_inside_an_async_read_is_not_relabelled(
+        self,
+    ) -> None:
+        class Internal:
+            async def read(self, size: int = -1) -> bytes:
+                return await b"internal mistake"  # type: ignore[misc]
+
+        async with aiogzip.open(None, "rb", fileobj=Internal()) as f:
+            with pytest.raises(OSError) as caught:
+                await f.read()
+        assert str(caught.value).startswith("Error reading from file: ")
+        assert "fileobj.read() returned" not in str(caught.value)
+        for scan in (aiogzip.verify, aiogzip.inspect):
+            with pytest.raises(OSError) as caught:
+                await scan(None, fileobj=Internal())
+            assert str(caught.value).startswith("Error reading from file: ")
+
+    @pytest.mark.asyncio
+    async def test_an_await_that_fails_inside_an_async_write_is_not_relabelled(
+        self,
+    ) -> None:
+        class Internal:
+            async def write(self, data: bytes) -> int:
+                return await 5  # type: ignore[misc]
+
+        with pytest.raises(TypeError) as caught:
+            async with aiogzip.open(None, "wb", fileobj=Internal()):
+                pass
+        assert "fileobj.write() returned" not in str(caught.value)
+        assert "await" in str(caught.value)
 
 
 class TestPositionalFileObject:
@@ -307,3 +344,62 @@ class TestRepr:
     def test_codec_repr_tolerates_a_half_built_instance(self) -> None:
         for cls in (aiogzip.GzipEncoder, aiogzip.GzipDecoder):
             assert repr(cls.__new__(cls)) == f"<aiogzip.{cls.__name__} [uninitialized]>"
+
+
+class TestDiagnosticsNeverReplaceTheError:
+    """A note or hint that cannot be built must leave the real error alone."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("scan", [aiogzip.verify, aiogzip.inspect])
+    async def test_scan_survives_a_name_property_that_raises(self, scan: Any) -> None:
+        class Reader(AsyncReader):
+            @property
+            def name(self) -> str:
+                raise RuntimeError("no name for you")
+
+        with pytest.raises(gzip.BadGzipFile, match="Not a gzipped file") as caught:
+            await scan(None, fileobj=Reader(b"not gzip"))
+        assert not hasattr(caught.value, "__notes__")
+
+    @pytest.mark.asyncio
+    async def test_reader_survives_a_name_property_that_raises(self) -> None:
+        class Reader(AsyncReader):
+            @property
+            def name(self) -> str:
+                raise RuntimeError("no name for you")
+
+        async with aiogzip.open(None, "rb", fileobj=Reader(b"not gzip")) as f:
+            with pytest.raises(gzip.BadGzipFile, match="Not a gzipped file") as caught:
+                await f.read()
+        assert not hasattr(caught.value, "__notes__")
+
+    @pytest.mark.asyncio
+    async def test_a_name_whose_repr_raises_is_not_noted(self, tmp_path: Path) -> None:
+        class Unprintable(str):
+            def __repr__(self) -> str:
+                raise RuntimeError("no repr for you")
+
+        path = tmp_path / "bad.gz"
+        path.write_bytes(b"not gzip")
+        name = Unprintable(path)
+        with pytest.raises(gzip.BadGzipFile, match="Not a gzipped file") as caught:
+            await aiogzip.verify(name)
+        assert not hasattr(caught.value, "__notes__")
+        async with aiogzip.open(name, "rb") as f:
+            with pytest.raises(gzip.BadGzipFile, match="Not a gzipped file") as caught:
+                await f.read()
+        assert not hasattr(caught.value, "__notes__")
+
+    def test_a_filename_whose_read_attribute_raises_keeps_its_type_error(
+        self,
+    ) -> None:
+        class Hostile:
+            @property
+            def read(self) -> Any:
+                raise RuntimeError("no read for you")
+
+        with pytest.raises(TypeError) as caught:
+            aiogzip.open(Hostile(), "rb")  # type: ignore[call-overload]
+        assert str(caught.value) == (
+            "Filename must be a string, bytes, or PathLike object"
+        )
