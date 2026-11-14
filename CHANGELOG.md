@@ -27,6 +27,15 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- The error guide's taxonomy lists text decoding and encoding failures
+  (`UnicodeDecodeError`, `UnicodeEncodeError`), an unknown `encoding` or
+  `errors` handler (`LookupError`) and the library's two warnings. New
+  sections state what a text handle can still do after each Unicode error,
+  when each `LookupError` is raised, and when and how often the
+  `fast_compress` fallback `UserWarning` and the `AIOGZIP_ENGINE`
+  `RuntimeWarning` are issued, with the `-W` filters that turn them into
+  errors in tests. The guide also describes the `while reading '...'` note
+  on `BadGzipFile`. (#220)
 - The security policy (`SECURITY.md`) covers every entry point that reads
   untrusted gzip input, not only the file handle: `open()`, `read()`,
   `decompress_chunks()`, `GzipDecoder`, `inspect()`, `verify()` and the

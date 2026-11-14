@@ -19,12 +19,18 @@ system text may vary.
 | Underlying I/O failure | `OSError` | Missing file, permission denied, disk errors — whatever the OS raised. |
 | `max_decompressed_size` exceeded | `OSError` (not `BadGzipFile`) | Message starts with `"decompressed output exceeded max_decompressed_size"`. |
 | Wrong argument types / values | `TypeError` / `ValueError` | Raised eagerly at the call with a corrective message. |
+| Undecodable bytes in a text read | `UnicodeDecodeError` | A `ValueError` subtype, not an `OSError`. The reader stays open, but the failed read has consumed data. See [Text decoding and encoding errors](#text-decoding-and-encoding-errors). |
+| Unencodable character in a text write | `UnicodeEncodeError` | A `ValueError` subtype. Nothing from the failed `write()` is written and the writer stays usable; `writelines()` keeps every line before the failing one. See [Text decoding and encoding errors](#text-decoding-and-encoding-errors). |
+| Unknown `encoding` for a text handle | `LookupError` | Raised when the handle is constructed, before a file is opened. See [Unknown encodings and error handlers](#unknown-encodings-and-error-handlers). |
+| Unknown `errors` handler for a text handle | `LookupError` | Not raised at construction: raised by the first read or write that needs the handler. See [Unknown encodings and error handlers](#unknown-encodings-and-error-handlers). |
 | Overlapping operations on one async file | `aiogzip.ConcurrentOperationError` | An `OSError` subtype reporting a shared-handle ownership bug before state corruption. |
 | Codec operation still active | `RuntimeError` | Exhaust the returned iterator before starting another operation. |
 | Codec abandoned or partially closed | `OSError` on later use | The instance is unusable; call `discard()` and create a new codec. |
 | Codec used after successful decoder finalization | `ValueError` | `feed()` and repeated `finish()` are terminal-state misuse. |
 | Operations on a closed file | `ValueError` | Matches `io` module conventions, except that `async for` over a closed handle ends without raising (see below). |
 | Reading a write-mode file (or vice versa) | `OSError` | e.g. `"File not open for reading"`. |
+| `fast_compress=True` without zlib-ng | `UserWarning` (not an exception) | Compression falls back to stdlib zlib. See [Warnings](#warnings). |
+| Unrecognized `AIOGZIP_ENGINE` value | `RuntimeWarning` (not an exception) | Issued when `aiogzip` is imported; the value is ignored. See [Warnings](#warnings). |
 
 `gzip.BadGzipFile` subclasses `OSError`, so order your handlers from specific
 to general:
@@ -42,6 +48,18 @@ except OSError as exc:
     ...  # I/O failure, or the decompression cap tripped (see below)
 ```
 
+A `BadGzipFile` raised by a file handle, `aiogzip.read()`, `inspect()` or
+`verify()` names the file in an exception note when a name is known: a path,
+or the `name` of a file object. Python prints the note under the traceback and
+exposes it as `__notes__`; the message itself is not rewritten:
+
+```text
+gzip.BadGzipFile: Error decompressing gzip data: Not a gzipped file (b'(\xb5'): looks like Zstandard
+while reading 'data.zst'
+```
+
+Text decoding and encoding errors carry no such note.
+
 ## Closed and unopened handles
 
 Reads, writes and seeks on a closed handle raise `ValueError`. Iteration is
@@ -52,6 +70,132 @@ loop must distinguish a closed handle from an empty stream.
 `flush()` on a write handle that has not been opened yet (constructed but not
 entered with `async with`) returns without error: no gzip member has started,
 so there is nothing to flush.
+
+## Text decoding and encoding errors
+
+A text handle (`AsyncGzipTextFile`, or `aiogzip.open()` in a text mode)
+decodes and encodes with Python's codecs, using the handle's `encoding`
+(default `"utf-8"`) and `errors` (default `"strict"`). The codec's exceptions
+propagate unchanged. `UnicodeDecodeError` and `UnicodeEncodeError` subclass
+`ValueError`, not `OSError`, so an `except OSError` clause that covers corrupt
+gzip data does not cover them. Their messages are Python's, for example:
+
+```text
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 37: invalid start byte
+UnicodeEncodeError: 'ascii' codec can't encode character '\xe9' in position 3: ordinal not in range(128)
+```
+
+### Reading: `UnicodeDecodeError`
+
+`read()`, `readline()`, `readlines()` and iteration raise
+`UnicodeDecodeError` when the decompressed bytes are not valid in the handle's
+encoding. After the error:
+
+- The handle is still open and is not terminal. The error is about the text
+  encoding and says nothing about the file's integrity: it can be raised
+  before the member's checksum has been checked.
+- The failed read has consumed the whole chunk of decompressed bytes it was
+  decoding. The next read resumes after that chunk and skips text without an
+  error, possibly far more than the undecodable bytes themselves. If the
+  chunk was the last one, the next read returns `''`, which looks like a
+  clean end of file. Do not retry the read.
+- Text decoded before the failing chunk and not yet returned stays buffered,
+  and a later read returns it.
+- The `position` in the message counts from the start of the chunk being
+  decoded, not from the start of the file.
+- `seek(0)` starts again from the beginning. It does not change the result:
+  reading forward meets the same bytes and raises again.
+
+A file that ends inside a multibyte character raises `UnicodeDecodeError`
+(`unexpected end of data`) when a read reaches the end. Reading again raises
+the same error instead of returning `''`; `seek(0)` rewinds as above.
+
+To read such a file, reopen it with the correct `encoding`, or with an
+`errors` handler such as `"replace"`, which substitutes U+FFFD for each
+invalid byte sequence and does not raise.
+
+### Writing: `UnicodeEncodeError`
+
+`write()` raises `UnicodeEncodeError` when the string contains a character
+the encoding cannot represent. Nothing from that call is written, including
+the characters before the offending one, and the encoder is restored to the
+state it had before the call. The writer stays usable: `tell()` is unchanged,
+later writes and `flush()` work normally, and a byte-order mark is still
+written only once.
+
+`writelines()` writes every line before the one that fails to encode, and the
+exception describes that line, as separate `write()` calls would. The failing
+line and the lines after it are not written. The writer stays usable here
+too. Before 2.0.1 the lines that shared a batch with the failing line were
+also lost.
+
+The exception is a `UnicodeEncodeError` raised by a custom `fileobj`'s own
+`write()`. That is a sink failure: the writer is broken, as described under
+[Custom sink errors](#custom-sink-errors-in-write-and-flush), and
+`writelines()` does not retry line by line.
+
+### Unknown encodings and error handlers
+
+The two parameters are checked at different times:
+
+- An unknown `encoding` raises `LookupError` (`unknown encoding: ...`) from
+  the `AsyncGzipTextFile` constructor or from `aiogzip.open()`, before a file
+  is opened or created. An empty `encoding` raises `ValueError`.
+- An unknown `errors` handler is not detected at construction. The handle
+  opens, and reads and writes succeed for as long as the data needs no error
+  handling. The first read that meets undecodable bytes, or the first write
+  that meets an unencodable character, raises `LookupError` (`unknown error
+  handler name '...'`) in place of the Unicode error. After a read, or a
+  `write()`, the handle is in the state described above for the
+  corresponding Unicode error. `writelines()` differs: the batch of lines
+  that contains the failing line is not written at all, including the
+  lines before it in that batch, because the line-by-line recovery runs
+  only for `UnicodeEncodeError`. Batches completed earlier in the same
+  call stay written.
+
+`LookupError` is neither a `ValueError` nor an `OSError`.
+
+## Warnings
+
+aiogzip issues two warnings through Python's `warnings` module. Neither stops
+the operation.
+
+| Warning | Category | Issued when | How often |
+|---|---|---|---|
+| `fast_compress=True requested but zlib-ng is not available; falling back to stdlib zlib. ...` | `UserWarning` | A writer asks for `fast_compress=True` and zlib-ng is not installed, or `AIOGZIP_ENGINE=stdlib` has disabled it. Compression proceeds with stdlib zlib. | See below. |
+| `Ignoring unrecognized AIOGZIP_ENGINE value '...'; expected 'stdlib' or 'zlib-ng'.` | `RuntimeWarning` | `aiogzip` is first imported with `AIOGZIP_ENGINE` set to a value other than `stdlib` or `zlib-ng` (compared after stripping whitespace and lowercasing). An empty or whitespace-only value is treated as unset and does not warn. The value is ignored, as if the variable were unset. | Once per process. |
+
+The fallback warning is issued at a different point for each API:
+
+- `AsyncGzipBinaryFile`, and `aiogzip.open()` in a binary write mode: when
+  the handle is constructed.
+- `AsyncGzipTextFile`, and `aiogzip.open()` in a text write mode: when the
+  handle is opened (on entering `async with`), not when it is constructed.
+- `GzipEncoder`: when the encoder is constructed.
+- `compress_chunks()`: at the call, before the first chunk is requested.
+
+Read-mode handles ignore `fast_compress` and do not warn.
+
+For `GzipEncoder` and `compress_chunks()`, Python's default filter shows the
+warning once per calling location. A file handle warns every time one is
+opened, including repeated opens from the same line.
+
+To turn the warnings into errors in tests, use a `-W` option or the
+`PYTHONWARNINGS` environment variable. Both take the
+`action:message:category` form:
+
+```bash
+# Fail when fast compression silently falls back to stdlib zlib
+python -m pytest -W "error:fast_compress=True requested:UserWarning"
+
+# Fail on a mistyped AIOGZIP_ENGINE. The warning fires during import, so set
+# the filter for the interpreter.
+python -W error::RuntimeWarning -c "import aiogzip"
+PYTHONWARNINGS=error::RuntimeWarning python -m pytest
+```
+
+With the fallback filter set to `error`, the `UserWarning` is raised as an
+exception from the point listed above.
 
 ## Custom sink errors in `write()` and `flush()`
 
@@ -264,7 +408,9 @@ of decompressed bytes it was decoding, so the next read resumes after that
 chunk and silently skips text, possibly far more than the undecodable bytes
 themselves. Call `seek(0)` to
 start again from the beginning, or reopen the file with a different `encoding`
-or an `errors` handler such as `"replace"`.
+or an `errors` handler such as `"replace"`. See
+[Text decoding and encoding errors](#text-decoding-and-encoding-errors) for
+the handle's state after each Unicode error.
 
 ## Codec finalization and operation abandonment
 
