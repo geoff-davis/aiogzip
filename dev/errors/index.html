@@ -537,6 +537,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#text-decoding-and-encoding-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Text decoding and encoding errors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Text decoding and encoding errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-unicodedecodeerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading: UnicodeDecodeError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-unicodeencodeerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing: UnicodeEncodeError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unknown-encodings-and-error-handlers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unknown encodings and error handlers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warnings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#custom-sink-errors-in-write-and-flush" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -794,6 +855,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#text-decoding-and-encoding-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Text decoding and encoding errors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Text decoding and encoding errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-unicodedecodeerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading: UnicodeDecodeError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-unicodeencodeerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing: UnicodeEncodeError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unknown-encodings-and-error-handlers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unknown encodings and error handlers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warnings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#custom-sink-errors-in-write-and-flush" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -920,6 +1042,26 @@ system text may vary.</p>
 <td>Raised eagerly at the call with a corrective message.</td>
 </tr>
 <tr>
+<td>Undecodable bytes in a text read</td>
+<td><code>UnicodeDecodeError</code></td>
+<td>A <code>ValueError</code> subtype, not an <code>OSError</code>. The reader stays open, but the failed read has consumed data. See <a href="#text-decoding-and-encoding-errors">Text decoding and encoding errors</a>.</td>
+</tr>
+<tr>
+<td>Unencodable character in a text write</td>
+<td><code>UnicodeEncodeError</code></td>
+<td>A <code>ValueError</code> subtype. Nothing from the failed <code>write()</code> is written and the writer stays usable; <code>writelines()</code> keeps every line before the failing one. See <a href="#text-decoding-and-encoding-errors">Text decoding and encoding errors</a>.</td>
+</tr>
+<tr>
+<td>Unknown <code>encoding</code> for a text handle</td>
+<td><code>LookupError</code></td>
+<td>Raised when the handle is constructed, before a file is opened. See <a href="#unknown-encodings-and-error-handlers">Unknown encodings and error handlers</a>.</td>
+</tr>
+<tr>
+<td>Unknown <code>errors</code> handler for a text handle</td>
+<td><code>LookupError</code></td>
+<td>Not raised at construction: raised by the first read or write that needs the handler. See <a href="#unknown-encodings-and-error-handlers">Unknown encodings and error handlers</a>.</td>
+</tr>
+<tr>
 <td>Overlapping operations on one async file</td>
 <td><code>aiogzip.ConcurrentOperationError</code></td>
 <td>An <code>OSError</code> subtype reporting a shared-handle ownership bug before state corruption.</td>
@@ -949,6 +1091,16 @@ system text may vary.</p>
 <td><code>OSError</code></td>
 <td>e.g. <code>"File not open for reading"</code>.</td>
 </tr>
+<tr>
+<td><code>fast_compress=True</code> without zlib-ng</td>
+<td><code>UserWarning</code> (not an exception)</td>
+<td>Compression falls back to stdlib zlib. See <a href="#warnings">Warnings</a>.</td>
+</tr>
+<tr>
+<td>Unrecognized <code>AIOGZIP_ENGINE</code> value</td>
+<td><code>RuntimeWarning</code> (not an exception)</td>
+<td>Issued when <code>aiogzip</code> is imported; the value is ignored. See <a href="#warnings">Warnings</a>.</td>
+</tr>
 </tbody>
 </table>
 <p><code>gzip.BadGzipFile</code> subclasses <code>OSError</code>, so order your handlers from specific
@@ -964,6 +1116,14 @@ to general:</p>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="o">...</span>  <span class="c1"># I/O failure, or the decompression cap tripped (see below)</span>
 </code></pre></div>
+<p>A <code>BadGzipFile</code> raised by a file handle, <code>aiogzip.read()</code>, <code>inspect()</code> or
+<code>verify()</code> names the file in an exception note when a name is known: a path,
+or the <code>name</code> of a file object. Python prints the note under the traceback and
+exposes it as <code>__notes__</code>; the message itself is not rewritten:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gzip.BadGzipFile: Error decompressing gzip data: Not a gzipped file (b'(\xb5'): looks like Zstandard
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>while reading 'data.zst'
+</code></pre></div>
+<p>Text decoding and encoding errors carry no such note.</p>
 <h2 id="closed-and-unopened-handles">Closed and unopened handles</h2>
 <p>Reads, writes and seeks on a closed handle raise <code>ValueError</code>. Iteration is
 the exception: <code>async for</code> over a closed binary or text handle yields nothing
@@ -972,6 +1132,130 @@ loop must distinguish a closed handle from an empty stream.</p>
 <p><code>flush()</code> on a write handle that has not been opened yet (constructed but not
 entered with <code>async with</code>) returns without error: no gzip member has started,
 so there is nothing to flush.</p>
+<h2 id="text-decoding-and-encoding-errors">Text decoding and encoding errors</h2>
+<p>A text handle (<code>AsyncGzipTextFile</code>, or <code>aiogzip.open()</code> in a text mode)
+decodes and encodes with Python's codecs, using the handle's <code>encoding</code>
+(default <code>"utf-8"</code>) and <code>errors</code> (default <code>"strict"</code>). The codec's exceptions
+propagate unchanged. <code>UnicodeDecodeError</code> and <code>UnicodeEncodeError</code> subclass
+<code>ValueError</code>, not <code>OSError</code>, so an <code>except OSError</code> clause that covers corrupt
+gzip data does not cover them. Their messages are Python's, for example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 37: invalid start byte
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>UnicodeEncodeError: 'ascii' codec can't encode character '\xe9' in position 3: ordinal not in range(128)
+</code></pre></div>
+<h3 id="reading-unicodedecodeerror">Reading: <code>UnicodeDecodeError</code></h3>
+<p><code>read()</code>, <code>readline()</code>, <code>readlines()</code> and iteration raise
+<code>UnicodeDecodeError</code> when the decompressed bytes are not valid in the handle's
+encoding. After the error:</p>
+<ul>
+<li>The handle is still open and is not terminal. The error is about the text
+  encoding and says nothing about the file's integrity: it can be raised
+  before the member's checksum has been checked.</li>
+<li>The failed read has consumed the whole chunk of decompressed bytes it was
+  decoding. The next read resumes after that chunk and skips text without an
+  error, possibly far more than the undecodable bytes themselves. If the
+  chunk was the last one, the next read returns <code>''</code>, which looks like a
+  clean end of file. Do not retry the read.</li>
+<li>Text decoded before the failing chunk and not yet returned stays buffered,
+  and a later read returns it.</li>
+<li>The <code>position</code> in the message counts from the start of the chunk being
+  decoded, not from the start of the file.</li>
+<li><code>seek(0)</code> starts again from the beginning. It does not change the result:
+  reading forward meets the same bytes and raises again.</li>
+</ul>
+<p>A file that ends inside a multibyte character raises <code>UnicodeDecodeError</code>
+(<code>unexpected end of data</code>) when a read reaches the end. Reading again raises
+the same error instead of returning <code>''</code>; <code>seek(0)</code> rewinds as above.</p>
+<p>To read such a file, reopen it with the correct <code>encoding</code>, or with an
+<code>errors</code> handler such as <code>"replace"</code>, which substitutes U+FFFD for each
+invalid byte sequence and does not raise.</p>
+<h3 id="writing-unicodeencodeerror">Writing: <code>UnicodeEncodeError</code></h3>
+<p><code>write()</code> raises <code>UnicodeEncodeError</code> when the string contains a character
+the encoding cannot represent. Nothing from that call is written, including
+the characters before the offending one, and the encoder is restored to the
+state it had before the call. The writer stays usable: <code>tell()</code> is unchanged,
+later writes and <code>flush()</code> work normally, and a byte-order mark is still
+written only once.</p>
+<p><code>writelines()</code> writes every line before the one that fails to encode, and the
+exception describes that line, as separate <code>write()</code> calls would. The failing
+line and the lines after it are not written. The writer stays usable here
+too. Before 2.0.1 the lines that shared a batch with the failing line were
+also lost.</p>
+<p>The exception is a <code>UnicodeEncodeError</code> raised by a custom <code>fileobj</code>'s own
+<code>write()</code>. That is a sink failure: the writer is broken, as described under
+<a href="#custom-sink-errors-in-write-and-flush">Custom sink errors</a>, and
+<code>writelines()</code> does not retry line by line.</p>
+<h3 id="unknown-encodings-and-error-handlers">Unknown encodings and error handlers</h3>
+<p>The two parameters are checked at different times:</p>
+<ul>
+<li>An unknown <code>encoding</code> raises <code>LookupError</code> (<code>unknown encoding: ...</code>) from
+  the <code>AsyncGzipTextFile</code> constructor or from <code>aiogzip.open()</code>, before a file
+  is opened or created. An empty <code>encoding</code> raises <code>ValueError</code>.</li>
+<li>An unknown <code>errors</code> handler is not detected at construction. The handle
+  opens, and reads and writes succeed for as long as the data needs no error
+  handling. The first read that meets undecodable bytes, or the first write
+  that meets an unencodable character, raises <code>LookupError</code> (<code>unknown error
+  handler name '...'</code>) in place of the Unicode error. After a read, or a
+  <code>write()</code>, the handle is in the state described above for the
+  corresponding Unicode error. <code>writelines()</code> differs: the batch of lines
+  that contains the failing line is not written at all, including the
+  lines before it in that batch, because the line-by-line recovery runs
+  only for <code>UnicodeEncodeError</code>. Batches completed earlier in the same
+  call stay written.</li>
+</ul>
+<p><code>LookupError</code> is neither a <code>ValueError</code> nor an <code>OSError</code>.</p>
+<h2 id="warnings">Warnings</h2>
+<p>aiogzip issues two warnings through Python's <code>warnings</code> module. Neither stops
+the operation.</p>
+<table>
+<thead>
+<tr>
+<th>Warning</th>
+<th>Category</th>
+<th>Issued when</th>
+<th>How often</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fast_compress=True requested but zlib-ng is not available; falling back to stdlib zlib. ...</code></td>
+<td><code>UserWarning</code></td>
+<td>A writer asks for <code>fast_compress=True</code> and zlib-ng is not installed, or <code>AIOGZIP_ENGINE=stdlib</code> has disabled it. Compression proceeds with stdlib zlib.</td>
+<td>See below.</td>
+</tr>
+<tr>
+<td><code>Ignoring unrecognized AIOGZIP_ENGINE value '...'; expected 'stdlib' or 'zlib-ng'.</code></td>
+<td><code>RuntimeWarning</code></td>
+<td><code>aiogzip</code> is first imported with <code>AIOGZIP_ENGINE</code> set to a value other than <code>stdlib</code> or <code>zlib-ng</code> (compared after stripping whitespace and lowercasing). An empty or whitespace-only value is treated as unset and does not warn. The value is ignored, as if the variable were unset.</td>
+<td>Once per process.</td>
+</tr>
+</tbody>
+</table>
+<p>The fallback warning is issued at a different point for each API:</p>
+<ul>
+<li><code>AsyncGzipBinaryFile</code>, and <code>aiogzip.open()</code> in a binary write mode: when
+  the handle is constructed.</li>
+<li><code>AsyncGzipTextFile</code>, and <code>aiogzip.open()</code> in a text write mode: when the
+  handle is opened (on entering <code>async with</code>), not when it is constructed.</li>
+<li><code>GzipEncoder</code>: when the encoder is constructed.</li>
+<li><code>compress_chunks()</code>: at the call, before the first chunk is requested.</li>
+</ul>
+<p>Read-mode handles ignore <code>fast_compress</code> and do not warn.</p>
+<p>For <code>GzipEncoder</code> and <code>compress_chunks()</code>, Python's default filter shows the
+warning once per calling location. A file handle warns every time one is
+opened, including repeated opens from the same line.</p>
+<p>To turn the warnings into errors in tests, use a <code>-W</code> option or the
+<code>PYTHONWARNINGS</code> environment variable. Both take the
+<code>action:message:category</code> form:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Fail when fast compression silently falls back to stdlib zlib</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-W<span class="w"> </span><span class="s2">"error:fast_compress=True requested:UserWarning"</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Fail on a mistyped AIOGZIP_ENGINE. The warning fires during import, so set</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># the filter for the interpreter.</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>python<span class="w"> </span>-W<span class="w"> </span>error::RuntimeWarning<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import aiogzip"</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="nv">PYTHONWARNINGS</span><span class="o">=</span>error::RuntimeWarning<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pytest
+</code></pre></div>
+<p>With the fallback filter set to <code>error</code>, the <code>UserWarning</code> is raised as an
+exception from the point listed above.</p>
 <h2 id="custom-sink-errors-in-write-and-flush">Custom sink errors in <code>write()</code> and <code>flush()</code></h2>
 <p>When a custom <code>fileobj</code>'s <code>write()</code> raises, the two calls report it
 differently:</p>
@@ -1000,12 +1284,12 @@ concurrently because they do not share gzip or buffer state.</p>
 not thread-safe. Do not call one handle from several threads or event loops.</p>
 <p>When several tasks intentionally share a handle, use an application lock that
 covers the complete logical operation, not only the first low-level call:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">lock</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">async</span> <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">batch</span> <span class="o">=</span> <span class="k">await</span> <span class="n">stream</span><span class="o">.</span><span class="n">readlines</span><span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">lock</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">async</span> <span class="k">with</span> <span class="n">lock</span><span class="p">:</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">batch</span> <span class="o">=</span> <span class="k">await</span> <span class="n">stream</span><span class="o">.</span><span class="n">readlines</span><span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
 </code></pre></div>
 <p>The reservation covers text already decoded into the wrapper's buffer as well
 as binary codec work. Composite <code>readlines()</code>, <code>writelines()</code>, and write-mode
@@ -1066,15 +1350,15 @@ exceeded. Because the cap error is not a <code>BadGzipFile</code>, the handler s
 above distinguishes the two cases by exception type alone. If you need to
 single the cap out from real I/O errors within the <code>OSError</code> branch, match on
 its stable message prefix:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">"untrusted.gz"</span><span class="p">,</span> <span class="n">max_decompressed_size</span><span class="o">=</span><span class="mi">100</span> <span class="o">*</span> <span class="mi">2</span><span class="o">**</span><span class="mi">20</span><span class="p">)</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">except</span> <span class="n">gzip</span><span class="o">.</span><span class="n">BadGzipFile</span><span class="p">:</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">raise</span>  <span class="c1"># corrupt input: not the cap</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"decompressed output exceeded max_decompressed_size"</span><span class="p">):</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="o">...</span>  <span class="c1"># over budget: maybe retry with a larger cap</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="k">raise</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">aiogzip</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">"untrusted.gz"</span><span class="p">,</span> <span class="n">max_decompressed_size</span><span class="o">=</span><span class="mi">100</span> <span class="o">*</span> <span class="mi">2</span><span class="o">**</span><span class="mi">20</span><span class="p">)</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">except</span> <span class="n">gzip</span><span class="o">.</span><span class="n">BadGzipFile</span><span class="p">:</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="k">raise</span>  <span class="c1"># corrupt input: not the cap</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"decompressed output exceeded max_decompressed_size"</span><span class="p">):</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="o">...</span>  <span class="c1"># over budget: maybe retry with a larger cap</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        <span class="k">raise</span>
 </code></pre></div>
 <h2 id="where-errors-surface">Where errors surface</h2>
 <p>Decompressed bytes reach the caller in one of three states:</p>
@@ -1109,17 +1393,17 @@ for a full defensive-reading recipe.</p>
 <h2 id="recovery-data-after-an-integrity-failure">Recovery data after an integrity failure</h2>
 <p>High-level binary and text readers distinguish clean EOF from a poisoned
 terminal state. Their integrity-failure lifecycle is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>healthy
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  -&gt; integrity failure raised
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  -&gt; previously decoded recovery data may remain readable
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  -&gt; recovery data is drained
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  -&gt; stable terminal OSError
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>rewindable source:
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  absolute seek(0) may construct a fresh decoder and recover
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>non-rewindable source:
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>  close and reopen/recreate the source
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>healthy
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  -&gt; integrity failure raised
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>  -&gt; previously decoded recovery data may remain readable
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>  -&gt; recovery data is drained
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  -&gt; stable terminal OSError
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>rewindable source:
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  absolute seek(0) may construct a fresh decoder and recover
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>non-rewindable source:
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>  close and reopen/recreate the source
 </code></pre></div>
 <p>Recovery data is not proof that its gzip member is valid. Deflate output can
 be emitted before a later CRC-32 or <code>ISIZE</code> trailer check fails, so applications
@@ -1156,7 +1440,9 @@ of decompressed bytes it was decoding, so the next read resumes after that
 chunk and silently skips text, possibly far more than the undecodable bytes
 themselves. Call <code>seek(0)</code> to
 start again from the beginning, or reopen the file with a different <code>encoding</code>
-or an <code>errors</code> handler such as <code>"replace"</code>.</p>
+or an <code>errors</code> handler such as <code>"replace"</code>. See
+<a href="#text-decoding-and-encoding-errors">Text decoding and encoding errors</a> for
+the handle's state after each Unicode error.</p>
 <h2 id="codec-finalization-and-operation-abandonment">Codec finalization and operation abandonment</h2>
 <p>Every state-changing <code>GzipEncoder</code> or <code>GzipDecoder</code> call reserves the codec and
 returns a lazy <code>CodecOperation</code>. Engine errors, integrity failures, or closing
