@@ -135,16 +135,6 @@ _NOT_AWAITABLE = re.compile(
 )
 
 
-class _SyncResultMessage(str):
-    """The message that ``_explain_sync_result`` put on a TypeError.
-
-    It remembers the exception it was written for, so a wrapper that copies
-    ``args`` into another exception does not carry the diagnosis with it.
-    """
-
-    _owner: Optional[BaseException] = None
-
-
 def _explain_sync_result(error: TypeError, result: object, method: str) -> None:
     """Clarify ``error`` if awaiting a synchronous method's result caused it.
 
@@ -179,12 +169,15 @@ def _explain_sync_result(error: TypeError, result: object, method: str) -> None:
         if match is None:
             return
         returned = match.group(1) or match.group(2)
-        message = _SyncResultMessage(
+        message = (
             f"fileobj.{method}() returned {returned}, not an awaitable; "
             "aiogzip needs an async file object. Wrap a sync file with "
             "aiofiles.threadpool.wrap(f), or use gzip.open()."
         )
-        message._owner = error
+        # The diagnosis is recorded on the exception, not in the message: a
+        # wrapper that copies args then carries neither the diagnosis nor a
+        # reference back to this exception and its traceback.
+        setattr(error, "_aiogzip_sync_result", message)  # noqa: B010
         error.args = (message,)
     except Exception:
         # A diagnostic must not replace the error it describes.
@@ -194,9 +187,9 @@ def _explain_sync_result(error: TypeError, result: object, method: str) -> None:
 def _sync_result_message(error: BaseException) -> Optional[str]:
     """Return the explanation ``_explain_sync_result`` attached, if any."""
     try:
-        args = error.args
-        if args and isinstance(args[0], _SyncResultMessage) and args[0]._owner is error:
-            return str(args[0])
+        message = getattr(error, "_aiogzip_sync_result", None)
+        if type(message) is str and error.args == (message,):
+            return message
     except Exception:
         # Reading the marker must not replace the error being reported.
         pass

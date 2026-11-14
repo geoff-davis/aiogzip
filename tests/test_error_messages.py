@@ -9,6 +9,7 @@ input that is not gzip at all.
 from __future__ import annotations
 
 import asyncio
+import gc
 import gzip
 import io
 from pathlib import Path
@@ -372,6 +373,10 @@ class TestSynchronousFileObject:
             assert _sync_result_message(error) is not None
             copied = RuntimeError(*error.args)
             assert _sync_result_message(copied) is None
+            # The copied args are plain strings: they do not keep the
+            # diagnosed exception, or its traceback, alive.
+            assert [type(arg) for arg in copied.args] == [str]
+            assert gc.get_referents(copied.args[0]) == []
         else:  # pragma: no cover
             pytest.fail("the await did not fail")
 
