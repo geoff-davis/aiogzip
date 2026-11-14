@@ -46,10 +46,13 @@ _INFLATE_INPUT_WINDOW = 256 * 1024
 # A member that ends inside its window costs work in proportion to the rest
 # of that window: the engine copies the unused input and the decoder checks
 # and requeues it. A stream of tiny members in full windows therefore cost
-# quadratic work. After the first member, each member starts with a window
-# sized from the member before it and grows it while the member continues,
-# so the surplus handed to the engine stays in proportion to the members.
-_INFLATE_INPUT_MIN_WINDOW = 1024
+# quadratic work. So a member that leaves a large surplus shrinks the window
+# for the members after it: to twice its own size, but by no more than a
+# quarter at a time, so that one small member among large ones does not
+# split the next large one. A member that outlasts its window grows it
+# again. The surplus handed to the engine then stays within a constant
+# factor of the members themselves.
+_INFLATE_INPUT_MIN_WINDOW = 4096
 _INFLATE_INPUT_WINDOW_GROWTH = 4
 _INFLATE_OUTPUT_MIN_BATCH = 64 * 1024
 _INFLATE_OUTPUT_BATCH = 256 * 1024
@@ -475,10 +478,8 @@ class GzipDecoder(_CodecBase):
         self._output_chunk_size = output_chunk_size
         self._max_decompressed_size = max_decompressed_size
         self._collect_member_info = validated_collect_member_info
-        self._pending = _InputQueue()
+        self._pending = _InputQueue(_INFLATE_INPUT_WINDOW)
         self._inflate_input: bytes | None = None
-        self._inflate_window = _INFLATE_INPUT_WINDOW
-        self._next_member_window = _INFLATE_INPUT_WINDOW
         self._output = _OutputCursor()
         self._eof_after_output = False
         self._engine_output_held = False
@@ -621,6 +622,19 @@ class GzipDecoder(_CodecBase):
                 f"compressed offset {self._member_offset}: {error}"
             ) from error
 
+    def _shrink_inflate_window(self) -> None:
+        """Size the window from a member that left a large surplus in it."""
+        pending = self._pending
+        window = 2 * (self._consumed_size - self._member_offset + 8)
+        decayed = pending.window - (pending.window >> 2)
+        if window < decayed:
+            window = decayed
+        if window > _INFLATE_INPUT_WINDOW:
+            window = _INFLATE_INPUT_WINDOW
+        elif window < _INFLATE_INPUT_MIN_WINDOW:
+            window = _INFLATE_INPUT_MIN_WINDOW
+        pending.window = window
+
     def _complete_member(self, trailer: bytes) -> None:
         expected_crc, trailer_isize = struct.unpack("<II", trailer)
         actual_crc = self._member_crc & 0xFFFFFFFF
@@ -653,12 +667,6 @@ class GzipDecoder(_CodecBase):
                     trailer_isize=trailer_isize,
                 )
             )
-        window = 2 * (self._consumed_size - self._member_offset)
-        if window >= _INFLATE_INPUT_WINDOW:
-            window = _INFLATE_INPUT_WINDOW
-        elif window < _INFLATE_INPUT_MIN_WINDOW:
-            window = _INFLATE_INPUT_MIN_WINDOW
-        self._next_member_window = window
         self._member_count += 1
         self._header = None
         parser = self._header_parser
@@ -702,20 +710,14 @@ class GzipDecoder(_CodecBase):
                 self._engine = _engine.decompressobj(-_engine.MAX_WBITS)
                 self._member_crc = 0
                 self._member_size = 0
-                self._inflate_window = self._next_member_window
                 self._state = "body"
                 continue
 
             if self._state == "body":
                 if self._inflate_input is None:
                     if self._pending:
-                        window = self._inflate_window
-                        self._inflate_input = self._pending.pop_window(window)
-                        if window < _INFLATE_INPUT_WINDOW:
-                            self._inflate_window = min(
-                                _INFLATE_INPUT_WINDOW,
-                                window * _INFLATE_INPUT_WINDOW_GROWTH,
-                            )
+                        pending = self._pending
+                        self._inflate_input = pending.pop_window(pending.window)
                     elif self._engine_output_held:
                         # The last step filled its output bound with no input
                         # left over, so the engine may hold output it can
@@ -731,10 +733,21 @@ class GzipDecoder(_CodecBase):
                 if step.eof:
                     self._inflate_input = None
                     self._engine_output_held = False
-                    if step.retained:
-                        self._pending.prepend(step.retained)
+                    retained = step.retained
+                    if retained:
+                        self._pending.prepend(retained)
+                        if len(retained) > _INFLATE_INPUT_MIN_WINDOW:
+                            self._shrink_inflate_window()
                 else:
                     self._inflate_input = step.retained or None
+                    if (
+                        not step.retained
+                        and self._pending.window < _INFLATE_INPUT_WINDOW
+                    ):
+                        self._pending.window = min(
+                            _INFLATE_INPUT_WINDOW,
+                            self._pending.window * _INFLATE_INPUT_WINDOW_GROWTH,
+                        )
                     self._engine_output_held = (
                         not step.retained and len(step.output) >= output_limit
                     )
