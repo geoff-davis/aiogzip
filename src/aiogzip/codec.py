@@ -46,12 +46,14 @@ _INFLATE_INPUT_WINDOW = 256 * 1024
 # A member that ends inside its window costs work in proportion to the rest
 # of that window: the engine copies the unused input and the decoder checks
 # and requeues it. A stream of tiny members in full windows therefore cost
-# quadratic work. So a member that leaves a large surplus shrinks the window
-# for the members after it: to twice its own size, but by no more than a
-# quarter at a time, so that one small member among large ones does not
-# split the next large one. A member that outlasts its window grows it
-# again. The surplus handed to the engine then stays within a constant
-# factor of the members themselves.
+# quadratic work. So a member that leaves a surplus of more than twice its
+# own size shrinks the window for the members after it: to twice its size,
+# but by no more than a quarter at a time, so that one small member among
+# large ones does not split the next large one. A member with a smaller
+# surplus keeps the window at no less than twice its size, and a member
+# that outlasts its window grows it again. The surplus handed to the engine
+# then stays within a constant factor of the members themselves. A surplus
+# of 4 KiB or less is never examined: that is what 4 KiB feeds always cost.
 _INFLATE_INPUT_MIN_WINDOW = 4096
 _INFLATE_INPUT_WINDOW_GROWTH = 4
 _INFLATE_OUTPUT_MIN_BATCH = 64 * 1024
@@ -622,10 +624,17 @@ class GzipDecoder(_CodecBase):
                 f"compressed offset {self._member_offset}: {error}"
             ) from error
 
-    def _shrink_inflate_window(self) -> None:
-        """Size the window from a member that left a large surplus in it."""
+    def _adapt_inflate_window(self, surplus: int) -> None:
+        """Resize the window after a member that left a surplus in it."""
         pending = self._pending
         window = 2 * (self._consumed_size - self._member_offset + 8)
+        if surplus <= window:
+            # The surplus is in proportion to the member. Do not shrink, so
+            # that members of this size keep sharing whole input spans, and
+            # make sure the next one of this size fits.
+            if pending.window < window:
+                pending.window = min(window, _INFLATE_INPUT_WINDOW)
+            return
         decayed = pending.window - (pending.window >> 2)
         if window < decayed:
             window = decayed
@@ -735,9 +744,9 @@ class GzipDecoder(_CodecBase):
                     self._engine_output_held = False
                     retained = step.retained
                     if retained:
-                        self._pending.prepend(retained)
+                        self._pending.return_tail(retained)
                         if len(retained) > _INFLATE_INPUT_MIN_WINDOW:
-                            self._shrink_inflate_window()
+                            self._adapt_inflate_window(len(retained))
                 else:
                     self._inflate_input = step.retained or None
                     if (
