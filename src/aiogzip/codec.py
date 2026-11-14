@@ -49,7 +49,7 @@ _INFLATE_INPUT_WINDOW = 256 * 1024
 # quadratic work. So a member that leaves a surplus of more than twice its
 # own size shrinks the window for the members after it: to twice its size,
 # but by no more than a quarter at a time, so that one small member among
-# large ones does not split the next large one. A member with a smaller
+# large ones rarely splits the next large one. A member with a smaller
 # surplus keeps the window at no less than twice its size, and a member
 # that outlasts its window grows it again. The surplus handed to the engine
 # then stays within a constant factor of the members themselves. A surplus

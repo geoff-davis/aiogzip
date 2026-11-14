@@ -209,6 +209,8 @@ class _InputQueue:
         """Consume one non-empty contiguous window bounded by *max_bytes*."""
         if max_bytes <= 0:
             raise ValueError("window size must be positive")
+        # Only the window returned by this call may be rewound.
+        self._sliced = None
         spans = self._spans
         if not spans:
             return b""
@@ -269,6 +271,7 @@ class _InputQueue:
         """Release every queued span."""
         self._spans.clear()
         self._spare = None
+        self._sliced = None
         self._size = 0
 
 

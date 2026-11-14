@@ -273,6 +273,37 @@ def test_return_tail_rewinds_only_the_latest_slice():
     assert queue.take(20) == b"456789"
 
 
+def test_return_tail_follows_a_later_window_that_was_not_sliced():
+    queue = _InputQueue()
+    queue.append(b"0123456789")
+    assert queue.pop_window(3) == b"012"
+    queue.prepend(b"abc")
+    window = queue.pop_window(3)
+    assert window == b"abc"
+    queue.return_tail(window[1:])
+    assert queue.take(100) == b"bc3456789"
+
+
+def test_return_tail_rewinds_after_an_append():
+    queue = _InputQueue()
+    queue.append(b"0123456789")
+    window = queue.pop_window(4)
+    queue.append(b"more")
+    queue.return_tail(window[1:])
+    assert len(queue._spans) == 2
+    assert queue.take(100) == b"123456789more"
+
+
+def test_clear_releases_the_sliced_span():
+    queue = _InputQueue()
+    queue.append(b"0123456789")
+    queue.pop_window(4)
+    queue.clear()
+    assert queue._sliced is None
+    queue.return_tail(b"xy")
+    assert queue.take(100) == b"xy"
+
+
 def test_return_tail_never_rewinds_past_the_latest_slice():
     queue = _InputQueue()
     queue.append(b"0123456789")
