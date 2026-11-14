@@ -179,8 +179,10 @@ class AsyncGzipBinaryFile:
     """
     An asynchronous gzip file reader/writer for binary data.
 
-    This class provides async gzip compression/decompression for binary data,
-    making it a drop-in replacement for gzip.open() in binary mode.
+    This class provides async gzip compression/decompression for binary data.
+    Its API is modeled after gzip.open() in binary mode, but it is not a
+    drop-in replacement: methods that perform I/O are coroutines and must be
+    awaited.
 
     Features:
     - Full compatibility with gzip.open() file format

@@ -84,8 +84,10 @@ the consumer exits early. See the
 for backpressure, limits, cancellation, metadata, and lifecycle behavior.
 
 For synchronous custom transports, the public 2.0 codec performs gzip framing
-and validation without I/O or executor offload. Its API is frozen for 2.0 as
-of `2.0.0b1`:
+and validation without I/O or executor offload. It is part of the public API
+that the
+[stability policy](https://geoff-davis.github.io/aiogzip/latest/stability/)
+covers:
 
 ```python
 import aiogzip
