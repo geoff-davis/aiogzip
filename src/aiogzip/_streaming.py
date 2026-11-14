@@ -37,6 +37,11 @@ from .codec import (
 # items too, and checkpoint before asking the source for another item.
 _INLINE_SOURCE_BYTES_CHECKPOINT = 16 * 1024 * 1024
 _SOURCE_ITEMS_CHECKPOINT = 256
+# Compression of a small item runs inline, and its cost follows the input,
+# not the output: highly compressible input reaches no output checkpoint.
+# Bound the input compressed inline between turns to two offload thresholds,
+# so the longest stretch stays of the order of one inline feed.
+_INLINE_COMPRESS_BYTES_CHECKPOINT = 2 * _ZLIB_OFFLOAD_THRESHOLD
 
 
 def _decompress_chunks(
@@ -188,6 +193,7 @@ async def _compress_chunks_impl(
             if (
                 budget.source_items >= _SOURCE_ITEMS_CHECKPOINT
                 or budget.source_bytes >= _INLINE_SOURCE_BYTES_CHECKPOINT
+                or budget.inline_input_bytes >= _INLINE_COMPRESS_BYTES_CHECKPOINT
             ):
                 await _cooperative_checkpoint()
                 budget.reset()
@@ -205,6 +211,7 @@ async def _compress_chunks_impl(
             operation = encoder._feed_snapshot(snapshot)
             first_result = None
             if len(snapshot) < _ZLIB_OFFLOAD_THRESHOLD:
+                budget.inline_input_bytes += len(snapshot)
                 # Most small compression feeds complete without output. Avoid
                 # constructing an async driver for that already-finished work.
                 try:

@@ -32,13 +32,14 @@ class _StreamBudget:
 
     source_items: int = 0
     source_bytes: int = 0
+    inline_input_bytes: int = 0
     output_bytes: int = 0
     output_chunks: int = 0
     no_output_bytes: int = 0
     no_output_steps: int = 0
 
     def reset(self) -> None:
-        self.source_items = self.source_bytes = 0
+        self.source_items = self.source_bytes = self.inline_input_bytes = 0
         self.output_bytes = self.output_chunks = 0
         self.no_output_bytes = self.no_output_steps = 0
 
