@@ -51,7 +51,8 @@ must be installed — `uv run prek install` handles it via
 
 ## Test Coverage Best Practices
 
-- **Current coverage:** ~93% (1,300+ tests)
+- **Current coverage:** see the coverage badge in `README.md`; the figure
+  is not repeated here because it went stale.
 - **Target:** Maintain or improve coverage. CI enforces a floor via
   `--cov-fail-under=85`.
 - Always add tests for new features
@@ -92,12 +93,16 @@ silent test edit. `plans/README.md` indexes every plan and record.
 
 ### Test Organization
 
-Tests are organized by priority:
+Most test files are named for their subject. Edge-case tests are grouped
+in classes named for their priority, and a test file may define any of
+them; `tests/test_regressions.py` has all three:
 
 - `TestHighPriorityEdgeCases` - Security & data integrity
 - `TestMediumPriorityEdgeCases` - Robustness
 - `TestLowPriorityEdgeCases` - Defensive validations
-- `TestNewlineHandlingBugs` - Specific bug fixes
+
+`TestNewlineHandlingBugs` in `tests/test_text_io.py` holds the newline bug
+fixes.
 
 ## Performance Regression Checks
 
@@ -235,10 +240,10 @@ modernization of untouched modules; keep changes focused and reviewable.
 pytest --cov --cov-report=term-missing --cov-report=html
 
 # Run specific test class
-pytest tests/test_aiogzip.py::TestNewlineHandlingBugs -v
+pytest tests/test_text_io.py::TestNewlineHandlingBugs -v
 
-# Check typing with mypy (if configured)
-mypy src/aiogzip.py
+# Check typing with mypy, as CI does
+mypy src tests/typing/public_api_positive.py
 ```
 
 ## Commit Message Format
