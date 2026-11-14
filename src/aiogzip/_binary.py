@@ -179,39 +179,123 @@ class AsyncGzipBinaryFile:
     """
     An asynchronous gzip file reader/writer for binary data.
 
-    This class provides async gzip compression/decompression for binary data,
-    making it a drop-in replacement for gzip.open() in binary mode.
+    This class provides async gzip compression/decompression for binary data.
+    Its API is modeled after gzip.open() in binary mode, but it is not a
+    drop-in replacement: methods that perform I/O are coroutines and must be
+    awaited.
 
     Features:
+
     - Full compatibility with gzip.open() file format
     - Binary mode only (no text encoding/decoding)
     - Async context manager support
     - Configurable chunk size for performance tuning
 
-    Basic Usage:
-        # Write binary data
-        async with AsyncGzipBinaryFile("data.gz", "wb") as f:
-            await f.write(b"Hello, World!")
+    Basic usage:
 
-        # Read binary data
-        async with AsyncGzipBinaryFile("data.gz", "rb") as f:
-            data = await f.read()  # Returns bytes
+    ```python
+    # Write binary data
+    async with AsyncGzipBinaryFile("data.gz", "wb") as f:
+        await f.write(b"Hello, World!")
 
-        # Imperative lifecycle when `async with` is impractical
-        f = AsyncGzipBinaryFile("data.gz", "rb")
-        await f.open()
-        try:
-            data = await f.read()
-        finally:
-            await f.close()
+    # Read binary data
+    async with AsyncGzipBinaryFile("data.gz", "rb") as f:
+        data = await f.read()  # Returns bytes
+
+    # Imperative lifecycle when `async with` is impractical
+    f = AsyncGzipBinaryFile("data.gz", "rb")
+    await f.open()
+    try:
+        data = await f.read()
+    finally:
+        await f.close()
+    ```
 
     Interoperability with gzip.open():
-        # Files created by AsyncGzipBinaryFile can be read by gzip.open()
-        async with AsyncGzipBinaryFile("data.gz", "wb") as f:
-            await f.write(b"data")
 
-        with gzip.open("data.gz", "rb") as f:
-            data = f.read()  # Works perfectly!
+    ```python
+    # Files created by AsyncGzipBinaryFile can be read by gzip.open()
+    async with AsyncGzipBinaryFile("data.gz", "wb") as f:
+        await f.write(b"data")
+
+    with gzip.open("data.gz", "rb") as f:
+        data = f.read()
+    ```
+
+    Constructing a handle checks its arguments and opens nothing; the file
+    is opened by ``async with`` or ``await f.open()``. Pass every argument
+    after ``mode`` by keyword. Each parameter is described in full under
+    "Parameters" in the API reference.
+
+    Args:
+        filename: Path of the gzip file, as ``str``, ``bytes`` or
+            ``os.PathLike``, or ``None`` when ``fileobj`` is given. With a
+            ``fileobj`` the path is not opened; it supplies ``name`` and, on
+            a writer, the name stored in the gzip header. Raises
+            ``ValueError`` if it is the empty string or if it and
+            ``fileobj`` are both ``None``, and ``TypeError`` for any other
+            type.
+        mode: One of ``r``, ``w``, ``x`` or ``a``, with an optional ``b``.
+            The default is ``"rb"``. A ``t`` raises ``ValueError``; use
+            ``open()`` or ``AsyncGzipTextFile`` for text. A ``+`` is
+            accepted but does not make the handle both readable and
+            writable. Raises ``TypeError`` if it is not a string and
+            ``ValueError`` if it is not a valid mode.
+        chunk_size: Reading: the number of compressed bytes requested from
+            the file or ``fileobj`` in each read. Writing: the batch size of
+            ``writelines()``. From 1 to 134217728 (128 MiB); the default is
+            262144 (256 KiB). It is not a memory limit. Raises ``TypeError``
+            if it is not an ``int`` and ``ValueError`` if it is out of
+            range.
+        compresslevel: Writing only. The compression level, from ``-1`` to
+            ``9``; the default is ``6``. Raises ``TypeError`` if it is not
+            an ``int`` and ``ValueError`` if it is out of range. A reader
+            ignores it and does not check it.
+        mtime: Writing only. The timestamp stored in the gzip header, in
+            seconds since the epoch, from ``0`` to ``4294967295``. A
+            ``float`` is truncated to an integer before the range check.
+            The default, ``None``, stores the current time when the handle
+            is opened. Raises ``TypeError`` if it is not an ``int`` or
+            ``float`` and ``ValueError`` if it is negative, infinite, NaN or
+            too large.
+        original_filename: Writing only. The name stored in the gzip header,
+            as ``str`` or ``bytes``. The default, ``None``, takes the name
+            from ``filename``; ``""`` stores no name. Only the final path
+            component is stored, with a trailing ``.gz`` removed. Raises
+            ``TypeError`` if it is not ``str`` or ``bytes`` and
+            ``ValueError`` if it contains a NUL.
+        fileobj: An already-open asynchronous file object to use in place
+            of a path. A reader needs ``async read(size)`` and a writer
+            needs ``async write(data)``. The default is ``None``.
+        closefd: Whether closing the handle also closes ``fileobj``.
+            ``True`` closes it; ``None`` (the default) and ``False`` leave
+            it open. It has no effect on a file that the handle opened from
+            a path, which is always closed with the handle. Raises
+            ``TypeError`` for any value other than ``True``, ``False`` or
+            ``None``.
+        max_decompressed_size: Reading only. The largest number of
+            decompressed bytes the reader will produce in one pass through
+            the stream; crossing it raises ``OSError`` from the read. A
+            positive integer; the default, ``None``, sets no limit. Raises
+            ``TypeError`` if it is not an ``int`` or ``None`` and
+            ``ValueError`` if it is below 1.
+        max_rewind_cache_size: Reading only, when the source cannot seek.
+            The largest number of compressed bytes kept so that the reader
+            can ``seek()`` backward. A positive integer; the default is
+            134217728 (128 MiB), and ``None`` sets no limit. Past the limit
+            the cache is discarded and a backward ``seek()`` raises
+            ``OSError``. Raises ``TypeError`` if it is not an ``int`` or
+            ``None`` and ``ValueError`` if it is below 1.
+        strict_size: Writing only. With ``True``, a write that would take
+            the gzip member past 4294967295 bytes raises ``OSError``. With
+            ``False`` (the default), the size stored in the trailer wraps.
+            Raises ``TypeError`` for any value other than ``True`` or
+            ``False``.
+        fast_compress: Writing only. With ``True``, the writer compresses
+            with zlib-ng if the ``aiogzip[fast]`` extra is installed and
+            ``AIOGZIP_ENGINE=stdlib`` has not disabled it; otherwise it warns
+            (``UserWarning``) and uses zlib. The default is ``False``. Raises ``TypeError`` for any value other than
+            ``True`` or ``False``.
     """
 
     __slots__ = (
