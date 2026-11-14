@@ -52,8 +52,9 @@ Please include the following information in your report:
 A gzip stream from a source you do not control can be a decompression bomb,
 can hold any number of members, and can carry any header metadata. aiogzip
 has the controls described below, but **the decompressed-size limit is off
-by default**. Two limits are always on: the rewind cache is capped at
-128 MiB by default, and a member header is limited to 128 MiB. This section
+by default**. Two other limits apply without any setting: the rewind cache
+is capped at 128 MiB by default (`max_rewind_cache_size=None` removes the
+cap), and a member header is limited to a fixed 128 MiB. This section
 applies to aiogzip 2.x.
 
 The maintained recipe is
@@ -228,9 +229,10 @@ resource limit.
 
 aiogzip sets no timeouts. A slow or stalled source keeps a read waiting, so
 wrap reads from untrusted network sources in `asyncio.timeout()`. The
-timeout cancels the waiting task; it is not a hard deadline. A read that
-has already started in the underlying file object or in a worker thread
-runs until it settles, and the handle waits for it. See
+timeout cancels the waiting task; it is not always a hard deadline. A read
+from a file opened by path, or any other read that runs in a worker thread,
+runs until it settles once started, and the handle waits for it. A custom
+async `fileobj` is cancelled cooperatively and can stop at once. See
 [Cancellation](https://geoff-davis.github.io/aiogzip/latest/recipes/#cancellation).
 
 ### Writing
