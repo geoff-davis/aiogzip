@@ -216,8 +216,9 @@ opened. Pass a fixed value such as `mtime=0` for
 [reproducible gzip output](recipes.md#reproducible-gzip-output).
 
 Raises `TypeError` if the value is not an `int` or `float` (a `bool` is
-rejected). Raises `ValueError` if it is negative, above 2³² − 1, infinite or
-NaN.
+rejected). Raises `ValueError` if it is negative, infinite or NaN, or if
+its truncated value is above 2³² − 1 (so `4294967295.9` is accepted as
+`4294967295`).
 
 A reader checks the value and then ignores it. The `mtime` *property* of a
 reader reports the timestamp read from the stream; see
