@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Clearer errors for three common mistakes. Exception types are unchanged.
+  (#199)
+  - A synchronous file object passed as `fileobj` is reported as such:
+    `fileobj.read() returned bytes, not an awaitable; aiogzip needs an async
+    file object. Wrap a sync file with aiofiles.threadpool.wrap(f), or use
+    gzip.open().` It gave `'bytes' object can't be awaited` on the first
+    read, and a bare `'int' object can't be awaited` when opening for
+    writing.
+  - A `BadGzipFile` from the file reader, `inspect()` or `verify()` names the
+    file in a note (`while reading 'shard-0042.gz'`), which Python prints
+    under the traceback and exposes as `__notes__`. The message is not
+    rewritten.
+  - Input that is not gzip shows its first two bytes, as the standard
+    library does, and names the format for Zstandard, bzip2, xz and zip:
+    `Not a gzipped file (b'(\xb5'): looks like Zstandard`.
+  - A file object passed as the filename gets a pointer to `fileobj=`.
+- `repr()` of `GzipEncoder` and `GzipDecoder` shows their progress, and
+  `repr()` of a file that was never opened says `unopened` where it said
+  `closed=False`.
+
 ## [2.0.2] - 2026-11-14
 
 ### Fixed

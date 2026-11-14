@@ -19,6 +19,26 @@ from ._common import (
 _RESERVED_FLAGS = 0xE0
 
 
+# The first two bytes of formats that are often mistaken for gzip. Two bytes
+# are all a fragmented header has when the magic number is checked, so the
+# hint is the same however the input is split.
+_MAGIC_HINTS = {
+    b"\x28\xb5": "Zstandard",
+    b"BZ": "bzip2",
+    b"\xfd7": "xz",
+    b"PK": "zip",
+}
+
+
+def _not_gzip(magic: bytes) -> gzip.BadGzipFile:
+    """Build the error for a member that does not start with 1f 8b."""
+    message = f"Not a gzipped file ({magic!r})"
+    hint = _MAGIC_HINTS.get(magic)
+    if hint is not None:
+        message += f": looks like {hint}"
+    return gzip.BadGzipFile(message)
+
+
 @dataclass(frozen=True, slots=True)
 class _ParsedHeader:
     """Metadata and encoded size of one complete gzip member header."""
@@ -153,7 +173,7 @@ class _GzipHeaderParser:
         if size < target:
             return False
         if size == 2 and self._fixed != b"\x1f\x8b":
-            raise gzip.BadGzipFile("Not a gzipped file")
+            raise _not_gzip(bytes(self._fixed))
         if size == 3 and self._fixed[2] != GZIP_METHOD_DEFLATE:
             raise gzip.BadGzipFile(f"Unknown compression method {self._fixed[2]}")
         if size == 4:
@@ -271,7 +291,7 @@ class _GzipHeaderParser:
             # decoder and releases its queue and accounting together.
             fixed = pending.take_view(10)
             if fixed[0] != 0x1F or fixed[1] != 0x8B:
-                raise gzip.BadGzipFile("Not a gzipped file")
+                raise _not_gzip(bytes(fixed[:2]))
             if fixed[2] != GZIP_METHOD_DEFLATE:
                 raise gzip.BadGzipFile(f"Unknown compression method {fixed[2]}")
             flags = fixed[3]

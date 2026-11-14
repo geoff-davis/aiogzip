@@ -1,6 +1,7 @@
 """Gzip stream inspection result types and private scanner internals."""
 
 import asyncio
+import gzip
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple, Union, cast
 
@@ -17,6 +18,8 @@ from ._common import (
     WithAsyncRead,
     WithAsyncReadWrite,
     _Filename,
+    _note_source,
+    _sync_fileobj_message,
     _validate_chunk_size,
     _validate_filename,
     _validate_optional_bool,
@@ -125,7 +128,10 @@ async def _scan_gzip(
             except asyncio.CancelledError:
                 raise
             except Exception as error:
-                raise OSError(f"Error reading from file: {error}") from error
+                sync_message = _sync_fileobj_message(error, "read")
+                raise OSError(
+                    sync_message or f"Error reading from file: {error}"
+                ) from error
             if isinstance(chunk, (bytearray, memoryview)):
                 chunk = bytes(chunk)
             if not isinstance(chunk, bytes):
@@ -154,6 +160,11 @@ async def _scan_gzip(
         )
     except BaseException as error:
         failure = error
+        if isinstance(error, gzip.BadGzipFile):
+            _note_source(
+                error,
+                filename if filename is not None else getattr(fileobj, "name", None),
+            )
         raise
     finally:
         if decoder is not None:

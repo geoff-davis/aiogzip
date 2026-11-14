@@ -7,6 +7,7 @@ import aiofiles
 import aiofiles.threadpool
 
 from ._codec_async import _settle_before_cancel
+from ._common import _sync_fileobj_message
 from ._source_io import _is_native_source
 
 _STANDARD_OPEN = aiofiles.open
@@ -128,7 +129,13 @@ async def _write_initial_header(file: Any, data: bytes) -> None:
     """Finish the opening header before publication, including short writes."""
     offset = 0
     while offset < len(data):
-        written = await _initial_call(file, "write", data[offset:])
+        try:
+            written = await _initial_call(file, "write", data[offset:])
+        except TypeError as error:
+            sync_message = _sync_fileobj_message(error, "write")
+            if sync_message is None:
+                raise
+            raise TypeError(sync_message) from error
         if not isinstance(written, int) or isinstance(written, bool):
             raise OSError(
                 f"underlying file write() returned an invalid byte count ({written!r})"

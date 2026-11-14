@@ -42,7 +42,9 @@ from ._common import (
     _Filename,
     _format_file_repr,
     _normalize_mtime,
+    _note_source,
     _parse_mode_tokens,
+    _sync_fileobj_message,
     _validate_bool,
     _validate_chunk_size,
     _validate_compresslevel,
@@ -1479,11 +1481,11 @@ class AsyncGzipBinaryFile:
             except gzip.BadGzipFile as error:
                 self._retain_validation_pieces(pieces)
                 self._poison_read(decoder, validation_failed=True)
-                raise gzip.BadGzipFile(_decompression_error_message(error)) from error
+                raise self._bad_gzip(_decompression_error_message(error)) from error
             except _engine.ZLIB_ERRORS as error:
                 self._retain_validation_pieces(pieces)
                 self._poison_read(decoder, validation_failed=True)
-                raise gzip.BadGzipFile(
+                raise self._bad_gzip(
                     f"Error finalizing gzip decompression: {error}"
                 ) from error
             except OSError:
@@ -1520,13 +1522,23 @@ class AsyncGzipBinaryFile:
             # those pieces for the explicit validation-salvage call sequence.
             self._retain_validation_pieces(feed_pieces)
             self._poison_read(decoder, validation_failed=True)
-            raise gzip.BadGzipFile(_decompression_error_message(error)) from error
+            raise self._bad_gzip(_decompression_error_message(error)) from error
         except OSError:
             self._poison_read(decoder)
             raise
         except Exception as error:
             self._poison_read(decoder)
             raise OSError(f"Unexpected error during decompression: {error}") from error
+
+    def _bad_gzip(self, message: str) -> gzip.BadGzipFile:
+        """Build a corrupt-data error that names this file in a note."""
+        error = gzip.BadGzipFile(message)
+        try:
+            name = self.name
+        except Exception:
+            name = None
+        _note_source(error, name)
+        return error
 
     def _sync_decoder_mtime(self, decoder: GzipDecoder) -> None:
         """Observe the most recently completed header from ``decoder``."""
@@ -1945,7 +1957,8 @@ class AsyncGzipBinaryFile:
         except OSError:
             raise
         except Exception as e:
-            raise OSError(f"Error reading from file: {e}") from e
+            sync_message = _sync_fileobj_message(e, "read")
+            raise OSError(sync_message or f"Error reading from file: {e}") from e
 
         # Cache before the abort check: the source has consumed this chunk, so
         # a reader left open by a failed abort close must replay it on rewind.
