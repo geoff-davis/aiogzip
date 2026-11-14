@@ -34,12 +34,24 @@ class _Span:
 class _InputQueue:
     """A queue of immutable spans with O(1) length and head removal."""
 
-    __slots__ = ("_size", "_spans", "_spare", "window")
+    __slots__ = (
+        "_size",
+        "_sliced",
+        "_sliced_size",
+        "_sliced_start",
+        "_spans",
+        "_spare",
+        "window",
+    )
 
     def __init__(self, window: int = 0) -> None:
         self._spans: deque[_Span] = deque()
         self._size = 0
         self._spare: _Span | None = None
+        # The span pop_window() last sliced, and its start after the slice.
+        self._sliced: _Span | None = None
+        self._sliced_start = 0
+        self._sliced_size = 0
         # The owner's current pop_window() bound. It is kept here because
         # the decoder is at CPython's limit of 30 inline instance attributes;
         # one more would slow every attribute access on the decode path.
@@ -73,6 +85,8 @@ class _InputQueue:
         return spare
 
     def _release_span(self, span: _Span) -> None:
+        if span is self._sliced:
+            self._sliced = None
         if self._spare is None:
             span.data = b""
             span.start = 0
@@ -195,9 +209,45 @@ class _InputQueue:
         """Consume one non-empty contiguous window bounded by *max_bytes*."""
         if max_bytes <= 0:
             raise ValueError("window size must be positive")
-        if self._size <= max_bytes and len(self._spans) == 1:
-            return self._take_head(self._size)
+        spans = self._spans
+        if not spans:
+            return b""
+        head = spans[0]
+        available = head.end - head.start
+        if available > max_bytes:
+            # The usual case behind small members: a slice of the head span,
+            # whose unused tail return_tail() can put back without a copy.
+            start = head.start
+            head.start = start + max_bytes
+            self._size -= max_bytes
+            self._sliced = head
+            self._sliced_start = head.start
+            self._sliced_size = max_bytes
+            return head.data[start : start + max_bytes]
+        if len(spans) == 1:
+            return self._take_head(available)
         return self.take(max_bytes)
+
+    def return_tail(self, tail: bytes) -> None:
+        """Put back the unused tail of the window pop_window() last returned.
+
+        If that window was sliced from the span still at the head, and
+        nothing has been consumed since, the span is rewound; otherwise the
+        tail is prepended as its own span.
+        """
+        head = self._sliced
+        if (
+            head is not None
+            and self._spans
+            and self._spans[0] is head
+            and head.start == self._sliced_start
+            and len(tail) <= self._sliced_size
+        ):
+            self._sliced = None
+            head.start -= len(tail)
+            self._size += len(tail)
+            return
+        self.prepend(tail)
 
     def consume_leading_zeroes(self) -> int:
         """Consume leading NUL padding without copying complete spans."""
