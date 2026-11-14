@@ -666,6 +666,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#review-2026-11-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review, 2026-11-14
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -771,6 +782,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#review-2026-11-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review, 2026-11-14
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -834,6 +856,19 @@ engine for decompression and/or compression.</p>
 <li>the engine-agnostic consumption-accounting rewrite lands (2.0 sans-IO
   extraction), removing the main implementation hazard.</li>
 </ul>
+<h2 id="review-2026-11-14">Review, 2026-11-14</h2>
+<p>The second condition is met, and the decision stands.</p>
+<p>The rewrite shipped in 2.0.0a1. The decoder takes the consumed byte count
+and the retained input from one function, <code>_engine.inflate_step</code>, which
+reconciles the engine's leftover fields against the input span it was given.
+It no longer needs post-EOF bytes to appear in both <code>unused_data</code> and
+<code>unconsumed_tail</code>. <code>tests/test_codec_engine_accounting.py</code> checks an engine
+that reports leftovers in only one field, split across both, duplicated or
+overlapping. Those cases use stand-in engines; isal itself has not been run
+against the 2.0 decoder.</p>
+<p>Removing the hazard makes adoption possible, not worthwhile. Nothing was
+re-measured for this review: the ARM result and the level 0–3 compression
+cap are taken as unchanged, and the first condition is still open.</p>
 
 
 
