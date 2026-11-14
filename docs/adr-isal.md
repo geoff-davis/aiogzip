@@ -46,3 +46,20 @@ Not adopted. zlib-ng remains the only optional engine.
   realistic-entropy data (not extreme-ratio fixtures), or
 - the engine-agnostic consumption-accounting rewrite lands (2.0 sans-IO
   extraction), removing the main implementation hazard.
+
+## Review, 2026-11-14
+
+The second condition is met, and the decision stands.
+
+The rewrite shipped in 2.0.0a1. The decoder takes the consumed byte count
+and the retained input from one function, `_engine.inflate_step`, which
+reconciles the engine's leftover fields against the input span it was given.
+It no longer needs post-EOF bytes to appear in both `unused_data` and
+`unconsumed_tail`. `tests/test_codec_engine_accounting.py` checks an engine
+that reports leftovers in only one field, split across both, duplicated or
+overlapping. Those cases use stand-in engines; isal itself has not been run
+against the 2.0 decoder.
+
+Removing the hazard makes adoption possible, not worthwhile. Nothing was
+re-measured for this review: the ARM result and the level 0–3 compression
+cap are taken as unchanged, and the first condition is still open.

@@ -22,7 +22,7 @@ def test_source_failure_trace_matches_exact_bc2_exceptions(tmp_path, engine):
             "warn_default_encoding",
             "-W",
             "error::EncodingWarning",
-            str(root / "scripts/capture_b2_source_failure_trace.py"),
+            str(root / "scripts/capture_source_failure_trace.py"),
             "--source-root",
             str(root),
             "--engine",

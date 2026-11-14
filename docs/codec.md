@@ -5,7 +5,9 @@ without taking ownership of files, sockets, an event loop, or any other
 transport. They are synchronous state machines: callers provide immutable
 `bytes`, consume bounded output chunks, and decide where those chunks go.
 
-The public codec API has been frozen for the 2.0 line since `2.0.0b1`.
+The codec is part of aiogzip's public API and has the same compatibility
+commitment as the asyncio API: an incompatible change is made only in a new
+major release.
 Ordinary `asyncio` callers can continue using `open()`, `read()`, `write()`,
 `compress_chunks()`, and `decompress_chunks()` without changing their code.
 See the [stability policy](stability.md) for guarantees and non-guarantees.

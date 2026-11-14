@@ -181,18 +181,34 @@ def AsyncGzipFile(
     """
     Factory function that returns the appropriate AsyncGzip class based on mode.
 
-    This provides backward compatibility with the original AsyncGzipFile interface
-    while using the new separated binary and text file classes.
+    ``open()`` is the recommended entry point and has identical behavior.
+    ``AsyncGzipFile`` is the older name, kept for existing code.
+
+    The call checks its arguments and opens nothing; the file is opened by
+    ``async with`` or ``await f.open()``. Each parameter is described in
+    full under "Parameters" in the API reference.
 
     Args:
-        filename: Path to the file
-        mode: File mode; any of 'r', 'w', 'a', 'x' with an optional 'b'
-            (binary, the default) or 't' (text) suffix
-        **kwargs: Additional arguments passed to the appropriate class
+        filename: Path of the gzip file, as ``str``, ``bytes`` or
+            ``os.PathLike``, or ``None`` when ``fileobj`` is given.
+        mode: One of ``r``, ``w``, ``x`` or ``a``, with an optional ``b``
+            (binary) or ``t`` (text). The default is ``"rb"``, and a mode
+            with neither ``b`` nor ``t`` is binary. Raises ``TypeError`` if
+            it is not a string and ``ValueError`` if it is not a valid mode.
+        **kwargs: Passed by keyword to the class: ``chunk_size``,
+            ``compresslevel``, ``mtime``, ``original_filename``,
+            ``fileobj``, ``closefd``, ``max_decompressed_size``,
+            ``max_rewind_cache_size``, ``strict_size`` and
+            ``fast_compress``, and in a text mode ``encoding``, ``errors``
+            and ``newline``. Each has the meaning, default and exceptions
+            documented on ``AsyncGzipBinaryFile`` and ``AsyncGzipTextFile``.
+            In a binary mode, ``encoding``, ``errors`` or ``newline`` other
+            than ``None`` raises ``ValueError``. An unknown keyword raises
+            ``TypeError``.
 
     Returns:
-        AsyncGzipBinaryFile for binary modes ('rb', 'wb', 'ab', 'xb')
-        AsyncGzipTextFile for text modes ('rt', 'wt', 'at', 'xt')
+        An ``AsyncGzipTextFile`` if ``mode`` contains ``t``, otherwise an
+            ``AsyncGzipBinaryFile``.
     """
     if not isinstance(mode, str):
         raise TypeError("mode must be a string")
@@ -266,6 +282,32 @@ def open(
 
     This is the recommended public entry point. ``AsyncGzipFile`` remains
     available and has identical behavior.
+
+    The call checks its arguments and opens nothing; the file is opened by
+    ``async with`` or ``await f.open()``. Each parameter is described in
+    full under "Parameters" in the API reference.
+
+    Args:
+        filename: Path of the gzip file, as ``str``, ``bytes`` or
+            ``os.PathLike``, or ``None`` when ``fileobj`` is given.
+        mode: One of ``r``, ``w``, ``x`` or ``a``, with an optional ``b``
+            (binary) or ``t`` (text). The default is ``"rb"``, and a mode
+            with neither ``b`` nor ``t`` is binary. Raises ``TypeError`` if
+            it is not a string and ``ValueError`` if it is not a valid mode.
+        **kwargs: Passed by keyword to the class: ``chunk_size``,
+            ``compresslevel``, ``mtime``, ``original_filename``,
+            ``fileobj``, ``closefd``, ``max_decompressed_size``,
+            ``max_rewind_cache_size``, ``strict_size`` and
+            ``fast_compress``, and in a text mode ``encoding``, ``errors``
+            and ``newline``. Each has the meaning, default and exceptions
+            documented on ``AsyncGzipBinaryFile`` and ``AsyncGzipTextFile``.
+            In a binary mode, ``encoding``, ``errors`` or ``newline`` other
+            than ``None`` raises ``ValueError``. An unknown keyword raises
+            ``TypeError``.
+
+    Returns:
+        An ``AsyncGzipTextFile`` if ``mode`` contains ``t``, otherwise an
+            ``AsyncGzipBinaryFile``.
     """
     return AsyncGzipFile(filename, mode, **kwargs)
 
@@ -279,7 +321,32 @@ async def read(
     max_decompressed_size: Optional[int] = None,
     max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
 ) -> bytes:
-    """Read and decompress an entire gzip stream into memory."""
+    """Read and decompress an entire gzip stream into memory.
+
+    The keyword parameters have the meaning, default, range and exceptions
+    documented on ``AsyncGzipBinaryFile``. An invalid argument raises when
+    the call is awaited.
+
+    Args:
+        filename: Path of the gzip file, or ``None`` when ``fileobj`` is
+            given.
+        chunk_size: The number of compressed bytes requested from the file
+            or ``fileobj`` in each read, from 1 to 134217728 (128 MiB). The
+            default is 262144 (256 KiB). It does not limit memory.
+        fileobj: An already-open asynchronous file object, with an
+            ``async read(size)`` method, to read in place of a path.
+        closefd: ``True`` closes ``fileobj`` when the read ends; ``None``
+            (the default) and ``False`` leave it open.
+        max_decompressed_size: The largest number of decompressed bytes to
+            accept; a larger stream raises ``OSError``. The default,
+            ``None``, sets no limit. Set it for untrusted input.
+        max_rewind_cache_size: The largest number of compressed bytes kept
+            for rewinding a source that cannot seek. The default is
+            134217728 (128 MiB), and ``None`` sets no limit.
+
+    Returns:
+        The whole decompressed payload.
+    """
     async with open(
         filename,
         "rb",
@@ -305,7 +372,36 @@ async def write(
     strict_size: bool = False,
     fast_compress: bool = False,
 ) -> None:
-    """Compress and write an entire bytes-like payload to a gzip stream."""
+    """Compress and write an entire bytes-like payload to a gzip stream.
+
+    The keyword parameters have the meaning, default, range and exceptions
+    documented on ``AsyncGzipBinaryFile``. An invalid argument raises when
+    the call is awaited.
+
+    Args:
+        filename: Path of the gzip file to create or truncate, or ``None``
+            when ``fileobj`` is given.
+        data: The payload, as ``bytes``, ``bytearray`` or ``memoryview``.
+        chunk_size: Checked as for the file classes: from 1 to 134217728
+            (128 MiB). The default is 262144 (256 KiB).
+        compresslevel: The compression level, from ``-1`` to ``9``. The
+            default is ``6``.
+        mtime: The timestamp stored in the gzip header, from ``0`` to
+            ``4294967295``. The default, ``None``, stores the current time;
+            pass ``0`` for reproducible output.
+        original_filename: The name stored in the gzip header. The default,
+            ``None``, takes it from ``filename``; ``""`` stores no name.
+        fileobj: An already-open asynchronous file object, with an
+            ``async write(data)`` method, to write to in place of a path.
+        closefd: ``True`` closes ``fileobj`` when the write ends; ``None``
+            (the default) and ``False`` leave it open.
+        strict_size: With ``True``, a payload larger than 4294967295 bytes
+            raises ``OSError``. The default is ``False``.
+        fast_compress: With ``True``, compress with zlib-ng if the
+            ``aiogzip[fast]`` extra is installed and
+            ``AIOGZIP_ENGINE=stdlib`` has not disabled it. The default is
+            ``False``.
+    """
     async with open(
         filename,
         "wb",

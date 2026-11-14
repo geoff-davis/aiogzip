@@ -22,7 +22,7 @@ def test_open_trace_matches_exact_bc3_exceptions(tmp_path, engine):
             "warn_default_encoding",
             "-W",
             "error::EncodingWarning",
-            str(root / "scripts/capture_b2_open_trace.py"),
+            str(root / "scripts/capture_open_trace.py"),
             "--source-root",
             str(root),
             "--engine",

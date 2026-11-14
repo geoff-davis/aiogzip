@@ -1,7 +1,7 @@
 """WP7: pending-origin lifecycle and exact rollback state for the text origin.
 
 Cookie replay through every producer is covered by the BC6 suite in
-test_wp5_longline_preflight.py; these tests assert the checkpoint objects
+test_longline_replay.py; these tests assert the checkpoint objects
 themselves.
 """
 
