@@ -27,6 +27,14 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- The API reference has a "Parameters" section that documents every
+  parameter of `open()`, `AsyncGzipFile`, `AsyncGzipBinaryFile` and
+  `AsyncGzipTextFile` in one place: its meaning, default and valid range,
+  whether it is used for reading or writing, and the exception raised for an
+  invalid value. It covers `encoding`, `errors` and `newline`, which the page
+  did not mention, and lists the parameters of `read()`, `write()`,
+  `inspect()` and `verify()`. A test keeps the section in step with the
+  constructor signatures. (#217)
 - The docs no longer overstate compatibility with `gzip`. The home page says
   what is matched (the file format and the familiar file operations, with
   I/O methods awaited) and links the migration guide for the differences. The
