@@ -211,10 +211,42 @@ class TestCorruptStreamOrdering:
         assert "max_decompressed_size" in message
         assert published == LIMIT
 
+    def test_one_small_member_moves_a_boundary_in_the_next_member(self):
+        # One empty member takes a quarter off the window. Stored blocks
+        # that end exactly at that 192 KiB boundary put the invalid block
+        # type in the next window, behind the size limit.
+        window = FULL - FULL // 4
+        sizes = [65535, 65535, window - 2 * 65535 - 15]
+        body = b"".join(
+            b"\x00"
+            + size.to_bytes(2, "little")
+            + (size ^ 0xFFFF).to_bytes(2, "little")
+            + b"a" * size
+            for size in sizes
+        )
+        header = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff"
+        corrupt = header + body + b"\x06"
+        limit = sum(sizes) - 1
+        _, first, _ = _outcome(corrupt, len(corrupt), max_decompressed_size=limit)
+        assert first is gzip.BadGzipFile
+        blob = gzip.compress(b"", mtime=0) + corrupt
+        _, kind, message = _outcome(blob, len(blob), max_decompressed_size=limit)
+        assert kind is OSError
+        assert "max_decompressed_size" in message
+
+    def test_discard_releases_the_sliced_input(self):
+        member = gzip.compress(b"", mtime=0)
+        decoder = GzipDecoder()
+        operation = decoder.feed(member * 60_000)
+        next(iter(operation), None)
+        decoder.discard()
+        assert decoder._pending._sliced is None
+        assert not decoder._pending
+
     @pytest.mark.parametrize("lead", [0, 1])
-    def test_corruption_in_a_full_window_is_found_as_before(self, lead):
+    def test_corruption_within_the_window_is_found_as_before(self, lead):
         # The first member has the full window, and one small member before
-        # it takes only a quarter off: the corruption is in the same window.
+        # it leaves 192 KiB: this corruption is still in the first window.
         blob = _corrupt_after_stored_block(lead)
         _, kind, _ = _outcome(blob, len(blob), max_decompressed_size=LIMIT)
         assert kind is gzip.BadGzipFile
