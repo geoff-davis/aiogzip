@@ -398,7 +398,9 @@ async def write(
         strict_size: With ``True``, a payload larger than 4294967295 bytes
             raises ``OSError``. The default is ``False``.
         fast_compress: With ``True``, compress with zlib-ng if the
-            ``aiogzip[fast]`` extra is installed. The default is ``False``.
+            ``aiogzip[fast]`` extra is installed and
+            ``AIOGZIP_ENGINE=stdlib`` has not disabled it. The default is
+            ``False``.
     """
     async with open(
         filename,

@@ -292,9 +292,9 @@ class AsyncGzipBinaryFile:
             Raises ``TypeError`` for any value other than ``True`` or
             ``False``.
         fast_compress: Writing only. With ``True``, the writer compresses
-            with zlib-ng if the ``aiogzip[fast]`` extra is installed;
-            otherwise it warns (``UserWarning``) and uses zlib. The default
-            is ``False``. Raises ``TypeError`` for any value other than
+            with zlib-ng if the ``aiogzip[fast]`` extra is installed and
+            ``AIOGZIP_ENGINE=stdlib`` has not disabled it; otherwise it warns
+            (``UserWarning``) and uses zlib. The default is ``False``. Raises ``TypeError`` for any value other than
             ``True`` or ``False``.
     """
 
