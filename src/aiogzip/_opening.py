@@ -7,7 +7,7 @@ import aiofiles
 import aiofiles.threadpool
 
 from ._codec_async import _settle_before_cancel
-from ._common import _sync_fileobj_message
+from ._common import _explain_sync_result
 from ._source_io import _is_native_source
 
 _STANDARD_OPEN = aiofiles.open
@@ -68,7 +68,13 @@ async def _initial_call(file: Any, method: str, *args: Any) -> Any:
         return await _settle_before_cancel(_submit_native(file, method, *args))
     result = getattr(file, method)(*args)
     if method == "write" or hasattr(result, "__await__"):
-        return await result
+        try:
+            return await result
+        except TypeError as error:
+            # The same exception with a clearer message: a new one would add
+            # a cause that this failure never had.
+            _explain_sync_result(error, result, method)
+            raise
     return result
 
 
@@ -129,15 +135,7 @@ async def _write_initial_header(file: Any, data: bytes) -> None:
     """Finish the opening header before publication, including short writes."""
     offset = 0
     while offset < len(data):
-        try:
-            written = await _initial_call(file, "write", data[offset:])
-        except TypeError as error:
-            sync_message = _sync_fileobj_message(error, "write")
-            if sync_message is not None:
-                # The same exception with a clearer message: a new one would
-                # add a cause that this failure never had.
-                error.args = (sync_message,)
-            raise
+        written = await _initial_call(file, "write", data[offset:])
         if not isinstance(written, int) or isinstance(written, bool):
             raise OSError(
                 f"underlying file write() returned an invalid byte count ({written!r})"

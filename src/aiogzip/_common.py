@@ -134,36 +134,64 @@ _NOT_AWAITABLE = re.compile(
 )
 
 
-def _sync_fileobj_message(error: BaseException, method: str) -> Optional[str]:
-    """Explain an await of a synchronous file object's result, if that is it.
+class _SyncResultMessage(str):
+    """Marks the message that ``_explain_sync_result`` put on a TypeError."""
+
+    __slots__ = ()
+
+
+def _explain_sync_result(error: TypeError, result: object, method: str) -> None:
+    """Clarify ``error`` if awaiting a synchronous method's result caused it.
 
     ``isinstance(io.BytesIO(), WithAsyncRead)`` is true, because a runtime
     protocol checks names only, so a synchronous file object is found out
-    when its first result is awaited. This runs in the handler that already
-    holds that ``TypeError``; the read path makes no extra check.
+    when its first result is awaited. The caller passes the object it
+    awaited. The message is replaced only when all of this holds, so that a
+    failure inside a real awaitable is never relabelled:
+
+    - ``result`` has no ``__await__``, so it is not a coroutine, a Future or
+      any other awaitable object;
+    - the innermost traceback frame is aiogzip's own ``await``, which rules
+      out a generator-based coroutine (it has no ``__await__`` either) that
+      failed in its own frame;
+    - the text is the interpreter's await-conversion error.
+
+    The exception keeps its identity, traceback, cause and context. This
+    runs only in a handler that already holds the error.
     """
-    if not isinstance(error, TypeError):
-        return None
-    # The text alone does not say where the await failed: an async read()
-    # that awaits a non-awaitable internally raises the same error. Rewrite
-    # only when the innermost frame is aiogzip's own await of the result.
-    traceback = error.__traceback__
-    if traceback is None:
-        return None
-    while traceback.tb_next is not None:
-        traceback = traceback.tb_next
-    module = traceback.tb_frame.f_globals.get("__name__")
-    if not isinstance(module, str) or not module.startswith("aiogzip."):
-        return None
-    match = _NOT_AWAITABLE.search(str(error))
-    if match is None:
-        return None
-    returned = match.group(1) or match.group(2)
-    return (
-        f"fileobj.{method}() returned {returned}, not an awaitable; aiogzip "
-        "needs an async file object. Wrap a sync file with "
-        "aiofiles.threadpool.wrap(f), or use gzip.open()."
-    )
+    try:
+        if hasattr(result, "__await__"):
+            return
+        traceback = error.__traceback__
+        if traceback is None:
+            return
+        while traceback.tb_next is not None:
+            traceback = traceback.tb_next
+        module = traceback.tb_frame.f_globals.get("__name__")
+        if not isinstance(module, str) or not module.startswith("aiogzip."):
+            return
+        match = _NOT_AWAITABLE.search(str(error))
+        if match is None:
+            return
+        returned = match.group(1) or match.group(2)
+        error.args = (
+            _SyncResultMessage(
+                f"fileobj.{method}() returned {returned}, not an awaitable; "
+                "aiogzip needs an async file object. Wrap a sync file with "
+                "aiofiles.threadpool.wrap(f), or use gzip.open()."
+            ),
+        )
+    except Exception:
+        # A diagnostic must not replace the error it describes.
+        pass
+
+
+def _sync_result_message(error: BaseException) -> Optional[str]:
+    """Return the explanation ``_explain_sync_result`` attached, if any."""
+    args = error.args
+    if args and isinstance(args[0], _SyncResultMessage):
+        return str(args[0])
+    return None
 
 
 def _note_source(error: BaseException, name: object, action: str = "reading") -> None:

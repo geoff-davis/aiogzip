@@ -17,10 +17,11 @@ from ._codec_async import (
 from ._common import (
     WithAsyncRead,
     WithAsyncReadWrite,
+    _explain_sync_result,
     _Filename,
     _note_source,
     _source_name,
-    _sync_fileobj_message,
+    _sync_result_message,
     _validate_chunk_size,
     _validate_filename,
     _validate_optional_bool,
@@ -123,13 +124,18 @@ async def _scan_gzip(
                 if _is_native_source(source, "read"):
                     chunk = await _read_native(source, chunk_size)
                 else:
-                    chunk = await source.read(chunk_size)
+                    pending = source.read(chunk_size)
+                    try:
+                        chunk = await pending
+                    except TypeError as error:
+                        _explain_sync_result(error, pending, "read")
+                        raise
             except OSError:
                 raise
             except asyncio.CancelledError:
                 raise
             except Exception as error:
-                sync_message = _sync_fileobj_message(error, "read")
+                sync_message = _sync_result_message(error)
                 raise OSError(
                     sync_message or f"Error reading from file: {error}"
                 ) from error

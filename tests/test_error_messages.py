@@ -8,6 +8,7 @@ input that is not gzip at all.
 
 from __future__ import annotations
 
+import asyncio
 import gzip
 import io
 from pathlib import Path
@@ -17,7 +18,11 @@ import aiofiles
 import pytest
 
 import aiogzip
-from aiogzip._common import _NOT_AWAITABLE, _sync_fileobj_message
+from aiogzip._common import (
+    _NOT_AWAITABLE,
+    _explain_sync_result,
+    _sync_result_message,
+)
 
 GZIP_HELLO = gzip.compress(b"hello")
 
@@ -225,12 +230,49 @@ class TestSynchronousFileObject:
         assert match is not None
         assert (match.group(1) or match.group(2)) == "bytes"
 
-    def test_other_errors_are_not_recognized(self) -> None:
-        assert _sync_fileobj_message(TypeError("boom"), "read") is None
-        assert _sync_fileobj_message(ValueError("can't be awaited"), "read") is None
+    def test_other_errors_are_not_explained(self) -> None:
+        for error in (TypeError("boom"), ValueError("can't be awaited")):
+            before = error.args
+            _explain_sync_result(error, b"", "read")  # type: ignore[arg-type]
+            assert error.args == before
+            assert _sync_result_message(error) is None
         # Without a traceback there is no evidence of where the await failed.
         untraced = TypeError("'bytes' object can't be awaited")
-        assert _sync_fileobj_message(untraced, "read") is None
+        _explain_sync_result(untraced, b"", "read")
+        assert _sync_result_message(untraced) is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("method", ["read", "write"])
+    async def test_a_future_that_fails_with_the_same_text_is_not_relabelled(
+        self, method: str
+    ) -> None:
+        # A C-implemented Future carries its exception with no Python frame
+        # of its own, so the innermost frame is aiogzip's await. The awaited
+        # object is awaitable, which is what rules the explanation out.
+        text = "'bytes' object can't be awaited"
+
+        class FutureBacked:
+            def _fail(self, *args: Any) -> Any:
+                future = asyncio.get_running_loop().create_future()
+                future.set_exception(TypeError(text))
+                return future
+
+            read = write = _fail
+
+        if method == "read":
+            async with aiogzip.open(None, "rb", fileobj=FutureBacked()) as f:
+                with pytest.raises(OSError) as caught:
+                    await f.read()
+            assert str(caught.value) == f"Error reading from file: {text}"
+            for scan in (aiogzip.verify, aiogzip.inspect):
+                with pytest.raises(OSError) as caught:
+                    await scan(None, fileobj=FutureBacked())
+                assert str(caught.value) == f"Error reading from file: {text}"
+        else:
+            with pytest.raises(TypeError) as raised:
+                async with aiogzip.open(None, "wb", fileobj=FutureBacked()):
+                    pass
+            assert str(raised.value) == text
 
     @pytest.mark.asyncio
     async def test_an_await_that_fails_inside_an_async_read_is_not_relabelled(

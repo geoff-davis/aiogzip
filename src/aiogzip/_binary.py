@@ -39,12 +39,13 @@ from ._common import (
     WithAsyncReadWrite,
     WithAsyncWrite,
     _check_can_open,
+    _explain_sync_result,
     _Filename,
     _format_file_repr,
     _normalize_mtime,
     _note_source,
     _parse_mode_tokens,
-    _sync_fileobj_message,
+    _sync_result_message,
     _validate_bool,
     _validate_chunk_size,
     _validate_compresslevel,
@@ -1957,7 +1958,7 @@ class AsyncGzipBinaryFile:
         except OSError:
             raise
         except Exception as e:
-            sync_message = _sync_fileobj_message(e, "read")
+            sync_message = _sync_result_message(e)
             raise OSError(sync_message or f"Error reading from file: {e}") from e
 
         # Cache before the abort check: the source has consumed this chunk, so
@@ -1990,7 +1991,12 @@ class AsyncGzipBinaryFile:
         try:
             result = getattr(source, method)(*args)
             if method == "read" or hasattr(result, "__await__"):
-                result = await result
+                try:
+                    result = await result
+                except TypeError as error:
+                    # ``result`` is still what the source returned.
+                    _explain_sync_result(error, result, method)
+                    raise
             return result
         except BaseException:
             if before is None or _source_position(source) != before:
