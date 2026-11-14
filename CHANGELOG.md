@@ -4,14 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Changed
-
-- The source distribution no longer includes the measurement scripts that
-  were written for the 2.0.0b2 release gates, or their tests. They remain
-  available at the
-  [`v2.0.2` tag](https://github.com/geoff-davis/aiogzip/tree/v2.0.2/scripts).
-  The installed package is unchanged.
-
 ## [2.0.2] - 2026-11-14
 
 ### Fixed
