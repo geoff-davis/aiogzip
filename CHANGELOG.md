@@ -25,6 +25,15 @@ All notable changes to this project will be documented in this file.
   `repr()` of a file that was never opened says `unopened` where it said
   `closed=False`.
 
+### Documentation
+
+- The security policy (`SECURITY.md`) covers every entry point that reads
+  untrusted gzip input, not only the file handle: `open()`, `read()`,
+  `decompress_chunks()`, `GzipDecoder`, `inspect()`, `verify()` and the
+  command line. It states that `max_decompressed_size` defaults to no limit
+  everywhere, and describes the rewind cache, member count and metadata, and
+  when integrity is checked. (#219)
+
 ## [2.0.2] - 2026-11-14
 
 ### Fixed
