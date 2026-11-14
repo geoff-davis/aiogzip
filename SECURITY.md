@@ -51,8 +51,10 @@ Please include the following information in your report:
 
 A gzip stream from a source you do not control can be a decompression bomb,
 can hold any number of members, and can carry any header metadata. aiogzip
-has the controls described below, but **none of the size limits is on by
-default**. This section applies to aiogzip 2.x.
+has the controls described below, but **the decompressed-size limit is off
+by default**. Two limits are always on: the rewind cache is capped at
+128 MiB by default, and a member header is limited to 128 MiB. This section
+applies to aiogzip 2.x.
 
 The maintained recipe is
 [Processing untrusted gzip input](https://geoff-davis.github.io/aiogzip/latest/recipes/#processing-untrusted-gzip-input).
@@ -136,9 +138,11 @@ Without the limit:
   stream as one object. `readline()` and line iteration hold a whole line,
   and a stream with no line ending is one line.
 - `decompress_chunks()` and `GzipDecoder` inflate on demand and yield chunks
-  no larger than `output_chunk_size` (default 256 KiB), so their own memory
-  stays small. The total output is still unlimited, and so is whatever your
-  code accumulates from it.
+  no larger than `output_chunk_size` (default 256 KiB), so the decompressed
+  data they hold at one time is small. That bounds the output buffer only.
+  They hold each compressed input item you pass in whole, whatever its size,
+  so pass input in bounded pieces. The total output is still unlimited, and
+  so is whatever your code accumulates from it.
 - `verify()` and `inspect()` discard the payload, so a bomb costs processor
   time rather than memory.
 
@@ -223,7 +227,11 @@ resource limit.
 ### Timeouts
 
 aiogzip sets no timeouts. A slow or stalled source keeps a read waiting, so
-wrap reads from untrusted network sources in `asyncio.timeout()`.
+wrap reads from untrusted network sources in `asyncio.timeout()`. The
+timeout cancels the waiting task; it is not a hard deadline. A read that
+has already started in the underlying file object or in a worker thread
+runs until it settles, and the handle waits for it. See
+[Cancellation](https://geoff-davis.github.io/aiogzip/latest/recipes/#cancellation).
 
 ### Writing
 
