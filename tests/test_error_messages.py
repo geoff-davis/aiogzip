@@ -306,6 +306,75 @@ class TestSynchronousFileObject:
         assert "fileobj.write() returned" not in str(caught.value)
         assert "await" in str(caught.value)
 
+    @pytest.mark.asyncio
+    async def test_an_awaitable_that_hides_dunder_await_is_not_relabelled(
+        self,
+    ) -> None:
+        # ``await`` finds __await__ on the type; hasattr() on the instance
+        # can be told otherwise.
+        text = "'bytes' object can't be awaited"
+
+        class Hidden:
+            def __getattribute__(self, name: str) -> Any:
+                if name == "__await__":
+                    raise AttributeError(name)
+                return object.__getattribute__(self, name)
+
+            def __await__(self) -> Any:
+                future = asyncio.get_running_loop().create_future()
+                future.set_exception(TypeError(text))
+                return future.__await__()
+
+        class Source:
+            def read(self, size: int = -1) -> Any:
+                return Hidden()
+
+        assert not hasattr(Hidden(), "__await__")
+        with pytest.raises(OSError) as caught:
+            await aiogzip.verify(None, fileobj=Source())
+        assert str(caught.value) == f"Error reading from file: {text}"
+        async with aiogzip.open(None, "rb", fileobj=Source()) as f:
+            with pytest.raises(OSError) as caught:
+                await f.read()
+        assert str(caught.value) == f"Error reading from file: {text}"
+
+    @pytest.mark.asyncio
+    async def test_an_error_whose_args_cannot_be_read_is_still_wrapped(self) -> None:
+        class Awkward(Exception):
+            @property
+            def args(self) -> Any:  # type: ignore[override]
+                raise RuntimeError("no args for you")
+
+            def __str__(self) -> str:
+                return "original"
+
+        class Source:
+            async def read(self, size: int = -1) -> bytes:
+                raise Awkward()
+
+        with pytest.raises(OSError) as caught:
+            await aiogzip.verify(None, fileobj=Source())
+        assert str(caught.value) == "Error reading from file: original"
+        assert isinstance(caught.value.__cause__, Awkward)
+        async with aiogzip.open(None, "rb", fileobj=Source()) as f:
+            with pytest.raises(OSError) as caught:
+                await f.read()
+        assert str(caught.value) == "Error reading from file: original"
+
+    def test_copied_args_do_not_carry_the_diagnosis(self) -> None:
+        # Raise the interpreter's error from a frame that looks like aiogzip's.
+        namespace: dict[str, Any] = {"__name__": "aiogzip._test"}
+        exec("async def provoke():\n    await b''\n", namespace)
+        try:
+            asyncio.run(namespace["provoke"]())
+        except TypeError as error:
+            _explain_sync_result(error, b"", "write")
+            assert _sync_result_message(error) is not None
+            copied = RuntimeError(*error.args)
+            assert _sync_result_message(copied) is None
+        else:  # pragma: no cover
+            pytest.fail("the await did not fail")
+
 
 class TestPositionalFileObject:
     @pytest.mark.parametrize("mode", ["rb", "wb", "rt"])

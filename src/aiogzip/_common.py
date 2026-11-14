@@ -1,5 +1,6 @@
 """Shared constants, helpers, and protocols for aiogzip internals."""
 
+import inspect
 import os
 import re
 import struct
@@ -135,9 +136,13 @@ _NOT_AWAITABLE = re.compile(
 
 
 class _SyncResultMessage(str):
-    """Marks the message that ``_explain_sync_result`` put on a TypeError."""
+    """The message that ``_explain_sync_result`` put on a TypeError.
 
-    __slots__ = ()
+    It remembers the exception it was written for, so a wrapper that copies
+    ``args`` into another exception does not carry the diagnosis with it.
+    """
+
+    _owner: Optional[BaseException] = None
 
 
 def _explain_sync_result(error: TypeError, result: object, method: str) -> None:
@@ -149,18 +154,18 @@ def _explain_sync_result(error: TypeError, result: object, method: str) -> None:
     awaited. The message is replaced only when all of this holds, so that a
     failure inside a real awaitable is never relabelled:
 
-    - ``result`` has no ``__await__``, so it is not a coroutine, a Future or
-      any other awaitable object;
-    - the innermost traceback frame is aiogzip's own ``await``, which rules
-      out a generator-based coroutine (it has no ``__await__`` either) that
-      failed in its own frame;
+    - ``result`` is not awaitable. ``inspect.isawaitable`` looks
+      ``__await__`` up on the type, as ``await`` does, so an object that
+      hides the attribute from ``hasattr`` still counts as awaitable, and
+      it knows generator-based coroutines;
+    - the innermost traceback frame is aiogzip's own ``await``;
     - the text is the interpreter's await-conversion error.
 
     The exception keeps its identity, traceback, cause and context. This
     runs only in a handler that already holds the error.
     """
     try:
-        if hasattr(result, "__await__"):
+        if inspect.isawaitable(result):
             return
         traceback = error.__traceback__
         if traceback is None:
@@ -174,13 +179,13 @@ def _explain_sync_result(error: TypeError, result: object, method: str) -> None:
         if match is None:
             return
         returned = match.group(1) or match.group(2)
-        error.args = (
-            _SyncResultMessage(
-                f"fileobj.{method}() returned {returned}, not an awaitable; "
-                "aiogzip needs an async file object. Wrap a sync file with "
-                "aiofiles.threadpool.wrap(f), or use gzip.open()."
-            ),
+        message = _SyncResultMessage(
+            f"fileobj.{method}() returned {returned}, not an awaitable; "
+            "aiogzip needs an async file object. Wrap a sync file with "
+            "aiofiles.threadpool.wrap(f), or use gzip.open()."
         )
+        message._owner = error
+        error.args = (message,)
     except Exception:
         # A diagnostic must not replace the error it describes.
         pass
@@ -188,9 +193,13 @@ def _explain_sync_result(error: TypeError, result: object, method: str) -> None:
 
 def _sync_result_message(error: BaseException) -> Optional[str]:
     """Return the explanation ``_explain_sync_result`` attached, if any."""
-    args = error.args
-    if args and isinstance(args[0], _SyncResultMessage):
-        return str(args[0])
+    try:
+        args = error.args
+        if args and isinstance(args[0], _SyncResultMessage) and args[0]._owner is error:
+            return str(args[0])
+    except Exception:
+        # Reading the marker must not replace the error being reported.
+        pass
     return None
 
 
