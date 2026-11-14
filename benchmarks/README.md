@@ -177,120 +177,23 @@ The public codec cases are emitted as explicit skips for targets such as
 `v1.11.0` that predate `GzipDecoder`; supported high-level streaming cases
 still run normally.
 
-### 10. 2.0.0a3 file-header and write harness (`bench_a3_regressions.py`)
+### Retired release harnesses
 
-The `a3` harness targets an explicit checkout and captures the high-level
-optional-header path, concatenated-member metadata overhead, and a fixed-total
-write-size curve. It retains individual samples, medians, MAD/min/max values,
-fixture and output digests, source/sink counts, tracemalloc peaks, and complete
-environment/source attestations:
+The harnesses written for single 2.0 pre-release gates are no longer in the
+tree. Their recorded results stay under `plans/benchmarks/` and
+`plans/reviews/`, and the code is available at the
+[`v2.0.2` tag](https://github.com/geoff-davis/aiogzip/tree/v2.0.2/benchmarks):
 
-```bash
-uv run --frozen python benchmarks/bench_a3_regressions.py \
-  --source-root /tmp/aiogzip-v2.0.0a2-a3 \
-  --engine stdlib --repeat 5 \
-  --output /tmp/v2.0.0a2-a3-stdlib.json
-```
+| File | Gate it served |
+|---|---|
+| `bench_a3_regressions.py`, `verify_a3_headers.py`, `verify_a3_writes.py`, `profile_small_writes.py` | 2.0.0a3 file-header and write measurements |
+| `bench_a4_supplement.py` | 2.0.0a4 high-level read supplement |
+| `investigate_b1_timing.py` | 2.0.0b1 same-process timing investigation |
+| `measure_scheduler_policy.py`, `tune_decoder_batches.py`, `profile_compression_paths.py`, `render_regression_baseline.py` | 2.0.0a2 scheduler, decoder-batch and compression investigations, and the pre-change baseline record |
 
-Use `--fixture-sizes-mib`, `--memory-fixture-size-mib`, `--member-counts`,
-`--write-sizes`, `--total-write-bytes`, and `--source-chunk-bytes` to select an
-explicitly recorded matrix. Members runs default to the a3
-`--members-mtime-policy last-header` contract; use `first-header` only for an
-explicitly identified historical a2 comparison whose wrapper retained the
-first header timestamp. By default, tracemalloc is limited to the plan's
-32 MiB incomplete FNAME/FCOMMENT allocation gates; the complete and larger
-cases remain ordinary wall-time measurements. Allocation peaks default to one
-sample via `--memory-repeat 1` because their durations are not used as timing
-claims; primary wall-time comparisons retain five or more samples.
-`profile_small_writes.py`
-captures cProfile tables and hot-path call counts for the diagnostic 10 B,
-1 KiB, and 64 KiB write sizes. Correctness checks and fixture construction are
-kept outside ordinary wall-time regions; tracemalloc cases are labeled
-separately and are not used as wall-time claims.
-`verify_a3_writes.py` complements that memory-sink matrix with 1, 4, and 10
-independent writers, all seven sizes through temporary path-backed files, and
-separate tracemalloc samples for 10 B, 1 KiB, and 64 KiB writes. Concurrent
-cases keep aggregate input fixed at 8 MiB and verify every independent gzip
-member after timing:
-
-```bash
-uv run --frozen python benchmarks/verify_a3_writes.py \
-  --source-root . --engine stdlib \
-  --output /tmp/v2.0.0a3-write-surfaces-stdlib.json
-```
-
-`verify_a3_headers.py` is the release-only structural companion. It leaves the
-locked exact-a2 comparison harness unchanged while checking 64 MiB post-failure
-retention, reporting the intentional non-seekable rewind cache separately,
-sampling a path-backed 16 MiB case, exercising combined optional fields through
-text mode, and testing the real 128 MiB boundary:
-
-```bash
-uv run --frozen python benchmarks/verify_a3_headers.py \
-  --source-root . --engine stdlib \
-  --output /tmp/v2.0.0a3-header-verification-stdlib.json
-```
-
-Run it once with each engine outside normal CI. Fixture creation and reader
-opening precede tracemalloc, and the JSON reports both peak allocation and
-current allocation after close plus garbage collection.
-
-### 11. 2.0.0a4 high-level supplement (`bench_a4_supplement.py`)
-
-The `a4` supplement leaves the established `a3` and decoder-regression
-harnesses unchanged. It adds only the release rows they do not represent:
-bounded `iter_batches()` JSONL reading, whole binary-read throughput and peak
-Python allocation, and concurrent independent-file reads. It targets an
-explicit checkout, records fixture and output hashes, retains every timing
-sample, and uses one verified untimed warm-up per throughput row:
-
-```bash
-uv run --frozen python benchmarks/bench_a4_supplement.py \
-  --source-root /tmp/aiogzip-v2.0.0a3-a4 \
-  --engine stdlib --repeat 5 \
-  --output /tmp/v2.0.0a3-a4-supplement-stdlib.json
-```
-
-Run this supplement beside `bench_a3_regressions.py` and the `release` profile
-of `bench_codec_regressions.py`; it does not replace either historical
-comparison surface. The JSONL digest is updated incrementally inside the timed
-region so the benchmark does not retain all decoded rows. Binary and
-concurrent digests are calculated after each bounded library read completes.
-
-### Targeted same-process evidence investigation
-
-`investigate_b1_timing.py` is an evidence-only diagnostic for threshold rows
-that remain noisy across separate benchmark processes. It loads two source
-trees under distinct package aliases in one interpreter, runs configurable
-untimed A/B/B/A warm-up cycles, disables GC during measurement, and then runs
-measured A/B/B/A cycles. It reports raw samples plus per-side minima and
-medians and does not replace the locked release matrices.
-Before allocating fixtures, it requires clean tracked source trees, captures
-commit and `git describe` provenance, and verifies both packages actually use
-the requested engine. The output is checkpointed atomically after every case,
-so a late failure preserves completed measurements with `status: failed`:
-
-```bash
-candidate_commit=$(git -C . rev-parse HEAD) &&
-taskset -c 0 uv run python benchmarks/investigate_b1_timing.py \
-  --baseline-root /tmp/aiogzip-v2.0.0a4 \
-  --candidate-root . \
-  --canonical-candidate-commit "$candidate_commit" \
-  --engine stdlib --warmup-cycles 25 --cycles 50 \
-  --output /tmp/aiogzip-b1-targeted-stdlib.json
-```
-
-Run it once per required engine only after retaining the original threshold
-crossing and the interleaved process-level follow-up. The example above puts
-the a4 source on the raw baseline side and the b1 source on the raw candidate
-side, so its default `--canonical-candidate-side candidate` is correct. If the
-roots are reversed instead (b1 as `--baseline-root`, a4 as
-`--candidate-root`), pass `--canonical-candidate-side baseline` and obtain
-`--canonical-candidate-commit` from the b1 baseline root. The required commit
-independently binds the side choice to the expected exact source. Treat the
-diagnostic's minimum comparison as an investigation result, not a standalone
-performance claim; inspect medians and temporal slices for drift before using
-it to adjudicate a threshold.
+`bench_compare.py` still reads the targeted captures that
+`investigate_b1_timing.py` produced, so the archived JSON evidence remains
+checkable.
 
 ## Running Benchmarks
 
@@ -483,8 +386,11 @@ benchmarks/
 ├── bench_micro.py         # Micro-benchmarks
 ├── bench_read_health.py   # Seek, recovery and salvage paths
 ├── bench_text_origin.py   # Cookie, compaction and rollback paths
+├── bench_streaming.py     # Streaming helpers and sans-I/O codec
+├── bench_inspection.py    # inspect() and verify() scans
 ├── bench_codec_regressions.py # 2.0.0a2 regression matrices
 ├── bench_compare.py       # Result comparison tool
+├── bench_targeted_contract.py # Targeted-capture schema read by bench_compare.py
 └── README.md              # This file
 ```
 
