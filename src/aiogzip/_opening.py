@@ -7,6 +7,7 @@ import aiofiles
 import aiofiles.threadpool
 
 from ._codec_async import _settle_before_cancel
+from ._common import _explain_sync_result
 from ._source_io import _is_native_source
 
 _STANDARD_OPEN = aiofiles.open
@@ -67,7 +68,13 @@ async def _initial_call(file: Any, method: str, *args: Any) -> Any:
         return await _settle_before_cancel(_submit_native(file, method, *args))
     result = getattr(file, method)(*args)
     if method == "write" or hasattr(result, "__await__"):
-        return await result
+        try:
+            return await result
+        except TypeError as error:
+            # The same exception with a clearer message: a new one would add
+            # a cause that this failure never had.
+            _explain_sync_result(error, result, method)
+            raise
     return result
 
 

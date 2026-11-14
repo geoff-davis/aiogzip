@@ -330,6 +330,15 @@ class GzipEncoder(_CodecBase):
         """Whether the header-producing operation has advanced."""
         return self._started
 
+    def __repr__(self) -> str:
+        try:
+            return (
+                f"<aiogzip.GzipEncoder started={self.started} "
+                f"finished={self.finished} input_size={self.input_size}>"
+            )
+        except AttributeError:
+            return "<aiogzip.GzipEncoder [uninitialized]>"
+
     @property
     def finished(self) -> bool:
         """Whether the finish operation completed successfully."""
@@ -534,6 +543,17 @@ class GzipDecoder(_CodecBase):
     def uncompressed_size(self) -> int:
         """Decompressed bytes accounted during operation advancement."""
         return self._uncompressed_size
+
+    def __repr__(self) -> str:
+        try:
+            return (
+                f"<aiogzip.GzipDecoder finished={self.finished} "
+                f"member_count={self.member_count} "
+                f"compressed_size={self.compressed_size} "
+                f"uncompressed_size={self.uncompressed_size}>"
+            )
+        except AttributeError:
+            return "<aiogzip.GzipDecoder [uninitialized]>"
 
     @property
     def finished(self) -> bool:

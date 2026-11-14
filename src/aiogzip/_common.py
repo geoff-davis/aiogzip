@@ -1,6 +1,8 @@
 """Shared constants, helpers, and protocols for aiogzip internals."""
 
+import inspect
 import os
+import re
 import struct
 import time
 from typing import (
@@ -85,10 +87,16 @@ def _format_file_repr(obj: Any) -> str:
     """
     cls_name = type(obj).__name__
     try:
-        return (
-            f"<aiogzip.{cls_name} name={obj.name!r} "
-            f"mode={obj._mode!r} closed={obj.closed}>"
+        closed = obj.closed
+        # The binary class holds its file in _file, the text class its binary
+        # handle in _binary_file. ``closed`` is False before open() as well,
+        # so say which of the two states this is.
+        opened = (
+            getattr(obj, "_binary_file", None) is not None
+            or getattr(obj, "_file", None) is not None
         )
+        state = f"closed={closed}" if closed or opened else "unopened"
+        return f"<aiogzip.{cls_name} name={obj.name!r} mode={obj._mode!r} {state}>"
     except AttributeError:
         return f"<aiogzip.{cls_name} [uninitialized]>"
 
@@ -108,9 +116,117 @@ def _validate_filename(filename: _Filename, fileobj: Any) -> None:
         raise ValueError("Either filename or fileobj must be provided")
     if filename is not None:
         if not isinstance(filename, (str, bytes, os.PathLike)):
-            raise TypeError("Filename must be a string, bytes, or PathLike object")
+            message = "Filename must be a string, bytes, or PathLike object"
+            if _looks_like_file(filename):
+                message += (
+                    f", not {type(filename).__name__}; pass a file object as "
+                    "fileobj=..."
+                )
+            raise TypeError(message)
         if isinstance(filename, str) and not filename:
             raise ValueError("Filename cannot be empty")
+
+
+# CPython 3.14 says "'bytes' object can't be awaited"; earlier versions say
+# "object bytes can't be used in 'await' expression".
+_NOT_AWAITABLE = re.compile(
+    r"'([\w.]+)' object can't be awaited"
+    r"|object ([\w.]+) can't be used in 'await' expression"
+)
+
+
+def _explain_sync_result(error: TypeError, result: object, method: str) -> None:
+    """Clarify ``error`` if awaiting a synchronous method's result caused it.
+
+    ``isinstance(io.BytesIO(), WithAsyncRead)`` is true, because a runtime
+    protocol checks names only, so a synchronous file object is found out
+    when its first result is awaited. The caller passes the object it
+    awaited. The message is replaced only when all of this holds, so that a
+    failure inside a real awaitable is never relabelled:
+
+    - ``result`` is not awaitable. ``inspect.isawaitable`` looks
+      ``__await__`` up on the type, as ``await`` does, so an object that
+      hides the attribute from ``hasattr`` still counts as awaitable, and
+      it knows generator-based coroutines;
+    - the innermost traceback frame is aiogzip's own ``await``;
+    - the text is the interpreter's await-conversion error.
+
+    The exception keeps its identity, traceback, cause and context. This
+    runs only in a handler that already holds the error.
+    """
+    try:
+        if inspect.isawaitable(result):
+            return
+        traceback = error.__traceback__
+        if traceback is None:
+            return
+        while traceback.tb_next is not None:
+            traceback = traceback.tb_next
+        module = traceback.tb_frame.f_globals.get("__name__")
+        if not isinstance(module, str) or not module.startswith("aiogzip."):
+            return
+        match = _NOT_AWAITABLE.search(str(error))
+        if match is None:
+            return
+        returned = match.group(1) or match.group(2)
+        message = (
+            f"fileobj.{method}() returned {returned}, not an awaitable; "
+            "aiogzip needs an async file object. Wrap a sync file with "
+            "aiofiles.threadpool.wrap(f), or use gzip.open()."
+        )
+        # The diagnosis is recorded on the exception, not in the message: a
+        # wrapper that copies args then carries neither the diagnosis nor a
+        # reference back to this exception and its traceback.
+        setattr(error, "_aiogzip_sync_result", message)  # noqa: B010
+        error.args = (message,)
+    except Exception:
+        # A diagnostic must not replace the error it describes.
+        pass
+
+
+def _sync_result_message(error: BaseException) -> Optional[str]:
+    """Return the explanation ``_explain_sync_result`` attached, if any."""
+    try:
+        message = getattr(error, "_aiogzip_sync_result", None)
+        if type(message) is str and error.args == (message,):
+            return message
+    except Exception:
+        # Reading the marker must not replace the error being reported.
+        pass
+    return None
+
+
+def _note_source(error: BaseException, name: object, action: str = "reading") -> None:
+    """Name the file on ``error`` with a note, when a path-like name is known.
+
+    The message is left alone: the sans-I/O codec that built it has no
+    filename, and callers match on the message text. The note is best
+    effort: a name whose ``__fspath__`` or ``__repr__`` raises must not
+    replace the error being reported.
+    """
+    try:
+        if isinstance(name, (str, bytes, os.PathLike)):
+            error.add_note(f"while {action} {os.fspath(name)!r}")
+    except Exception:
+        pass
+
+
+def _source_name(filename: object, fileobj: object) -> object:
+    """Return the filename, or the file object's ``name``, without raising."""
+    if filename is not None:
+        return filename
+    try:
+        return getattr(fileobj, "name", None)
+    except Exception:
+        return None
+
+
+def _looks_like_file(value: object) -> bool:
+    """Report whether ``value`` has ``read`` or ``write``, without raising."""
+    try:
+        return hasattr(value, "read") or hasattr(value, "write")
+    except Exception:
+        return False
 
 
 def _validate_chunk_size(chunk_size: int) -> None:
