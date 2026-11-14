@@ -744,14 +744,23 @@ class GzipDecoder(_CodecBase):
                     self._engine_output_held = False
                     retained = step.retained
                     if retained:
-                        self._pending.return_tail(retained)
-                        if len(retained) > _INFLATE_INPUT_MIN_WINDOW:
-                            self._adapt_inflate_window(len(retained))
+                        pending = self._pending
+                        if pending._sliced is None:
+                            pending.prepend(retained)
+                        else:
+                            pending.return_tail(retained)
+                        surplus = len(retained)
+                        if surplus > _INFLATE_INPUT_MIN_WINDOW and (
+                            pending.window < _INFLATE_INPUT_WINDOW
+                            or surplus
+                            > 2 * (self._consumed_size - self._member_offset + 8)
+                        ):
+                            self._adapt_inflate_window(surplus)
                 else:
                     self._inflate_input = step.retained or None
                     if (
-                        not step.retained
-                        and self._pending.window < _INFLATE_INPUT_WINDOW
+                        self._pending.window < _INFLATE_INPUT_WINDOW
+                        and not step.retained
                     ):
                         self._pending.window = min(
                             _INFLATE_INPUT_WINDOW,
