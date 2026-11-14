@@ -22,6 +22,17 @@ _INLINE_OUTPUT_BYTES_CHECKPOINT = 1024 * 1024
 _INLINE_OUTPUT_CHUNKS_CHECKPOINT = 4096
 _NO_OUTPUT_BYTES_CHECKPOINT = 128 * 1024
 _NO_OUTPUT_STEPS_CHECKPOINT = 8
+# Composite file writes (``writelines()`` and the write-mode zero-fill
+# ``seek()``) run many inline writes under one reservation. A write below
+# _ZLIB_OFFLOAD_THRESHOLD compresses on the event loop, and a sink that never
+# suspends adds no yield of its own, so a composite checkpoints between
+# writes: at the driver's 1 MiB inline bound (four writes just under the
+# offload threshold), or after as many writes as the chunk streams allow
+# source items. Offloaded writes yield at their executor hop and are not
+# counted. A single ``write()`` call is bounded by its payload and never
+# checkpoints.
+_INLINE_WRITE_BYTES_CHECKPOINT = 1024 * 1024
+_INLINE_WRITES_CHECKPOINT = 256
 
 _T = TypeVar("_T")
 
@@ -42,6 +53,28 @@ class _StreamBudget:
         self.source_items = self.source_bytes = self.inline_input_bytes = 0
         self.output_bytes = self.output_chunks = 0
         self.no_output_bytes = self.no_output_steps = 0
+
+
+@dataclass(slots=True)
+class _WriteBudget:
+    """Inline work done since one composite file write last yielded."""
+
+    inline_bytes: int = 0
+    inline_writes: int = 0
+
+    def spent(self) -> bool:
+        return (
+            self.inline_bytes >= _INLINE_WRITE_BYTES_CHECKPOINT
+            or self.inline_writes >= _INLINE_WRITES_CHECKPOINT
+        )
+
+    def add(self, length: int) -> None:
+        if length < _ZLIB_OFFLOAD_THRESHOLD:
+            self.inline_bytes += length
+            self.inline_writes += 1
+
+    def reset(self) -> None:
+        self.inline_bytes = self.inline_writes = 0
 
 
 async def _run_in_thread(method: Callable[[bytes], _T], data: bytes) -> _T:

@@ -63,6 +63,13 @@ All notable changes to this project will be documented in this file.
   hold the loop while up to 16 MiB of small items, or more when the items
   are just under 256 KiB, were compressed. The compressed bytes are
   identical. (#194)
+- `writelines()` and a forward `seek()` in write mode yield to the event loop
+  at bounded intervals when the `fileobj` never suspends in `write()`, such
+  as an in-memory sink. They could compress a whole call's data without
+  letting another task run, and could not be cancelled or timed out until
+  they finished. A cancellation delivered at one of the new yield points
+  leaves the writer broken, as a cancellation during a sink write always
+  has. A single `write()` call is unchanged. (#193)
 
 ## [2.0.1] - 2026-11-10
 
