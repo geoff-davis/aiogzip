@@ -212,3 +212,102 @@ def test_output_cursor_rejects_non_exact_bytes_and_invalid_bound():
     with pytest.raises(ValueError):
         cursor.pop(0)
     assert len(cursor) == 1
+
+
+def test_pop_window_slices_the_head_span_and_return_tail_rewinds_it():
+    data = bytes(range(256)) * 4
+    queue = _InputQueue()
+    queue.append(data)
+    window = queue.pop_window(100)
+    assert window == data[:100]
+    assert len(queue) == len(data) - 100
+    queue.return_tail(window[40:])
+    # The span was rewound: one span again, and no copy of the tail.
+    assert len(queue) == len(data) - 40
+    assert len(queue._spans) == 1
+    assert queue.pop_window(len(data)) == data[40:]
+    assert not queue
+
+
+def test_return_tail_prepends_when_the_head_moved_after_the_slice():
+    data = bytes(range(256)) * 4
+    queue = _InputQueue()
+    queue.append(data)
+    window = queue.pop_window(100)
+    assert queue.take_exact(8) == data[100:108]
+    queue.return_tail(window[40:])
+    assert len(queue._spans) == 2
+    assert queue.take(len(data)) == data[40:100] + data[108:]
+
+
+def test_return_tail_prepends_after_a_whole_span_window():
+    queue = _InputQueue()
+    queue.append(b"abcdef")
+    window = queue.pop_window(6)
+    assert window == b"abcdef"
+    queue.append(b"ghi")
+    queue.return_tail(window[4:])
+    assert queue.take(10) == b"efghi"
+
+
+def test_return_tail_does_not_rewind_a_recycled_span():
+    queue = _InputQueue()
+    queue.append(b"0123456789")
+    window = queue.pop_window(4)
+    # Drain the sliced span; the queue recycles its span object.
+    assert queue.take(6) == b"456789"
+    queue.append(b"ABCDEFGHIJ")
+    assert queue.pop_window(4) == b"ABCD"
+    assert queue.take_exact(2) == b"EF"
+    queue.return_tail(window[2:])
+    assert queue.take(20) == b"23GHIJ"
+
+
+def test_return_tail_rewinds_only_the_latest_slice():
+    queue = _InputQueue()
+    queue.append(b"0123456789")
+    first = queue.pop_window(3)
+    second = queue.pop_window(3)
+    assert (first, second) == (b"012", b"345")
+    queue.return_tail(second[1:])
+    assert queue.take(20) == b"456789"
+
+
+def test_return_tail_follows_a_later_window_that_was_not_sliced():
+    queue = _InputQueue()
+    queue.append(b"0123456789")
+    assert queue.pop_window(3) == b"012"
+    queue.prepend(b"abc")
+    window = queue.pop_window(3)
+    assert window == b"abc"
+    queue.return_tail(window[1:])
+    assert queue.take(100) == b"bc3456789"
+
+
+def test_return_tail_rewinds_after_an_append():
+    queue = _InputQueue()
+    queue.append(b"0123456789")
+    window = queue.pop_window(4)
+    queue.append(b"more")
+    queue.return_tail(window[1:])
+    assert len(queue._spans) == 2
+    assert queue.take(100) == b"123456789more"
+
+
+def test_clear_releases_the_sliced_span():
+    queue = _InputQueue()
+    queue.append(b"0123456789")
+    queue.pop_window(4)
+    queue.clear()
+    assert queue._sliced is None
+    queue.return_tail(b"xy")
+    assert queue.take(100) == b"xy"
+
+
+def test_return_tail_never_rewinds_past_the_latest_slice():
+    queue = _InputQueue()
+    queue.append(b"0123456789")
+    assert queue.pop_window(3) == b"012"
+    assert queue.pop_window(3) == b"345"
+    queue.return_tail(b"wxyz")
+    assert queue.take(20) == b"wxyz6789"

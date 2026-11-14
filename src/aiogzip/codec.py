@@ -43,6 +43,19 @@ _FAST_COMPRESS_FALLBACK_WARNING = (
     "'pip install aiogzip[fast]' to enable faster compression."
 )
 _INFLATE_INPUT_WINDOW = 256 * 1024
+# A member that ends inside its window costs work in proportion to the rest
+# of that window: the engine copies the unused input and the decoder checks
+# and requeues it. A stream of tiny members in full windows therefore cost
+# quadratic work. So a member that leaves a surplus of more than twice its
+# own size shrinks the window for the members after it: to twice its size,
+# but by no more than a quarter at a time, so that one small member among
+# large ones rarely splits the next large one. A member with a smaller
+# surplus keeps the window at no less than twice its size, and a member
+# that outlasts its window grows it again. The surplus handed to the engine
+# then stays within a constant factor of the members themselves. A surplus
+# of 4 KiB or less is never examined: that is what 4 KiB feeds always cost.
+_INFLATE_INPUT_MIN_WINDOW = 4096
+_INFLATE_INPUT_WINDOW_GROWTH = 4
 _INFLATE_OUTPUT_MIN_BATCH = 64 * 1024
 _INFLATE_OUTPUT_BATCH = 256 * 1024
 
@@ -467,7 +480,7 @@ class GzipDecoder(_CodecBase):
         self._output_chunk_size = output_chunk_size
         self._max_decompressed_size = max_decompressed_size
         self._collect_member_info = validated_collect_member_info
-        self._pending = _InputQueue()
+        self._pending = _InputQueue(_INFLATE_INPUT_WINDOW)
         self._inflate_input: bytes | None = None
         self._output = _OutputCursor()
         self._eof_after_output = False
@@ -611,6 +624,26 @@ class GzipDecoder(_CodecBase):
                 f"compressed offset {self._member_offset}: {error}"
             ) from error
 
+    def _adapt_inflate_window(self, surplus: int) -> None:
+        """Resize the window after a member that left a surplus in it."""
+        pending = self._pending
+        window = 2 * (self._consumed_size - self._member_offset + 8)
+        if surplus <= window:
+            # The surplus is in proportion to the member. Do not shrink, so
+            # that members of this size keep sharing whole input spans, and
+            # make sure the next one of this size fits.
+            if pending.window < window:
+                pending.window = min(window, _INFLATE_INPUT_WINDOW)
+            return
+        decayed = pending.window - (pending.window >> 2)
+        if window < decayed:
+            window = decayed
+        if window > _INFLATE_INPUT_WINDOW:
+            window = _INFLATE_INPUT_WINDOW
+        elif window < _INFLATE_INPUT_MIN_WINDOW:
+            window = _INFLATE_INPUT_MIN_WINDOW
+        pending.window = window
+
     def _complete_member(self, trailer: bytes) -> None:
         expected_crc, trailer_isize = struct.unpack("<II", trailer)
         actual_crc = self._member_crc & 0xFFFFFFFF
@@ -692,9 +725,8 @@ class GzipDecoder(_CodecBase):
             if self._state == "body":
                 if self._inflate_input is None:
                     if self._pending:
-                        self._inflate_input = self._pending.pop_window(
-                            _INFLATE_INPUT_WINDOW
-                        )
+                        pending = self._pending
+                        self._inflate_input = pending.pop_window(pending.window)
                     elif self._engine_output_held:
                         # The last step filled its output bound with no input
                         # left over, so the engine may hold output it can
@@ -710,10 +742,30 @@ class GzipDecoder(_CodecBase):
                 if step.eof:
                     self._inflate_input = None
                     self._engine_output_held = False
-                    if step.retained:
-                        self._pending.prepend(step.retained)
+                    retained = step.retained
+                    if retained:
+                        pending = self._pending
+                        if pending._sliced is None:
+                            pending.prepend(retained)
+                        else:
+                            pending.return_tail(retained)
+                        surplus = len(retained)
+                        if surplus > _INFLATE_INPUT_MIN_WINDOW and (
+                            pending.window < _INFLATE_INPUT_WINDOW
+                            or surplus
+                            > 2 * (self._consumed_size - self._member_offset + 8)
+                        ):
+                            self._adapt_inflate_window(surplus)
                 else:
                     self._inflate_input = step.retained or None
+                    if (
+                        self._pending.window < _INFLATE_INPUT_WINDOW
+                        and not step.retained
+                    ):
+                        self._pending.window = min(
+                            _INFLATE_INPUT_WINDOW,
+                            self._pending.window * _INFLATE_INPUT_WINDOW_GROWTH,
+                        )
                     self._engine_output_held = (
                         not step.retained and len(step.output) >= output_limit
                     )
