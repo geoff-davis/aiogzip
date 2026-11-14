@@ -25,6 +25,8 @@ import aiofiles
 from . import _engine
 from ._codec_async import (
     _DECODE_OFFLOAD_THRESHOLD,
+    _INLINE_WRITE_BYTES_CHECKPOINT,
+    _INLINE_WRITES_CHECKPOINT,
     _ZLIB_OFFLOAD_THRESHOLD,
     _cooperative_checkpoint,
     _drive_operation,
@@ -579,7 +581,17 @@ class AsyncGzipBinaryFile:
             if count > 0:
                 zero_chunk = b"\x00" * min(self._SEEK_ZERO_CHUNK_SIZE, count)
                 remaining = count
-                budget = _WriteBudget()
+                # Every fill chunk is one inline write of the same size, so
+                # the composite budget reduces to a count of writes. Keeping
+                # that count here spares each 1 KiB write a second coroutine.
+                writes_per_checkpoint = max(
+                    1,
+                    min(
+                        _INLINE_WRITES_CHECKPOINT,
+                        _INLINE_WRITE_BYTES_CHECKPOINT // len(zero_chunk),
+                    ),
+                )
+                writes = 0
                 with self._write_call as encoder:
                     while remaining > 0:
                         chunk = (
@@ -587,7 +599,11 @@ class AsyncGzipBinaryFile:
                             if remaining >= len(zero_chunk)
                             else zero_chunk[:remaining]
                         )
-                        await self._write_composite_reserved(chunk, encoder, budget)
+                        if writes == writes_per_checkpoint:
+                            await self._write_checkpoint_reserved(encoder)
+                            writes = 0
+                        await self._write_reserved(chunk, encoder)
+                        writes += 1
                         remaining -= len(chunk)
             return self._position
 
