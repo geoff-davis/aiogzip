@@ -25,6 +25,18 @@ All notable changes to this project will be documented in this file.
   `repr()` of a file that was never opened says `unopened` where it said
   `closed=False`.
 
+### Documentation
+
+- The error guide's taxonomy lists text decoding and encoding failures
+  (`UnicodeDecodeError`, `UnicodeEncodeError`), an unknown `encoding` or
+  `errors` handler (`LookupError`) and the library's two warnings. New
+  sections state what a text handle can still do after each Unicode error,
+  when each `LookupError` is raised, and when and how often the
+  `fast_compress` fallback `UserWarning` and the `AIOGZIP_ENGINE`
+  `RuntimeWarning` are issued, with the `-W` filters that turn them into
+  errors in tests. The guide also describes the `while reading '...'` note
+  on `BadGzipFile`. (#220)
+
 ## [2.0.2] - 2026-11-14
 
 ### Fixed
