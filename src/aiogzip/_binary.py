@@ -408,8 +408,7 @@ class AsyncGzipBinaryFile:
         self._mode_op = mode_op
         self._mode_plus = plus
         self._writing_mode = mode_op in {"w", "a", "x"}
-        if self._writing_mode:
-            _validate_compresslevel(compresslevel)
+        _validate_compresslevel(compresslevel)
         self._fast_compress = validated_fast_compress
         if (
             self._writing_mode

@@ -318,8 +318,9 @@ Always include:
   command-line output (a header name is printed with `repr()`), event-loop
   fairness in `inspect()`, `verify()`, `compress_chunks()`, `writelines()`
   and the zero-fill `seek()` (#193, #194), the cost of a stream of many
-  tiny gzip members (#192) and two type-annotation gaps (behavior
-  exceptions BC28–BC32). The public API is unchanged. Development continues
+  tiny gzip members (#192), two type-annotation gaps and reader-side
+  `compresslevel` validation (behavior exceptions BC28–BC34). Public
+  signatures are unchanged. Development continues
   as `2.0.3.dev0`.
 
 ---
