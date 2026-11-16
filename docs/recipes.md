@@ -341,7 +341,10 @@ async def count_lines(url: str) -> int:
                 closefd=True,
                 max_decompressed_size=1024**3,
             ) as f:
-                return sum([1 async for _ in f])
+                count = 0
+                async for _ in f:
+                    count += 1
+                return count
 ```
 
 ### aiohttp
@@ -371,7 +374,10 @@ async def count_lines(url: str) -> int:
                 closefd=False,
                 max_decompressed_size=1024**3,
             ) as f:
-                return sum([1 async for _ in f])
+                count = 0
+                async for _ in f:
+                    count += 1
+                return count
 ```
 
 `closefd=False` leaves closing the response to its own `async with`.
@@ -416,7 +422,10 @@ async def count_lines(bucket: str, key: str) -> int:
             async with aiogzip.open(
                 None, "rt", fileobj=stream, closefd=False
             ) as f:
-                return sum([1 async for _ in f])
+                count = 0
+                async for _ in f:
+                    count += 1
+                return count
 ```
 
 On an older aiobotocore, or to avoid depending on its body interface at all,
@@ -444,9 +453,10 @@ async def upload(url: str, chunks) -> None:
         response.raise_for_status()
 ```
 
-A body produced this way can be sent only once. A client that has to resend
-it, for a redirect or a retry, cannot; aiohttp raises `ClientPayloadError` on
-a redirect.
+A body produced this way can be sent only once, so a client cannot resend it
+for a retry. aiohttp raises `ClientPayloadError` when it follows a redirect
+that needs the body again; a redirect that turns the request into a `GET`
+drops the body instead.
 
 ## Gzip over S3 with fsspec
 
@@ -520,8 +530,10 @@ Pass `max_decompressed_size` whenever the bytes came from someone else; see
 
 To read lines or text from in-memory data, or to use any other handle method,
 wrap a synchronous file object with `aiofiles.threadpool.wrap()` and pass it
-as `fileobj`. This works for `io.BytesIO` and for any other binary file
-object whose methods block:
+as `fileobj`. `wrap()` accepts the standard library's file types, including
+`io.BytesIO` and the buffered binary files that `open(path, "rb")` returns.
+It raises `TypeError` for a type it does not know, such as a class of your
+own that only has a `read()` method:
 
 ```python
 import io
