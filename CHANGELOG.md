@@ -4,17 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Fixed
-
-- The `fast_compress=True` fallback warning (zlib-ng unavailable) from a file
-  handle now behaves as it does for `GzipEncoder`. (#234)
-  - It names the line of your code that called `aiogzip.open()`,
-    `aiogzip.write()` or a file class, where it named a line inside aiogzip.
-  - Python's default filter shows it once for each such line. It was shown
-    again on every open.
-  - A text handle warns when it is constructed, as a binary handle does,
-    where it warned on entering `async with`.
-
 ### Changed
 
 - Clearer errors for common mistakes. Exception types are unchanged. (#199)
@@ -35,6 +24,23 @@ All notable changes to this project will be documented in this file.
 - `repr()` of `GzipEncoder` and `GzipDecoder` shows their progress, and
   `repr()` of a file that was never opened says `unopened` where it said
   `closed=False`.
+
+### Fixed
+
+- The `fast_compress=True` fallback warning (zlib-ng unavailable) from a file
+  handle now behaves as it does for `GzipEncoder`. (#234)
+  - It names the line of your code that called `aiogzip.open()`,
+    `aiogzip.write()` or a file class, where it named a line inside aiogzip.
+  - Python's default filter shows it once for each such line. It was shown
+    again on every open.
+  - A text handle warns when it is constructed, as a binary handle does,
+    where it warned on entering `async with`.
+- `AsyncGzipTextFile` and `aiogzip.open()` in a text mode reject an `errors`
+  value that is neither a `str` nor `None` with `TypeError` when the handle
+  is constructed, as `io.TextIOWrapper` does. Such a value was accepted, and
+  every read or write then failed with the codec's own `TypeError`. An
+  unknown handler name is still reported by the first read or write that
+  needs it. (#232)
 
 ### Documentation
 

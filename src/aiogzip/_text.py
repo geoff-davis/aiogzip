@@ -221,9 +221,10 @@ class AsyncGzipTextFile:
         errors: The name of the codec error handler, such as ``"strict"``,
             ``"replace"`` or ``"ignore"``, used for decoding on a reader
             and encoding on a writer. The default is ``"strict"``, and
-            ``None`` means the default. The name is not checked here: an
-            unknown name raises ``LookupError`` from the first read or
-            write that meets an encoding or decoding error.
+            ``None`` means the default. Raises ``TypeError`` if it is
+            neither a ``str`` nor ``None``. The name itself is not checked
+            here: an unknown name raises ``LookupError`` from the first
+            read or write that meets an encoding or decoding error.
         newline: One of ``None``, ``""``, ``"\\n"``, ``"\\r"`` or
             ``"\\r\\n"``, with the same meaning as in ``io.TextIOWrapper``.
             With the default, ``None``, a reader returns ``\\r\\n`` and
@@ -402,6 +403,8 @@ class AsyncGzipTextFile:
             raise ValueError("Encoding cannot be empty")
         if errors is None:
             errors = "strict"
+        elif not isinstance(errors, str):
+            raise TypeError(f"errors must be str or None, not {type(errors).__name__}")
         if newline not in {None, "", "\n", "\r", "\r\n"}:
             raise ValueError(f"illegal newline value: {newline}")
 
