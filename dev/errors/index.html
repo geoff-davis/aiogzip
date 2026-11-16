@@ -1190,7 +1190,9 @@ also lost.</p>
 <li>An unknown <code>encoding</code> raises <code>LookupError</code> (<code>unknown encoding: ...</code>) from
   the <code>AsyncGzipTextFile</code> constructor or from <code>aiogzip.open()</code>, before a file
   is opened or created. An empty <code>encoding</code> raises <code>ValueError</code>.</li>
-<li>An unknown <code>errors</code> handler is not detected at construction. The handle
+<li>An <code>errors</code> value that is neither a <code>str</code> nor <code>None</code> raises <code>TypeError</code>
+  (<code>errors must be str or None, not int</code>) from the same place.</li>
+<li>An unknown <code>errors</code> handler name is not detected at construction. The handle
   opens, and reads and writes succeed for as long as the data needs no error
   handling. The first read that meets undecodable bytes, or the first write
   that meets an unencodable character, raises <code>LookupError</code> (<code>unknown error
