@@ -184,6 +184,78 @@ class TestStandalone:
         await reader.close()
         assert reader.closed
 
+    @pytest.mark.parametrize("started", [False, True])
+    @pytest.mark.parametrize("failure", [OSError("cleanup failed"), None])
+    async def test_failed_or_cancelled_cleanup_is_retried(self, started, failure):
+        gate = asyncio.Event()
+        attempts = []
+
+        class Flaky(Source):
+            async def aclose(self):
+                attempts.append(len(attempts))
+                if len(attempts) == 1:
+                    if failure is not None:
+                        raise failure
+                    await gate.wait()
+                self.closed += 1
+
+        source = Flaky(b"abcdef", 2)
+        reader = IterableReader(source)
+        if started:
+            assert await reader.read(1) == b"a"
+        if failure is not None:
+            with pytest.raises(OSError, match="cleanup failed"):
+                await reader.close()
+        else:
+            task = asyncio.ensure_future(reader.close())
+            await asyncio.sleep(0)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        assert reader.closed and source.closed == 0
+        with pytest.raises(ValueError, match="closed"):
+            await reader.read(1)
+        await reader.close()
+        await reader.close()
+        assert source.closed == 1 and attempts == [0, 1]
+
+    async def test_generator_based_aclose_is_awaited(self):
+        import types
+
+        ran = []
+
+        class Old(Source):
+            @types.coroutine
+            def aclose(self):
+                yield
+                ran.append(True)
+
+        reader = IterableReader(Old())
+        await reader.close()
+        assert ran == [True]
+
+    async def test_cleanup_that_failed_under_a_handle_can_be_retried(self):
+        """The handle closes once; the reader still owes the source a close."""
+        attempts = []
+
+        class Flaky(Source):
+            async def aclose(self):
+                attempts.append(True)
+                if len(attempts) == 1:
+                    raise OSError("cleanup failed")
+                self.closed += 1
+
+        source = Flaky(size=1000)
+        reader = IterableReader(source)
+        handle = aiogzip.open(None, "rb", fileobj=reader, closefd=True)
+        await handle.open()
+        await handle.read(10)
+        with pytest.raises(OSError, match="cleanup failed"):
+            await handle.close()
+        assert handle.closed and reader.closed and source.closed == 0
+        await reader.close()
+        assert source.closed == 1 and len(attempts) == 2
+
     async def test_a_run_of_empty_items_yields_to_the_event_loop(self):
         count = 4 * _iterable_reader._EMPTY_ITEMS_CHECKPOINT
         reader = IterableReader(_items(*([b""] * count), b"x"))
