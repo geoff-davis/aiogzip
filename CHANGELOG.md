@@ -70,6 +70,14 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- **Recipes for gzip that is not in a local file**: `docs/recipes.md` now
+  covers a `.gz` file served over HTTP with httpx and aiohttp, an S3 object
+  with aiobotocore, uploading compressed output as a streamed request body,
+  and data already in memory. Each HTTP recipe says how to stop the client
+  from undoing `Content-Encoding` first. The fsspec recipe's heading is now
+  "Gzip over S3 with fsspec", which changes its link anchor. (#205)
+- **The command line is documented**: `python -m aiogzip inspect` and
+  `verify`, with `--json` and the exit status. (#205)
 - The error guide's taxonomy lists text decoding and encoding failures
   (`UnicodeDecodeError`, `UnicodeEncodeError`), an unknown `encoding` or
   `errors` handler (`LookupError`) and the library's two warnings. New
