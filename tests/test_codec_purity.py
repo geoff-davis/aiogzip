@@ -49,6 +49,7 @@ def test_transport_wrappers_do_not_own_gzip_or_raw_engine_state():
     wrapper_modules = (
         aiogzip._binary,
         aiogzip._inspection,
+        aiogzip._oneshot,
         aiogzip._streaming,
     )
 

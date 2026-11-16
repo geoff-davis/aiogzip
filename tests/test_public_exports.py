@@ -30,7 +30,9 @@ def test_key_re_exports_are_stable():
         WithAsyncRead,
         WithAsyncReadWrite,
         WithAsyncWrite,
+        compress,
         compress_chunks,
+        decompress,
         decompress_chunks,
         engine_info,
         inspect,
@@ -60,6 +62,23 @@ def test_key_re_exports_are_stable():
     assert verify is aiogzip.verify
     assert decompress_chunks is aiogzip.decompress_chunks
     assert compress_chunks is aiogzip.compress_chunks
+    assert compress is aiogzip.compress
+    assert decompress is aiogzip.decompress
+
+
+def test_codec_module_exports_the_synchronous_one_shot_twins():
+    """The codec twins are separate functions from the async top-level pair."""
+    from aiogzip import codec
+
+    assert codec.__all__ == [
+        "CodecOperation",
+        "GzipDecoder",
+        "GzipEncoder",
+        "compress",
+        "decompress",
+    ]
+    assert codec.compress is not aiogzip.compress
+    assert codec.decompress is not aiogzip.decompress
 
 
 def test_metadata_types_keep_private_inspection_aliases():

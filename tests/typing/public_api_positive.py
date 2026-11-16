@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 from typing import Union, assert_type
 
 import aiogzip
+import aiogzip.codec
 
 
 class Reader:
@@ -157,6 +158,31 @@ async def fileobj_contract() -> None:
 def streaming_contract() -> None:
     assert_type(aiogzip.decompress_chunks(source()), AsyncIterator[bytes])
     assert_type(aiogzip.compress_chunks(source()), AsyncIterator[bytes])
+
+
+async def one_shot_contract() -> None:
+    assert_type(await aiogzip.compress(b"payload"), bytes)
+    assert_type(await aiogzip.compress(bytearray(b"payload"), mtime=0), bytes)
+    assert_type(
+        await aiogzip.compress(
+            memoryview(b"payload"),
+            compresslevel=9,
+            mtime=0,
+            original_filename="payload.bin",
+            fast_compress=True,
+            strict_size=True,
+        ),
+        bytes,
+    )
+    assert_type(await aiogzip.decompress(b"compressed"), bytes)
+    assert_type(
+        await aiogzip.decompress(bytearray(b"x"), max_decompressed_size=1024),
+        bytes,
+    )
+    assert_type(aiogzip.codec.compress(b"payload", mtime=0), bytes)
+    assert_type(
+        aiogzip.codec.decompress(b"compressed", max_decompressed_size=None), bytes
+    )
 
 
 def codec_contract() -> None:

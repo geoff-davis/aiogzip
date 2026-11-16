@@ -34,7 +34,13 @@ from ._common import (
 from ._gzip_header import _GzipHeaderParser, _ParsedHeader
 from ._metadata import GzipMemberInfo
 
-__all__ = ["CodecOperation", "GzipDecoder", "GzipEncoder"]
+__all__ = [
+    "CodecOperation",
+    "GzipDecoder",
+    "GzipEncoder",
+    "compress",
+    "decompress",
+]
 
 _INFLATE_INPUT_WINDOW = 256 * 1024
 # A member that ends inside its window costs work in proportion to the rest
@@ -813,3 +819,83 @@ class GzipDecoder(_CodecBase):
             if self._pending or (parser is not None and parser.started):
                 raise gzip.BadGzipFile("truncated gzip member header")
             self._finished = True
+
+
+def compress(
+    data: bytes,
+    *,
+    compresslevel: int = 6,
+    mtime: int | float | None = None,
+    original_filename: str | bytes | None = None,
+    fast_compress: bool = False,
+    strict_size: bool = False,
+) -> bytes:
+    """Compress ``data`` into one complete gzip member, synchronously.
+
+    This is :class:`GzipEncoder` driven to completion in the calling thread.
+    The options have the meaning, default and range they have there. For a
+    payload that arrives in pieces, or output that should not be held in
+    memory at once, use the encoder itself.
+
+    Args:
+        data: The payload. Exact ``bytes`` is used as it is and a ``bytes``
+            subclass is copied; any other type raises ``TypeError``.
+        compresslevel: The compression level, from ``-1`` to ``9``.
+        mtime: The gzip header timestamp. ``None`` stores the current time;
+            pass ``0`` for reproducible output.
+        original_filename: The name stored in the gzip header, if any.
+        fast_compress: With ``True``, compress with zlib-ng when available.
+        strict_size: With ``True``, a payload larger than 4294967295 bytes
+            raises ``OSError``.
+
+    Returns:
+        One gzip member.
+    """
+    snapshot = _snapshot_bytes_input(data)
+    encoder = GzipEncoder(
+        compresslevel=compresslevel,
+        mtime=mtime,
+        original_filename=original_filename,
+        fast_compress=fast_compress,
+        strict_size=strict_size,
+        output_chunk_size=_MAX_CHUNK_SIZE,
+    )
+    try:
+        parts = [*encoder.start(), *encoder.feed(snapshot), *encoder.finish()]
+    finally:
+        encoder.discard()
+    return b"".join(parts)
+
+
+def decompress(data: bytes, *, max_decompressed_size: int | None = None) -> bytes:
+    """Decompress a complete gzip stream held in memory, synchronously.
+
+    This is :class:`GzipDecoder` driven to completion in the calling thread.
+    Like ``gzip.decompress()``, it decodes every concatenated member, accepts
+    trailing zero padding and returns ``b""`` for empty input. Unlike it, the
+    output can be bounded: with ``max_decompressed_size`` set, the call stops
+    inflating and raises once the stream proves larger, so it never inflates
+    more than that many bytes. The result is assembled with one join, so the
+    peak is about twice the output size.
+
+    Args:
+        data: The whole gzip stream. Exact ``bytes`` is used as it is and a
+            ``bytes`` subclass is copied; any other type raises ``TypeError``.
+        max_decompressed_size: The largest number of decompressed bytes to
+            accept. The default, ``None``, sets no limit. Set it for
+            untrusted input.
+
+    Returns:
+        The decompressed payload of all members.
+
+    Raises:
+        gzip.BadGzipFile: If the stream is malformed, corrupt or truncated.
+        OSError: If the output would exceed ``max_decompressed_size``.
+    """
+    snapshot = _snapshot_bytes_input(data)
+    decoder = GzipDecoder(max_decompressed_size=max_decompressed_size)
+    try:
+        parts = [*decoder.feed(snapshot), *decoder.finish()]
+    finally:
+        decoder.discard()
+    return b"".join(parts)
