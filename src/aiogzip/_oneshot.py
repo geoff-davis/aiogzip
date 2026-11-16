@@ -16,6 +16,7 @@ from .codec import (
     GzipDecoder,
     GzipEncoder,
     _AsyncDrivableOperation,
+    _OutputCollector,
     _snapshot_bytes_input,
 )
 
@@ -34,13 +35,22 @@ def _snapshot(data: Any, name: str) -> bytes:
 
 
 async def _collect(
-    parts: list[bytes], operation: object, workload: bytes = b"", **options: Any
+    output: _OutputCollector,
+    operation: object,
+    workload: bytes = b"",
+    **options: Any,
 ) -> None:
     driver = _drive_operation(
         cast(_AsyncDrivableOperation, operation), workload=workload, **options
     )
-    async for chunk in driver:
-        parts.append(chunk)
+    try:
+        async for chunk in driver:
+            output.add(chunk)
+    finally:
+        # A failure in this loop's own body leaves the driver suspended.
+        # Close it here so the operation is released before the codec is
+        # discarded, not by the event loop's generator hook later.
+        await driver.aclose()
 
 
 async def _compress(
@@ -63,15 +73,15 @@ async def _compress(
         strict_size=strict_size,
         output_chunk_size=_MAX_CHUNK_SIZE,
     )
-    parts: list[bytes] = []
+    output = _OutputCollector()
     try:
-        await _collect(parts, encoder.start())
+        await _collect(output, encoder.start())
         if snapshot:
-            await _collect(parts, encoder.feed(snapshot), snapshot)
-        await _collect(parts, encoder.finish())
+            await _collect(output, encoder.feed(snapshot), snapshot)
+        await _collect(output, encoder.finish())
     finally:
         encoder.discard()
-    return b"".join(parts)
+    return output.join()
 
 
 async def _decompress(
@@ -81,16 +91,16 @@ async def _decompress(
 ) -> bytes:
     snapshot = _snapshot(data, "decompress")
     decoder = GzipDecoder(max_decompressed_size=max_decompressed_size)
-    parts: list[bytes] = []
+    output = _OutputCollector()
     try:
         if snapshot:
             await _collect(
-                parts,
+                output,
                 decoder.feed(snapshot),
                 snapshot,
                 offload_threshold=_DECODE_OFFLOAD_THRESHOLD,
             )
-        await _collect(parts, decoder.finish())
+        await _collect(output, decoder.finish())
     finally:
         decoder.discard()
-    return b"".join(parts)
+    return output.join()

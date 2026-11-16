@@ -339,6 +339,60 @@ class TestLimit:
         assert len(result) == size
         assert peak < 2 * size + 3 * MIB
 
+    @pytest.mark.parametrize("use_async", [False, True])
+    async def test_many_tiny_members_cost_no_memory_per_member(self, use_async):
+        """100,000 one-byte members: a chunk each, but no object kept for each."""
+        count = 100_000
+        blob = gzip.compress(b"x") * count
+        tracemalloc.start()
+        try:
+            tracemalloc.reset_peak()
+            before = tracemalloc.get_traced_memory()[0]
+            if use_async:
+                result = await aiogzip.decompress(blob, max_decompressed_size=count)
+            else:
+                result = codec.decompress(blob, max_decompressed_size=count)
+            peak = tracemalloc.get_traced_memory()[1] - before
+        finally:
+            tracemalloc.stop()
+        assert result == b"x" * count
+        # The decoder's fixed working buffers, under 1 MiB. One bytes object
+        # for each member would add more than 3 MiB.
+        assert peak < 2 * MIB
+
+
+class TestOutputCollector:
+    @_settings
+    @given(
+        sizes=st.lists(
+            st.sampled_from([0, 1, 7, 4096, 65535, 65536, 65537, 200_000]),
+            max_size=40,
+        )
+    )
+    def test_join_is_the_concatenation_in_order(self, sizes):
+        chunks = [bytes([index % 251]) * size for index, size in enumerate(sizes)]
+        collector = codec._OutputCollector()
+        for chunk in chunks:
+            collector.add(chunk)
+        assert collector.join() == b"".join(chunks)
+
+    def test_small_chunks_are_stored_in_large_pieces(self):
+        collector = codec._OutputCollector()
+        for _ in range(300_000):
+            collector.add(b"x")
+        assert len(collector._parts) == 300_000 // codec._COLLECT_SMALL_CHUNK
+        assert all(len(p) == codec._COLLECT_SMALL_CHUNK for p in collector._parts)
+        assert collector.join() == b"x" * 300_000
+
+    def test_one_large_chunk_is_returned_without_a_copy(self):
+        chunk = os.urandom(codec._COLLECT_SMALL_CHUNK)
+        collector = codec._OutputCollector()
+        collector.add(chunk)
+        assert collector.join() is chunk
+
+    def test_empty(self):
+        assert codec._OutputCollector().join() == b""
+
 
 class _Offloads:
     """Count the executor hops the shared driver makes."""
@@ -455,6 +509,26 @@ class TestCancellation:
         with pytest.raises(asyncio.CancelledError):
             await task
         assert finished.is_set()
+
+    async def test_collection_failure_closes_the_operation_first(self):
+        """If keeping a chunk fails, the operation is closed before return."""
+        from aiogzip import _oneshot
+
+        failure = MemoryError("no room")
+
+        class Full:
+            def add(self, chunk):
+                raise failure
+
+        decoder = codec.GzipDecoder()
+        operation = decoder.feed(gzip.compress(b"payload"))
+        with pytest.raises(MemoryError) as caught:
+            await _oneshot._collect(Full(), operation)
+        assert caught.value is failure
+        # Closed already, not on a later turn of the event loop: the decoder
+        # has no active operation and is unusable.
+        with pytest.raises(OSError, match="unusable"):
+            decoder.finish()
 
     async def test_codec_is_discarded_when_a_call_fails(self, monkeypatch):
         made = []

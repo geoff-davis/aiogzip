@@ -142,8 +142,9 @@ Without the limit:
   and a stream with no line ending is one line.
 - `aiogzip.decompress()` and `aiogzip.codec.decompress()` return the whole
   decompressed stream as one object, and hold it twice for a moment while
-  joining it. With `max_decompressed_size` set they stop inflating at the
-  limit, so that is at most twice the limit.
+  joining it. With `max_decompressed_size` set they stop inflating one byte
+  past the limit, so that is about twice the limit, plus under 1 MiB of
+  working buffers whatever the number of members.
 - `decompress_chunks()` and `GzipDecoder` inflate on demand and yield chunks
   no larger than `output_chunk_size` (default 256 KiB), so the decompressed
   data they hold at one time is small. That bounds the output buffer only.
