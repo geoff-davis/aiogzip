@@ -52,16 +52,11 @@ Prepare a new release of aiogzip. This skill handles changelog generation, versi
   --reinstall-package aiogzip` before running the suite. Otherwise
   `tests/test_public_api_contract.py` compares the new `__version__` with
   the old installed metadata and fails.
-- Update the current-version line in CLAUDE.md's **Version History** section
-  (`- **<old> (current)** - ...` → `- **<version> (current)** - ...`), and
-  refresh its "Recent work includes ..." summary if this release adds
-  notable items. No other process owns this line — skipping this step is
-  how it goes stale.
 
 ### 5. Create release branch and PR
 
 - Create branch `release/v<version>` from `origin/main`.
-- Stage `CHANGELOG.md`, `src/aiogzip/__init__.py`, and `CLAUDE.md`.
+- Stage `CHANGELOG.md` and `src/aiogzip/__init__.py`.
 - Commit with message: `Prepare release v<version>`
 - Record the release artifacts. The publish workflow uploads only files whose
   SHA-256 matches `plans/releases/v<version>.sha256`, and fails without it.
