@@ -16,11 +16,8 @@ reproducible error behaviour or debugging).
 import importlib
 import os
 import sys
-import threading
 import warnings
 import zlib
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from types import FrameType
 from typing import Any, Tuple, Type
@@ -247,15 +244,6 @@ _FAST_COMPRESS_FALLBACK_WARNING = (
 _PACKAGE = __name__.rpartition(".")[0]
 
 
-class _FallbackWarningState(threading.local):
-    """How many nested constructions are being silenced in this thread."""
-
-    suppressed = 0
-
-
-_fallback_warning_state = _FallbackWarningState()
-
-
 def _is_package_frame(frame: FrameType) -> bool:
     """True for a frame of a module inside the aiogzip package.
 
@@ -280,12 +268,15 @@ def warn_fast_compress_fallback() -> None:
     after counting ``stacklevel`` frames, so the result does not depend on
     which frames ``warn()`` skips while counting.
 
-    ``warnings.catch_warnings()`` is not used to silence a nested duplicate,
-    because entering it resets every module's warning registry and so
-    defeats the once-per-location rule.
+    A handle that has warned builds inner objects that would warn again: its
+    encoder, and a text handle's binary file. When zlib-ng is unavailable the
+    handle asks those for ``fast_compress=False``, which is what the fallback
+    gives, so they have nothing to warn about. Nothing ambient silences the
+    warning: ``warnings.catch_warnings()`` resets every module's warning
+    registry and so defeats the once-per-location rule, and a flag held in a
+    context variable or thread-local would also silence unrelated code that
+    happens to run during the construction.
     """
-    if _fallback_warning_state.suppressed:
-        return
     frame = sys._getframe(1)
     while _is_package_frame(frame):
         outer = frame.f_back
@@ -304,24 +295,6 @@ def warn_fast_compress_fallback() -> None:
         module=module_globals.get("__name__") or "<string>",
         registry=module_globals.setdefault("__warningregistry__", {}),
     )
-
-
-@contextmanager
-def fast_compress_fallback_warning_suppressed() -> Iterator[None]:
-    """Silence the fallback warning for a nested construction.
-
-    Used while aiogzip builds an inner object for a handle that has already
-    warned: the encoder of a file handle, or the binary file of a text
-    handle. The state is per thread and is restored before the ``with``
-    block is left. It is not a ``ContextVar``: a task created inside the
-    block would copy the context and keep the suppression after the block
-    had ended.
-    """
-    _fallback_warning_state.suppressed += 1
-    try:
-        yield
-    finally:
-        _fallback_warning_state.suppressed -= 1
 
 
 def decompress_engine_name() -> str:

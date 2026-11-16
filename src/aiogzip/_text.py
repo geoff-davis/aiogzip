@@ -537,22 +537,24 @@ class AsyncGzipTextFile:
         self._opening = True
         try:
             filename = os.fspath(self._filename) if self._filename is not None else None
-            # __init__ has already warned about a zlib-ng fallback.
-            with _engine.fast_compress_fallback_warning_suppressed():
-                binary_file = AsyncGzipBinaryFile(
-                    filename=filename,
-                    mode=self._binary_mode,
-                    chunk_size=self._chunk_size,
-                    compresslevel=self._compresslevel,
-                    mtime=self._header_mtime,
-                    original_filename=self._header_filename_override,
-                    fileobj=self._external_file,
-                    closefd=self._closefd,
-                    max_decompressed_size=self._max_decompressed_size,
-                    max_rewind_cache_size=self._max_rewind_cache_size,
-                    strict_size=self._strict_size,
-                    fast_compress=self._fast_compress,
-                )
+            # __init__ has already warned if fast compression was asked for
+            # and zlib-ng is unavailable. The binary file would warn again,
+            # so in that case it is asked for what the fallback gives anyway:
+            # stdlib zlib.
+            binary_file = AsyncGzipBinaryFile(
+                filename=filename,
+                mode=self._binary_mode,
+                chunk_size=self._chunk_size,
+                compresslevel=self._compresslevel,
+                mtime=self._header_mtime,
+                original_filename=self._header_filename_override,
+                fileobj=self._external_file,
+                closefd=self._closefd,
+                max_decompressed_size=self._max_decompressed_size,
+                max_rewind_cache_size=self._max_rewind_cache_size,
+                strict_size=self._strict_size,
+                fast_compress=(self._fast_compress and _engine.have_fast_engine()),
+            )
             try:
                 await binary_file.open()
             except BaseException as failure:

@@ -11,7 +11,6 @@ import linecache
 import os
 import subprocess
 import sys
-import threading
 import warnings
 
 import pytest
@@ -264,23 +263,131 @@ class TestFallbackWarningLocation:
         assert len(_fallbacks(caught)) == 1
 
     @pytest.mark.parametrize("mode", ["wb", "wt"])
-    async def test_suppression_ends_with_the_open(self, mode, tmp_path):
+    async def test_unrelated_construction_during_a_handle_still_warns(
+        self, mode, tmp_path
+    ):
+        """Only the handle's own inner objects are silent.
+
+        Nothing ambient silences the warning, so an unrelated encoder built
+        while a handle is being constructed or opened warns as usual. An
+        ``int`` subclass is accepted as ``chunk_size``; its comparisons run
+        inside the constructors, which is where an eagerly started task or
+        any other callback would run.
+        """
+        independent = []
+
+        class Chunk(int):
+            def _hook(self):
+                with warnings.catch_warnings(record=True) as inner:
+                    warnings.simplefilter("always")
+                    aiogzip.GzipEncoder(fast_compress=True)
+                independent.append(len(_fallbacks(inner)))
+
+            def __lt__(self, other):
+                self._hook()
+                return int(self) < other
+
+            def __gt__(self, other):
+                self._hook()
+                return int(self) > other
+
+            def __le__(self, other):
+                self._hook()
+                return int(self) <= other
+
+            def __ge__(self, other):
+                self._hook()
+                return int(self) >= other
+
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            async with aiogzip.open(tmp_path / "s.gz", mode, fast_compress=True):
-                assert _engine._fallback_warning_state.suppressed == 0
-                aiogzip.GzipEncoder(fast_compress=True)
-        assert len(_fallbacks(caught)) == 2
+            handle = aiogzip.open(
+                tmp_path / "u.gz", mode, chunk_size=Chunk(1024), fast_compress=True
+            )
+            constructed = len(independent)
+            async with handle as f:
+                await f.write("x" if "t" in mode else b"x")
+        assert constructed > 0
+        assert len(independent) > constructed
+        assert independent == [1] * len(independent)
+        assert len(_fallbacks(caught)) == 1
 
-    async def test_failed_open_leaves_no_suppression(self, tmp_path):
-        missing = tmp_path / "no-such-dir" / "f.gz"
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            for mode in ("wb", "wt"):
-                with pytest.raises(OSError):
-                    async with aiogzip.open(missing, mode, fast_compress=True):
-                        pass
-        assert _engine._fallback_warning_state.suppressed == 0
+    @pytest.mark.skipif(
+        not hasattr(asyncio, "eager_task_factory"), reason="needs Python 3.12"
+    )
+    async def test_eager_task_started_during_open_still_warns(self, tmp_path):
+        loop = asyncio.get_running_loop()
+        counts = []
+
+        async def construct():
+            with warnings.catch_warnings(record=True) as inner:
+                warnings.simplefilter("always")
+                aiogzip.GzipEncoder(fast_compress=True)
+            counts.append(len(_fallbacks(inner)))
+
+        class Chunk(int):
+            def __gt__(self, other):
+                tasks.append(loop.create_task(construct()))
+                return int(self) > other
+
+            __lt__ = __gt__
+
+        tasks = []
+        previous = loop.get_task_factory()
+        loop.set_task_factory(asyncio.eager_task_factory)
+        try:
+            with warnings.catch_warnings(record=True):
+                warnings.simplefilter("always")
+                async with aiogzip.open(
+                    tmp_path / "eager.gz",
+                    "wt",
+                    chunk_size=Chunk(1024),
+                    fast_compress=True,
+                ) as f:
+                    await f.write("x")
+            await asyncio.gather(*tasks)
+        finally:
+            loop.set_task_factory(previous)
+        assert counts and counts == [1] * len(counts)
+
+    @pytest.mark.parametrize("mode", ["wb", "wt"])
+    async def test_fallback_output_equals_default_output(self, mode, tmp_path):
+        """The fallback is stdlib zlib, byte for byte."""
+        outputs = []
+        for fast in (False, True):
+            path = tmp_path / "same.gz"
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                async with aiogzip.open(path, mode, mtime=0, fast_compress=fast) as f:
+                    await f.write("payload " * 500 if "t" in mode else PAYLOAD)
+            outputs.append(path.read_bytes())
+        assert outputs[0] == outputs[1]
+
+    @pytest.mark.skipif(not ZNG_AVAILABLE, reason="needs zlib-ng")
+    @pytest.mark.parametrize("mode", ["wb", "wt"])
+    async def test_available_engine_is_still_requested(
+        self, mode, monkeypatch, tmp_path
+    ):
+        monkeypatch.setattr(_engine, "_HAVE_ZNG", True)
+        calls = []
+        real = _engine.compressobj
+
+        def recording(level, wbits, fast=False):
+            calls.append(fast)
+            return real(level, wbits, fast=fast)
+
+        monkeypatch.setattr(_engine, "compressobj", recording)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            async with aiogzip.open(tmp_path / "z.gz", mode, fast_compress=True) as f:
+                await f.write("x" if "t" in mode else b"x")
+        assert calls == [True]
+
+    async def test_text_handle_buffer_is_a_plain_binary_file(self, tmp_path):
+        with pytest.warns(UserWarning, match=FALLBACK):
+            handle = aiogzip.open(tmp_path / "p.gz", "wt", fast_compress=True)
+        async with handle as f:
+            assert type(f.buffer) is AsyncGzipBinaryFile
 
     def test_subclass_outside_the_package_is_the_caller(self):
         class Encoder(aiogzip.GzipEncoder):
@@ -293,45 +400,6 @@ class TestFallbackWarningLocation:
         (warning,) = _fallbacks(caught)
         assert warning.filename == __file__
         assert "super().__init__(fast_compress=True)" in _source_line(warning)
-
-    async def test_task_created_during_suppression_still_warns(self):
-        """Suppression must not follow a task created inside the block."""
-
-        async def construct():
-            aiogzip.GzipEncoder(fast_compress=True)
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            with _engine.fast_compress_fallback_warning_suppressed():
-                task = asyncio.get_running_loop().create_task(construct())
-                aiogzip.GzipEncoder(fast_compress=True)
-            assert _fallbacks(caught) == []
-            await task
-        assert len(_fallbacks(caught)) == 1
-
-    def test_suppression_is_per_thread(self):
-        caught_in_thread = []
-
-        def construct():
-            with warnings.catch_warnings(record=True) as caught:
-                warnings.simplefilter("always")
-                aiogzip.GzipEncoder(fast_compress=True)
-                caught_in_thread.extend(_fallbacks(caught))
-
-        with _engine.fast_compress_fallback_warning_suppressed():
-            thread = threading.Thread(target=construct)
-            thread.start()
-            thread.join()
-        assert len(caught_in_thread) == 1
-
-    def test_suppression_nests_and_survives_an_exception(self):
-        with pytest.raises(RuntimeError):
-            with _engine.fast_compress_fallback_warning_suppressed():
-                with _engine.fast_compress_fallback_warning_suppressed():
-                    assert _engine._fallback_warning_state.suppressed == 2
-                assert _engine._fallback_warning_state.suppressed == 1
-                raise RuntimeError
-        assert _engine._fallback_warning_state.suppressed == 0
 
     @pytest.mark.parametrize(
         "filename",
