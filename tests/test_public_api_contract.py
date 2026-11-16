@@ -49,7 +49,9 @@ def _removed_or_altered(baseline: object, current: object, path: str) -> list[st
 
 
 def test_frozen_2_0_baseline_is_unchanged():
-    digest = hashlib.sha256(BASELINE.read_bytes()).hexdigest()
+    # A Windows checkout may convert line endings; the content is what counts.
+    content = BASELINE.read_bytes().replace(b"\r\n", b"\n")
+    digest = hashlib.sha256(content).hexdigest()
     assert digest == BASELINE_SHA256
 
 
