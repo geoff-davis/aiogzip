@@ -147,6 +147,68 @@ class TestTextWriteModeSeek:
             assert await f.read() == "abcdef"
 
 
+class TestTextErrorsType:
+    """`errors` must be a string or None, checked at construction (#232)."""
+
+    @pytest.mark.parametrize("mode", ["rt", "wt", "at", "xt"])
+    @pytest.mark.parametrize("value", [123, b"strict", 1.5, ["strict"], True])
+    def test_non_string_errors_is_a_type_error(self, mode, value, tmp_path):
+        path = tmp_path / "missing.gz"
+        expected = f"errors must be str or None, not {type(value).__name__}"
+        with pytest.raises(TypeError, match=expected):
+            aiogzip.AsyncGzipTextFile(path, mode, errors=value)
+        with pytest.raises(TypeError, match=expected):
+            aiogzip.open(path, mode, errors=value)
+        assert not path.exists()
+
+    def test_fileobj_is_not_touched(self):
+        class Untouchable:
+            def __getattr__(self, name):
+                raise AssertionError(f"fileobj.{name} was used")
+
+        with pytest.raises(TypeError, match="errors must be str or None"):
+            aiogzip.AsyncGzipTextFile(None, "rt", fileobj=Untouchable(), errors=0)
+
+    @pytest.mark.asyncio
+    async def test_none_and_empty_string_are_still_accepted(self, tmp_path):
+        path = tmp_path / "ok.gz"
+        async with aiogzip.open(path, "wt", errors=None) as f:
+            await f.write("abc")
+        async with aiogzip.open(path, "rt", errors="") as f:
+            assert await f.read() == "abc"
+
+    @pytest.mark.asyncio
+    async def test_str_subclass_is_accepted(self, tmp_path):
+        class Name(str):
+            pass
+
+        path = tmp_path / "sub.gz"
+        async with aiogzip.open(path, "wt", errors=Name("replace")) as f:
+            await f.write("abc")
+
+    @pytest.mark.asyncio
+    async def test_unknown_handler_name_is_still_reported_late(self, tmp_path):
+        path = tmp_path / "late.gz"
+        async with aiogzip.open(path, "wb") as f:
+            await f.write(b"ok\n\xff\n")
+        async with aiogzip.open(path, "rt", errors="no-such-handler") as f:
+            with pytest.raises(LookupError, match="no-such-handler"):
+                await f.read()
+
+    @pytest.mark.asyncio
+    async def test_handler_registered_after_construction_works(self, tmp_path):
+        import codecs
+
+        name = "aiogzip-test-late-handler"
+        path = tmp_path / "registered.gz"
+        async with aiogzip.open(path, "wb") as f:
+            await f.write(b"a\xffb")
+        handle = aiogzip.open(path, "rt", errors=name)
+        codecs.register_error(name, lambda exc: ("?", exc.end))
+        async with handle as f:
+            assert await f.read() == "a?b"
+
+
 class TestFastCompressFallbackWarning:
     @pytest.mark.asyncio
     async def test_warning_is_deduplicated_and_leaves_other_registries(
