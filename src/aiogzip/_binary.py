@@ -5,7 +5,6 @@ import gzip
 import io
 import operator
 import os
-import warnings
 from enum import Enum, auto
 from pathlib import Path
 from typing import (
@@ -416,12 +415,7 @@ class AsyncGzipBinaryFile:
             and self._fast_compress
             and not _engine.have_fast_engine()
         ):
-            warnings.warn(
-                "fast_compress=True requested but zlib-ng is not available; "
-                "falling back to stdlib zlib. Install the extra with "
-                "'pip install aiogzip[fast]' to enable faster compression.",
-                stacklevel=2,
-            )
+            _engine.warn_fast_compress_fallback()
         self._chunk_size = chunk_size
         self._compresslevel = compresslevel
         self._header_mtime = _normalize_mtime(mtime)
@@ -526,24 +520,19 @@ class AsyncGzipBinaryFile:
                 if header_filename is None and self._filename is not None:
                     header_filename = os.fspath(self._filename)
 
-                # __init__ already emits the established file-boundary warning
-                # when fast compression is unavailable. Avoid duplicating it
-                # when the codec performs its own direct-use warning.
-                with warnings.catch_warnings():
-                    warnings.filterwarnings(
-                        "ignore",
-                        message="fast_compress=True requested.*",
-                    )
-                    encoder = GzipEncoder(
-                        compresslevel=self._compresslevel,
-                        mtime=self._header_mtime,
-                        original_filename=header_filename,
-                        fast_compress=self._fast_compress,
-                        strict_size=self._strict_size,
-                        output_chunk_size=max(
-                            self._chunk_size, self.DEFAULT_CHUNK_SIZE
-                        ),
-                    )
+                # __init__ has already warned if fast compression was asked
+                # for and zlib-ng is unavailable. The encoder would warn
+                # again, so in that case it is asked for what the fallback
+                # gives anyway: stdlib zlib. Nothing ambient silences the
+                # warning (see _engine.warn_fast_compress_fallback).
+                encoder = GzipEncoder(
+                    compresslevel=self._compresslevel,
+                    mtime=self._header_mtime,
+                    original_filename=header_filename,
+                    fast_compress=(self._fast_compress and _engine.have_fast_engine()),
+                    strict_size=self._strict_size,
+                    output_chunk_size=max(self._chunk_size, self.DEFAULT_CHUNK_SIZE),
+                )
                 for header_chunk in encoder.start():
                     await _write_initial_header(resource, header_chunk)
             else:  # read mode

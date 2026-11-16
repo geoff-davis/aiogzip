@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import gzip
 import struct
-import warnings
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from typing import Protocol
@@ -37,11 +36,6 @@ from ._metadata import GzipMemberInfo
 
 __all__ = ["CodecOperation", "GzipDecoder", "GzipEncoder"]
 
-_FAST_COMPRESS_FALLBACK_WARNING = (
-    "fast_compress=True requested but zlib-ng is not available; "
-    "falling back to stdlib zlib. Install the extra with "
-    "'pip install aiogzip[fast]' to enable faster compression."
-)
 _INFLATE_INPUT_WINDOW = 256 * 1024
 # A member that ends inside its window costs work in proportion to the rest
 # of that window: the engine copies the unused input and the decoder checks
@@ -274,10 +268,6 @@ class GzipEncoder(_CodecBase):
     This class performs no I/O or executor offload and is not thread-safe.
     """
 
-    # How far up the stack the zlib-ng fallback warning points: the code
-    # that constructed the encoder.
-    _fallback_warning_stacklevel = 2
-
     def __init__(
         self,
         *,
@@ -301,10 +291,7 @@ class GzipEncoder(_CodecBase):
         self._strict_size = validated_strict_size
         self._output_chunk_size = output_chunk_size
         if self._fast_compress and not _engine.have_fast_engine():
-            warnings.warn(
-                _FAST_COMPRESS_FALLBACK_WARNING,
-                stacklevel=self._fallback_warning_stacklevel,
-            )
+            _engine.warn_fast_compress_fallback()
         self._engine: ZlibEngine = _engine.compressobj(
             compresslevel,
             -_engine.MAX_WBITS,
