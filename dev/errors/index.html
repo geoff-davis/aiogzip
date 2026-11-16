@@ -1232,19 +1232,21 @@ the operation.</p>
 </tr>
 </tbody>
 </table>
-<p>The fallback warning is issued at a different point for each API:</p>
+<p>The fallback warning is issued when the object is created, before any file
+is opened:</p>
 <ul>
-<li><code>AsyncGzipBinaryFile</code>, and <code>aiogzip.open()</code> in a binary write mode: when
-  the handle is constructed.</li>
-<li><code>AsyncGzipTextFile</code>, and <code>aiogzip.open()</code> in a text write mode: when the
-  handle is opened (on entering <code>async with</code>), not when it is constructed.</li>
+<li><code>AsyncGzipBinaryFile</code>, <code>AsyncGzipTextFile</code> and <code>aiogzip.open()</code> in a write
+  mode: when the handle is constructed.</li>
+<li><code>aiogzip.write()</code>: when the call is awaited.</li>
 <li><code>GzipEncoder</code>: when the encoder is constructed.</li>
 <li><code>compress_chunks()</code>: at the call, before the first chunk is requested.</li>
 </ul>
 <p>Read-mode handles ignore <code>fast_compress</code> and do not warn.</p>
-<p>For <code>GzipEncoder</code> and <code>compress_chunks()</code>, Python's default filter shows the
-warning once per calling location. A file handle warns every time one is
-opened, including repeated opens from the same line.</p>
+<p>The warning is attributed to your code: its location is the nearest caller
+outside the <code>aiogzip</code> package, such as the line that calls <code>aiogzip.open()</code>.
+Python's default filter therefore shows it once for each such line, however
+many files that line opens. Under an <code>always</code> filter it is shown once for
+each handle, encoder or <code>compress_chunks()</code> call.</p>
 <p>To turn the warnings into errors in tests, use a <code>-W</code> option or the
 <code>PYTHONWARNINGS</code> environment variable. Both take the
 <code>action:message:category</code> form:</p>
