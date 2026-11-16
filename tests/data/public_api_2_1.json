@@ -1643,6 +1643,100 @@
           "return": "int"
         }
       }
+    },
+    "IterableReader": {
+      "constructor": {
+        "parameters": [
+          {
+            "annotation": "AsyncIterable[bytes | bytearray | memoryview]",
+            "default": {
+              "kind": "required"
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "source"
+          }
+        ],
+        "return": "None"
+      },
+      "members": {
+        "aclose": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "close": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "None"
+          }
+        },
+        "closed": {
+          "kind": "property",
+          "return": "bool"
+        },
+        "read": {
+          "kind": "coroutine_function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              },
+              {
+                "annotation": "Optional[int]",
+                "default": {
+                  "kind": "value",
+                  "value": -1
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "size"
+              }
+            ],
+            "return": "bytes"
+          }
+        },
+        "tell": {
+          "kind": "function",
+          "signature": {
+            "parameters": [
+              {
+                "annotation": null,
+                "default": {
+                  "kind": "required"
+                },
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "self"
+              }
+            ],
+            "return": "int"
+          }
+        }
+      }
     }
   },
   "codec_functions": {
@@ -2462,6 +2556,7 @@
         "GzipEncoder",
         "GzipInfo",
         "GzipMemberInfo",
+        "IterableReader",
         "VerificationResult",
         "WithAsyncRead",
         "WithAsyncReadWrite",
