@@ -131,6 +131,7 @@ _CLASS_MEMBERS = {
         "finish",
     ),
     "GzipInfo": ("member_count",),
+    "IterableReader": ("read", "tell", "close", "aclose", "closed"),
 }
 
 _DATACLASSES = (

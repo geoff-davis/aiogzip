@@ -16,6 +16,16 @@ All notable changes to this project will be documented in this file.
     `fast_compress` and `strict_size`, and returns one gzip member.
   - Both accept `bytes`, `bytearray` or `memoryview`, offload large inputs
     to the default executor and yield to the event loop between steps.
+- `aiogzip.IterableReader`: wraps an `AsyncIterable[bytes]`, such as an
+  HTTP response body or an object-store download, so that it can be passed
+  as `fileobj`. Lines, text, `iter_batches()` and sized reads then work on
+  a source that only offers async iteration. (#201)
+  - Items may be `bytes`, `bytearray` or `memoryview`; empty items are
+    skipped, and the source is never read ahead.
+  - It cannot seek. Rewinding goes through the handle's rewind cache,
+    bounded by `max_rewind_cache_size`.
+  - If the source raises or a read is cancelled while waiting for an item,
+    the reader becomes unusable and the gzip handle reports a broken stream.
 - `aiogzip.codec.compress()` and `aiogzip.codec.decompress()`: synchronous
   twins with the same options, for code outside an event loop. They accept
   `bytes` only, like the rest of the codec.

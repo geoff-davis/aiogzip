@@ -160,6 +160,23 @@ def streaming_contract() -> None:
     assert_type(aiogzip.compress_chunks(source()), AsyncIterator[bytes])
 
 
+async def iterable_reader_contract() -> None:
+    reader = aiogzip.IterableReader(source())
+    assert_type(await reader.read(), bytes)
+    assert_type(await reader.read(10), bytes)
+    assert_type(reader.tell(), int)
+    assert_type(reader.closed, bool)
+    assert_type(aiogzip.open(None, "rb", fileobj=reader), aiogzip.AsyncGzipBinaryFile)
+    assert_type(
+        aiogzip.open(None, "rt", fileobj=reader, closefd=True),
+        aiogzip.AsyncGzipTextFile,
+    )
+    assert_type(await aiogzip.read(None, fileobj=reader), bytes)
+    protocol: aiogzip.WithAsyncRead = reader
+    del protocol
+    await reader.aclose()
+
+
 async def one_shot_contract() -> None:
     assert_type(await aiogzip.compress(b"payload"), bytes)
     assert_type(await aiogzip.compress(bytearray(b"payload"), mtime=0), bytes)
