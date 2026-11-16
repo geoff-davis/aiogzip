@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- The `fast_compress=True` fallback warning (zlib-ng unavailable) from a file
+  handle now behaves as it does for `GzipEncoder`. (#234)
+  - It names the line of your code that called `aiogzip.open()`,
+    `aiogzip.write()` or a file class, where it named a line inside aiogzip.
+  - Python's default filter shows it once for each such line. It was shown
+    again on every open.
+  - A text handle warns when it is constructed, as a binary handle does,
+    where it warned on entering `async with`.
+
 ### Changed
 
 - Clearer errors for common mistakes. Exception types are unchanged. (#199)

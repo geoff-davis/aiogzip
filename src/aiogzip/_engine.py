@@ -18,6 +18,9 @@ import os
 import sys
 import warnings
 import zlib
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Tuple, Type
 
@@ -231,6 +234,56 @@ def compressobj(level: int, wbits: int, fast: bool = False) -> ZlibEngine:
 def have_fast_engine() -> bool:
     """True when zlib-ng is available and not disabled via the env escape hatch."""
     return _HAVE_ZNG
+
+
+_FAST_COMPRESS_FALLBACK_WARNING = (
+    "fast_compress=True requested but zlib-ng is not available; "
+    "falling back to stdlib zlib. Install the extra with "
+    "'pip install aiogzip[fast]' to enable faster compression."
+)
+
+# Source files under this directory are aiogzip's own frames.
+_PACKAGE_PREFIX = os.path.dirname(__file__) + os.sep
+
+# True while aiogzip builds an inner object for a handle that has already
+# warned: the encoder of a file handle, or the binary file of a text handle.
+_fallback_warning_suppressed: ContextVar[bool] = ContextVar(
+    "aiogzip_fallback_warning_suppressed", default=False
+)
+
+
+def warn_fast_compress_fallback() -> None:
+    """Warn that ``fast_compress=True`` is using stdlib zlib.
+
+    The warning is attributed to the nearest caller outside the aiogzip
+    package: the line that called ``aiogzip.open()``, ``compress_chunks()``
+    or a constructor. Python's default filter then shows it once for each
+    such line. ``warnings.catch_warnings()`` is not used to silence a nested
+    duplicate, because entering it resets every module's warning registry
+    and so defeats that once-per-location rule.
+    """
+    if _fallback_warning_suppressed.get():
+        return
+    # stacklevel 1 is this function and 2 is its caller.
+    stacklevel = 2
+    frame = sys._getframe(1)
+    while frame.f_code.co_filename.startswith(_PACKAGE_PREFIX):
+        outer = frame.f_back
+        if outer is None:
+            break
+        frame = outer
+        stacklevel += 1
+    warnings.warn(_FAST_COMPRESS_FALLBACK_WARNING, UserWarning, stacklevel=stacklevel)
+
+
+@contextmanager
+def fast_compress_fallback_warning_suppressed() -> Iterator[None]:
+    """Silence the fallback warning for a nested construction."""
+    token = _fallback_warning_suppressed.set(True)
+    try:
+        yield
+    finally:
+        _fallback_warning_suppressed.reset(token)
 
 
 def decompress_engine_name() -> str:

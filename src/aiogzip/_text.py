@@ -22,6 +22,7 @@ from typing import (
     cast,
 )
 
+from . import _engine
 from ._binary import AsyncGzipBinaryFile, ConcurrentOperationError
 from ._codec_async import _WriteBudget
 from ._common import (
@@ -277,8 +278,8 @@ class AsyncGzipTextFile:
         fast_compress: Writing only. With ``True``, the writer compresses
             with zlib-ng if the ``aiogzip[fast]`` extra is installed and
             ``AIOGZIP_ENGINE=stdlib`` has not disabled it;
-            otherwise it warns (``UserWarning``) when the handle is opened
-            and uses zlib. The default is ``False``. Raises ``TypeError``
+            otherwise it warns (``UserWarning``) when the handle is
+            constructed and uses zlib. The default is ``False``. Raises ``TypeError``
             for any value other than ``True`` or ``False``.
     """
 
@@ -478,6 +479,15 @@ class AsyncGzipTextFile:
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._strict_size = validated_strict_size
         self._fast_compress = validated_fast_compress
+        if (
+            self._writing_mode
+            and self._fast_compress
+            and not _engine.have_fast_engine()
+        ):
+            # Warn here, as the binary handle does, so the warning names the
+            # code that asked for fast compression. open() silences the
+            # binary file's own warning.
+            _engine.warn_fast_compress_fallback()
 
         # Batched line iteration: for the single-character terminator modes we
         # bulk-split a decoded chunk into whole lines once (C-speed) and serve
@@ -527,20 +537,22 @@ class AsyncGzipTextFile:
         self._opening = True
         try:
             filename = os.fspath(self._filename) if self._filename is not None else None
-            binary_file = AsyncGzipBinaryFile(
-                filename=filename,
-                mode=self._binary_mode,
-                chunk_size=self._chunk_size,
-                compresslevel=self._compresslevel,
-                mtime=self._header_mtime,
-                original_filename=self._header_filename_override,
-                fileobj=self._external_file,
-                closefd=self._closefd,
-                max_decompressed_size=self._max_decompressed_size,
-                max_rewind_cache_size=self._max_rewind_cache_size,
-                strict_size=self._strict_size,
-                fast_compress=self._fast_compress,
-            )
+            # __init__ has already warned about a zlib-ng fallback.
+            with _engine.fast_compress_fallback_warning_suppressed():
+                binary_file = AsyncGzipBinaryFile(
+                    filename=filename,
+                    mode=self._binary_mode,
+                    chunk_size=self._chunk_size,
+                    compresslevel=self._compresslevel,
+                    mtime=self._header_mtime,
+                    original_filename=self._header_filename_override,
+                    fileobj=self._external_file,
+                    closefd=self._closefd,
+                    max_decompressed_size=self._max_decompressed_size,
+                    max_rewind_cache_size=self._max_rewind_cache_size,
+                    strict_size=self._strict_size,
+                    fast_compress=self._fast_compress,
+                )
             try:
                 await binary_file.open()
             except BaseException as failure:

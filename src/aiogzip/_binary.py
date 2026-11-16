@@ -5,7 +5,6 @@ import gzip
 import io
 import operator
 import os
-import warnings
 from enum import Enum, auto
 from pathlib import Path
 from typing import (
@@ -416,12 +415,7 @@ class AsyncGzipBinaryFile:
             and self._fast_compress
             and not _engine.have_fast_engine()
         ):
-            warnings.warn(
-                "fast_compress=True requested but zlib-ng is not available; "
-                "falling back to stdlib zlib. Install the extra with "
-                "'pip install aiogzip[fast]' to enable faster compression.",
-                stacklevel=2,
-            )
+            _engine.warn_fast_compress_fallback()
         self._chunk_size = chunk_size
         self._compresslevel = compresslevel
         self._header_mtime = _normalize_mtime(mtime)
@@ -526,14 +520,12 @@ class AsyncGzipBinaryFile:
                 if header_filename is None and self._filename is not None:
                     header_filename = os.fspath(self._filename)
 
-                # __init__ already emits the established file-boundary warning
-                # when fast compression is unavailable. Avoid duplicating it
-                # when the codec performs its own direct-use warning.
-                with warnings.catch_warnings():
-                    warnings.filterwarnings(
-                        "ignore",
-                        message="fast_compress=True requested.*",
-                    )
+                # __init__ has already warned if fast compression is
+                # unavailable, so the encoder must not warn again. This does
+                # not use warnings.catch_warnings(), which resets every
+                # module's warning registry and made the warning repeat on
+                # every open.
+                with _engine.fast_compress_fallback_warning_suppressed():
                     encoder = GzipEncoder(
                         compresslevel=self._compresslevel,
                         mtime=self._header_mtime,
