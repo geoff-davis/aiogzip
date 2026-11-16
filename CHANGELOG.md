@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `AsyncGzipTextFile` and `aiogzip.open()` in a text mode reject an `errors`
+  value that is neither a `str` nor `None` with `TypeError` when the handle
+  is constructed, as `io.TextIOWrapper` does. Such a value was accepted, and
+  every read or write then failed with the codec's own `TypeError`. An
+  unknown handler name is still reported by the first read or write that
+  needs it. (#232)
+
 ### Changed
 
 - Clearer errors for common mistakes. Exception types are unchanged. (#199)

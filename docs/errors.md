@@ -141,7 +141,9 @@ The two parameters are checked at different times:
 - An unknown `encoding` raises `LookupError` (`unknown encoding: ...`) from
   the `AsyncGzipTextFile` constructor or from `aiogzip.open()`, before a file
   is opened or created. An empty `encoding` raises `ValueError`.
-- An unknown `errors` handler is not detected at construction. The handle
+- An `errors` value that is neither a `str` nor `None` raises `TypeError`
+  (`errors must be str or None, not int`) from the same place.
+- An unknown `errors` handler name is not detected at construction. The handle
   opens, and reads and writes succeed for as long as the data needs no error
   handling. The first read that meets undecodable bytes, or the first write
   that meets an unencodable character, raises `LookupError` (`unknown error

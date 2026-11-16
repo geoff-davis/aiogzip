@@ -173,8 +173,10 @@ reader and to encoding on a writer. The default is `"strict"`, and `None`
 means the default.
 
 With `"strict"`, undecodable input raises `UnicodeDecodeError` from the read
-and unencodable text raises `UnicodeEncodeError` from the write. The name is
-not checked when the handle is constructed: an unknown name raises
+and unencodable text raises `UnicodeEncodeError` from the write.
+
+Raises `TypeError` if the value is neither a `str` nor `None`. The name
+itself is not checked when the handle is constructed: an unknown name raises
 `LookupError` from the first read or write that meets an encoding or decoding
 error.
 
