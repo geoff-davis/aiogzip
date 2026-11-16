@@ -557,15 +557,18 @@ data = await aiogzip.decompress(blob, max_decompressed_size=50 * 2**20)
 
 `compress()` returns one gzip member and takes the options of
 `compress_chunks()`: `compresslevel`, `mtime`, `original_filename`,
-`fast_compress` and `strict_size`. The default level is `6`, where
-`gzip.compress()` uses `9`, and no file name is stored unless one is given.
+`fast_compress` and `strict_size`. Two defaults differ from
+`gzip.compress()`: the level is `6` on every Python version (the standard
+library used `9` before Python 3.15), and `mtime=None` stores the current
+time (the standard library stores `0` from Python 3.14). Pass `mtime=0` for
+reproducible output. No file name is stored unless one is given.
 
 `decompress()` decodes every concatenated member, accepts trailing zero
 padding and returns `b""` for empty input, as `gzip.decompress()` does. It
 returns only after every member's CRC and length have been checked.
 Corrupt or truncated input raises `gzip.BadGzipFile`. With
 `max_decompressed_size` set, a larger stream raises `OSError` as soon as it
-proves larger, so the call never inflates more than that many bytes.
+proves larger. It inflates one byte past the limit to prove it, and no more.
 `await asyncio.to_thread(gzip.decompress, data)` has no such bound.
 The default is `None`, no limit, as everywhere else in the API; set it for
 untrusted input.
@@ -574,11 +577,13 @@ Both accept `bytes`, `bytearray` or `memoryview`. A mutable buffer is copied
 once before any work starts, so changing it afterwards does not affect the
 result. Invalid arguments raise when the call is awaited.
 
-Neither blocks the event loop for long. `compress()` runs a payload of
-256 KiB or more in the default executor and a smaller one inline.
+The codec work does not hold the event loop for long. `compress()` runs a
+payload of 256 KiB or more in the default executor and a smaller one inline.
 `decompress()` inflates in bounded steps and yields to other tasks between
 them, with the first step of an input of 1 MiB or more in the executor. A
-cancelled call returns after the step in progress has finished.
+cancelled call returns after the step in progress has finished. Two plain
+memory copies do run on the event loop and grow with the payload: the copy
+of a `bytearray` or `memoryview` input, and the join that builds the result.
 
 `aiogzip.codec.compress()` and `aiogzip.codec.decompress()` are synchronous
 twins with the same options, for code outside an event loop. They run

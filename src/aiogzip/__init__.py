@@ -565,7 +565,9 @@ async def compress(
     The asynchronous counterpart of ``gzip.compress()``. A payload of 256 KiB
     or more is compressed in the default executor; a smaller one is
     compressed inline, where a thread hop would cost more than the work.
-    ``aiogzip.codec.compress()`` is the synchronous twin.
+    Copying a mutable ``data`` and assembling the result are plain memory
+    copies made on the event loop. ``aiogzip.codec.compress()`` is the
+    synchronous twin.
 
     An invalid argument raises when the call is awaited.
 
@@ -574,7 +576,7 @@ async def compress(
             mutable buffer is copied once, before anything else runs, so
             later changes to it do not affect the result.
         compresslevel: The compression level, from ``-1`` to ``9``. The
-            default is ``6``; ``gzip.compress()`` defaults to ``9``.
+            default is ``6``.
         mtime: The timestamp stored in the gzip header, from ``0`` to
             ``4294967295``. The default, ``None``, stores the current time;
             pass ``0`` for reproducible output.
@@ -617,11 +619,13 @@ async def decompress(
     padding and returns ``b""`` for empty input. The result is returned only
     after every member's CRC and length have been checked.
 
-    Inflation runs in bounded steps that yield to the event loop. With
-    ``max_decompressed_size`` set, the call stops and raises as soon as the
-    stream proves larger, so it never inflates more than that many bytes.
-    The result is assembled with one join, so the peak is about twice the
-    output size. ``aiogzip.codec.decompress()`` is the synchronous twin.
+    Inflation runs in bounded steps that yield to the event loop. Copying a
+    mutable ``data`` and assembling the result are plain memory copies made
+    on the event loop. With ``max_decompressed_size`` set, the call stops and
+    raises as soon as the stream proves larger: it inflates one byte past
+    the limit to prove it, and no more. The result is assembled with one
+    join, so the peak is about twice the output size.
+    ``aiogzip.codec.decompress()`` is the synchronous twin.
 
     An invalid argument raises when the call is awaited.
 

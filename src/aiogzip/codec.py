@@ -821,6 +821,44 @@ class GzipDecoder(_CodecBase):
             self._finished = True
 
 
+# A one-shot result is assembled from the codec's output chunks. A stream of
+# tiny members yields a chunk for each, and a list of them would cost several
+# times the payload in object headers. Chunks below this size are gathered in
+# a buffer and stored in pieces of at least this size.
+_COLLECT_SMALL_CHUNK = 64 * 1024
+
+
+class _OutputCollector:
+    """Gather one-shot output with overhead proportional to its size."""
+
+    __slots__ = ("_parts", "_small")
+
+    def __init__(self) -> None:
+        self._parts: list[bytes] = []
+        self._small = bytearray()
+
+    def add(self, chunk: bytes) -> None:
+        if len(chunk) < _COLLECT_SMALL_CHUNK:
+            self._small += chunk
+            if len(self._small) < _COLLECT_SMALL_CHUNK:
+                return
+            chunk = b""
+        if self._small:
+            self._parts.append(bytes(self._small))
+            self._small.clear()
+        if chunk:
+            self._parts.append(chunk)
+
+    def join(self) -> bytes:
+        self.add(b"")
+        if self._small:
+            self._parts.append(bytes(self._small))
+            self._small = bytearray()
+        if len(self._parts) == 1:
+            return self._parts[0]
+        return b"".join(self._parts)
+
+
 def compress(
     data: bytes,
     *,
@@ -860,11 +898,18 @@ def compress(
         strict_size=strict_size,
         output_chunk_size=_MAX_CHUNK_SIZE,
     )
+    output = _OutputCollector()
     try:
-        parts = [*encoder.start(), *encoder.feed(snapshot), *encoder.finish()]
+        for operation in (
+            encoder.start,
+            lambda: encoder.feed(snapshot),
+            encoder.finish,
+        ):
+            for chunk in operation():
+                output.add(chunk)
     finally:
         encoder.discard()
-    return b"".join(parts)
+    return output.join()
 
 
 def decompress(data: bytes, *, max_decompressed_size: int | None = None) -> bytes:
@@ -874,9 +919,9 @@ def decompress(data: bytes, *, max_decompressed_size: int | None = None) -> byte
     Like ``gzip.decompress()``, it decodes every concatenated member, accepts
     trailing zero padding and returns ``b""`` for empty input. Unlike it, the
     output can be bounded: with ``max_decompressed_size`` set, the call stops
-    inflating and raises once the stream proves larger, so it never inflates
-    more than that many bytes. The result is assembled with one join, so the
-    peak is about twice the output size.
+    inflating and raises once the stream proves larger: it inflates one byte
+    past the limit to prove it, and no more. The result is assembled with one
+    join, so the peak is about twice the output size.
 
     Args:
         data: The whole gzip stream. Exact ``bytes`` is used as it is and a
@@ -894,8 +939,12 @@ def decompress(data: bytes, *, max_decompressed_size: int | None = None) -> byte
     """
     snapshot = _snapshot_bytes_input(data)
     decoder = GzipDecoder(max_decompressed_size=max_decompressed_size)
+    output = _OutputCollector()
     try:
-        parts = [*decoder.feed(snapshot), *decoder.finish()]
+        for chunk in decoder.feed(snapshot):
+            output.add(chunk)
+        for chunk in decoder.finish():
+            output.add(chunk)
     finally:
         decoder.discard()
-    return b"".join(parts)
+    return output.join()
