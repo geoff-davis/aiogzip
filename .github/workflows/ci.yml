@@ -149,7 +149,7 @@ jobs:
       # gate for the structured runtime manifest. The test suite also covers
       # deterministic capture and intentional failure cases.
       - name: Check frozen public API manifest
-        run: python scripts/capture_public_api.py --check tests/data/public_api_2_0.json
+        run: python scripts/capture_public_api.py --check tests/data/public_api_2_1.json
 
       # Step 4: Run tests with pytest and coverage
       # --cov-fail-under gates against silent coverage regressions. The
@@ -334,7 +334,7 @@ jobs:
           cd "$temporary_workdir"
           "$GITHUB_WORKSPACE/.minimum-venv/bin/python" \
             "$GITHUB_WORKSPACE/scripts/capture_public_api.py" \
-            --check "$GITHUB_WORKSPACE/tests/data/public_api_2_0.json"
+            --check "$GITHUB_WORKSPACE/tests/data/public_api_2_1.json"
           "$GITHUB_WORKSPACE/.minimum-venv/bin/python" -m mypy --strict \
             "$GITHUB_WORKSPACE/tests/typing/public_api_positive.py"
           "$GITHUB_WORKSPACE/.minimum-venv/bin/python" -m ty check \
@@ -513,7 +513,7 @@ jobs:
             --artifact-kind "${{ matrix.artifact }}" \
             --repository-root "$GITHUB_WORKSPACE" \
             --api-script "$GITHUB_WORKSPACE/scripts/capture_public_api.py" \
-            --api-manifest "$GITHUB_WORKSPACE/tests/data/public_api_2_0.json" \
+            --api-manifest "$GITHUB_WORKSPACE/tests/data/public_api_2_1.json" \
             --report-output "$GITHUB_WORKSPACE/artifact-report.json"
 
       - name: Run maintained example success and failure scenarios
