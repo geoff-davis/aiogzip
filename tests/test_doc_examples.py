@@ -1,6 +1,6 @@
 """Validate code snippets in the documentation against the real API.
 
-Every fenced ``python`` block in README.md, CLAUDE.md, and docs/*.md is
+Every fenced ``python`` block in README.md, AGENTS.md, and docs/*.md is
 checked three ways:
 
 1. It parses as Python (top-level ``await``/``async with`` allowed, with
@@ -34,7 +34,7 @@ REPO_ROOT = Path(__file__).parent.parent
 DOC_FILES = sorted(
     {
         REPO_ROOT / "README.md",
-        REPO_ROOT / "CLAUDE.md",
+        REPO_ROOT / "AGENTS.md",
         *(REPO_ROOT / "docs").glob("*.md"),
     }
 )

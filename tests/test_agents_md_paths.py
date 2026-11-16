@@ -1,6 +1,6 @@
-"""Paths and test classes quoted in CLAUDE.md must exist.
+"""Paths and test classes quoted in AGENTS.md must exist.
 
-CLAUDE.md's "Useful Commands" named ``tests/test_aiogzip.py`` and
+The agent guide (then CLAUDE.md) named ``tests/test_aiogzip.py`` and
 ``src/aiogzip.py`` long after both were gone. ``test_doc_examples.py``
 checks fenced ``python`` blocks only, and those commands are in ``bash``
 blocks, so nothing failed.
@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).parent.parent
-CLAUDE_MD = REPO_ROOT / "CLAUDE.md"
+AGENTS_MD = REPO_ROOT / "AGENTS.md"
 
 # A repository-relative path under a top-level directory of this project.
 # The lookbehind skips a path that is the tail of a longer one, such as
@@ -35,22 +35,22 @@ def quoted_test_classes(text: str) -> list[tuple[str, str]]:
 
 
 pytestmark = pytest.mark.skipif(
-    not CLAUDE_MD.exists(), reason="CLAUDE.md is not part of this tree"
+    not AGENTS_MD.exists(), reason="AGENTS.md is not part of this tree"
 )
 
-_TEXT = CLAUDE_MD.read_text(encoding="utf-8") if CLAUDE_MD.exists() else ""
+_TEXT = AGENTS_MD.read_text(encoding="utf-8") if AGENTS_MD.exists() else ""
 
 
 @pytest.mark.parametrize("path", quoted_paths(_TEXT))
 def test_quoted_path_exists(path: str) -> None:
-    assert (REPO_ROOT / path).exists(), f"CLAUDE.md names {path}, which does not exist"
+    assert (REPO_ROOT / path).exists(), f"AGENTS.md names {path}, which does not exist"
 
 
 @pytest.mark.parametrize(("path", "name"), quoted_test_classes(_TEXT))
 def test_quoted_test_class_exists(path: str, name: str) -> None:
     source = (REPO_ROOT / path).read_text(encoding="utf-8")
     assert re.search(rf"^class {name}\b", source, re.MULTILINE), (
-        f"CLAUDE.md names {path}::{name}, which is not defined there"
+        f"AGENTS.md names {path}::{name}, which is not defined there"
     )
 
 

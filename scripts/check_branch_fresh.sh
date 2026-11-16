@@ -3,7 +3,7 @@
 # history of the branch being pushed — i.e. the branch was cut from (or has
 # drifted behind) a stale main. This repo is developed from multiple
 # machines, so a locally-green branch can still be based on old code.
-# See CLAUDE.md "Sync Before Working".
+# See AGENTS.md "Before starting work".
 #
 # Limitation: this checks HEAD, not the refs actually being pushed (which
 # arrive on stdin). Pushing a non-checked-out branch validates the wrong
