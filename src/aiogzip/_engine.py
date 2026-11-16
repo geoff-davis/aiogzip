@@ -16,12 +16,13 @@ reproducible error behaviour or debugging).
 import importlib
 import os
 import sys
+import threading
 import warnings
 import zlib
 from collections.abc import Iterator
 from contextlib import contextmanager
-from contextvars import ContextVar
 from dataclasses import dataclass
+from types import FrameType
 from typing import Any, Tuple, Type
 
 from ._common import ZlibEngine
@@ -242,48 +243,85 @@ _FAST_COMPRESS_FALLBACK_WARNING = (
     "'pip install aiogzip[fast]' to enable faster compression."
 )
 
-# Source files under this directory are aiogzip's own frames.
-_PACKAGE_PREFIX = os.path.dirname(__file__) + os.sep
+# The package whose frames are aiogzip's own ("aiogzip").
+_PACKAGE = __name__.rpartition(".")[0]
 
-# True while aiogzip builds an inner object for a handle that has already
-# warned: the encoder of a file handle, or the binary file of a text handle.
-_fallback_warning_suppressed: ContextVar[bool] = ContextVar(
-    "aiogzip_fallback_warning_suppressed", default=False
-)
+
+class _FallbackWarningState(threading.local):
+    """How many nested constructions are being silenced in this thread."""
+
+    suppressed = 0
+
+
+_fallback_warning_state = _FallbackWarningState()
+
+
+def _is_package_frame(frame: FrameType) -> bool:
+    """True for a frame of a module inside the aiogzip package.
+
+    The module's ``__package__`` identifies it. File names are not compared:
+    relocated bytecode can keep a build-time ``co_filename`` that no longer
+    matches where the package is installed.
+    """
+    package = frame.f_globals.get("__package__")
+    return isinstance(package, str) and (
+        package == _PACKAGE or package.startswith(_PACKAGE + ".")
+    )
 
 
 def warn_fast_compress_fallback() -> None:
     """Warn that ``fast_compress=True`` is using stdlib zlib.
 
-    The warning is attributed to the nearest caller outside the aiogzip
-    package: the line that called ``aiogzip.open()``, ``compress_chunks()``
-    or a constructor. Python's default filter then shows it once for each
-    such line. ``warnings.catch_warnings()`` is not used to silence a nested
-    duplicate, because entering it resets every module's warning registry
-    and so defeats that once-per-location rule.
+    The warning is attributed to the nearest calling frame outside the
+    aiogzip package: the line that called ``aiogzip.open()``,
+    ``compress_chunks()`` or a constructor. Python's default filter then
+    shows it once for each such line. The frame is handed to
+    ``warnings.warn_explicit()`` directly, as ``warnings.warn()`` would do
+    after counting ``stacklevel`` frames, so the result does not depend on
+    which frames ``warn()`` skips while counting.
+
+    ``warnings.catch_warnings()`` is not used to silence a nested duplicate,
+    because entering it resets every module's warning registry and so
+    defeats the once-per-location rule.
     """
-    if _fallback_warning_suppressed.get():
+    if _fallback_warning_state.suppressed:
         return
-    # stacklevel 1 is this function and 2 is its caller.
-    stacklevel = 2
     frame = sys._getframe(1)
-    while frame.f_code.co_filename.startswith(_PACKAGE_PREFIX):
+    while _is_package_frame(frame):
         outer = frame.f_back
         if outer is None:
             break
         frame = outer
-        stacklevel += 1
-    warnings.warn(_FAST_COMPRESS_FALLBACK_WARNING, UserWarning, stacklevel=stacklevel)
+    # module_globals is not passed on: it only lets linecache ask the
+    # module's loader for the source line, and for a script run as __main__
+    # that lookup issues a DeprecationWarning of its own.
+    module_globals = frame.f_globals
+    warnings.warn_explicit(
+        _FAST_COMPRESS_FALLBACK_WARNING,
+        UserWarning,
+        frame.f_code.co_filename,
+        frame.f_lineno,
+        module=module_globals.get("__name__") or "<string>",
+        registry=module_globals.setdefault("__warningregistry__", {}),
+    )
 
 
 @contextmanager
 def fast_compress_fallback_warning_suppressed() -> Iterator[None]:
-    """Silence the fallback warning for a nested construction."""
-    token = _fallback_warning_suppressed.set(True)
+    """Silence the fallback warning for a nested construction.
+
+    Used while aiogzip builds an inner object for a handle that has already
+    warned: the encoder of a file handle, or the binary file of a text
+    handle. The state is per thread and is restored before the ``with``
+    block is left. It is not a ``ContextVar``: a task created inside the
+    block would copy the context and keep the suppression after the block
+    had ended.
+    """
+    _fallback_warning_state.suppressed += 1
     try:
         yield
     finally:
-        _fallback_warning_suppressed.reset(token)
+        _fallback_warning_state.suppressed -= 1
 
 
 def decompress_engine_name() -> str:

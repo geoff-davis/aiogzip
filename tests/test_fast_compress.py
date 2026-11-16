@@ -5,8 +5,13 @@ uses it when the caller passes fast_compress=True AND zlib-ng is available.
 Installing the extra alone must not change default compressed output.
 """
 
+import asyncio
 import gzip
 import linecache
+import os
+import subprocess
+import sys
+import threading
 import warnings
 
 import pytest
@@ -263,7 +268,7 @@ class TestFallbackWarningLocation:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             async with aiogzip.open(tmp_path / "s.gz", mode, fast_compress=True):
-                assert _engine._fallback_warning_suppressed.get() is False
+                assert _engine._fallback_warning_state.suppressed == 0
                 aiogzip.GzipEncoder(fast_compress=True)
         assert len(_fallbacks(caught)) == 2
 
@@ -275,7 +280,7 @@ class TestFallbackWarningLocation:
                 with pytest.raises(OSError):
                     async with aiogzip.open(missing, mode, fast_compress=True):
                         pass
-        assert _engine._fallback_warning_suppressed.get() is False
+        assert _engine._fallback_warning_state.suppressed == 0
 
     def test_subclass_outside_the_package_is_the_caller(self):
         class Encoder(aiogzip.GzipEncoder):
@@ -288,3 +293,123 @@ class TestFallbackWarningLocation:
         (warning,) = _fallbacks(caught)
         assert warning.filename == __file__
         assert "super().__init__(fast_compress=True)" in _source_line(warning)
+
+    async def test_task_created_during_suppression_still_warns(self):
+        """Suppression must not follow a task created inside the block."""
+
+        async def construct():
+            aiogzip.GzipEncoder(fast_compress=True)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with _engine.fast_compress_fallback_warning_suppressed():
+                task = asyncio.get_running_loop().create_task(construct())
+                aiogzip.GzipEncoder(fast_compress=True)
+            assert _fallbacks(caught) == []
+            await task
+        assert len(_fallbacks(caught)) == 1
+
+    def test_suppression_is_per_thread(self):
+        caught_in_thread = []
+
+        def construct():
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                aiogzip.GzipEncoder(fast_compress=True)
+                caught_in_thread.extend(_fallbacks(caught))
+
+        with _engine.fast_compress_fallback_warning_suppressed():
+            thread = threading.Thread(target=construct)
+            thread.start()
+            thread.join()
+        assert len(caught_in_thread) == 1
+
+    def test_suppression_nests_and_survives_an_exception(self):
+        with pytest.raises(RuntimeError):
+            with _engine.fast_compress_fallback_warning_suppressed():
+                with _engine.fast_compress_fallback_warning_suppressed():
+                    assert _engine._fallback_warning_state.suppressed == 2
+                assert _engine._fallback_warning_state.suppressed == 1
+                raise RuntimeError
+        assert _engine._fallback_warning_state.suppressed == 0
+
+    @pytest.mark.parametrize(
+        "filename",
+        [
+            "/app/importlib/_bootstrap_user.py",
+            "/elsewhere/build/lib/aiogzip/_binary.py",
+            "<string>",
+        ],
+    )
+    def test_caller_is_identified_by_module_not_by_file_name(self, filename):
+        """A caller is whatever module is outside the package.
+
+        ``warnings.warn()`` skips frames whose file name looks like
+        importlib's bootstrap while it counts ``stacklevel``, and a file name
+        can look like one of aiogzip's own. Neither changes the attribution.
+        """
+        source = "\n\nimport aiogzip\naiogzip.GzipEncoder(fast_compress=True)\n"
+        namespace = {"__name__": "user_module", "__package__": ""}
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            exec(compile(source, filename, "exec"), namespace)
+        (warning,) = _fallbacks(caught)
+        assert (warning.filename, warning.lineno) == (filename, 4)
+
+    def test_package_frame_with_a_foreign_file_name_is_skipped(self):
+        """Relocated bytecode keeps a build-time file name; it is still ours."""
+        source = "def construct(encoder):\n    return encoder(fast_compress=True)\n"
+        namespace = {"__name__": "aiogzip._relocated", "__package__": "aiogzip"}
+        exec(compile(source, "/build/tmp/aiogzip/_relocated.py", "exec"), namespace)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            namespace["construct"](aiogzip.GzipEncoder)
+        (warning,) = _fallbacks(caught)
+        assert warning.filename == __file__
+        assert 'namespace["construct"](aiogzip.GzipEncoder)' in _source_line(warning)
+
+    def test_similarly_named_package_is_a_caller(self):
+        source = "import aiogzip\naiogzip.GzipEncoder(fast_compress=True)\n"
+        namespace = {"__name__": "aiogzip_tools.x", "__package__": "aiogzip_tools"}
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            exec(compile(source, "/app/aiogzip_tools/x.py", "exec"), namespace)
+        (warning,) = _fallbacks(caught)
+        assert warning.filename == "/app/aiogzip_tools/x.py"
+
+    def test_error_filter_can_match_the_calling_module(self, tmp_path):
+        """The module name given to the filter is the caller's."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            warnings.filterwarnings(
+                "error", category=UserWarning, module=__name__.replace(".", r"\.")
+            )
+            with pytest.raises(UserWarning, match=FALLBACK):
+                aiogzip.open(tmp_path / "m.gz", "wt", fast_compress=True)
+
+    def test_script_run_as_main_gets_one_warning_at_its_own_line(self, tmp_path):
+        """A plain script is the caller, and nothing else is warned about."""
+        script = tmp_path / "script.py"
+        script.write_text(
+            "import asyncio\n"
+            "import sys\n"
+            "import aiogzip\n"
+            "async def main():\n"
+            "    for name in ('a.gz', 'b.gz'):\n"
+            "        async with aiogzip.open(name, 'wt', fast_compress=True) as f:\n"
+            "            await f.write('x')\n"
+            "asyncio.run(main())\n"
+        )
+        src = os.path.dirname(os.path.dirname(aiogzip.__file__))
+        result = subprocess.run(
+            [sys.executable, "-W", "error::DeprecationWarning", str(script)],
+            cwd=tmp_path,
+            env={**os.environ, "AIOGZIP_ENGINE": "stdlib", "PYTHONPATH": src},
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stderr
+        warned = [line for line in result.stderr.splitlines() if "Warning" in line]
+        assert len(warned) == 1, result.stderr
+        assert warned[0].startswith(f"{script}:6: UserWarning: fast_compress=True")
