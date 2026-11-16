@@ -1648,7 +1648,7 @@
       "constructor": {
         "parameters": [
           {
-            "annotation": "AsyncIterable[bytes | bytearray | memoryview]",
+            "annotation": "AsyncIterable[Union[bytes, bytearray, memoryview]]",
             "default": {
               "kind": "required"
             },

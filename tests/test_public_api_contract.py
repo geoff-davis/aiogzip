@@ -123,6 +123,13 @@ def test_public_api_annotations_are_interpreter_neutral():
         module._annotation_name(typing.Union[str, bytes, Path, None])
         == "Union[str, bytes, pathlib.Path, NoneType]"
     )
+    assert (
+        module._annotation_name(typing.AsyncIterable[typing.Union[bytes, bytearray]])
+        == "AsyncIterable[Union[bytes, bytearray]]"
+    )
+    assert module._annotation_name(typing.AsyncIterable[bytes]) == (
+        "AsyncIterable[bytes]"
+    )
 
 
 def test_public_api_capture_rejects_duplicate_exports():
