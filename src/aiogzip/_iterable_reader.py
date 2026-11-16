@@ -6,6 +6,7 @@ adapter as it reads any other custom ``fileobj``.
 """
 
 import asyncio
+import inspect
 from typing import Any, AsyncIterable, Optional, Union
 
 # An item that is empty is skipped, not treated as end of input. A source
@@ -43,6 +44,7 @@ class IterableReader:
     """
 
     __slots__ = (
+        "_cleaned_up",
         "_closed",
         "_eof",
         "_failure",
@@ -74,6 +76,7 @@ class IterableReader:
         self._position = 0
         self._eof = False
         self._closed = False
+        self._cleaned_up = False
         self._reading = False
         self._failure: Optional[BaseException] = None
 
@@ -204,21 +207,27 @@ class IterableReader:
 
         Calls the iterator's ``aclose()`` when it has one, so an async
         generator's cleanup runs. If iteration never started, an ``aclose()``
-        on the source itself is used. Closing twice has no effect.
+        on the source itself is used. Closing again after a close that
+        succeeded has no effect. If the source's ``aclose()`` raises or is
+        cancelled, the reader stays closed to reads, the error propagates and
+        a later ``close()`` calls ``aclose()`` again.
         """
-        if self._closed:
+        if self._cleaned_up:
             return
         self._closed = True
         self._head = b""
         self._offset = 0
+        # Keep the source until its cleanup has succeeded, so that a failed
+        # or cancelled close can be retried.
         target = self._iterator if self._iterator is not None else self._source
-        self._iterator = None
-        self._source = None
         aclose = getattr(target, "aclose", None)
         if callable(aclose):
             result = aclose()
-            if hasattr(result, "__await__"):
+            if inspect.isawaitable(result):
                 await result
+        self._cleaned_up = True
+        self._iterator = None
+        self._source = None
 
     async def aclose(self) -> None:
         """Alias of :meth:`close`, for code written against async generators."""
