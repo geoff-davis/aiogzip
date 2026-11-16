@@ -303,8 +303,9 @@ class TestLimit:
     @pytest.mark.parametrize("use_async", [False, True])
     async def test_expansion_past_the_limit_is_never_held(self, use_async):
         """A 64 MiB bomb with a 1 MiB limit allocates about the limit."""
-        bomb = gzip.compress(bytes(64 * MIB), compresslevel=1)
-        assert len(bomb) < MIB // 2
+        bomb = gzip.compress(bytes(64 * MIB), compresslevel=9)
+        # Windows builds of CPython bundle zlib-ng, which compresses less.
+        assert len(bomb) < MIB
         tracemalloc.start()
         try:
             tracemalloc.reset_peak()
@@ -441,7 +442,7 @@ class TestOffload:
     async def test_inline_decompression_yields_to_the_event_loop(self):
         """A small bomb inflates inline; other tasks still run during it."""
         size = 32 * MIB
-        blob = gzip.compress(bytes(size), compresslevel=1)
+        blob = gzip.compress(bytes(size), compresslevel=9)
         assert len(blob) < driver._DECODE_OFFLOAD_THRESHOLD
         turns = 0
         done = False
