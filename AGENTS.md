@@ -30,8 +30,11 @@ git log --oneline main..origin/main   # any output means local main is stale
 ```
 
 If local main is behind, fast-forward it (`git checkout main && git pull --ff-only`) and branch from the updated
-main, then `uv sync --all-extras`. As a cross-check, `__version__` should match the newest `CHANGELOG.md` entry and
-the latest tag (`git tag --sort=-v:refname | head -1`).
+main, then `uv sync --all-extras`. As a cross-check, compare `__version__` with the newest released
+`CHANGELOG.md` entry and the latest tag (`git tag --sort=-v:refname | head -1`). On a release commit all three
+agree. Between releases `__version__` is a development version ahead of the latest tag (for example `2.0.3.dev0`
+after `v2.0.2`) with an `[Unreleased]` changelog section; that is normal. A `__version__` at or behind a tag that
+origin has moved past means the clone is stale.
 
 Why: a stale checkout once produced a full package review and a 21-commit branch built on v1.7.0 while origin was
 at v1.8.0. Two commits duplicated shipped work, the PR opened conflicting, and everything had to be rebased. The git
@@ -238,5 +241,6 @@ github-actions ecosystem keeps the pin current.
 
 ## Releases
 
-`/release-prep`, merge, then `/release-tag`. Publishing is tag-triggered; `/release-tag` confirms PyPI before
-creating the GitHub release.
+`/release-prep`, merge, then `/release-tag`. Publishing is tag-triggered. `/release-tag` pushes the signed tag,
+creates the GitHub release, then watches the publish workflow and confirms the version is live on PyPI before
+reporting the release complete.
