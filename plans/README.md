@@ -10,6 +10,10 @@ release after 2.0: one-shot helpers, a reader for `AsyncIterable[bytes]`
 sources and documentation, all additive. The maintainer decided D1 to D8 on
 2026-11-16. `main` stays `2.0.3.dev0` until 2.0.3 is published.
 
+- [2.0.2 benchmark table refresh](benchmarks/v2.0.2-table-refresh.md): the
+  current `docs/performance.md` table and the baseline for gate M11, with
+  2.0.0a1 and 1.11.0 measured alongside (#206)
+
 ## Released: 2.0.0
 
 2.0.0 was published on 2026-10-17, 2.0.1 on 2026-11-10 and 2.0.2 on

@@ -7,26 +7,41 @@ line size, storage latency, and how much concurrency the application can use.
 
 ## Benchmark Summary
 
-The table below is from the 2.0.0a1 release-candidate Linux x86-64 runs on
-Python 3.12.12 on 2026-07-22. Full environment metadata, locked v1.11.0
-comparisons, and absolute sans-I/O codec results are in the
-[candidate benchmark record](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a1-candidate.md).
-Each result is the median of at least five runs. Direct I/O uses 8 MiB of
-uncompressed input; the concurrency case uses ten 1 MiB files plus simulated
-latency. Read comparisons use the exact same deterministic gzip bytes, and
-write comparisons use `compresslevel=6` for both libraries. These numbers
-illustrate tradeoffs rather than promising performance on different hardware
-or data.
+The table below is from aiogzip 2.0.2, measured on 2026-11-16 on Linux x86-64
+with Python 3.14.2. Full environment metadata, the raw captures and the same
+measurements for 2.0.0a1 and 1.11.0 are in the
+[2.0.2 benchmark record](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.2-table-refresh.md).
+Each figure is a best-observed comparison, not a typical one: a capture runs
+each workload five times and reports the run whose aiogzip time was the
+median, and the table compares the lowest aiogzip time with the lowest `gzip`
+time across three interleaved captures. Direct I/O uses 8 MiB
+of uncompressed input; the concurrency case uses ten 1 MiB files plus
+simulated latency. Read comparisons use the exact same deterministic gzip
+bytes, and write comparisons use `compresslevel=6` for both libraries. These
+numbers illustrate tradeoffs rather than promising performance on different
+hardware or data.
 
 | Workload | aiogzip (stdlib) vs `gzip` | aiogzip (zlib-ng) vs `gzip` |
 | --- | ---: | ---: |
-| Bulk text write, level 6 | parity (~1.01x slower) | parity (~1.02x slower) |
-| Bulk LF-only text read | ~1.25x slower | ~1.90x faster |
-| Tuned JSONL line iteration | ~1.79x slower | ~1.53x slower |
-| Tuned JSONL read and parse | parity (~1.01x faster) | ~1.09x slower |
-| JSONL batched `readlines()` and parse | parity | parity (~1.01x slower) |
-| Highly compressible bulk `read(-1)` | ~1.08x faster | ~14.5x faster |
-| Ten files with simulated 10 ms latency | ~6.4x faster | ~6.9x faster |
+| Bulk text write, level 6 | parity (~1.01x slower) | parity (~1.01x slower) |
+| Bulk LF-only text read | ~1.11x slower | ~2.0x faster |
+| Tuned JSONL line iteration | ~1.62x slower | ~1.44x slower |
+| Tuned JSONL read and parse | ~1.11x slower | ~1.14x slower |
+| JSONL batched `readlines()` and parse | parity (~1.02x faster) | ~1.07x faster |
+| Highly compressible bulk `read(-1)` | ~1.05x faster | ~12.2x faster |
+| Ten files with simulated 10 ms latency | ~7.1x faster | ~6.8x faster |
+
+The previous table, from 2.0.0a1 on Python 3.12, is in the
+[2.0.0a1 candidate record](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a1-candidate.md).
+Much of the difference between its ratios and these does not come from the
+library: the 2.0.0a1 source measured again in this environment gives ratios
+close to the ones above. The interpreter, the zlib-ng package, the machine
+state and the way runs are combined all differ from that record, and their
+effects were not separated. Measured side by side here, 2.0.2 is faster
+than 2.0.0a1 on bulk text reads and within about 2% of it on the other table
+workloads, with one exception: the highly compressible `read(-1)` on zlib-ng
+takes about 10% longer (0.1 ms on an 8 MiB read), which a pinned micro-test
+confirmed.
 
 ### 2.0.0a2 decoder evidence
 
@@ -97,19 +112,20 @@ not be interpreted as a 1.3x advantage over stdlib `gzip`.
 
 For batch-oriented reads, `readlines(hint)` avoids awaiting that per-line path.
 In the current 100,000-line stdlib-engine microbenchmark, `readlines()` took
-about 8.9 ms versus 25.8 ms for a `readline()` loop, roughly 2.9x faster. Batched line
+about 5.2 ms versus 16.5 ms for a `readline()` loop in their fastest runs,
+roughly 3.1x faster. Batched line
 splitting also uses C-level `str.splitlines()` when a cheap probe confirms the
 region contains only standard newlines. On the representative 8 MiB JSONL
-fixture, parsing 1 MiB groups was about 9-14% faster than direct `async for`
-and finished at parity with synchronous `gzip` on both engines. This
+fixture, parsing 1 MiB groups was about 13% faster than direct `async for`
+and finished at parity with synchronous `gzip` or slightly ahead of it. This
 optimization does not change direct
 async-iteration performance.
 
 Default universal-newline reads also have a common LF-only fast path. It scans
 once for CR and returns the decoded text unchanged when none is present,
 instead of counting CRLF, LF, and CR separately. On the 8 MiB fixture this made
-the zlib-ng bulk text read about 1.8x faster than `gzip`; stdlib-zlib aiogzip
-narrowed to about 1.2x slower. Mixed CR, LF, and CRLF input retains the full
+the zlib-ng bulk text read about 2.0x faster than `gzip`; stdlib-zlib aiogzip
+narrowed to about 1.1x slower. Mixed CR, LF, and CRLF input retains the full
 tracking and translation path.
 
 For writing many small records, prefer `writelines()` over an explicit loop of
@@ -137,7 +153,7 @@ Concurrency and event-loop responsiveness are aiogzip's primary advantages over
 calling synchronous `gzip` directly inside an async application.
 
 - A synthetic ten-file workload with 10 ms of simulated latency measured about
-  6.6-7.3x faster than sequential synchronous processing. The gain comes from
+  7x faster than sequential synchronous processing. The gain comes from
   overlapping the delays; it is not a raw codec-speed comparison.
 - The suite also includes a short five-operation mixed read/write workload;
   treat its ratio as latency-sensitive rather than a stable throughput claim.
@@ -158,7 +174,7 @@ pip install "aiogzip[fast]"
 - **Decompression** uses zlib-ng automatically whenever it is installed. Its
   output is **byte-identical** to stdlib `zlib`, so this is transparent. In the
   representative runs above it changed bulk LF-only text reading from slower
-than `gzip` to faster, and made highly compressible bulk `read(-1)` about 14x
+than `gzip` to faster, and made highly compressible bulk `read(-1)` about 12x
   faster. Gains depend strongly on the data and access pattern.
 - **CRC-32 checksums** also use zlib-ng's SIMD implementation when it is
   installed, except on macOS where Apple's hardware-accelerated stdlib zlib is

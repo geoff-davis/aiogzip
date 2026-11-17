@@ -1,0 +1,61 @@
+scheduled Mon Nov 16 19:07:18 PST 2026 for Mon Nov 16 19:07:18 PST 2026; runner c692654
+19:07:23 busy=0.54 cores, load 1.06 0.82 0.66, waiting
+19:08:28 busy=0.50 cores, load 0.97 0.83 0.67, waiting
+19:09:33 start table-v2.0.2-stdlib-r1 (load 0.68 0.77 0.66)
+19:09:52 done table-v2.0.2-stdlib-r1 (load 0.92 0.82 0.68)
+19:09:58 start table-v2.0.0a1-stdlib-r1 (load 0.84 0.81 0.68)
+19:10:17 done table-v2.0.0a1-stdlib-r1 (load 0.89 0.82 0.68)
+19:10:22 start table-v1.11.0-stdlib-r1 (load 0.98 0.84 0.69)
+19:10:38 done table-v1.11.0-stdlib-r1 (load 1.38 0.94 0.73)
+19:10:43 busy=0.52 cores, load 1.27 0.92 0.72, waiting
+19:11:48 start table-v2.0.2-zlib-ng-r1 (load 0.70 0.83 0.71)
+19:12:07 done table-v2.0.2-zlib-ng-r1 (load 0.91 0.87 0.72)
+19:12:12 busy=0.60 cores, load 0.83 0.85 0.72, waiting
+19:13:17 busy=0.57 cores, load 0.66 0.78 0.70, waiting
+19:14:22 busy=0.58 cores, load 0.42 0.69 0.67, waiting
+19:15:27 start table-v2.0.0a1-zlib-ng-r1 (load 0.76 0.73 0.69)
+19:15:45 done table-v2.0.0a1-zlib-ng-r1 (load 0.83 0.75 0.70)
+19:15:50 busy=0.52 cores, load 0.76 0.74 0.69, waiting
+19:16:55 start table-v1.11.0-zlib-ng-r1 (load 0.51 0.67 0.67)
+19:17:11 done table-v1.11.0-zlib-ng-r1 (load 0.69 0.70 0.68)
+19:17:16 start table-v1.11.0-stdlib-r2 (load 0.71 0.71 0.69)
+19:17:33 done table-v1.11.0-stdlib-r2 (load 0.78 0.72 0.69)
+19:17:38 start table-v2.0.2-stdlib-r2 (load 0.71 0.71 0.69)
+19:17:57 done table-v2.0.2-stdlib-r2 (load 0.80 0.73 0.70)
+19:18:02 start table-v2.0.0a1-stdlib-r2 (load 0.73 0.72 0.69)
+19:18:21 done table-v2.0.0a1-stdlib-r2 (load 0.95 0.77 0.71)
+19:18:26 busy=0.51 cores, load 0.96 0.77 0.71, waiting
+19:19:31 busy=0.64 cores, load 0.54 0.70 0.69, waiting
+19:20:37 busy=0.59 cores, load 0.88 0.76 0.72, waiting
+19:21:42 busy=0.59 cores, load 0.69 0.75 0.72, waiting
+19:22:47 busy=0.84 cores, load 0.58 0.70 0.70, waiting
+19:23:52 start table-v1.11.0-zlib-ng-r2 (load 0.66 0.72 0.71)
+19:24:08 done table-v1.11.0-zlib-ng-r2 (load 0.74 0.74 0.72)
+19:24:13 start table-v2.0.2-zlib-ng-r2 (load 0.68 0.73 0.72)
+19:24:31 done table-v2.0.2-zlib-ng-r2 (load 0.77 0.75 0.72)
+19:24:36 start table-v2.0.0a1-zlib-ng-r2 (load 0.71 0.73 0.72)
+19:24:55 done table-v2.0.0a1-zlib-ng-r2 (load 1.03 0.80 0.74)
+19:25:00 busy=0.71 cores, load 0.94 0.79 0.74, waiting
+19:26:05 start table-v2.0.0a1-stdlib-r3 (load 0.55 0.72 0.72)
+19:26:24 done table-v2.0.0a1-stdlib-r3 (load 1.84 1.01 0.81)
+19:26:29 start table-v1.11.0-stdlib-r3 (load 1.70 0.99 0.81)
+19:26:46 done table-v1.11.0-stdlib-r3 (load 1.62 1.01 0.82)
+19:26:51 start table-v2.0.2-stdlib-r3 (load 1.49 0.99 0.81)
+19:27:10 done table-v2.0.2-stdlib-r3 (load 1.35 1.00 0.82)
+19:27:16 busy=0.56 cores, load 1.64 1.06 0.84, waiting
+19:28:21 busy=0.53 cores, load 0.84 0.94 0.81, waiting
+19:29:26 busy=0.57 cores, load 0.67 0.86 0.80, waiting
+19:30:31 start table-v2.0.0a1-zlib-ng-r3 (load 0.36 0.74 0.76)
+19:30:49 done table-v2.0.0a1-zlib-ng-r3 (load 0.84 0.82 0.78)
+19:30:54 start table-v1.11.0-zlib-ng-r3 (load 0.77 0.81 0.78)
+19:31:10 done table-v1.11.0-zlib-ng-r3 (load 0.99 0.85 0.80)
+19:31:15 busy=0.50 cores, load 0.91 0.83 0.79, waiting
+19:32:20 start table-v2.0.2-zlib-ng-r3 (load 0.72 0.78 0.77)
+19:32:39 done table-v2.0.2-zlib-ng-r3 (load 0.88 0.81 0.78)
+19:32:44 busy=0.67 cores, load 0.81 0.80 0.78, waiting
+19:33:49 busy=0.56 cores, load 0.47 0.70 0.75, waiting
+19:34:54 start all-v2.0.2-stdlib (load 0.56 0.70 0.74)
+19:35:23 done all-v2.0.2-stdlib (load 0.71 0.72 0.75)
+19:35:28 start all-v2.0.2-zlib-ng (load 0.73 0.73 0.75)
+19:35:59 done all-v2.0.2-zlib-ng (load 0.90 0.77 0.77)
+finished Mon Nov 16 19:35:59 PST 2026 status=0
