@@ -462,6 +462,11 @@ class GzipDecoder(_CodecBase):
     trailer-validated members survive a later failure or explicit discard;
     :attr:`finished` remains the whole-stream validation indicator.
 
+    ``max_members`` bounds the number of members. Input that continues after
+    that many complete members raises ``OSError`` before the next header is
+    parsed, so no record or header metadata is kept for it. Trailing zero
+    padding does not count.
+
     Methods return bounded lazy iterators that must be exhausted. This class
     performs no I/O or executor offload and is not thread-safe.
     """
@@ -472,6 +477,7 @@ class GzipDecoder(_CodecBase):
         output_chunk_size: int = 256 * 1024,
         max_decompressed_size: int | None = None,
         collect_member_info: bool = False,
+        max_members: int | None = None,
     ) -> None:
         validated_collect_member_info = _validate_bool(
             collect_member_info, "collect_member_info"
@@ -480,7 +486,9 @@ class GzipDecoder(_CodecBase):
         _validate_chunk_size(output_chunk_size)
         _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")
         self._output_chunk_size = output_chunk_size
+        _validate_optional_positive_int(max_members, "max_members")
         self._max_decompressed_size = max_decompressed_size
+        self._max_members = max_members
         self._collect_member_info = validated_collect_member_info
         self._pending = _InputQueue(_INFLATE_INPUT_WINDOW)
         self._inflate_input: bytes | None = None
@@ -718,6 +726,15 @@ class GzipDecoder(_CodecBase):
                 parser = self._header_parser
                 assert parser is not None
                 if not parser.started:
+                    limit = self._max_members
+                    if limit is not None and self._member_count >= limit:
+                        # Refuse the stream before parsing the next header,
+                        # which may carry metadata, or keeping its record.
+                        raise OSError(
+                            f"gzip stream exceeded max_members ({limit}): "
+                            f"input continues at compressed offset "
+                            f"{self._consumed_size}"
+                        )
                     self._member_offset = self._consumed_size
                 pending_size = len(self._pending)
                 parsed = parser.advance(self._pending)
@@ -912,7 +929,12 @@ def compress(
     return output.join()
 
 
-def decompress(data: bytes, *, max_decompressed_size: int | None = None) -> bytes:
+def decompress(
+    data: bytes,
+    *,
+    max_decompressed_size: int | None = None,
+    max_members: int | None = None,
+) -> bytes:
     """Decompress a complete gzip stream held in memory, synchronously.
 
     This is :class:`GzipDecoder` driven to completion in the calling thread.
@@ -929,16 +951,21 @@ def decompress(data: bytes, *, max_decompressed_size: int | None = None) -> byte
         max_decompressed_size: The largest number of decompressed bytes to
             accept. The default, ``None``, sets no limit. Set it for
             untrusted input.
+        max_members: The largest number of gzip members to accept. The
+            default, ``None``, sets no limit.
 
     Returns:
         The decompressed payload of all members.
 
     Raises:
         gzip.BadGzipFile: If the stream is malformed, corrupt or truncated.
-        OSError: If the output would exceed ``max_decompressed_size``.
+        OSError: If the output would exceed ``max_decompressed_size`` or the
+            stream has more than ``max_members`` members.
     """
     snapshot = _snapshot_bytes_input(data)
-    decoder = GzipDecoder(max_decompressed_size=max_decompressed_size)
+    decoder = GzipDecoder(
+        max_decompressed_size=max_decompressed_size, max_members=max_members
+    )
     output = _OutputCollector()
     try:
         for chunk in decoder.feed(snapshot):

@@ -96,6 +96,9 @@ async for data in aiogzip.decompress_chunks(
     await consume(data)
 ```
 
+`max_members` limits the number of gzip members in the same call; input that
+continues after that many raises `OSError`.
+
 The codec is limited to the remaining allowance plus one byte on each inflate
 call, so overflow is detected without first materializing an arbitrarily large
 expansion. Exceeding the limit raises `OSError`.
@@ -132,8 +135,8 @@ Each returned iterator is single-consumer. Do not issue overlapping `anext()`
 calls from multiple tasks; normal async-generator concurrency protection raises
 `RuntimeError` instead of allowing codec-state corruption.
 
-Argument validation for `source`, `output_chunk_size`, and
-`max_decompressed_size` happens when `decompress_chunks()` is called. Source
+Argument validation for `source`, `output_chunk_size`,
+`max_decompressed_size` and `max_members` happens when `decompress_chunks()` is called. Source
 item errors, corruption, I/O-like source failures, and cancellation occur while
 the iterator is consumed.
 

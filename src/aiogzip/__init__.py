@@ -148,6 +148,7 @@ def AsyncGzipFile(
     max_rewind_cache_size: Optional[int] = ...,
     strict_size: bool = ...,
     fast_compress: bool = ...,
+    max_members: Optional[int] = ...,
 ) -> AsyncGzipTextFile: ...
 
 
@@ -166,6 +167,7 @@ def AsyncGzipFile(
     max_rewind_cache_size: Optional[int] = ...,
     strict_size: bool = ...,
     fast_compress: bool = ...,
+    max_members: Optional[int] = ...,
 ) -> AsyncGzipBinaryFile: ...
 
 
@@ -200,8 +202,8 @@ def AsyncGzipFile(
         **kwargs: Passed by keyword to the class: ``chunk_size``,
             ``compresslevel``, ``mtime``, ``original_filename``,
             ``fileobj``, ``closefd``, ``max_decompressed_size``,
-            ``max_rewind_cache_size``, ``strict_size`` and
-            ``fast_compress``, and in a text mode ``encoding``, ``errors``
+            ``max_rewind_cache_size``, ``strict_size``,
+            ``fast_compress`` and ``max_members``, and in a text mode ``encoding``, ``errors``
             and ``newline``. Each has the meaning, default and exceptions
             documented on ``AsyncGzipBinaryFile`` and ``AsyncGzipTextFile``.
             In a binary mode, ``encoding``, ``errors`` or ``newline`` other
@@ -248,6 +250,7 @@ def open(
     max_rewind_cache_size: Optional[int] = ...,
     strict_size: bool = ...,
     fast_compress: bool = ...,
+    max_members: Optional[int] = ...,
 ) -> AsyncGzipTextFile: ...
 
 
@@ -266,6 +269,7 @@ def open(
     max_rewind_cache_size: Optional[int] = ...,
     strict_size: bool = ...,
     fast_compress: bool = ...,
+    max_members: Optional[int] = ...,
 ) -> AsyncGzipBinaryFile: ...
 
 
@@ -299,8 +303,8 @@ def open(
         **kwargs: Passed by keyword to the class: ``chunk_size``,
             ``compresslevel``, ``mtime``, ``original_filename``,
             ``fileobj``, ``closefd``, ``max_decompressed_size``,
-            ``max_rewind_cache_size``, ``strict_size`` and
-            ``fast_compress``, and in a text mode ``encoding``, ``errors``
+            ``max_rewind_cache_size``, ``strict_size``,
+            ``fast_compress`` and ``max_members``, and in a text mode ``encoding``, ``errors``
             and ``newline``. Each has the meaning, default and exceptions
             documented on ``AsyncGzipBinaryFile`` and ``AsyncGzipTextFile``.
             In a binary mode, ``encoding``, ``errors`` or ``newline`` other
@@ -322,6 +326,7 @@ async def read(
     closefd: Optional[bool] = None,
     max_decompressed_size: Optional[int] = None,
     max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
+    max_members: Optional[int] = None,
 ) -> bytes:
     """Read and decompress an entire gzip stream into memory.
 
@@ -345,6 +350,9 @@ async def read(
         max_rewind_cache_size: The largest number of compressed bytes kept
             for rewinding a source that cannot seek. The default is
             134217728 (128 MiB), and ``None`` sets no limit.
+        max_members: The largest number of gzip members to accept; input
+            that continues after that many raises ``OSError``. The default,
+            ``None``, sets no limit.
 
     Returns:
         The whole decompressed payload.
@@ -357,6 +365,7 @@ async def read(
         closefd=closefd,
         max_decompressed_size=max_decompressed_size,
         max_rewind_cache_size=max_rewind_cache_size,
+        max_members=max_members,
     ) as stream:
         return await stream.read()
 
@@ -426,18 +435,25 @@ async def inspect(
     fileobj: _ReadFileObj = None,
     closefd: Optional[bool] = None,
     max_decompressed_size: Optional[int] = None,
+    max_members: Optional[int] = None,
 ) -> GzipInfo:
     """Inspect and validate every member in a complete gzip stream.
 
     This performs a full decompression scan while discarding payload bytes.
     ``mtime`` preserves the literal header value, including zero; filename and
     comment metadata use Latin-1 decoding.
+
+    One record is kept for every member, so memory grows with the member
+    count, which ``max_decompressed_size`` does not bound. With
+    ``max_members`` set, input that continues after that many members raises
+    ``OSError`` before the next header is parsed or its record kept.
     """
     result = await _scan_gzip(
         filename,
         fileobj=fileobj,
         closefd=closefd,
         max_decompressed_size=max_decompressed_size,
+        max_members=max_members,
         chunk_size=chunk_size,
         collect_members=True,
     )
@@ -455,17 +471,21 @@ async def verify(
     fileobj: _ReadFileObj = None,
     closefd: Optional[bool] = None,
     max_decompressed_size: Optional[int] = None,
+    max_members: Optional[int] = None,
 ) -> VerificationResult:
     """Validate a complete gzip stream and return aggregate counts.
 
     Successful return means every header, deflate payload, CRC, and ``ISIZE``
-    was valid. Invalid input and resource-limit failures raise instead.
+    was valid. Invalid input and resource-limit failures raise instead:
+    ``OSError`` when the output exceeds ``max_decompressed_size`` or the
+    stream has more than ``max_members`` members.
     """
     result = await _scan_gzip(
         filename,
         fileobj=fileobj,
         closefd=closefd,
         max_decompressed_size=max_decompressed_size,
+        max_members=max_members,
         chunk_size=chunk_size,
         collect_members=False,
     )
@@ -481,6 +501,7 @@ def decompress_chunks(
     *,
     output_chunk_size: int = AsyncGzipBinaryFile.DEFAULT_CHUNK_SIZE,
     max_decompressed_size: Optional[int] = None,
+    max_members: Optional[int] = None,
 ) -> AsyncIterator[bytes]:
     """Incrementally decompress gzip bytes from an asynchronous iterable.
 
@@ -492,6 +513,7 @@ def decompress_chunks(
         source: Asynchronous iterable yielding compressed ``bytes``.
         output_chunk_size: Strict upper bound for each yielded chunk.
         max_decompressed_size: Optional cumulative decompressed-byte limit.
+        max_members: Optional limit on the number of gzip members.
 
     Returns:
         A single-consumer asynchronous iterator of decompressed ``bytes``.
@@ -500,12 +522,14 @@ def decompress_chunks(
         TypeError: If call-time arguments or a source item have invalid types.
         ValueError: If a size argument is outside its supported range.
         gzip.BadGzipFile: If the consumed gzip stream is malformed or corrupt.
-        OSError: If the cumulative output limit is exceeded.
+        OSError: If the cumulative output limit or the member limit is
+            exceeded.
     """
     return _decompress_chunks(
         source,
         output_chunk_size=output_chunk_size,
         max_decompressed_size=max_decompressed_size,
+        max_members=max_members,
     )
 
 
@@ -612,6 +636,7 @@ async def decompress(
     data: Union[bytes, bytearray, memoryview],
     *,
     max_decompressed_size: Optional[int] = None,
+    max_members: Optional[int] = None,
 ) -> bytes:
     """Decompress a complete gzip stream held in memory.
 
@@ -637,17 +662,23 @@ async def decompress(
         max_decompressed_size: The largest number of decompressed bytes to
             accept; a larger stream raises ``OSError``. The default,
             ``None``, sets no limit. Set it for untrusted input.
+        max_members: The largest number of gzip members to accept; input
+            that continues after that many raises ``OSError``. The default,
+            ``None``, sets no limit.
 
     Returns:
         The decompressed payload of all members.
 
     Raises:
-        TypeError: If ``data`` or the limit has an invalid type.
-        ValueError: If the limit is not positive.
+        TypeError: If ``data`` or a limit has an invalid type.
+        ValueError: If a limit is not positive.
         gzip.BadGzipFile: If the stream is malformed, corrupt or truncated.
-        OSError: If the output would exceed ``max_decompressed_size``.
+        OSError: If the output would exceed ``max_decompressed_size`` or the
+            stream has more than ``max_members`` members.
     """
-    return await _decompress(data, max_decompressed_size=max_decompressed_size)
+    return await _decompress(
+        data, max_decompressed_size=max_decompressed_size, max_members=max_members
+    )
 
 
 __all__ = [

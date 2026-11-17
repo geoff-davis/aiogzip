@@ -92,7 +92,8 @@ is poisoned and must be discarded.
 
 ## Processing untrusted gzip input
 
-Set an application-appropriate decompressed-size ceiling:
+Set an application-appropriate decompressed-size ceiling, and a member
+ceiling next to it:
 
 ```python
 import aiogzip
@@ -101,15 +102,23 @@ async with aiogzip.open(
     "uploaded-data.gz",
     "rb",
     max_decompressed_size=100 * 1024 * 1024,
+    max_members=1_000,
 ) as f:
     while chunk := await f.read(64 * 1024):
         await process(chunk)
 ```
 
-The right limit depends on the file format, account quotas, and available
-resources. Crossing it raises `OSError`; the inflater is bounded to the
-remaining allowance plus one byte for overflow detection instead of first
-allocating the complete expanded payload.
+The right limits depend on the file format, account quotas, and available
+resources. Crossing the size limit raises `OSError`; the inflater is bounded
+to the remaining allowance plus one byte for overflow detection instead of
+first allocating the complete expanded payload.
+
+`max_members` covers what the size limit cannot see. An empty gzip member is
+20 bytes of input and no output, so a small file can hold a very large number
+of them. A file written in one pass has one member. Files built by appending or
+concatenating gzip files, and block formats such as `bgzip`, have many, so
+choose a count that fits the files you expect. Input that continues after
+that many members raises `OSError` before the next header is parsed.
 
 A small file read, such as `read(1)` or `peek(1)`, can inflate and retain much
 more plaintext than it returns. The file wrapper drains the compressed input
@@ -131,9 +140,14 @@ validation scan while discarding decompressed bytes:
 result = await aiogzip.verify(
     "uploaded-data.gz",
     max_decompressed_size=100 * 1024 * 1024,
+    max_members=1_000,
 )
 print(result.uncompressed_size)
 ```
+
+`inspect()` keeps a record for every member, so always give it `max_members`
+on untrusted input: without it, memory grows with a count the sender
+controls.
 
 ## Reproducible gzip output
 

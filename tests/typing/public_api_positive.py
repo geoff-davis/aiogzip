@@ -200,6 +200,14 @@ async def one_shot_contract() -> None:
     assert_type(
         aiogzip.codec.decompress(b"compressed", max_decompressed_size=None), bytes
     )
+    assert_type(await aiogzip.decompress(b"compressed", max_members=1), bytes)
+    assert_type(aiogzip.codec.decompress(b"compressed", max_members=None), bytes)
+    assert_type(await aiogzip.read(path, max_members=4), bytes)
+    assert_type(await aiogzip.inspect(path, max_members=4), aiogzip.GzipInfo)
+    assert_type(await aiogzip.verify(path, max_members=4), aiogzip.VerificationResult)
+    assert_type(aiogzip.open(path, "rb", max_members=4), aiogzip.AsyncGzipBinaryFile)
+    assert_type(aiogzip.open(path, "rt", max_members=4), aiogzip.AsyncGzipTextFile)
+    assert_type(aiogzip.GzipDecoder(max_members=4), aiogzip.GzipDecoder)
 
 
 def codec_contract() -> None:

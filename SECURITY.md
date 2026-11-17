@@ -51,8 +51,8 @@ Please include the following information in your report:
 
 A gzip stream from a source you do not control can be a decompression bomb,
 can hold any number of members, and can carry any header metadata. aiogzip
-has the controls described below, but **the decompressed-size limit is off
-by default**. Two other limits apply without any setting: the rewind cache
+has the controls described below, but **the decompressed-size limit and the
+member limit are off by default**. Two other limits apply without any setting: the rewind cache
 is capped at 128 MiB by default (`max_rewind_cache_size=None` removes the
 cap), and a member header is limited to a fixed 128 MiB. This section
 applies to aiogzip 2.x.
@@ -64,7 +64,9 @@ This section lists what each entry point does and does not limit.
 ### Entry points and their defaults
 
 Every entry point that decompresses takes `max_decompressed_size`, and it
-defaults to `None` (no limit) in all of them.
+defaults to `None` (no limit) in all of them. From 2.1.0 each of them also
+takes `max_members`, with the same default; the command line has no option
+for either.
 
 | Entry point | `max_decompressed_size` | Other limits |
 | --- | --- | --- |
@@ -77,12 +79,14 @@ defaults to `None` (no limit) in all of them.
 | `aiogzip.verify()` | `None` | None |
 | `python -m aiogzip inspect` and `verify` | No option; always unlimited | None |
 
-Two things are not limited anywhere:
+One thing is not limited anywhere:
 
-- **The number of gzip members.** There is no member-count parameter.
 - **The compressed input size.** aiogzip reads until the source ends. Check
   the file size, or cap the bytes you accept from the network, before you
   hand the data to aiogzip.
+
+Before 2.1.0 there is no member-count parameter, and the compressed input
+size is the only bound on the number of members.
 
 ### Limit the decompressed size
 
@@ -185,12 +189,26 @@ rewind cache.
 ### Member count and member metadata
 
 `max_decompressed_size` does not limit the number of members: an empty member
-is 20 bytes of input and adds nothing to the count.
+is 20 bytes of input and adds nothing to the count. From 2.1.0, pass
+`max_members` as well:
 
+```python
+info = await aiogzip.inspect(
+    path,
+    max_decompressed_size=MAX_DECOMPRESSED_SIZE,
+    max_members=1_000,
+)
+```
+
+- Input that continues after `max_members` members raises a plain `OSError`
+  whose message starts with `gzip stream exceeded max_members`. It is raised
+  before the next member's header is parsed, so nothing is kept for that
+  member. Trailing zero padding is not a member.
 - `inspect()` and `GzipDecoder(collect_member_info=True)` keep a
-  `GzipMemberInfo` record for every member, so their memory grows with a
-  count that the sender controls. Limit the compressed input size, or use
-  `verify()`, which keeps only totals.
+  `GzipMemberInfo` record for every member, so without `max_members` their
+  memory grows with a count that the sender controls: 50,000 empty members
+  are 1 MB of input and about 12 MB of records. Set `max_members`, limit the
+  compressed input size, or use `verify()`, which keeps only totals.
 - `GzipDecoder` with the default `collect_member_info=False`,
   `decompress_chunks()`, `verify()` and file handles keep no member records.
 - A member header may be up to 128 MiB long. A longer one raises
@@ -227,10 +245,10 @@ signature or a keyed digest when you need to know where the data came from.
 ### Command line
 
 `python -m aiogzip inspect FILE` and `python -m aiogzip verify FILE` have no
-size-limit option and always run without one. For an untrusted file, call
-`aiogzip.verify()` or `aiogzip.inspect()` from Python with
-`max_decompressed_size`, or run the command under an operating-system
-resource limit.
+size-limit or member-limit option and always run without one. For an
+untrusted file, call `aiogzip.verify()` or `aiogzip.inspect()` from Python
+with `max_decompressed_size` and `max_members`, or run the command under an
+operating-system resource limit.
 
 ### Timeouts
 

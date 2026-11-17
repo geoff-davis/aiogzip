@@ -109,6 +109,15 @@
             },
             "kind": "POSITIONAL_OR_KEYWORD",
             "name": "fast_compress"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "max_members"
           }
         ],
         "return": "None"
@@ -823,6 +832,15 @@
             },
             "kind": "POSITIONAL_OR_KEYWORD",
             "name": "fast_compress"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "max_members"
           }
         ],
         "return": "None"
@@ -1357,6 +1375,15 @@
             },
             "kind": "KEYWORD_ONLY",
             "name": "collect_member_info"
+          },
+          {
+            "annotation": "int | None",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_members"
           }
         ],
         "return": "None"
@@ -1821,6 +1848,15 @@
             },
             "kind": "KEYWORD_ONLY",
             "name": "max_decompressed_size"
+          },
+          {
+            "annotation": "int | None",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_members"
           }
         ],
         "return": "bytes"
@@ -2195,6 +2231,15 @@
             },
             "kind": "KEYWORD_ONLY",
             "name": "max_decompressed_size"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_members"
           }
         ],
         "return": "bytes"
@@ -2229,6 +2274,15 @@
             },
             "kind": "KEYWORD_ONLY",
             "name": "max_decompressed_size"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_members"
           }
         ],
         "return": "AsyncIterator[bytes]"
@@ -2288,6 +2342,15 @@
             },
             "kind": "KEYWORD_ONLY",
             "name": "max_decompressed_size"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_members"
           }
         ],
         "return": "aiogzip.GzipInfo"
@@ -2382,6 +2445,15 @@
             },
             "kind": "KEYWORD_ONLY",
             "name": "max_rewind_cache_size"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_members"
           }
         ],
         "return": "bytes"
@@ -2434,6 +2506,15 @@
             },
             "kind": "KEYWORD_ONLY",
             "name": "max_decompressed_size"
+          },
+          {
+            "annotation": "Optional[int]",
+            "default": {
+              "kind": "value",
+              "value": null
+            },
+            "kind": "KEYWORD_ONLY",
+            "name": "max_members"
           }
         ],
         "return": "aiogzip.VerificationResult"
@@ -2626,7 +2707,8 @@
   "release_line": "2.1",
   "schema_version": 1,
   "stable_message_prefixes": [
-    "decompressed output exceeded max_decompressed_size"
+    "decompressed output exceeded max_decompressed_size",
+    "gzip stream exceeded max_members"
   ],
   "typing_aliases": {
     "ZlibEngine": "Any"
