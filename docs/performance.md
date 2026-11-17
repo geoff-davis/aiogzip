@@ -11,9 +11,10 @@ The table below is from aiogzip 2.0.2, measured on 2026-11-16 on Linux x86-64
 with Python 3.14.2. Full environment metadata, the raw captures and the same
 measurements for 2.0.0a1 and 1.11.0 are in the
 [2.0.2 benchmark record](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.2-table-refresh.md).
-Each capture reports the median of five runs, and each figure compares the
-lowest such time for aiogzip with the lowest for `gzip` across three
-interleaved captures. Direct I/O uses 8 MiB
+Each figure is a best-observed comparison, not a typical one: a capture runs
+each workload five times and reports the run whose aiogzip time was the
+median, and the table compares the lowest aiogzip time with the lowest `gzip`
+time across three interleaved captures. Direct I/O uses 8 MiB
 of uncompressed input; the concurrency case uses ten 1 MiB files plus
 simulated latency. Read comparisons use the exact same deterministic gzip
 bytes, and write comparisons use `compresslevel=6` for both libraries. These
@@ -26,14 +27,17 @@ hardware or data.
 | Bulk LF-only text read | ~1.11x slower | ~2.0x faster |
 | Tuned JSONL line iteration | ~1.62x slower | ~1.44x slower |
 | Tuned JSONL read and parse | ~1.11x slower | ~1.14x slower |
-| JSONL batched `readlines()` and parse | parity (~1.02x faster) | ~1.06x faster |
+| JSONL batched `readlines()` and parse | parity (~1.02x faster) | ~1.07x faster |
 | Highly compressible bulk `read(-1)` | ~1.05x faster | ~12.2x faster |
 | Ten files with simulated 10 ms latency | ~7.1x faster | ~6.8x faster |
 
 The previous table, from 2.0.0a1 on Python 3.12, is in the
 [2.0.0a1 candidate record](https://github.com/geoff-davis/aiogzip/blob/main/plans/benchmarks/v2.0.0a1-candidate.md).
-Its ratios differ from these mostly because the interpreter and its `gzip`
-module changed. Measured side by side on this environment, 2.0.2 is faster
+Much of the difference between its ratios and these does not come from the
+library: the 2.0.0a1 source measured again in this environment gives ratios
+close to the ones above. The interpreter, the zlib-ng package, the machine
+state and the way runs are combined all differ from that record, and their
+effects were not separated. Measured side by side here, 2.0.2 is faster
 than 2.0.0a1 on bulk text reads and within about 2% of it on the other table
 workloads, with one exception: the highly compressible `read(-1)` on zlib-ng
 takes about 10% longer (0.1 ms on an 8 MiB read), which a pinned micro-test
@@ -108,7 +112,8 @@ not be interpreted as a 1.3x advantage over stdlib `gzip`.
 
 For batch-oriented reads, `readlines(hint)` avoids awaiting that per-line path.
 In the current 100,000-line stdlib-engine microbenchmark, `readlines()` took
-about 5.2 ms versus 16.5 ms for a `readline()` loop, roughly 3.1x faster. Batched line
+about 5.2 ms versus 16.5 ms for a `readline()` loop in their fastest runs,
+roughly 3.1x faster. Batched line
 splitting also uses C-level `str.splitlines()` when a cheap probe confirms the
 region contains only standard newlines. On the representative 8 MiB JSONL
 fixture, parsing 1 MiB groups was about 13% faster than direct `async for`

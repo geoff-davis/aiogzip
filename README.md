@@ -237,7 +237,8 @@ replacement.
 
 aiogzip's performance advantage comes from async concurrency and optional
 codec acceleration. Comparisons use identical compressed fixtures for reads,
-compression level 6 for both writers, and median timings from repeated runs.
+compression level 6 for both writers, and the best of repeated captures for
+each side.
 
 On a representative Python 3.14 Linux run of aiogzip 2.0.2, the direct I/O cases used 8 MiB
 inputs and the concurrency case used ten 1 MiB files:
