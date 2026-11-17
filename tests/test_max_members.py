@@ -234,7 +234,10 @@ async def _inspect_peak(blob: bytes, max_members: Optional[int]) -> int:
     tracemalloc.start()
     try:
         try:
-            await aiogzip.inspect(None, fileobj=source, max_members=max_members)
+            # A small read size keeps the source chunk out of the peak.
+            await aiogzip.inspect(
+                None, fileobj=source, max_members=max_members, chunk_size=4096
+            )
         except OSError as error:
             assert str(error).startswith(PREFIX)
         return tracemalloc.get_traced_memory()[1]
@@ -244,10 +247,12 @@ async def _inspect_peak(blob: bytes, max_members: Optional[int]) -> int:
 
 class TestInspectMemory:
     async def test_the_limit_bounds_inspect_memory_on_many_empty_members(self) -> None:
-        # 50,000 empty members are 1 MB of input. Unbounded, inspect() keeps
-        # a record for each one, several times the input. With the limit it
-        # stops at the 101st member, inside the first chunk it read.
-        count = 50_000
+        # 10,000 empty members are 200 kB of input. Unbounded, inspect() keeps
+        # a record for each one, about twelve times the input. With the limit
+        # it stops at the 101st member, inside the first chunk it read. The
+        # count is kept small because tracing allocations under coverage is
+        # slow on the Windows runners.
+        count = 10_000
         blob = EMPTY_MEMBER * count
         assert len(blob) == 20 * count
 
@@ -255,5 +260,5 @@ class TestInspectMemory:
         bounded = await _inspect_peak(blob, 100)
 
         assert unbounded > 8 * len(blob)
-        assert bounded < 2 * len(blob)
-        assert bounded * 5 < unbounded
+        assert bounded < len(blob)
+        assert bounded * 10 < unbounded
