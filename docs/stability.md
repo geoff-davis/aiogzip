@@ -59,8 +59,9 @@ not compatibility promises.
   continue to narrow to their respective file classes, while dynamic mode
   strings return the documented union.
 - Public exception types and inheritance are frozen. Only message prefixes
-  explicitly identified as stable are covered; currently that is
-  `decompressed output exceeded max_decompressed_size`. Complete messages
+  explicitly identified as stable are covered; currently those are
+  `decompressed output exceeded max_decompressed_size` and, from 2.1.0,
+  `gzip stream exceeded max_members`. Complete messages
   containing offsets, sizes, member numbers, engine names, or platform text
   may change.
 - Public dataclass names, field order, field names, defaults, annotations, and

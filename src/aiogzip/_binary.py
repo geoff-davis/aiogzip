@@ -295,6 +295,12 @@ class AsyncGzipBinaryFile:
             ``AIOGZIP_ENGINE=stdlib`` has not disabled it; otherwise it warns
             (``UserWarning``) and uses zlib. The default is ``False``. Raises ``TypeError`` for any value other than
             ``True`` or ``False``.
+        max_members: Reading only. The largest number of gzip members the
+            reader will accept in one pass through the stream; input that
+            continues after that many raises ``OSError`` from the read. A
+            positive integer; the default, ``None``, sets no limit. Raises
+            ``TypeError`` if it is not an ``int`` or ``None`` and
+            ``ValueError`` if it is below 1.
     """
 
     __slots__ = (
@@ -345,6 +351,7 @@ class AsyncGzipBinaryFile:
         "_read_poison_observer",
         "_read_health",
         "_max_decompressed_size",
+        "_max_members",
         "_strict_size",
         "_fast_compress",
     )
@@ -385,6 +392,7 @@ class AsyncGzipBinaryFile:
         max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
         strict_size: bool = False,
         fast_compress: bool = False,
+        max_members: Optional[int] = None,
     ) -> None:
         validated_closefd = _validate_optional_bool(closefd, "closefd")
         validated_strict_size = _validate_bool(strict_size, "strict_size")
@@ -395,6 +403,7 @@ class AsyncGzipBinaryFile:
         _validate_chunk_size(chunk_size)
         _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")
         _validate_optional_positive_int(max_rewind_cache_size, "max_rewind_cache_size")
+        _validate_optional_positive_int(max_members, "max_members")
 
         # Validate mode and derive file characteristics
         mode_op, saw_b, saw_t, plus = _parse_mode_tokens(mode)
@@ -473,6 +482,7 @@ class AsyncGzipBinaryFile:
         self._read_health: _ReadHealth
         self._reset_read_health()
         self._max_decompressed_size: Optional[int] = max_decompressed_size
+        self._max_members: Optional[int] = max_members
         self._strict_size = validated_strict_size
 
     async def open(self) -> "AsyncGzipBinaryFile":
@@ -544,6 +554,7 @@ class AsyncGzipBinaryFile:
                     # operations.
                     output_chunk_size=max(self._chunk_size, self.DEFAULT_CHUNK_SIZE),
                     max_decompressed_size=self._max_decompressed_size,
+                    max_members=self._max_members,
                 )
                 self._eof = False
                 self._read_call_active = False
@@ -1977,6 +1988,7 @@ class AsyncGzipBinaryFile:
         self._decoder = GzipDecoder(
             output_chunk_size=max(self._chunk_size, self.DEFAULT_CHUNK_SIZE),
             max_decompressed_size=self._max_decompressed_size,
+            max_members=self._max_members,
         )
         self._decoder_header_generation = 0
         self._reset_read_health()

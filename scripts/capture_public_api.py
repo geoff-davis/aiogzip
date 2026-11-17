@@ -390,7 +390,8 @@ def capture() -> dict[str, object]:
             "type": type(getattr(aiogzip, "__version__", None)).__name__,
         },
         "stable_message_prefixes": [
-            "decompressed output exceeded max_decompressed_size"
+            "decompressed output exceeded max_decompressed_size",
+            "gzip stream exceeded max_members",
         ],
         "non_guarantees": [
             "engine_info string values",

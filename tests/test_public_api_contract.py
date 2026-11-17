@@ -27,8 +27,11 @@ BASELINE_SHA256 = "e0168ae90bf4f265da9255a6d0bfc3e27cf6f0282861ac6c5f253da67e9d8
 def _removed_or_altered(baseline: object, current: object, path: str) -> list[str]:
     """List every baseline entry that ``current`` lacks or holds differently.
 
-    A mapping may gain keys and an export list may gain names. Everything
-    else, down to each parameter of each signature, must be equal.
+    A mapping may gain keys, and an export list and the list of stable
+    message prefixes may gain entries. A signature may gain parameters, as
+    ``docs/stability.md`` allows a minor release to, only where no 2.0 call
+    can tell: after every 2.0 parameter, each with a default. Everything
+    else, down to each 2.0 parameter of each signature, must be equal.
     """
     if isinstance(baseline, dict):
         if not isinstance(current, dict):
@@ -42,9 +45,19 @@ def _removed_or_altered(baseline: object, current: object, path: str) -> list[st
                     _removed_or_altered(value, current[key], f"{path}.{key}")
                 )
         return problems
-    if path.endswith(".exports"):
+    if path.endswith(".exports") or path.endswith(".stable_message_prefixes"):
         assert isinstance(baseline, list) and isinstance(current, list)
         return [f"{path}: {name}" for name in baseline if name not in current]
+    if path.endswith(".parameters"):
+        assert isinstance(baseline, list) and isinstance(current, list)
+        if current[: len(baseline)] != baseline:
+            return [path]
+        return [
+            f"{path}: {parameter['name']}"
+            for parameter in current[len(baseline) :]
+            if parameter["default"]["kind"] == "required"
+            or parameter["kind"] in ("VAR_POSITIONAL", "VAR_KEYWORD")
+        ]
     return [] if baseline == current else [path]
 
 
@@ -79,6 +92,41 @@ def test_baseline_comparison_reports_removals_and_changes():
     ]
     assert _removed_or_altered(baseline, {"m": baseline["m"]}, "api") == [
         "api.functions"
+    ]
+
+
+def _parameter(name, default="value", kind="KEYWORD_ONLY"):
+    return {"name": name, "kind": kind, "default": {"kind": default}}
+
+
+def test_baseline_comparison_lets_a_signature_gain_only_optional_parameters():
+    baseline = {"f": {"parameters": [_parameter("a", "required"), _parameter("b")]}}
+    old = baseline["f"]["parameters"]
+
+    def compare(parameters):
+        return _removed_or_altered(baseline, {"f": {"parameters": parameters}}, "api")
+
+    assert compare([*old, _parameter("c")]) == []
+    # Inserted before a 2.0 parameter, reordered, removed or altered.
+    assert compare([old[0], _parameter("c"), old[1]]) == ["api.f.parameters"]
+    assert compare([old[1], old[0]]) == ["api.f.parameters"]
+    assert compare([old[0]]) == ["api.f.parameters"]
+    assert compare([old[0], _parameter("b", "required")]) == ["api.f.parameters"]
+    # Appended, but a 2.0 call would now fail or mean something else.
+    assert compare([*old, _parameter("c", "required")]) == ["api.f.parameters: c"]
+    assert compare([*old, _parameter("kw", "empty", "VAR_KEYWORD")]) == [
+        "api.f.parameters: kw"
+    ]
+
+
+def test_baseline_comparison_lets_stable_message_prefixes_grow():
+    baseline = {"stable_message_prefixes": ["a"]}
+    assert (
+        _removed_or_altered(baseline, {"stable_message_prefixes": ["a", "b"]}, "api")
+        == []
+    )
+    assert _removed_or_altered(baseline, {"stable_message_prefixes": ["b"]}, "api") == [
+        "api.stable_message_prefixes: a"
     ]
 
 
@@ -184,3 +232,12 @@ def test_documented_decompression_limit_message_prefix():
     assert str(caught.value).startswith(
         "decompressed output exceeded max_decompressed_size"
     )
+
+
+def test_documented_member_limit_message_prefix():
+    decoder = aiogzip.GzipDecoder(max_members=1)
+    operation = decoder.feed(gzip.compress(b"one", mtime=0) * 2)
+    with pytest.raises(OSError) as caught:
+        b"".join(operation)
+    assert type(caught.value) is OSError
+    assert str(caught.value).startswith("gzip stream exceeded max_members")

@@ -38,6 +38,7 @@ async def invalid_calls() -> None:
     aiogzip.IterableReader([b"payload"])  # EXPECT_ERROR[mypy=arg-type, ty=invalid-argument-type]
     await aiogzip.compress("payload")  # EXPECT_ERROR[mypy=arg-type, ty=invalid-argument-type]
     await aiogzip.decompress(b"data", max_decompressed_size="1")  # EXPECT_ERROR[mypy=arg-type, ty=invalid-argument-type]
+    await aiogzip.inspect(path, max_members="1")  # EXPECT_ERROR[mypy=arg-type, ty=invalid-argument-type]
     aiogzip.codec.compress(bytearray(b"payload"))  # EXPECT_ERROR[mypy=arg-type, ty=invalid-argument-type]
 
 

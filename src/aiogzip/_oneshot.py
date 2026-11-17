@@ -88,9 +88,12 @@ async def _decompress(
     data: Union[bytes, bytearray, memoryview],
     *,
     max_decompressed_size: Optional[int],
+    max_members: Optional[int],
 ) -> bytes:
     snapshot = _snapshot(data, "decompress")
-    decoder = GzipDecoder(max_decompressed_size=max_decompressed_size)
+    decoder = GzipDecoder(
+        max_decompressed_size=max_decompressed_size, max_members=max_members
+    )
     output = _OutputCollector()
     try:
         if snapshot:

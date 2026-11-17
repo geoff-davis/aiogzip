@@ -29,6 +29,17 @@ All notable changes to this project will be documented in this file.
 - `aiogzip.codec.compress()` and `aiogzip.codec.decompress()`: synchronous
   twins with the same options, for code outside an event loop. They accept
   `bytes` only, like the rest of the codec.
+- `max_members`: a limit on the number of gzip members, for untrusted
+  input. `max_decompressed_size` cannot see members: an empty one is 20
+  bytes of input and no output, and `inspect()` keeps a record for each.
+  (#231)
+  - Accepted by `open()` and the file classes, `read()`, `inspect()`,
+    `verify()`, `decompress_chunks()`, `decompress()`,
+    `aiogzip.codec.decompress()` and `GzipDecoder`. The default, `None`,
+    sets no limit.
+  - Input that continues after that many members raises a plain `OSError`
+    whose message starts with `gzip stream exceeded max_members`, before the
+    next header is parsed. Trailing zero padding is not a member.
 
 ### Changed
 
