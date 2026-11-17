@@ -83,8 +83,11 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ${{ matrix.os }}
-    # The macOS leg also runs the zlib-ng suite (see below).
-    timeout-minutes: ${{ matrix.os == 'macos-latest' && 25 || 15 }}
+    # The macOS leg also runs the zlib-ng suite (see below). The Windows
+    # 3.12 leg is the slowest single suite run: about six and a half minutes
+    # on main, and up to fifteen with the 2.1.0 tests, so a 15-minute limit
+    # cancelled a run in which every test was passing.
+    timeout-minutes: ${{ matrix.os == 'ubuntu-latest' && 15 || 25 }}
     # Defines a build matrix for your tests. Linux runs the full Python
     # version sweep, 3.11 to 3.15; Windows runs the oldest-common (3.12) and
     # 3.14 versions to guard platform-specific paths (e.g. os.linesep newline
