@@ -115,9 +115,9 @@ first allocating the complete expanded payload.
 
 `max_members` covers what the size limit cannot see. An empty gzip member is
 20 bytes of input and no output, so a small file can hold a very large number
-of them. A file written in one pass has one member. Files built by appending or
-concatenating gzip files, and block formats such as `bgzip`, have many, so
-choose a count that fits the files you expect. Input that continues after
+of them. A file written through a single aiogzip handle has one member. Files built
+by appending or concatenating gzip files, and block formats such as `bgzip`,
+have many, so choose a count that fits the files you expect. Input that continues after
 that many members raises `OSError` before the next header is parsed.
 
 A small file read, such as `read(1)` or `peek(1)`, can inflate and retain much
