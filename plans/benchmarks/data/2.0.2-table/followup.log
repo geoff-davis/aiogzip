@@ -1,0 +1,79 @@
+started Mon Nov 16 19:48:33 PST 2026; runner c692654
+19:48:38 busy=0.60 cores, load 0.61 0.62 0.65, waiting
+19:49:13 start all-v2.0.0a1-stdlib (load 0.55 0.60 0.64)
+19:49:37 FAILED all-v2.0.0a1-stdlib (exit 0)
+19:49:42 busy=0.51 cores, load 1.30 0.79 0.70, waiting
+19:50:17 start all-v2.0.0a1-zlib-ng (load 0.72 0.70 0.67)
+19:50:45 FAILED all-v2.0.0a1-zlib-ng (exit 0)
+19:50:50 start all-v1.11.0-stdlib (load 0.77 0.71 0.68)
+19:51:11 FAILED all-v1.11.0-stdlib (exit 0)
+19:51:16 busy=0.50 cores, load 0.77 0.72 0.69, waiting
+19:51:51 start all-v1.11.0-zlib-ng (load 0.63 0.69 0.68)
+19:52:16 FAILED all-v1.11.0-zlib-ng (exit 0)
+19:52:21 micro v2.0.2 zlib-ng r1 (load 0.84 0.74 0.69)
+19:52:28 busy=0.63 cores, load 0.77 0.72 0.69, waiting
+19:53:03 busy=0.66 cores, load 0.68 0.71 0.68, waiting
+19:53:38 micro v2.0.0a1 zlib-ng r1 (load 0.44 0.64 0.66)
+19:53:44 busy=0.60 cores, load 0.53 0.66 0.67, waiting
+19:54:19 busy=0.52 cores, load 0.35 0.60 0.65, waiting
+19:54:54 busy=0.62 cores, load 0.42 0.59 0.64, waiting
+19:55:29 micro v1.11.0 zlib-ng r1 (load 0.49 0.59 0.64)
+19:55:38 busy=0.61 cores, load 0.53 0.60 0.64, waiting
+19:56:13 micro v2.0.2 stdlib r1 (load 0.29 0.53 0.62)
+19:56:35 micro v2.0.0a1 stdlib r1 (load 0.45 0.55 0.62)
+19:56:56 micro v1.11.0 stdlib r1 (load 0.53 0.56 0.63)
+19:57:19 busy=0.66 cores, load 0.74 0.61 0.64, waiting
+19:57:54 busy=0.69 cores, load 0.55 0.58 0.63, waiting
+19:58:29 micro v1.11.0 zlib-ng r2 (load 0.36 0.53 0.61)
+19:58:38 micro v2.0.2 zlib-ng r2 (load 0.33 0.52 0.61)
+19:58:44 busy=0.70 cores, load 0.35 0.52 0.61, waiting
+19:59:19 micro v2.0.0a1 zlib-ng r2 (load 0.26 0.48 0.59)
+19:59:26 busy=0.57 cores, load 0.24 0.47 0.58, waiting
+20:00:01 busy=0.98 cores, load 0.33 0.46 0.58, waiting
+20:00:36 micro v1.11.0 stdlib r2 (load 0.35 0.46 0.57)
+20:00:56 micro v2.0.2 stdlib r2 (load 0.52 0.49 0.58)
+20:01:19 micro v2.0.0a1 stdlib r2 (load 0.76 0.55 0.60)
+20:01:41 busy=0.64 cores, load 0.83 0.58 0.61, waiting
+20:02:16 busy=0.61 cores, load 0.71 0.58 0.61, waiting
+20:02:51 busy=0.51 cores, load 0.64 0.58 0.61, waiting
+20:03:26 micro v2.0.0a1 zlib-ng r3 (load 0.51 0.56 0.60)
+20:03:32 micro v1.11.0 zlib-ng r3 (load 0.47 0.55 0.60)
+20:03:41 busy=0.57 cores, load 0.76 0.61 0.62, waiting
+20:04:16 micro v2.0.2 zlib-ng r3 (load 0.55 0.58 0.60)
+20:04:22 busy=0.63 cores, load 0.50 0.57 0.60, waiting
+20:04:57 micro v2.0.0a1 stdlib r3 (load 0.75 0.63 0.62)
+20:05:19 busy=0.62 cores, load 0.75 0.64 0.63, waiting
+20:05:54 micro v1.11.0 stdlib r3 (load 0.65 0.62 0.62)
+20:06:15 micro v2.0.2 stdlib r3 (load 0.74 0.64 0.63)
+20:06:39 busy=0.51 cores, load 0.81 0.67 0.64, waiting
+20:07:14 busy=0.51 cores, load 0.52 0.61 0.62, waiting
+20:07:49 busy=0.51 cores, load 0.41 0.58 0.61, waiting
+20:08:24 micro v2.0.2 zlib-ng r4 (load 0.42 0.56 0.60)
+20:08:31 micro v2.0.0a1 zlib-ng r4 (load 0.54 0.58 0.61)
+20:08:37 busy=0.53 cores, load 0.50 0.57 0.61, waiting
+20:09:12 micro v1.11.0 zlib-ng r4 (load 0.50 0.56 0.60)
+20:09:21 busy=0.51 cores, load 0.49 0.56 0.60, waiting
+20:09:56 busy=0.61 cores, load 0.27 0.49 0.58, waiting
+20:10:31 micro v2.0.2 stdlib r4 (load 0.42 0.50 0.58)
+20:10:53 micro v2.0.0a1 stdlib r4 (load 0.59 0.54 0.59)
+20:11:14 busy=0.52 cores, load 0.73 0.57 0.60, waiting
+20:11:49 micro v1.11.0 stdlib r4 (load 0.56 0.54 0.59)
+20:12:13 micro v1.11.0 zlib-ng r5 (load 0.61 0.56 0.59)
+20:12:21 micro v2.0.2 zlib-ng r5 (load 0.59 0.55 0.59)
+20:12:28 micro v2.0.0a1 zlib-ng r5 (load 0.54 0.54 0.58)
+20:12:34 micro v1.11.0 stdlib r5 (load 0.60 0.56 0.59)
+20:12:55 busy=0.71 cores, load 0.86 0.62 0.61, waiting
+20:13:30 micro v2.0.2 stdlib r5 (load 0.63 0.58 0.60)
+20:13:52 micro v2.0.0a1 stdlib r5 (load 0.65 0.59 0.60)
+20:14:14 micro v2.0.0a1 zlib-ng r6 (load 0.75 0.62 0.61)
+20:14:20 micro v1.11.0 zlib-ng r6 (load 0.79 0.63 0.62)
+20:14:29 busy=0.61 cores, load 0.73 0.62 0.61, waiting
+20:15:04 busy=1.09 cores, load 0.54 0.59 0.60, waiting
+20:15:39 micro v2.0.2 zlib-ng r6 (load 0.53 0.58 0.60)
+20:15:45 busy=0.56 cores, load 0.52 0.58 0.60, waiting
+20:16:20 micro v2.0.0a1 stdlib r6 (load 0.29 0.51 0.57)
+20:16:42 busy=0.67 cores, load 0.55 0.56 0.59, waiting
+20:17:17 busy=0.61 cores, load 0.46 0.54 0.58, waiting
+20:17:52 micro v1.11.0 stdlib r6 (load 0.26 0.48 0.56)
+20:18:16 micro v2.0.2 stdlib r6 (load 0.64 0.56 0.58)
+finished Mon Nov 16 20:18:33 PST 2026

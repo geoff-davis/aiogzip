@@ -36,7 +36,8 @@ Its ratios differ from these mostly because the interpreter and its `gzip`
 module changed. Measured side by side on this environment, 2.0.2 is faster
 than 2.0.0a1 on bulk text reads and within about 2% of it on the other table
 workloads, with one exception: the highly compressible `read(-1)` on zlib-ng
-took 1.14 ms against 1.07 ms, about 7% longer.
+takes about 10% longer (0.1 ms on an 8 MiB read), which a pinned micro-test
+confirmed.
 
 ### 2.0.0a2 decoder evidence
 
