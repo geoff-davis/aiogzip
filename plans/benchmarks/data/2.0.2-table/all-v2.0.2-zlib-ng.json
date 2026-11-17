@@ -1,0 +1,1856 @@
+{
+  "schema_version": 2,
+  "status": "complete",
+  "timestamp": 1794886528.3707054,
+  "categories": [
+    "io",
+    "memory",
+    "concurrency",
+    "compression",
+    "scenarios",
+    "errors",
+    "inspection",
+    "streaming",
+    "micro",
+    "read_health",
+    "text_origin",
+    "regressions"
+  ],
+  "data_size_mb": 8,
+  "repeat": 3,
+  "regression_profile": "quick",
+  "regression_mode": "throughput",
+  "source": {
+    "source_root": "/tmp/claude-1000/-home-geoff-Projects-personal-aiogzip/ed2d880c-00c7-43cd-92df-0341e13ebc8a/scratchpad/bench206/v2.0.2",
+    "aiogzip_file": "/tmp/claude-1000/-home-geoff-Projects-personal-aiogzip/ed2d880c-00c7-43cd-92df-0341e13ebc8a/scratchpad/bench206/v2.0.2/src/aiogzip/__init__.py",
+    "package_version": "2.0.2",
+    "target_commit": "50c8d59ac36757548bc3b1d37de25a2a081e9286",
+    "target_describe": "v2.0.2",
+    "target_dirty": false
+  },
+  "environment": {
+    "source_root": "/tmp/claude-1000/-home-geoff-Projects-personal-aiogzip/ed2d880c-00c7-43cd-92df-0341e13ebc8a/scratchpad/bench206/v2.0.2",
+    "aiogzip_file": "/tmp/claude-1000/-home-geoff-Projects-personal-aiogzip/ed2d880c-00c7-43cd-92df-0341e13ebc8a/scratchpad/bench206/v2.0.2/src/aiogzip/__init__.py",
+    "package_version": "2.0.2",
+    "target_commit": "50c8d59ac36757548bc3b1d37de25a2a081e9286",
+    "target_describe": "v2.0.2",
+    "target_dirty": false,
+    "environment_label": "issue-206 table refresh",
+    "runner_root": "/home/geoff/Projects/personal/aiogzip",
+    "runner_commit": "c6926544968f2f0f8c3860801285385c090ef864",
+    "regression_harness_sha256": "64c3c0e2431ac265b10736940bcddebb8c775f9e6cf6115dc3a26d21a3af6d27",
+    "python_implementation": "CPython",
+    "python_version": "3.14.2 (main, Dec 17 2025, 21:08:09) [Clang 21.1.4 ]",
+    "python_executable": "/home/geoff/Projects/personal/aiogzip/.venv/bin/python",
+    "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+    "os_name": "Linux",
+    "os_release": "6.17.0-41-generic",
+    "kernel_version": "#41-Ubuntu SMP PREEMPT_DYNAMIC Sat Jun 20 18:01:40 UTC 2026",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.42"
+    ],
+    "processor": "",
+    "cpu_count": 32,
+    "ram_bytes": 131894407168,
+    "filesystem_temp_root": "/tmp",
+    "zlib_compile_version": "1.3.1",
+    "zlib_runtime_version": "1.3.1",
+    "zlib_ng_package_version": "1.1.0",
+    "active_engines": {
+      "compression": "stdlib-zlib",
+      "decompression": "zlib-ng",
+      "crc32": "zlib-ng"
+    },
+    "requested_engine": "zlib-ng",
+    "forced_engine": null,
+    "uv_version": "uv 0.13.6 (x86_64-unknown-linux-gnu)",
+    "uv_lock_sha256": "51abf84414eef29c83bc3a553080a0e2e6400612aca697ac68921aeb24029601",
+    "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "cpu_governor": "powersave",
+    "cpu_boost": "enabled",
+    "system_load": [
+      0.732421875,
+      0.72607421875,
+      0.75
+    ],
+    "garbage_collection_enabled": true,
+    "garbage_collection_thresholds": [
+      2000,
+      10,
+      0
+    ]
+  },
+  "completed_categories": [
+    "io",
+    "memory",
+    "concurrency",
+    "compression",
+    "scenarios",
+    "errors",
+    "inspection",
+    "streaming",
+    "micro",
+    "read_health",
+    "text_origin",
+    "regressions"
+  ],
+  "results": [
+    {
+      "name": "Binary I/O (10-byte chunks, stress test)",
+      "category": "io",
+      "duration": 0.9854481844231486,
+      "duration_samples": [
+        1.237096345052123,
+        0.9854481844231486,
+        0.9676017202436924
+      ],
+      "median_absolute_deviation": 0.017846464179456234,
+      "duration_min": 0.9676017202436924,
+      "duration_max": 1.237096345052123,
+      "metrics": {
+        "aiogzip_write": "0.981s",
+        "aiogzip_read": "0.004s",
+        "gzip_write": "0.240s",
+        "gzip_read": "0.004s",
+        "speedup": "4.03x slower",
+        "chunks_written": 838860,
+        "chunks_per_sec": "854832",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Binary I/O (bulk, single write/read)",
+      "category": "io",
+      "duration": 0.13003225903958082,
+      "duration_samples": [
+        0.13003225903958082,
+        0.1462870016694069,
+        0.12674887478351593
+      ],
+      "median_absolute_deviation": 0.003283384256064892,
+      "duration_min": 0.12674887478351593,
+      "duration_max": 0.1462870016694069,
+      "metrics": {
+        "aiogzip_write": "0.127s",
+        "aiogzip_read": "0.003s",
+        "gzip_write": "0.122s",
+        "gzip_read": "0.003s",
+        "speedup": "1.05x slower",
+        "aiogzip_throughput": "61.5 MB/s",
+        "gzip_throughput": "64.4 MB/s",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Binary I/O (64KB chunks, 128 chunks)",
+      "category": "io",
+      "duration": 0.13121934607625008,
+      "duration_samples": [
+        0.1322251297533512,
+        0.13121934607625008,
+        0.1261850083246827
+      ],
+      "median_absolute_deviation": 0.0010057836771011353,
+      "duration_min": 0.1261850083246827,
+      "duration_max": 0.1322251297533512,
+      "metrics": {
+        "aiogzip_write": "0.128s",
+        "aiogzip_read": "0.003s",
+        "gzip_write": "0.119s",
+        "gzip_read": "0.002s",
+        "speedup": "1.08x slower",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Text write (bulk, compression level 6)",
+      "category": "io",
+      "duration": 0.18597884010523558,
+      "duration_samples": [
+        0.19072455074638128,
+        0.18597884010523558,
+        0.18583988677710295
+      ],
+      "median_absolute_deviation": 0.0001389533281326294,
+      "duration_min": 0.18583988677710295,
+      "duration_max": 0.19072455074638128,
+      "metrics": {
+        "aiogzip_time": "0.1860s",
+        "gzip_time": "0.1860s",
+        "speedup": "1.00x faster",
+        "aiogzip_throughput": "43.0 MB/s",
+        "gzip_throughput": "43.0 MB/s",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Text read (bulk, identical fixture)",
+      "category": "io",
+      "duration": 0.007394885644316673,
+      "duration_samples": [
+        0.007394885644316673,
+        0.007916150614619255,
+        0.007237586192786694
+      ],
+      "median_absolute_deviation": 0.0001572994515299797,
+      "duration_min": 0.007237586192786694,
+      "duration_max": 0.007916150614619255,
+      "metrics": {
+        "aiogzip_time": "0.0074s",
+        "gzip_time": "0.0120s",
+        "speedup": "1.62x faster",
+        "aiogzip_throughput": "1081.8 MB/s",
+        "gzip_throughput": "668.7 MB/s",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Text line iteration (default, identical fixture)",
+      "category": "io",
+      "duration": 0.01638009026646614,
+      "duration_samples": [
+        0.016499546356499195,
+        0.01638009026646614,
+        0.01610452774912119
+      ],
+      "median_absolute_deviation": 0.00011945609003305435,
+      "duration_min": 0.01610452774912119,
+      "duration_max": 0.016499546356499195,
+      "metrics": {
+        "aiogzip_time": "0.0164s",
+        "gzip_time": "0.0113s",
+        "speedup": "1.45x slower",
+        "aiogzip_lines_per_sec": "4508461",
+        "gzip_lines_per_sec": "6524166",
+        "lines": 73849,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Text line iteration (tuned, identical fixture)",
+      "category": "io",
+      "duration": 0.016466624103486538,
+      "duration_samples": [
+        0.016647566109895706,
+        0.016466624103486538,
+        0.01632449496537447
+      ],
+      "median_absolute_deviation": 0.00014212913811206818,
+      "duration_min": 0.01632449496537447,
+      "duration_max": 0.016647566109895706,
+      "metrics": {
+        "aiogzip_time": "0.0165s",
+        "gzip_time": "0.0113s",
+        "speedup": "1.45x slower",
+        "aiogzip_lines_per_sec": "4484769",
+        "gzip_lines_per_sec": "6524166",
+        "lines": 73849,
+        "tuning": "newline=\"\\n\", chunk_size=512 KiB",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Flush operations (100 flushes)",
+      "category": "io",
+      "duration": 0.004413291811943054,
+      "duration_samples": [
+        0.004413291811943054,
+        0.00465947762131691,
+        0.004004138521850109
+      ],
+      "median_absolute_deviation": 0.0002461858093738556,
+      "duration_min": 0.004004138521850109,
+      "duration_max": 0.00465947762131691,
+      "metrics": {
+        "ops_per_sec": "22659",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Read-all isolated (compressible, read-only timing)",
+      "category": "io",
+      "duration": 0.0012058624997735023,
+      "duration_samples": [
+        0.0011321119964122772,
+        0.0012058624997735023,
+        0.0012129563838243484
+      ],
+      "median_absolute_deviation": 7.0938840508461e-06,
+      "duration_min": 0.0011321119964122772,
+      "duration_max": 0.0012129563838243484,
+      "metrics": {
+        "aiogzip_read_best": "1.21ms",
+        "gzip_read_best": "14.65ms",
+        "aiogzip_throughput": "6634.3 MB/s",
+        "speedup": "12.15x faster",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Text large reads (sized read + long line, O(n) accumulation)",
+      "category": "io",
+      "duration": 0.0031378278508782387,
+      "duration_samples": [
+        0.0030675455927848816,
+        0.0031378278508782387,
+        0.0031640781089663506
+      ],
+      "median_absolute_deviation": 2.6250258088111877e-05,
+      "duration_min": 0.0030675455927848816,
+      "duration_max": 0.0031640781089663506,
+      "metrics": {
+        "read_size_best": "3.14ms",
+        "readline_long_best": "3.23ms",
+        "read_size_throughput": "2549.5 Mchar/s",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Memory efficiency (5MB)",
+      "category": "memory",
+      "duration": 0.07807604130357504,
+      "duration_samples": [
+        0.07807604130357504,
+        0.07831425219774246,
+        0.07666175439953804
+      ],
+      "median_absolute_deviation": 0.00023821089416742325,
+      "duration_min": 0.07666175439953804,
+      "duration_max": 0.07831425219774246,
+      "metrics": {
+        "memory_increase_mb": "7.7",
+        "memory_ratio": "1.54x",
+        "status": "OK",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Concurrent I/O (10 files, 10ms delay each)",
+      "category": "concurrency",
+      "duration": 0.03592257481068373,
+      "duration_samples": [
+        0.04201465379446745,
+        0.03592257481068373,
+        0.03521344251930714
+      ],
+      "median_absolute_deviation": 0.0007091322913765907,
+      "duration_min": 0.03521344251930714,
+      "duration_max": 0.04201465379446745,
+      "metrics": {
+        "async_time": "0.036s",
+        "sync_time": "0.294s",
+        "speedup": "8.20x",
+        "delay_saved": "0.259s",
+        "async_efficiency": "28%",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Mixed operations (5 read/write)",
+      "category": "concurrency",
+      "duration": 0.017169654369354248,
+      "duration_samples": [
+        0.01772875152528286,
+        0.017025241628289223,
+        0.017169654369354248
+      ],
+      "median_absolute_deviation": 0.00014441274106502533,
+      "duration_min": 0.017025241628289223,
+      "duration_max": 0.01772875152528286,
+      "metrics": {
+        "async_time": "0.017s",
+        "sync_time": "0.031s",
+        "speedup": "1.78x",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Compression: random",
+      "category": "compression",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "original": "1.0 MB",
+        "aiogzip_size": "1.0 MB",
+        "gzip_size": "1.0 MB",
+        "aiogzip_ratio": "1.00x",
+        "gzip_ratio": "1.00x",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Compression: compressible",
+      "category": "compression",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "original": "1.0 MB",
+        "aiogzip_size": "1.0 KB",
+        "gzip_size": "1.0 KB",
+        "aiogzip_ratio": "977.24x",
+        "gzip_ratio": "979.98x",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Compression: text",
+      "category": "compression",
+      "duration": 0.0,
+      "duration_samples": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "median_absolute_deviation": 0.0,
+      "duration_min": 0.0,
+      "duration_max": 0.0,
+      "metrics": {
+        "original": "1.0 MB",
+        "aiogzip_size": "146.5 KB",
+        "gzip_size": "146.5 KB",
+        "aiogzip_ratio": "6.99x",
+        "gzip_ratio": "6.99x",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Compression: fast_compress (text)",
+      "category": "compression",
+      "duration": 0.14620061870664358,
+      "duration_samples": [
+        0.14620061870664358,
+        0.14692682214081287,
+        0.14616677444428205
+      ],
+      "median_absolute_deviation": 3.384426236152649e-05,
+      "duration_min": 0.14616677444428205,
+      "duration_max": 0.14692682214081287,
+      "metrics": {
+        "stdlib_throughput": "43.0 MB/s",
+        "fast_throughput": "54.7 MB/s",
+        "speedup": "1.27x",
+        "stdlib_size": "1.1 MB",
+        "fast_size": "1.1 MB",
+        "size_vs_stdlib": "100.3%",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "JSONL read and parse (identical fixture)",
+      "category": "scenarios",
+      "duration": 0.0852912263944745,
+      "duration_samples": [
+        0.08548367954790592,
+        0.08505707234144211,
+        0.0852912263944745
+      ],
+      "median_absolute_deviation": 0.00019245315343141556,
+      "duration_min": 0.08505707234144211,
+      "duration_max": 0.08548367954790592,
+      "metrics": {
+        "aiogzip_time": "0.0853s",
+        "gzip_time": "0.0812s",
+        "records": 73849,
+        "speedup": "1.05x slower",
+        "tuning": "newline=\"\\n\", chunk_size=512 KiB",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "JSONL batched readlines and parse (identical fixture)",
+      "category": "scenarios",
+      "duration": 0.07430080603808165,
+      "duration_samples": [
+        0.07430080603808165,
+        0.07357444241642952,
+        0.0743451900780201
+      ],
+      "median_absolute_deviation": 4.438403993844986e-05,
+      "duration_min": 0.07357444241642952,
+      "duration_max": 0.0743451900780201,
+      "metrics": {
+        "aiogzip_time": "0.0743s",
+        "gzip_time": "0.0801s",
+        "records": 73849,
+        "speedup": "1.08x faster",
+        "tuning": "newline=\"\\n\", chunk_size=512 KiB, readlines=1 MiB",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Error handling",
+      "category": "errors",
+      "duration": 0.0004090443253517151,
+      "duration_samples": [
+        0.0006142416968941689,
+        0.0004090443253517151,
+        0.0004004184156656265
+      ],
+      "median_absolute_deviation": 8.625909686088562e-06,
+      "duration_min": 0.0004004184156656265,
+      "duration_max": 0.0006142416968941689,
+      "metrics": {
+        "errors_caught": 3,
+        "avg_time_per_error": "0.14ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Corrupted data handling",
+      "category": "errors",
+      "duration": 0.00019752420485019684,
+      "duration_samples": [
+        0.00025101471692323685,
+        0.00019752420485019684,
+        0.00012062769383192062
+      ],
+      "median_absolute_deviation": 5.349051207304001e-05,
+      "duration_min": 0.00012062769383192062,
+      "duration_max": 0.00025101471692323685,
+      "metrics": {
+        "error_detected": true,
+        "error_type": "BadGzipFile",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "verify (compressible)",
+      "category": "inspection",
+      "duration": 0.0016220007091760635,
+      "duration_samples": [
+        0.0017639575526118279,
+        0.0015440117567777634,
+        0.0016220007091760635
+      ],
+      "median_absolute_deviation": 7.798895239830017e-05,
+      "duration_min": 0.0015440117567777634,
+      "duration_max": 0.0017639575526118279,
+      "metrics": {
+        "peak_python_mb": 0.6926889419555664,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "inspect (compressible)",
+      "category": "inspection",
+      "duration": 0.001027483493089676,
+      "duration_samples": [
+        0.0012480216100811958,
+        0.001015903428196907,
+        0.001027483493089676
+      ],
+      "median_absolute_deviation": 1.158006489276886e-05,
+      "duration_min": 0.001015903428196907,
+      "duration_max": 0.0012480216100811958,
+      "metrics": {
+        "peak_python_mb": 0.6926889419555664,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "_read_discard (compressible)",
+      "category": "inspection",
+      "duration": 0.0016840863972902298,
+      "duration_samples": [
+        0.0035038813948631287,
+        0.00167759507894516,
+        0.0016840863972902298
+      ],
+      "median_absolute_deviation": 6.491318345069885e-06,
+      "duration_min": 0.00167759507894516,
+      "duration_max": 0.0035038813948631287,
+      "metrics": {
+        "peak_python_mb": 16.13339614868164,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "verify (incompressible)",
+      "category": "inspection",
+      "duration": 0.003412739373743534,
+      "duration_samples": [
+        0.004362676292657852,
+        0.003412739373743534,
+        0.0031532486900687218
+      ],
+      "median_absolute_deviation": 0.0002594906836748123,
+      "duration_min": 0.0031532486900687218,
+      "duration_max": 0.004362676292657852,
+      "metrics": {
+        "peak_python_mb": 0.9269819259643555,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "inspect (incompressible)",
+      "category": "inspection",
+      "duration": 0.0032719317823648453,
+      "duration_samples": [
+        0.0037422822788357735,
+        0.0032719317823648453,
+        0.0029639694839715958
+      ],
+      "median_absolute_deviation": 0.0003079622983932495,
+      "duration_min": 0.0029639694839715958,
+      "duration_max": 0.0037422822788357735,
+      "metrics": {
+        "peak_python_mb": 0.9269819259643555,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "_read_discard (incompressible)",
+      "category": "inspection",
+      "duration": 0.003935238346457481,
+      "duration_samples": [
+        0.003935238346457481,
+        0.0036044809967279434,
+        0.003953771665692329
+      ],
+      "median_absolute_deviation": 1.8533319234848022e-05,
+      "duration_min": 0.0036044809967279434,
+      "duration_max": 0.003953771665692329,
+      "metrics": {
+        "peak_python_mb": 16.13474750518799,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "verify (many-members)",
+      "category": "inspection",
+      "duration": 0.011129331775009632,
+      "duration_samples": [
+        0.0153709901496768,
+        0.011129331775009632,
+        0.011036437004804611
+      ],
+      "median_absolute_deviation": 9.28947702050209e-05,
+      "duration_min": 0.011036437004804611,
+      "duration_max": 0.0153709901496768,
+      "metrics": {
+        "peak_python_mb": 0.47324466705322266,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "inspect (many-members)",
+      "category": "inspection",
+      "duration": 0.021779238246381283,
+      "duration_samples": [
+        0.022341021336615086,
+        0.021744142286479473,
+        0.021779238246381283
+      ],
+      "median_absolute_deviation": 3.509595990180969e-05,
+      "duration_min": 0.021744142286479473,
+      "duration_max": 0.022341021336615086,
+      "metrics": {
+        "peak_python_mb": 0.7560205459594727,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "_read_discard (many-members)",
+      "category": "inspection",
+      "duration": 0.01217512134462595,
+      "duration_samples": [
+        0.01217512134462595,
+        0.011741290800273418,
+        0.012246496975421906
+      ],
+      "median_absolute_deviation": 7.137563079595566e-05,
+      "duration_min": 0.011741290800273418,
+      "duration_max": 0.012246496975421906,
+      "metrics": {
+        "peak_python_mb": 16.246068000793457,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "stdlib gzip.compress reference",
+      "category": "streaming",
+      "duration": 0.12216420844197273,
+      "duration_samples": [
+        0.12196860834956169,
+        0.12216420844197273,
+        0.1225285679101944
+      ],
+      "median_absolute_deviation": 0.00019560009241104126,
+      "duration_min": 0.12196860834956169,
+      "duration_max": 0.1225285679101944,
+      "metrics": {
+        "input_bytes": 8388608,
+        "compressed_bytes": 8391186,
+        "informational": true,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "sans-I/O codec encode (informational)",
+      "category": "streaming",
+      "duration": 0.11931615881621838,
+      "duration_samples": [
+        0.11869761813431978,
+        0.11931615881621838,
+        0.12030096165835857
+      ],
+      "median_absolute_deviation": 0.0006185406818985939,
+      "duration_min": 0.11869761813431978,
+      "duration_max": 0.12030096165835857,
+      "metrics": {
+        "input_bytes": 8388608,
+        "compressed_bytes": 8391186,
+        "output_chunks": 35,
+        "stdlib_reference_seconds": 0.12216420844197273,
+        "informational": true,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "stdlib gzip.decompress reference",
+      "category": "streaming",
+      "duration": 0.0034105442464351654,
+      "duration_samples": [
+        0.003308851271867752,
+        0.0034111058339476585,
+        0.0034105442464351654
+      ],
+      "median_absolute_deviation": 5.615875124931335e-07,
+      "duration_min": 0.003308851271867752,
+      "duration_max": 0.0034111058339476585,
+      "metrics": {
+        "input_bytes": 8391186,
+        "output_bytes": 8388608,
+        "informational": true,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "sans-I/O codec decode (informational)",
+      "category": "streaming",
+      "duration": 0.00279169250279665,
+      "duration_samples": [
+        0.00279169250279665,
+        0.0027872752398252487,
+        0.002823113463819027
+      ],
+      "median_absolute_deviation": 4.417262971401215e-06,
+      "duration_min": 0.0027872752398252487,
+      "duration_max": 0.002823113463819027,
+      "metrics": {
+        "input_bytes": 8391186,
+        "output_bytes": 8388608,
+        "output_chunks": 33,
+        "stdlib_reference_seconds": 0.003308851271867752,
+        "informational": true,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "decompress_chunks (64K in, 64K out)",
+      "category": "streaming",
+      "duration": 0.0013003302738070488,
+      "duration_samples": [
+        0.001349354162812233,
+        0.0012968238443136215,
+        0.0013003302738070488
+      ],
+      "median_absolute_deviation": 3.5064294934272766e-06,
+      "duration_min": 0.0012968238443136215,
+      "duration_max": 0.001349354162812233,
+      "metrics": {
+        "event_loop_ticks": 7,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "decompress_chunks (512K in, 256K out)",
+      "category": "streaming",
+      "duration": 0.0009195702150464058,
+      "duration_samples": [
+        0.0009424230083823204,
+        0.0008684433996677399,
+        0.0009195702150464058
+      ],
+      "median_absolute_deviation": 2.2852793335914612e-05,
+      "duration_min": 0.0008684433996677399,
+      "duration_max": 0.0009424230083823204,
+      "metrics": {
+        "event_loop_ticks": 6,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "file reader (64K output)",
+      "category": "streaming",
+      "duration": 0.003977758809924126,
+      "duration_samples": [
+        0.003977758809924126,
+        0.004131698980927467,
+        0.003900422714650631
+      ],
+      "median_absolute_deviation": 7.733609527349472e-05,
+      "duration_min": 0.003900422714650631,
+      "duration_max": 0.004131698980927467,
+      "metrics": {
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "decompress_chunks compressible peak",
+      "category": "streaming",
+      "duration": 0.0012678997591137886,
+      "duration_samples": [
+        0.0012678997591137886,
+        0.0012854626402258873,
+        0.0012565376237034798
+      ],
+      "median_absolute_deviation": 1.1362135410308838e-05,
+      "duration_min": 0.0012565376237034798,
+      "duration_max": 0.0012854626402258873,
+      "metrics": {
+        "peak_python_mb": 0.18134593963623047,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "full read compressible peak",
+      "category": "streaming",
+      "duration": 0.0015181638300418854,
+      "duration_samples": [
+        0.0015181638300418854,
+        0.0014873053878545761,
+        0.0019774222746491432
+      ],
+      "median_absolute_deviation": 3.0858442187309265e-05,
+      "duration_min": 0.0014873053878545761,
+      "duration_max": 0.0019774222746491432,
+      "metrics": {
+        "peak_python_mb": 16.13351821899414,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "compress_chunks (64K in, 64K out)",
+      "category": "streaming",
+      "duration": 0.11822597589343786,
+      "duration_samples": [
+        0.11647429037839174,
+        0.11875282321125269,
+        0.11822597589343786
+      ],
+      "median_absolute_deviation": 0.000526847317814827,
+      "duration_min": 0.11647429037839174,
+      "duration_max": 0.11875282321125269,
+      "metrics": {
+        "compressed_bytes": 8391186,
+        "event_loop_ticks": 16,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "compress_chunks (512K in, 256K out)",
+      "category": "streaming",
+      "duration": 0.12802538089454174,
+      "duration_samples": [
+        0.12802538089454174,
+        0.12903864867985249,
+        0.12180201336741447
+      ],
+      "median_absolute_deviation": 0.0010132677853107452,
+      "duration_min": 0.12180201336741447,
+      "duration_max": 0.12903864867985249,
+      "metrics": {
+        "compressed_bytes": 8391186,
+        "event_loop_ticks": 128007,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "compress_chunks fast (512K in, 256K out)",
+      "category": "streaming",
+      "duration": 0.0947299487888813,
+      "duration_samples": [
+        0.0947299487888813,
+        0.09598781913518906,
+        0.09433945920318365
+      ],
+      "median_absolute_deviation": 0.0003904895856976509,
+      "duration_min": 0.09433945920318365,
+      "duration_max": 0.09598781913518906,
+      "metrics": {
+        "compressed_bytes": 8391191,
+        "event_loop_ticks": 96258,
+        "engine": "zlib-ng",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "file writer (64K input)",
+      "category": "streaming",
+      "duration": 0.1264503514394164,
+      "duration_samples": [
+        0.12622676696628332,
+        0.12648832239210606,
+        0.1264503514394164
+      ],
+      "median_absolute_deviation": 3.7970952689647675e-05,
+      "duration_min": 0.12622676696628332,
+      "duration_max": 0.12648832239210606,
+      "metrics": {
+        "compressed_bytes": 8391203,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "compress_chunks compressible peak",
+      "category": "streaming",
+      "duration": 0.010434838011860847,
+      "duration_samples": [
+        0.010434838011860847,
+        0.010398739017546177,
+        0.010464435443282127
+      ],
+      "median_absolute_deviation": 2.9597431421279907e-05,
+      "duration_min": 0.010398739017546177,
+      "duration_max": 0.010464435443282127,
+      "metrics": {
+        "peak_python_mb": 0.38762760162353516,
+        "compressed_bytes": 8176,
+        "engine": "stdlib-zlib",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "read(-1) - 1MB file",
+      "category": "micro",
+      "duration": 0.00024217911995947362,
+      "duration_samples": [
+        0.00024217911995947362,
+        0.00023471642285585403,
+        0.000249186297878623
+      ],
+      "median_absolute_deviation": 7.007177919149393e-06,
+      "duration_min": 0.00023471642285585403,
+      "duration_max": 0.000249186297878623,
+      "metrics": {
+        "iterations": 100,
+        "avg_time_ms": "0.242ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Line iteration - 100K lines",
+      "category": "micro",
+      "duration": 0.01405718419700861,
+      "duration_samples": [
+        0.014245467788229386,
+        0.01405718419700861,
+        0.013851119950413705
+      ],
+      "median_absolute_deviation": 0.00018828359122077636,
+      "duration_min": 0.013851119950413705,
+      "duration_max": 0.014245467788229386,
+      "metrics": {
+        "iterations": 30,
+        "avg_time_ms": "14.057ms",
+        "lines_per_sec": "7113800",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "readline() loop - 100K lines",
+      "category": "micro",
+      "duration": 0.016035737780233223,
+      "duration_samples": [
+        0.016143870477875074,
+        0.016035737780233223,
+        0.015981819201260804
+      ],
+      "median_absolute_deviation": 5.391857897241864e-05,
+      "duration_min": 0.015981819201260804,
+      "duration_max": 0.016143870477875074,
+      "metrics": {
+        "iterations": 30,
+        "avg_time_ms": "16.036ms",
+        "lines_per_sec": "6236071",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "readlines() - 100K lines",
+      "category": "micro",
+      "duration": 0.004782373489191135,
+      "duration_samples": [
+        0.0047340553253889086,
+        0.004782373489191135,
+        0.0048835798787573974
+      ],
+      "median_absolute_deviation": 4.831816380222644e-05,
+      "duration_min": 0.0047340553253889086,
+      "duration_max": 0.0048835798787573974,
+      "metrics": {
+        "iterations": 30,
+        "avg_time_ms": "4.782ms",
+        "lines_per_sec": "20910119",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "readlines(1 MiB) batches - 100K lines",
+      "category": "micro",
+      "duration": 0.004729871886471907,
+      "duration_samples": [
+        0.004727681012203296,
+        0.004729871886471907,
+        0.004833155994613965
+      ],
+      "median_absolute_deviation": 2.1908742686115035e-06,
+      "duration_min": 0.004727681012203296,
+      "duration_max": 0.004833155994613965,
+      "metrics": {
+        "iterations": 30,
+        "avg_time_ms": "4.730ms",
+        "lines_per_sec": "21142222",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Small writes (1000 x 120 bytes)",
+      "category": "micro",
+      "duration": 0.0014900201931595802,
+      "duration_samples": [
+        0.0015963111072778702,
+        0.0014624781906604767,
+        0.0014900201931595802
+      ],
+      "median_absolute_deviation": 2.7542002499103546e-05,
+      "duration_min": 0.0014624781906604767,
+      "duration_max": 0.0015963111072778702,
+      "metrics": {
+        "ops_per_sec": "671132",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Text writelines batching (10K lines)",
+      "category": "micro",
+      "duration": 0.0016971221193671227,
+      "duration_samples": [
+        0.0017659412696957588,
+        0.0016597211360931396,
+        0.0016971221193671227
+      ],
+      "median_absolute_deviation": 3.7400983273983e-05,
+      "duration_min": 0.0016597211360931396,
+      "duration_max": 0.0017659412696957588,
+      "metrics": {
+        "individual_time": "13.250ms",
+        "batched_time": "1.697ms",
+        "speedup": "7.81x",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Binary readline (200KB line, 17-byte chunks)",
+      "category": "micro",
+      "duration": 0.0005826361104846001,
+      "duration_samples": [
+        0.0005826361104846001,
+        0.00059855991974473,
+        0.0005663773976266384
+      ],
+      "median_absolute_deviation": 1.5923809260129872e-05,
+      "duration_min": 0.0005663773976266384,
+      "duration_max": 0.00059855991974473,
+      "metrics": {
+        "iterations": 50,
+        "avg_time_ms": "0.583ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Binary read1 (2MiB, 4KiB buffers)",
+      "category": "micro",
+      "duration": 0.014301790265987317,
+      "duration_samples": [
+        0.014331626674781243,
+        0.014101114589720964,
+        0.014301790265987317
+      ],
+      "median_absolute_deviation": 2.9836408793925892e-05,
+      "duration_min": 0.014101114589720964,
+      "duration_max": 0.014331626674781243,
+      "metrics": {
+        "iterations": 30,
+        "avg_time_ms": "14.302ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "Binary readinto1 (2MiB, 4KiB buffers)",
+      "category": "micro",
+      "duration": 0.014470963614682357,
+      "duration_samples": [
+        0.014552092893670003,
+        0.014470963614682357,
+        0.014396687441815933
+      ],
+      "median_absolute_deviation": 7.427617286642416e-05,
+      "duration_min": 0.014396687441815933,
+      "duration_max": 0.014552092893670003,
+      "metrics": {
+        "iterations": 30,
+        "avg_time_ms": "14.471ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "seek(0) rewind x50 - healthy reader",
+      "category": "read_health",
+      "duration": 0.004592476738616824,
+      "duration_samples": [
+        0.004592476738616824,
+        0.004547669691964984,
+        0.004620197461917996
+      ],
+      "median_absolute_deviation": 2.7720723301172603e-05,
+      "duration_min": 0.004547669691964984,
+      "duration_max": 0.004620197461917996,
+      "metrics": {
+        "iterations": 20,
+        "avg_time_ms": "4.592ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "limit break + seek(0) recovery x10",
+      "category": "read_health",
+      "duration": 0.009197762049734593,
+      "duration_samples": [
+        0.009506478253751994,
+        0.008941961079835891,
+        0.009197762049734593
+      ],
+      "median_absolute_deviation": 0.00025580096989870175,
+      "duration_min": 0.008941961079835891,
+      "duration_max": 0.009506478253751994,
+      "metrics": {
+        "iterations": 10,
+        "avg_time_ms": "9.198ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "CRC failure + salvage read() - 4MB",
+      "category": "read_health",
+      "duration": 0.0013424511067569255,
+      "duration_samples": [
+        0.0013424511067569255,
+        0.0013082099612802267,
+        0.0013527465984225274
+      ],
+      "median_absolute_deviation": 1.0295491665601904e-05,
+      "duration_min": 0.0013082099612802267,
+      "duration_max": 0.0013527465984225274,
+      "metrics": {
+        "iterations": 20,
+        "avg_time_ms": "1.342ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "CRC failure + salvage readline() - 50K lines",
+      "category": "read_health",
+      "duration": 0.0196052604354918,
+      "duration_samples": [
+        0.019719882868230343,
+        0.0196052604354918,
+        0.019333497248589994
+      ],
+      "median_absolute_deviation": 0.00011462243273854117,
+      "duration_min": 0.019333497248589994,
+      "duration_max": 0.019719882868230343,
+      "metrics": {
+        "iterations": 10,
+        "avg_time_ms": "19.605ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "tell/seek cookie round trip x200",
+      "category": "text_origin",
+      "duration": 0.10243666991591453,
+      "duration_samples": [
+        0.10243666991591453,
+        0.10122892223298549,
+        0.10247751493006944
+      ],
+      "median_absolute_deviation": 4.084501415491104e-05,
+      "duration_min": 0.10122892223298549,
+      "duration_max": 0.10247751493006944,
+      "metrics": {
+        "iterations": 5,
+        "avg_time_ms": "102.437ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "readline + tell every 50 lines - 20K lines",
+      "category": "text_origin",
+      "duration": 0.00515179019421339,
+      "duration_samples": [
+        0.00515179019421339,
+        0.005113475304096937,
+        0.005228661280125379
+      ],
+      "median_absolute_deviation": 3.8314890116453e-05,
+      "duration_min": 0.005113475304096937,
+      "duration_max": 0.005228661280125379,
+      "metrics": {
+        "iterations": 10,
+        "avg_time_ms": "5.152ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "readlines(64) loop - 20K lines",
+      "category": "text_origin",
+      "duration": 0.0034785819239914416,
+      "duration_samples": [
+        0.0034785819239914416,
+        0.0034473010338842867,
+        0.0035293235443532465
+      ],
+      "median_absolute_deviation": 3.128089010715493e-05,
+      "duration_min": 0.0034473010338842867,
+      "duration_max": 0.0035293235443532465,
+      "metrics": {
+        "iterations": 10,
+        "avg_time_ms": "3.479ms",
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "direct decode incompressible 1MiB one-feed 256K-output",
+      "category": "regressions",
+      "duration": 0.0005461731925606728,
+      "duration_samples": [
+        0.0005461731925606728,
+        0.0005462039262056351,
+        0.0005418155342340469
+      ],
+      "median_absolute_deviation": 3.073364496231079e-08,
+      "duration_min": 0.0005418155342340469,
+      "duration_max": 0.0005462039262056351,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_kind": "incompressible",
+        "fixture_bytes": 1048576,
+        "fixture_sha256": "2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6",
+        "compressed_bytes": 1048914,
+        "compressed_sha256": "6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de",
+        "output_bytes": 1048576,
+        "output_sha256": "2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6",
+        "output_chunks": 5,
+        "max_output_chunk": 262064,
+        "throughput_mib_s": 1830.9210587791947,
+        "engine": "zlib-ng",
+        "source_items": 1,
+        "source_min_bytes": 1048914,
+        "source_max_bytes": 1048914,
+        "source_total_bytes": 1048914,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "direct decode incompressible 1MiB 256K-feeds 256K-output",
+      "category": "regressions",
+      "duration": 0.000529061071574688,
+      "duration_samples": [
+        0.000542796216905117,
+        0.000529061071574688,
+        0.0005175387486815453
+      ],
+      "median_absolute_deviation": 1.15223228931427e-05,
+      "duration_min": 0.0005175387486815453,
+      "duration_max": 0.000542796216905117,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_kind": "incompressible",
+        "fixture_bytes": 1048576,
+        "fixture_sha256": "2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6",
+        "compressed_bytes": 1048914,
+        "compressed_sha256": "6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de",
+        "output_bytes": 1048576,
+        "output_sha256": "2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6",
+        "output_chunks": 5,
+        "max_output_chunk": 262064,
+        "throughput_mib_s": 1890.140956739867,
+        "engine": "zlib-ng",
+        "source_items": 5,
+        "source_min_bytes": 338,
+        "source_max_bytes": 262144,
+        "source_total_bytes": 1048914,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "direct decode incompressible 2MiB one-feed 256K-output",
+      "category": "regressions",
+      "duration": 0.001050819642841816,
+      "duration_samples": [
+        0.0010326551273465157,
+        0.0010705357417464256,
+        0.001050819642841816
+      ],
+      "median_absolute_deviation": 1.8164515495300293e-05,
+      "duration_min": 0.0010326551273465157,
+      "duration_max": 0.0010705357417464256,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_kind": "incompressible",
+        "fixture_bytes": 2097152,
+        "fixture_sha256": "c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4",
+        "compressed_bytes": 2097810,
+        "compressed_sha256": "94677b6de09fea85efcc2e8137328364e5e3b8740a03eb6279c5782046a923f5",
+        "output_bytes": 2097152,
+        "output_sha256": "c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4",
+        "output_chunks": 9,
+        "max_output_chunk": 262064,
+        "throughput_mib_s": 1903.2761840949597,
+        "engine": "zlib-ng",
+        "source_items": 1,
+        "source_min_bytes": 2097810,
+        "source_max_bytes": 2097810,
+        "source_total_bytes": 2097810,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "direct decode incompressible 2MiB 256K-feeds 256K-output",
+      "category": "regressions",
+      "duration": 0.001041320152580738,
+      "duration_samples": [
+        0.0010195691138505936,
+        0.001041320152580738,
+        0.0010432740673422813
+      ],
+      "median_absolute_deviation": 1.953914761543274e-06,
+      "duration_min": 0.0010195691138505936,
+      "duration_max": 0.0010432740673422813,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_kind": "incompressible",
+        "fixture_bytes": 2097152,
+        "fixture_sha256": "c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4",
+        "compressed_bytes": 2097810,
+        "compressed_sha256": "94677b6de09fea85efcc2e8137328364e5e3b8740a03eb6279c5782046a923f5",
+        "output_bytes": 2097152,
+        "output_sha256": "c3c24a34798b4596db625275bd1309af75bd3587fe166638cc0161e2d13911e4",
+        "output_chunks": 9,
+        "max_output_chunk": 262064,
+        "throughput_mib_s": 1920.6389072979468,
+        "engine": "zlib-ng",
+        "source_items": 9,
+        "source_min_bytes": 658,
+        "source_max_bytes": 262144,
+        "source_total_bytes": 2097810,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "direct decode compressible 1MiB one-feed 256K-output",
+      "category": "regressions",
+      "duration": 0.0005901670083403587,
+      "duration_samples": [
+        0.0005896557122468948,
+        0.0005962485447525978,
+        0.0005901670083403587
+      ],
+      "median_absolute_deviation": 5.112960934638977e-07,
+      "duration_min": 0.0005896557122468948,
+      "duration_max": 0.0005962485447525978,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_kind": "compressible",
+        "fixture_bytes": 1048576,
+        "fixture_sha256": "d1b9693490369f6f29ff9db81b7a20293b870fd8c25eed6fdb1a9b3f04103b77",
+        "compressed_bytes": 3119,
+        "compressed_sha256": "d11e973d8c1276acb7e672352db7165897d0710724a744d720db3e7303f55452",
+        "output_bytes": 1048576,
+        "output_sha256": "d1b9693490369f6f29ff9db81b7a20293b870fd8c25eed6fdb1a9b3f04103b77",
+        "output_chunks": 4,
+        "max_output_chunk": 262144,
+        "throughput_mib_s": 1694.4356188465283,
+        "engine": "zlib-ng",
+        "source_items": 1,
+        "source_min_bytes": 3119,
+        "source_max_bytes": 3119,
+        "source_total_bytes": 3119,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "direct decode compressible 1MiB 256K-feeds 256K-output",
+      "category": "regressions",
+      "duration": 0.0005828728899359703,
+      "duration_samples": [
+        0.0005828728899359703,
+        0.0005864500999450684,
+        0.0005811601877212524
+      ],
+      "median_absolute_deviation": 1.712702214717865e-06,
+      "duration_min": 0.0005811601877212524,
+      "duration_max": 0.0005864500999450684,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_kind": "compressible",
+        "fixture_bytes": 1048576,
+        "fixture_sha256": "d1b9693490369f6f29ff9db81b7a20293b870fd8c25eed6fdb1a9b3f04103b77",
+        "compressed_bytes": 3119,
+        "compressed_sha256": "d11e973d8c1276acb7e672352db7165897d0710724a744d720db3e7303f55452",
+        "output_bytes": 1048576,
+        "output_sha256": "d1b9693490369f6f29ff9db81b7a20293b870fd8c25eed6fdb1a9b3f04103b77",
+        "output_chunks": 4,
+        "max_output_chunk": 262144,
+        "throughput_mib_s": 1715.639922985356,
+        "engine": "zlib-ng",
+        "source_items": 1,
+        "source_min_bytes": 3119,
+        "source_max_bytes": 3119,
+        "source_total_bytes": 3119,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "decompress_chunks 64K-in 64K-out",
+      "category": "regressions",
+      "duration": 0.0006446205079555511,
+      "duration_samples": [
+        0.0006292294710874557,
+        0.0006528059020638466,
+        0.0006446205079555511
+      ],
+      "median_absolute_deviation": 8.18539410829544e-06,
+      "duration_min": 0.0006292294710874557,
+      "duration_max": 0.0006528059020638466,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 1048576,
+        "fixture_sha256": "2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6",
+        "compressed_sha256": "6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de",
+        "output_bytes": 1048576,
+        "output_sha256": "2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6",
+        "output_chunks": 17,
+        "max_output_chunk": 65516,
+        "engine": "zlib-ng",
+        "source_items": 17,
+        "source_min_bytes": 338,
+        "source_max_bytes": 65536,
+        "source_total_bytes": 1048914,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "decompress_chunks 512K-in 256K-out",
+      "category": "regressions",
+      "duration": 0.0005444316193461418,
+      "duration_samples": [
+        0.0005444316193461418,
+        0.000545743852853775,
+        0.0005413452163338661
+      ],
+      "median_absolute_deviation": 1.3122335076332092e-06,
+      "duration_min": 0.0005413452163338661,
+      "duration_max": 0.000545743852853775,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 1048576,
+        "fixture_sha256": "2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6",
+        "compressed_sha256": "6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de",
+        "output_bytes": 1048576,
+        "output_sha256": "2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6",
+        "output_chunks": 5,
+        "max_output_chunk": 262064,
+        "engine": "zlib-ng",
+        "source_items": 3,
+        "source_min_bytes": 338,
+        "source_max_bytes": 524288,
+        "source_total_bytes": 1048914,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "compress_chunks 64K-in 64K-out",
+      "category": "regressions",
+      "duration": 0.014553082175552845,
+      "duration_samples": [
+        0.014553082175552845,
+        0.014707964845001698,
+        0.014493590220808983
+      ],
+      "median_absolute_deviation": 5.949195474386215e-05,
+      "duration_min": 0.014493590220808983,
+      "duration_max": 0.014707964845001698,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 1048576,
+        "fixture_sha256": "2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6",
+        "compressed_bytes": 1048914,
+        "compressed_sha256": "6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de",
+        "output_chunks": 34,
+        "engine": "stdlib-zlib",
+        "source_items": 16,
+        "source_min_bytes": 65536,
+        "source_max_bytes": 65536,
+        "source_total_bytes": 1048576,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "compress_chunks 512K-in 256K-out",
+      "category": "regressions",
+      "duration": 0.01615143660455942,
+      "duration_samples": [
+        0.01554412767291069,
+        0.01615143660455942,
+        0.01658552885055542
+      ],
+      "median_absolute_deviation": 0.0004340922459959984,
+      "duration_min": 0.01554412767291069,
+      "duration_max": 0.01658552885055542,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 1048576,
+        "fixture_sha256": "2c665adfc621787568096c12d16bcda307ab2dd935251b3fd84fce8ee3b675c6",
+        "compressed_bytes": 1048914,
+        "compressed_sha256": "6558346b4accc5921d4f2f647faec1cbf1047d197d014fc9e3deeabb36e9b2de",
+        "output_chunks": 8,
+        "engine": "stdlib-zlib",
+        "source_items": 2,
+        "source_min_bytes": 524288,
+        "source_max_bytes": 524288,
+        "source_total_bytes": 1048576,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "direct output bound 1 bytes",
+      "category": "regressions",
+      "duration": 0.029346739873290062,
+      "duration_samples": [
+        0.02938221674412489,
+        0.02909473143517971,
+        0.029346739873290062
+      ],
+      "median_absolute_deviation": 3.547687083482742e-05,
+      "duration_min": 0.02909473143517971,
+      "duration_max": 0.02938221674412489,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 131072,
+        "fixture_sha256": "066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f",
+        "compressed_bytes": 131130,
+        "compressed_sha256": "f816ca7a4ef335f9c6292ea6a1ad6e27b94de4c9a13b6694fd9af24888f86600",
+        "output_bytes": 131072,
+        "output_sha256": "066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f",
+        "output_chunks": 131072,
+        "max_output_chunk": 1,
+        "output_chunk_size": 1,
+        "engine_decompress_calls": 2,
+        "engine": "zlib-ng",
+        "source_items": 1,
+        "source_min_bytes": 131130,
+        "source_max_bytes": 131130,
+        "source_total_bytes": 131130,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "direct output bound 1024 bytes",
+      "category": "regressions",
+      "duration": 0.00013283081352710724,
+      "duration_samples": [
+        0.00013487506657838821,
+        0.00013283081352710724,
+        0.0001274915412068367
+      ],
+      "median_absolute_deviation": 2.0442530512809753e-06,
+      "duration_min": 0.0001274915412068367,
+      "duration_max": 0.00013487506657838821,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 131072,
+        "fixture_sha256": "066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f",
+        "compressed_bytes": 131130,
+        "compressed_sha256": "f816ca7a4ef335f9c6292ea6a1ad6e27b94de4c9a13b6694fd9af24888f86600",
+        "output_bytes": 131072,
+        "output_sha256": "066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f",
+        "output_chunks": 128,
+        "max_output_chunk": 1024,
+        "output_chunk_size": 1024,
+        "engine_decompress_calls": 2,
+        "engine": "zlib-ng",
+        "source_items": 1,
+        "source_min_bytes": 131130,
+        "source_max_bytes": 131130,
+        "source_total_bytes": 131130,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "direct output bound 65536 bytes",
+      "category": "regressions",
+      "duration": 8.392892777919769e-05,
+      "duration_samples": [
+        8.392892777919769e-05,
+        8.32676887512207e-05,
+        8.591264486312866e-05
+      ],
+      "median_absolute_deviation": 6.612390279769897e-07,
+      "duration_min": 8.32676887512207e-05,
+      "duration_max": 8.591264486312866e-05,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 131072,
+        "fixture_sha256": "066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f",
+        "compressed_bytes": 131130,
+        "compressed_sha256": "f816ca7a4ef335f9c6292ea6a1ad6e27b94de4c9a13b6694fd9af24888f86600",
+        "output_bytes": 131072,
+        "output_sha256": "066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f",
+        "output_chunks": 2,
+        "max_output_chunk": 65536,
+        "output_chunk_size": 65536,
+        "engine_decompress_calls": 2,
+        "engine": "zlib-ng",
+        "source_items": 1,
+        "source_min_bytes": 131130,
+        "source_max_bytes": 131130,
+        "source_total_bytes": 131130,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "direct output bound 262144 bytes",
+      "category": "regressions",
+      "duration": 7.952097803354263e-05,
+      "duration_samples": [
+        7.952097803354263e-05,
+        7.953029125928879e-05,
+        7.9290010035038e-05
+      ],
+      "median_absolute_deviation": 9.313225746154785e-09,
+      "duration_min": 7.9290010035038e-05,
+      "duration_max": 7.953029125928879e-05,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "fixture_bytes": 131072,
+        "fixture_sha256": "066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f",
+        "compressed_bytes": 131130,
+        "compressed_sha256": "f816ca7a4ef335f9c6292ea6a1ad6e27b94de4c9a13b6694fd9af24888f86600",
+        "output_bytes": 131072,
+        "output_sha256": "066b6cc1df6a1f9037a54b5ea061021b874e2a9be1d460f8f3d040c34aa93a0f",
+        "output_chunks": 1,
+        "max_output_chunk": 131072,
+        "output_chunk_size": 262144,
+        "engine_decompress_calls": 1,
+        "engine": "zlib-ng",
+        "source_items": 1,
+        "source_min_bytes": 131130,
+        "source_max_bytes": 131130,
+        "source_total_bytes": 131130,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "header filename 65536 bytes one-feed",
+      "category": "regressions",
+      "duration": 4.010647535324097e-05,
+      "duration_samples": [
+        4.5715831220149994e-05,
+        4.010647535324097e-05,
+        3.8743019104003906e-05
+      ],
+      "median_absolute_deviation": 1.3634562492370605e-06,
+      "duration_min": 3.8743019104003906e-05,
+      "duration_max": 4.5715831220149994e-05,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "header_field": "filename",
+        "header_field_bytes": 65536,
+        "header_crc": true,
+        "collect_member_info": false,
+        "fixture_bytes": 65583,
+        "fixture_sha256": "599d4cd04a561c8087fb4eeccebb427b7af724af9a53808e9c59679dcf118aa3",
+        "output_bytes": 24,
+        "output_sha256": "0581ed587384592c7c9713be7b0891d6ca32f9e817e70798bbed4da76cc59a14",
+        "engine": "zlib-ng",
+        "source_items": 1,
+        "source_min_bytes": 65583,
+        "source_max_bytes": 65583,
+        "source_total_bytes": 65583,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "header filename 65536 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 2.649053931236267e-05,
+      "duration_samples": [
+        3.0236318707466125e-05,
+        2.649053931236267e-05,
+        2.5989487767219543e-05
+      ],
+      "median_absolute_deviation": 5.010515451431274e-07,
+      "duration_min": 2.5989487767219543e-05,
+      "duration_max": 3.0236318707466125e-05,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "header_field": "filename",
+        "header_field_bytes": 65536,
+        "header_crc": true,
+        "collect_member_info": false,
+        "fixture_bytes": 65583,
+        "fixture_sha256": "599d4cd04a561c8087fb4eeccebb427b7af724af9a53808e9c59679dcf118aa3",
+        "output_bytes": 24,
+        "output_sha256": "0581ed587384592c7c9713be7b0891d6ca32f9e817e70798bbed4da76cc59a14",
+        "engine": "zlib-ng",
+        "source_items": 2,
+        "source_min_bytes": 47,
+        "source_max_bytes": 65536,
+        "source_total_bytes": 65583,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "header comment 65536 bytes one-feed",
+      "category": "regressions",
+      "duration": 2.099946141242981e-05,
+      "duration_samples": [
+        2.377573400735855e-05,
+        2.099946141242981e-05,
+        2.0598992705345154e-05
+      ],
+      "median_absolute_deviation": 4.0046870708465576e-07,
+      "duration_min": 2.0598992705345154e-05,
+      "duration_max": 2.377573400735855e-05,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "header_field": "comment",
+        "header_field_bytes": 65536,
+        "header_crc": true,
+        "collect_member_info": false,
+        "fixture_bytes": 65583,
+        "fixture_sha256": "187b763d6e454d84569771a17e820bb5af11ddfcb23ab654e6e65ef727087015",
+        "output_bytes": 24,
+        "output_sha256": "0581ed587384592c7c9713be7b0891d6ca32f9e817e70798bbed4da76cc59a14",
+        "engine": "zlib-ng",
+        "source_items": 1,
+        "source_min_bytes": 65583,
+        "source_max_bytes": 65583,
+        "source_total_bytes": 65583,
+        "suite_repeats": 3
+      }
+    },
+    {
+      "name": "header comment 65536 bytes 64K-feeds",
+      "category": "regressions",
+      "duration": 2.194102853536606e-05,
+      "duration_samples": [
+        2.2783875465393066e-05,
+        2.160109579563141e-05,
+        2.194102853536606e-05
+      ],
+      "median_absolute_deviation": 3.3993273973464966e-07,
+      "duration_min": 2.160109579563141e-05,
+      "duration_max": 2.2783875465393066e-05,
+      "metrics": {
+        "benchmark_mode": "throughput",
+        "header_field": "comment",
+        "header_field_bytes": 65536,
+        "header_crc": true,
+        "collect_member_info": false,
+        "fixture_bytes": 65583,
+        "fixture_sha256": "187b763d6e454d84569771a17e820bb5af11ddfcb23ab654e6e65ef727087015",
+        "output_bytes": 24,
+        "output_sha256": "0581ed587384592c7c9713be7b0891d6ca32f9e817e70798bbed4da76cc59a14",
+        "engine": "zlib-ng",
+        "source_items": 2,
+        "source_min_bytes": 47,
+        "source_max_bytes": 65536,
+        "source_total_bytes": 65583,
+        "suite_repeats": 3
+      }
+    }
+  ],
+  "completed_at": 1794886559.5942094
+}
