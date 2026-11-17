@@ -78,6 +78,11 @@ All notable changes to this project will be documented in this file.
   "Gzip over S3 with fsspec", which changes its link anchor. (#205)
 - **The command line is documented**: `python -m aiogzip inspect` and
   `verify`, with `--json` and the exit status. (#205)
+- **The performance table is re-measured**: `docs/performance.md` and the
+  README now quote aiogzip 2.0.2 on Python 3.14.2, replacing figures from the
+  2.0.0a1 candidate on Python 3.12. The record, with 2.0.0a1 and 1.11.0
+  measured alongside, is `plans/benchmarks/v2.0.2-table-refresh.md`. (#206,
+  #161)
 - The error guide's taxonomy lists text decoding and encoding failures
   (`UnicodeDecodeError`, `UnicodeEncodeError`), an unknown `encoding` or
   `errors` handler (`LookupError`) and the library's two warnings. New
