@@ -703,8 +703,14 @@ class GzipDecoder(_CodecBase):
         assert parser is not None
         parser.reset()
         self._engine = None
-        self._state = "header"
-        self._allow_padding = True
+        limit = self._max_members
+        if limit is not None and self._member_count >= limit:
+            # Checked here, once per member, so the header path stays as it
+            # was for streams without a limit.
+            self._state = "limited"
+        else:
+            self._state = "header"
+            self._allow_padding = True
 
     def _process(self, *, finalizing: bool) -> _CodecIterator:
         while True:
@@ -726,15 +732,6 @@ class GzipDecoder(_CodecBase):
                 parser = self._header_parser
                 assert parser is not None
                 if not parser.started:
-                    limit = self._max_members
-                    if limit is not None and self._member_count >= limit:
-                        # Refuse the stream before parsing the next header,
-                        # which may carry metadata, or keeping its record.
-                        raise OSError(
-                            f"gzip stream exceeded max_members ({limit}): "
-                            f"input continues at compressed offset "
-                            f"{self._consumed_size}"
-                        )
                     self._member_offset = self._consumed_size
                 pending_size = len(self._pending)
                 parsed = parser.advance(self._pending)
@@ -818,6 +815,21 @@ class GzipDecoder(_CodecBase):
                 self._consumed_size += 8
                 self._complete_member(trailer)
                 continue
+
+            if self._state == "limited":
+                # The last member allowed has ended. Trailing zero padding is
+                # accepted as at any member boundary; anything else would
+                # start another member, so refuse it before parsing its
+                # header, which may carry metadata, or keeping its record.
+                padding = self._pending.consume_leading_zeroes()
+                self._consumed_size += padding
+                if not self._pending:
+                    break
+                raise OSError(
+                    f"gzip stream exceeded max_members ({self._max_members}): "
+                    f"input continues at compressed offset "
+                    f"{self._consumed_size}"
+                )
 
             raise AssertionError(f"unknown gzip decoder state: {self._state}")
 
