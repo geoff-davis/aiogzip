@@ -77,6 +77,29 @@ class TestDecoderLimit:
             _decode(decoder, MEMBER * 5)
         assert [member.index for member in decoder.members] == [0, 1]
 
+    @staticmethod
+    def _feed_to_the_limit_then_padding(decoder: GzipDecoder) -> None:
+        for chunk in (MEMBER, b"", b"\0" * 3, b"", b"\0" * 2):
+            for _ in decoder.feed(chunk):
+                pass
+
+    def test_padding_fed_separately_after_the_limit_finishes(self) -> None:
+        decoder = GzipDecoder(max_members=1)
+        self._feed_to_the_limit_then_padding(decoder)
+        assert b"".join(decoder.finish()) == b""
+        assert decoder.finished
+        assert decoder.member_count == 1
+
+    def test_a_byte_fed_separately_after_the_limit_and_padding_raises(self) -> None:
+        decoder = GzipDecoder(max_members=1)
+        self._feed_to_the_limit_then_padding(decoder)
+        with pytest.raises(OSError) as raised:
+            for _ in decoder.feed(b"\x1f"):
+                pass
+        assert str(raised.value) == (
+            f"{PREFIX} (1): input continues at compressed offset {len(MEMBER) + 5}"
+        )
+
     def test_the_limit_holds_when_members_arrive_byte_by_byte(self) -> None:
         decoder = GzipDecoder(max_members=2)
         data = MEMBER * 3
