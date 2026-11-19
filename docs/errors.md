@@ -18,6 +18,7 @@ system text may vary.
 | Corrupt or malformed gzip data | `gzip.BadGzipFile` | Bad magic/header, CRC mismatch, wrong ISIZE, truncated or garbled deflate stream. Identical across engines. |
 | Underlying I/O failure | `OSError` | Missing file, permission denied, disk errors — whatever the OS raised. |
 | `max_decompressed_size` exceeded | `OSError` (not `BadGzipFile`) | Message starts with `"decompressed output exceeded max_decompressed_size"`. |
+| `max_members` exceeded | `OSError` (not `BadGzipFile`) | Message starts with `"gzip stream exceeded max_members"`. |
 | Wrong argument types / values | `TypeError` / `ValueError` | Raised eagerly at the call with a corrective message. |
 | Undecodable bytes in a text read | `UnicodeDecodeError` | A `ValueError` subtype, not an `OSError`. The reader stays open, but the failed read has consumed data. See [Text decoding and encoding errors](#text-decoding-and-encoding-errors). |
 | Unencodable character in a text write | `UnicodeEncodeError` | A `ValueError` subtype. Nothing from the failed `write()` is written and the writer stays usable; `writelines()` keeps every line before the failing one. See [Text decoding and encoding errors](#text-decoding-and-encoding-errors). |
@@ -322,6 +323,11 @@ except OSError as exc:
     else:
         raise
 ```
+
+The member limit works the same way. Input that continues after
+`max_members` members raises a plain `OSError` whose message starts with
+`gzip stream exceeded max_members`. It is raised before the next header is
+read, so it does not say whether the rest of the input is valid gzip.
 
 ## Where errors surface
 

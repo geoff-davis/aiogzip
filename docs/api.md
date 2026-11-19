@@ -11,6 +11,8 @@
 - `EngineInfo` and `engine_info` — immutable diagnostic information about the default compression and active decompression engines
 - `GzipMemberInfo`, `GzipInfo`, and `inspect` — validated per-member metadata and aggregate sizes from a complete decompression scan
 - `VerificationResult` and `verify` — lightweight aggregate counts after complete integrity verification
+- `compress` and `decompress` — one-shot gzip compression and bounded decompression of a payload already in memory
+- `IterableReader` — adapter that lets an `AsyncIterable[bytes]` be read through `open(..., fileobj=...)`
 - `decompress_chunks` — pull-driven decompression from an `AsyncIterable[bytes]` with bounded output chunks
 - `compress_chunks` — one-member gzip compression from an `AsyncIterable[bytes]` with bounded output chunks
 - `CodecOperation` — the closeable iterator returned by codec state changes
@@ -71,6 +73,7 @@ arguments to it.
 | [`max_rewind_cache_size`](#max_rewind_cache_size) | `134217728` (128 MiB) | reading | binary and text |
 | [`strict_size`](#strict_size) | `False` | writing | binary and text |
 | [`fast_compress`](#fast_compress) | `False` | writing | binary and text |
+| [`max_members`](#max_members) | `None` | reading | binary and text |
 
 `open()` and `AsyncGzipFile` take `filename` and `mode` positionally and
 everything else by keyword. The two classes also accept the other parameters
@@ -319,6 +322,26 @@ standard library's zlib. The default is `False`. See
 Raises `TypeError` for any value other than `True` or `False`. A reader
 checks the value, then ignores it and does not warn.
 
+### `max_members`
+
+Reading only. The largest number of gzip members the reader will accept in
+one pass through the stream, as a positive integer. The default, `None`, sets
+no limit. A stream of exactly that many members is accepted, and trailing
+zero padding is not a member. Input that continues after that many members
+raises `OSError` from the read, before the next member's header is parsed.
+
+The handle decodes all the compressed input it has read, which can be ahead
+of what a read returns, so the limit is on the stream and not on how far the
+caller has read: a first `read(1)` can raise if the first chunk already holds
+too many members. The count starts again when the handle rewinds. Set it with
+`max_decompressed_size` when reading untrusted input; see
+[Safety limits](#safety-limits).
+
+Raises `TypeError` if the value is not an `int` or `None` (a `bool` or
+`float` is rejected) and `ValueError` if it is below 1. A writer checks the
+value and then ignores it. The classes accept it by keyword, or positionally
+after `fast_compress`. Added in 2.1.0.
+
 ### Parameters of the whole-file helpers
 
 `read()`, `write()`, `inspect()` and `verify()` take `filename` positionally
@@ -328,10 +351,10 @@ invalid argument raises when the call is awaited.
 
 | Function | Keyword parameters |
 | --- | --- |
-| `read(filename)` | `chunk_size`, `fileobj`, `closefd`, `max_decompressed_size`, `max_rewind_cache_size` |
+| `read(filename)` | `chunk_size`, `fileobj`, `closefd`, `max_decompressed_size`, `max_rewind_cache_size`, `max_members` |
 | `write(filename, data)` | `chunk_size`, `compresslevel`, `mtime`, `original_filename`, `fileobj`, `closefd`, `strict_size`, `fast_compress` |
-| `inspect(filename)` | `chunk_size`, `fileobj`, `closefd`, `max_decompressed_size` |
-| `verify(filename)` | `chunk_size`, `fileobj`, `closefd`, `max_decompressed_size` |
+| `inspect(filename)` | `chunk_size`, `fileobj`, `closefd`, `max_decompressed_size`, `max_members` |
+| `verify(filename)` | `chunk_size`, `fileobj`, `closefd`, `max_decompressed_size`, `max_members` |
 
 `write()` takes `data` as `bytes`, `bytearray` or `memoryview`.
 `compress_chunks()`, `decompress_chunks()`, `GzipEncoder` and `GzipDecoder`
@@ -480,9 +503,16 @@ parses a header, `inspect()` (like `GzipDecoder` with
 whole and keeps it in the member's record. `FEXTRA` is at most 64 KiB by the
 format, but `FNAME` and `FCOMMENT` are bounded only by the header limit: any
 single gzip header larger than 128 MiB raises `gzip.BadGzipFile`.
-`max_decompressed_size` does not count header bytes. Scanning untrusted input
-with many members or very large header fields can therefore use substantial
-memory; prefer `verify()` when per-member metadata is not needed.
+`max_decompressed_size` does not count header bytes or members. Scanning
+untrusted input with many members or very large header fields can therefore
+use substantial memory. Set [`max_members`](#max_members) to bound the number
+of records, and prefer `verify()` when per-member metadata is not needed:
+
+```python
+info = await aiogzip.inspect(
+    "events.gz", max_decompressed_size=1024**3, max_members=10_000
+)
+```
 
 Cancelling `inspect()` or `verify()` waits for any native open, read or close
 already running in a worker thread to finish before the cancellation
@@ -543,6 +573,111 @@ may accept fewer bytes than requested as long as it returns the accepted byte
 count. `aiogzip` retries short writes until the complete gzip block is written.
 A zero-progress or otherwise invalid count raises `OSError`.
 
+## Reading from an async iterable
+
+`decompress_chunks()` turns an asynchronous iterable of compressed bytes
+into decompressed chunks. To read lines, text or sized binary reads from such
+a source, wrap it in `IterableReader` and pass that as `fileobj`:
+
+```python
+reader = aiogzip.IterableReader(compressed_source())
+async with aiogzip.open(None, "rt", fileobj=reader, closefd=True) as stream:
+    async for line in stream:
+        print(line)
+```
+
+The source can be any asynchronous iterable of `bytes`, `bytearray` or
+`memoryview`: an HTTP response body, an object-store download, an async
+generator. Empty items are skipped. The reader pulls one item at a time and
+only when a read needs more input, so it applies backpressure to the source
+and never reads ahead.
+
+- **Closing.** With `closefd=True` the gzip handle closes the reader when it
+  closes, and the reader calls the iterator's `aclose()`, so an async
+  generator's cleanup runs even when you stop early. With the default,
+  the reader is left open and you close it with `await reader.aclose()`.
+- **Seeking.** The reader cannot seek. `seek()` backwards and `rewind()`
+  replay compressed input from the handle's rewind cache, which
+  [`max_rewind_cache_size`](#max_rewind_cache_size) bounds.
+- **Failures.** If the source raises, or a read is cancelled while waiting
+  for the next item, the reader cannot tell whether input was lost. It
+  becomes unusable and the gzip handle reports its stream as broken; reopen
+  from a new source. See
+  [source failures and cancellation](recipes.md#source-failures-and-cancellation).
+- **Limits.** `max_decompressed_size` works as for any other source.
+
+`reader.tell()` is the number of compressed bytes handed out so far. A reader
+serves one consumer and one gzip handle.
+
+::: aiogzip.IterableReader
+
+## In-memory compression and decompression
+
+`compress()` and `decompress()` are coroutines for a payload that is already
+in memory, such as an HTTP body, a queue message or a cache value. They are
+the asynchronous counterparts of `gzip.compress()` and `gzip.decompress()`.
+
+```python
+blob = await aiogzip.compress(payload, mtime=0)
+data = await aiogzip.decompress(blob, max_decompressed_size=50 * 2**20)
+```
+
+`compress()` returns one gzip member and takes the options of
+`compress_chunks()`: `compresslevel`, `mtime`, `original_filename`,
+`fast_compress` and `strict_size`. Two defaults differ from
+`gzip.compress()`: the level is `6` on every Python version (the standard
+library used `9` before Python 3.15), and `mtime=None` stores the current
+time (the standard library stores `0` from Python 3.14). Pass `mtime=0` for
+reproducible output. No file name is stored unless one is given.
+
+`decompress()` decodes every concatenated member, accepts trailing zero
+padding and returns `b""` for empty input, as `gzip.decompress()` does. It
+returns only after every member's CRC and length have been checked.
+Corrupt or truncated input raises `gzip.BadGzipFile`. With
+`max_decompressed_size` set, a larger stream raises `OSError` as soon as it
+proves larger. It inflates one byte past the limit to prove it, and no more.
+`await asyncio.to_thread(gzip.decompress, data)` has no such bound.
+The default is `None`, no limit, as everywhere else in the API; set it for
+untrusted input. `max_members` limits the number of members in the same way;
+see [Safety limits](#safety-limits).
+
+Both accept `bytes`, `bytearray` or `memoryview`. A mutable buffer is copied
+once before any work starts, so changing it afterwards does not affect the
+result. Invalid arguments raise when the call is awaited.
+
+The codec work does not hold the event loop for long. `compress()` runs a
+payload of 256 KiB or more in the default executor and a smaller one inline.
+`decompress()` inflates in bounded steps and yields to other tasks between
+them, with the first step of an input of 1 MiB or more in the executor. A
+cancelled call returns after the step in progress has finished. Two plain
+memory copies do run on the event loop and grow with the payload: the copy
+of a `bytearray` or `memoryview` input, and the join that builds the result.
+
+`aiogzip.codec.compress()` and `aiogzip.codec.decompress()` are synchronous
+twins with the same options, for code outside an event loop. They run
+entirely in the calling thread and, like the rest of the codec, accept
+`bytes` only.
+
+```python
+import aiogzip.codec
+
+blob = aiogzip.codec.compress(b"payload", mtime=0)
+data = aiogzip.codec.decompress(blob, max_decompressed_size=50 * 2**20)
+```
+
+Both pairs hold the whole input and the whole output in memory, and the
+output briefly twice while it is joined into one object. For a
+payload that arrives in pieces use `compress_chunks()` and
+`decompress_chunks()`; for a file use `open()`.
+
+::: aiogzip.compress
+
+::: aiogzip.decompress
+
+::: aiogzip.codec.compress
+
+::: aiogzip.codec.decompress
+
 ## Safety limits
 
 Set `max_decompressed_size=<bytes>` when reading untrusted gzip data. The
@@ -551,6 +686,15 @@ the stream. Each inflate call is restricted to the remaining allowance plus
 one byte, so an over-limit member raises `OSError` without first materializing
 its full expansion in memory. Rewinding resets the accounting because the new
 read pass starts again at byte zero.
+
+Set `max_members=<count>` as well when the number of members matters. The
+size limit does not count members: an empty member is 20 bytes of input and
+no output, and `inspect()` keeps a record for each one. Input that continues
+after `max_members` members raises `OSError` before the next header is
+parsed. Every entry point that takes `max_decompressed_size` takes
+`max_members`: the file handles, `read()`, `inspect()`, `verify()`,
+`decompress_chunks()`, `decompress()`, `aiogzip.codec.decompress()` and
+`GzipDecoder`.
 
 ## Text encodings
 
@@ -564,9 +708,10 @@ Both binary and text `writelines()` collect small inputs into bounded
 `chunk_size` batches before compression. Inputs larger than a batch are written
 directly, so generators remain streaming and memory use stays bounded.
 
-Byte-count and compression tuning parameters are integer-only:
-`chunk_size`, `compresslevel`, `max_decompressed_size`, and
-`max_rewind_cache_size` reject floats, strings, and booleans with `TypeError`.
+Byte-count, member-count and compression tuning parameters are integer-only:
+`chunk_size`, `compresslevel`, `max_decompressed_size`,
+`max_rewind_cache_size` and `max_members` reject floats, strings, and
+booleans with `TypeError`.
 
 ## `seek()` and `tell()` in text mode
 

@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `aiogzip.compress()` and `aiogzip.decompress()`: one-shot coroutines for a
+  payload already in memory, such as an HTTP body or a cache value. (#200)
+  - `decompress()` takes `max_decompressed_size` and stops inflating at the
+    limit, which `await asyncio.to_thread(gzip.decompress, data)` cannot do.
+    It decodes all members and accepts trailing zero padding, as
+    `gzip.decompress()` does.
+  - `compress()` takes `compresslevel`, `mtime`, `original_filename`,
+    `fast_compress` and `strict_size`, and returns one gzip member.
+  - Both accept `bytes`, `bytearray` or `memoryview`, offload large inputs
+    to the default executor and yield to the event loop between steps.
+- `aiogzip.IterableReader`: wraps an `AsyncIterable[bytes]`, such as an
+  HTTP response body or an object-store download, so that it can be passed
+  as `fileobj`. Lines, text, `iter_batches()` and sized reads then work on
+  a source that only offers async iteration. (#201)
+  - Items may be `bytes`, `bytearray` or `memoryview`; empty items are
+    skipped, and the source is never read ahead.
+  - It cannot seek. Rewinding goes through the handle's rewind cache,
+    bounded by `max_rewind_cache_size`.
+  - If the source raises or a read is cancelled while waiting for an item,
+    the reader becomes unusable and the gzip handle reports a broken stream.
+- `aiogzip.codec.compress()` and `aiogzip.codec.decompress()`: synchronous
+  twins with the same options, for code outside an event loop. They accept
+  `bytes` only, like the rest of the codec.
+- `max_members`: a limit on the number of gzip members, for untrusted
+  input. `max_decompressed_size` cannot see members: an empty one is 20
+  bytes of input and no output, and `inspect()` keeps a record for each.
+  (#231)
+  - Accepted by `open()` and the file classes, `read()`, `inspect()`,
+    `verify()`, `decompress_chunks()`, `decompress()`,
+    `aiogzip.codec.decompress()` and `GzipDecoder`. The default, `None`,
+    sets no limit.
+  - Input that continues after that many members raises a plain `OSError`
+    whose message starts with `gzip stream exceeded max_members`, before the
+    next header is parsed. Trailing zero padding is not a member.
+
 ### Changed
 
 - Clearer errors for common mistakes. Exception types are unchanged. (#199)
@@ -44,6 +81,14 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- **Recipes for gzip that is not in a local file**: `docs/recipes.md` now
+  covers a `.gz` file served over HTTP with httpx and aiohttp, an S3 object
+  with aiobotocore, uploading compressed output as a streamed request body,
+  and data already in memory. Each HTTP recipe says how to stop the client
+  from undoing `Content-Encoding` first. The fsspec recipe's heading is now
+  "Gzip over S3 with fsspec", which changes its link anchor. (#205)
+- **The command line is documented**: `python -m aiogzip inspect` and
+  `verify`, with `--json` and the exit status. (#205)
 - **The performance table is re-measured**: `docs/performance.md` and the
   README now quote aiogzip 2.0.2 on Python 3.14.2, replacing figures from the
   2.0.0a1 candidate on Python 3.12. The record, with 2.0.0a1 and 1.11.0

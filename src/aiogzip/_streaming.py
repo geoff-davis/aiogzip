@@ -48,16 +48,19 @@ def _decompress_chunks(
     *,
     output_chunk_size: int,
     max_decompressed_size: Optional[int],
+    max_members: Optional[int],
 ) -> AsyncIterator[bytes]:
     """Validate call-time arguments and return the decompression generator."""
     if not callable(getattr(source, "__aiter__", None)):
         raise TypeError("source must be an asynchronous iterable of bytes")
     _validate_chunk_size(output_chunk_size)
     _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")
+    _validate_optional_positive_int(max_members, "max_members")
     return _decompress_chunks_impl(
         source,
         output_chunk_size=output_chunk_size,
         max_decompressed_size=max_decompressed_size,
+        max_members=max_members,
     )
 
 
@@ -66,10 +69,12 @@ async def _decompress_chunks_impl(
     *,
     output_chunk_size: int,
     max_decompressed_size: Optional[int],
+    max_members: Optional[int],
 ) -> AsyncIterator[bytes]:
     """Pull compressed input only as bounded decompressed output is requested."""
     decoder = GzipDecoder(
         max_decompressed_size=max_decompressed_size,
+        max_members=max_members,
         output_chunk_size=output_chunk_size,
         collect_member_info=False,
     )

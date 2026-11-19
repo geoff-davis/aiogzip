@@ -82,6 +82,7 @@ async def _scan_gzip(
     fileobj: _ReadFileObj,
     closefd: Optional[bool],
     max_decompressed_size: Optional[int],
+    max_members: Optional[int],
     chunk_size: int,
     collect_members: bool,
 ) -> _ScanResult:
@@ -90,6 +91,7 @@ async def _scan_gzip(
     _validate_filename(filename, fileobj)
     _validate_chunk_size(chunk_size)
     _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")
+    _validate_optional_positive_int(max_members, "max_members")
 
     source: Any
     owns_source = fileobj is None
@@ -106,6 +108,7 @@ async def _scan_gzip(
     try:
         decoder = GzipDecoder(
             max_decompressed_size=max_decompressed_size,
+            max_members=max_members,
             output_chunk_size=chunk_size,
             collect_member_info=collect_members,
         )

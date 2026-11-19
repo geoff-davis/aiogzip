@@ -211,7 +211,7 @@ replacement.
   unbounded cache.
 - **Untrusted input:** `max_decompressed_size` caps cumulative decompressed
   output for a read pass. Overflow raises `OSError` without first materializing
-  the complete expansion.
+  the complete expansion. `max_members` caps the number of gzip members.
 - **Task safety:** One logical task owns one open handle at a time. Separate
   handles may progress concurrently. An overlapping call raises
   `ConcurrentOperationError` before state corruption; it is a misuse signal,

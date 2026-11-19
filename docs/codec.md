@@ -100,6 +100,12 @@ over the limit. That probe byte is not yielded and is not included in
 `uncompressed_size`, CRC-32, or ISIZE accounting. Corrupt, truncated, or
 malformed gzip data raises `gzip.BadGzipFile`.
 
+`max_members` is a positive-integer limit on the number of members. Once that
+many have been validated, any further input other than zero padding raises
+`OSError` before the next header is parsed, so with
+`collect_member_info=True` no record or header metadata is kept for it.
+`member_count` and `members` still describe the members that completed.
+
 Pass `collect_member_info=True` when member metadata is needed. After each
 member's trailer is validated, `members` gains a `GzipMemberInfo` entry and
 `member_count` advances. Metadata for an incomplete or corrupt member is never

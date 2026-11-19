@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 from typing import Union, assert_type
 
 import aiogzip
+import aiogzip.codec
 
 
 class Reader:
@@ -157,6 +158,56 @@ async def fileobj_contract() -> None:
 def streaming_contract() -> None:
     assert_type(aiogzip.decompress_chunks(source()), AsyncIterator[bytes])
     assert_type(aiogzip.compress_chunks(source()), AsyncIterator[bytes])
+
+
+async def iterable_reader_contract() -> None:
+    reader = aiogzip.IterableReader(source())
+    assert_type(await reader.read(), bytes)
+    assert_type(await reader.read(10), bytes)
+    assert_type(reader.tell(), int)
+    assert_type(reader.closed, bool)
+    assert_type(aiogzip.open(None, "rb", fileobj=reader), aiogzip.AsyncGzipBinaryFile)
+    assert_type(
+        aiogzip.open(None, "rt", fileobj=reader, closefd=True),
+        aiogzip.AsyncGzipTextFile,
+    )
+    assert_type(await aiogzip.read(None, fileobj=reader), bytes)
+    protocol: aiogzip.WithAsyncRead = reader
+    del protocol
+    await reader.aclose()
+
+
+async def one_shot_contract() -> None:
+    assert_type(await aiogzip.compress(b"payload"), bytes)
+    assert_type(await aiogzip.compress(bytearray(b"payload"), mtime=0), bytes)
+    assert_type(
+        await aiogzip.compress(
+            memoryview(b"payload"),
+            compresslevel=9,
+            mtime=0,
+            original_filename="payload.bin",
+            fast_compress=True,
+            strict_size=True,
+        ),
+        bytes,
+    )
+    assert_type(await aiogzip.decompress(b"compressed"), bytes)
+    assert_type(
+        await aiogzip.decompress(bytearray(b"x"), max_decompressed_size=1024),
+        bytes,
+    )
+    assert_type(aiogzip.codec.compress(b"payload", mtime=0), bytes)
+    assert_type(
+        aiogzip.codec.decompress(b"compressed", max_decompressed_size=None), bytes
+    )
+    assert_type(await aiogzip.decompress(b"compressed", max_members=1), bytes)
+    assert_type(aiogzip.codec.decompress(b"compressed", max_members=None), bytes)
+    assert_type(await aiogzip.read(path, max_members=4), bytes)
+    assert_type(await aiogzip.inspect(path, max_members=4), aiogzip.GzipInfo)
+    assert_type(await aiogzip.verify(path, max_members=4), aiogzip.VerificationResult)
+    assert_type(aiogzip.open(path, "rb", max_members=4), aiogzip.AsyncGzipBinaryFile)
+    assert_type(aiogzip.open(path, "rt", max_members=4), aiogzip.AsyncGzipTextFile)
+    assert_type(aiogzip.GzipDecoder(max_members=4), aiogzip.GzipDecoder)
 
 
 def codec_contract() -> None:
