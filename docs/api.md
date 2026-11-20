@@ -84,13 +84,9 @@ Calling `open()`, `AsyncGzipFile` or a class constructs a handle and checks
 its arguments. It does not open or create anything: the file is opened by
 `async with` or `await f.open()`. An invalid argument therefore raises before
 any file is opened, and before any method of a `fileobj` is called. Each
-parameter below names the exception it raises. There are two exceptions to
-the rule:
-
-- An unknown `errors` name is not detected until the first encoding or
-  decoding error.
-- The text class emits the `fast_compress` fallback warning when the handle
-  is opened, not when it is constructed.
+parameter below names the exception it raises. There is one exception to
+the rule: an unknown `errors` name is not detected until the first encoding
+or decoding error.
 
 A parameter that is used only for writing is ignored by a reader, and a
 parameter that is used only for reading is ignored by a writer. Values are
@@ -172,8 +168,10 @@ reader and to encoding on a writer. The default is `"strict"`, and `None`
 means the default.
 
 With `"strict"`, undecodable input raises `UnicodeDecodeError` from the read
-and unencodable text raises `UnicodeEncodeError` from the write. The name is
-not checked when the handle is constructed: an unknown name raises
+and unencodable text raises `UnicodeEncodeError` from the write.
+
+Raises `TypeError` if the value is neither a `str` nor `None`. The name
+itself is not checked when the handle is constructed: an unknown name raises
 `LookupError` from the first read or write that meets an encoding or decoding
 error.
 
@@ -313,8 +311,8 @@ checks the value and then ignores it.
 Writing only. With `True`, the writer compresses with zlib-ng if the
 `aiogzip[fast]` extra is installed. The output is valid gzip but is not
 byte-for-byte identical to the default output. If zlib-ng is not available,
-the writer warns (`UserWarning`) and uses the standard library's zlib. The
-default is `False`. See
+the writer warns (`UserWarning`) when the handle is constructed and uses the
+standard library's zlib. The default is `False`. See
 [Optional Faster Codec](performance.md#optional-faster-codec-aiogzipfast-zlib-ng).
 
 Raises `TypeError` for any value other than `True` or `False`. A reader

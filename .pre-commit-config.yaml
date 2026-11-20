@@ -13,7 +13,7 @@ default_stages: [pre-commit]
 
 repos:
   # Refuse pushes from a branch based on a stale main (multi-machine
-  # development guard; see CLAUDE.md "Sync Before Working").
+  # development guard; see AGENTS.md "Before starting work").
   - repo: local
     hooks:
       - id: check-branch-fresh
@@ -85,3 +85,4 @@ repos:
       - id: markdownlint-cli2
         args: [--fix]
         files: \.(md|markdown)$
+        exclude: ^CLAUDE\.md$  # a one-line @AGENTS.md import, not a document

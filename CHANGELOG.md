@@ -31,8 +31,30 @@ All notable changes to this project will be documented in this file.
   `repr()` of a file that was never opened says `unopened` where it said
   `closed=False`.
 
+### Fixed
+
+- The `fast_compress=True` fallback warning (zlib-ng unavailable) from a file
+  handle now behaves as it does for `GzipEncoder`. (#234)
+  - It names the line of your code that called `aiogzip.open()`,
+    `aiogzip.write()` or a file class, where it named a line inside aiogzip.
+  - Python's default filter shows it once for each such line. It was shown
+    again on every open.
+  - A text handle warns when it is constructed, as a binary handle does,
+    where it warned on entering `async with`.
+- `AsyncGzipTextFile` and `aiogzip.open()` in a text mode reject an `errors`
+  value that is neither a `str` nor `None` with `TypeError` when the handle
+  is constructed, as `io.TextIOWrapper` does. Such a value was accepted, and
+  every read or write then failed with the codec's own `TypeError`. An
+  unknown handler name is still reported by the first read or write that
+  needs it. (#232)
+
 ### Documentation
 
+- **The performance table is re-measured**: `docs/performance.md` and the
+  README now quote aiogzip 2.0.2 on Python 3.14.2, replacing figures from the
+  2.0.0a1 candidate on Python 3.12. The record, with 2.0.0a1 and 1.11.0
+  measured alongside, is `plans/benchmarks/v2.0.2-table-refresh.md`. (#206,
+  #161)
 - The error guide's taxonomy lists text decoding and encoding failures
   (`UnicodeDecodeError`, `UnicodeEncodeError`), an unknown `encoding` or
   `errors` handler (`LookupError`) and the library's two warnings. New

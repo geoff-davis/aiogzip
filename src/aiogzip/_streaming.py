@@ -10,7 +10,6 @@ from typing import (
     cast,
 )
 
-from . import _engine
 from ._codec_async import (
     _DECODE_OFFLOAD_THRESHOLD,
     _DONE,
@@ -128,12 +127,6 @@ async def _decompress_chunks_impl(
             await _close_async_iterator(iterator, failure)
 
 
-class _ChunkStreamEncoder(GzipEncoder):
-    """The encoder as built by ``compress_chunks()``, two frames deeper."""
-
-    _fallback_warning_stacklevel = 4
-
-
 def _compress_chunks(
     source: AsyncIterable[bytes],
     *,
@@ -157,15 +150,9 @@ def _compress_chunks(
         "strict_size": validated_strict_size,
         "output_chunk_size": output_chunk_size,
     }
-    encoder_type = GzipEncoder
-    if validated_fast_compress and not _engine.have_fast_engine():
-        # The encoder warns about the fallback itself. From here its caller
-        # is two frames further out, so the warning names the code that
-        # called compress_chunks() and Python's once-per-location filter
-        # applies. Capturing and re-issuing the warning needed
-        # catch_warnings(), which resets every module's warning registry.
-        encoder_type = _ChunkStreamEncoder
-    encoder = encoder_type(**options)
+    # The encoder warns about a zlib-ng fallback itself, and attributes the
+    # warning to the code that called compress_chunks().
+    encoder = GzipEncoder(**options)
     return _compress_chunks_impl(source, encoder)
 
 

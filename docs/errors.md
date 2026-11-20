@@ -141,7 +141,9 @@ The two parameters are checked at different times:
 - An unknown `encoding` raises `LookupError` (`unknown encoding: ...`) from
   the `AsyncGzipTextFile` constructor or from `aiogzip.open()`, before a file
   is opened or created. An empty `encoding` raises `ValueError`.
-- An unknown `errors` handler is not detected at construction. The handle
+- An `errors` value that is neither a `str` nor `None` raises `TypeError`
+  (`errors must be str or None, not int`) from the same place.
+- An unknown `errors` handler name is not detected at construction. The handle
   opens, and reads and writes succeed for as long as the data needs no error
   handling. The first read that meets undecodable bytes, or the first write
   that meets an unencodable character, raises `LookupError` (`unknown error
@@ -165,20 +167,22 @@ the operation.
 | `fast_compress=True requested but zlib-ng is not available; falling back to stdlib zlib. ...` | `UserWarning` | A writer asks for `fast_compress=True` and zlib-ng is not installed, or `AIOGZIP_ENGINE=stdlib` has disabled it. Compression proceeds with stdlib zlib. | See below. |
 | `Ignoring unrecognized AIOGZIP_ENGINE value '...'; expected 'stdlib' or 'zlib-ng'.` | `RuntimeWarning` | `aiogzip` is first imported with `AIOGZIP_ENGINE` set to a value other than `stdlib` or `zlib-ng` (compared after stripping whitespace and lowercasing). An empty or whitespace-only value is treated as unset and does not warn. The value is ignored, as if the variable were unset. | Once per process. |
 
-The fallback warning is issued at a different point for each API:
+The fallback warning is issued when the object is created, before any file
+is opened:
 
-- `AsyncGzipBinaryFile`, and `aiogzip.open()` in a binary write mode: when
-  the handle is constructed.
-- `AsyncGzipTextFile`, and `aiogzip.open()` in a text write mode: when the
-  handle is opened (on entering `async with`), not when it is constructed.
+- `AsyncGzipBinaryFile`, `AsyncGzipTextFile` and `aiogzip.open()` in a write
+  mode: when the handle is constructed.
+- `aiogzip.write()`: when the call is awaited.
 - `GzipEncoder`: when the encoder is constructed.
 - `compress_chunks()`: at the call, before the first chunk is requested.
 
 Read-mode handles ignore `fast_compress` and do not warn.
 
-For `GzipEncoder` and `compress_chunks()`, Python's default filter shows the
-warning once per calling location. A file handle warns every time one is
-opened, including repeated opens from the same line.
+The warning is attributed to your code: its location is the nearest caller
+outside the `aiogzip` package, such as the line that calls `aiogzip.open()`.
+Python's default filter therefore shows it once for each such line, however
+many files that line opens. Under an `always` filter it is shown once for
+each handle, encoder or `compress_chunks()` call.
 
 To turn the warnings into errors in tests, use a `-W` option or the
 `PYTHONWARNINGS` environment variable. Both take the
