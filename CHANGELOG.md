@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Validate `compresslevel` on binary and text readers as well as writers.
+  Invalid values now raise `TypeError` or `ValueError` when the handle is
+  constructed, before any file is opened. (#233)
+
 ### Changed
 
 - Clearer errors for common mistakes. Exception types are unchanged. (#199)

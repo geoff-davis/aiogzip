@@ -89,9 +89,8 @@ the rule: an unknown `errors` name is not detected until the first encoding
 or decoding error.
 
 A parameter that is used only for writing is ignored by a reader, and a
-parameter that is used only for reading is ignored by a writer. Its value is
-still checked in the other mode, with one exception: `compresslevel` is not
-checked on a reader.
+parameter that is used only for reading is ignored by a writer. Values are
+validated in every mode, even when the parameter is otherwise ignored.
 
 ### `filename`
 
@@ -197,13 +196,13 @@ Raises `ValueError` for any other string.
 
 ### `compresslevel`
 
-Writing only. An integer from `-1` to `9`. The default is `6`. `0` stores
+Used when writing. An integer from `-1` to `9`. The default is `6`. `0` stores
 the data without compression, `1` is fastest, `9` compresses most, and `-1`
 selects the compression library's default level.
 
 Raises `TypeError` if the value is not an `int` (a `bool` or `float` is
-rejected) and `ValueError` if it is outside `-1` to `9`. A reader ignores
-`compresslevel` and does not check it.
+rejected) and `ValueError` if it is outside `-1` to `9`. A reader validates
+`compresslevel` when the handle is constructed, then ignores it.
 
 ### `mtime`
 
