@@ -244,3 +244,11 @@ github-actions ecosystem keeps the pin current.
 `/release-prep`, merge, then `/release-tag`. Publishing is tag-triggered. `/release-tag` pushes the signed tag,
 creates the GitHub release, then watches the publish workflow and confirms the version is live on PyPI before
 reporting the release complete.
+
+## Context window
+
+A full context window is compacted, and the session continues: the conversation is replaced by a summary and work
+carries on. Running low is not a reason to stop, rush, or hand work to a subagent that would not otherwise get it.
+When the token usage reminder shows the window is nearly full (auto-compaction fires at about 13k to 15k tokens
+remaining), reach a clean state first: notes or the plan file updated, and the working tree either committed or
+described.
