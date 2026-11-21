@@ -190,7 +190,7 @@ def _smoke(
             "--api-script",
             str(source / "scripts" / "capture_public_api.py"),
             "--api-manifest",
-            str(source / "tests" / "data" / "public_api_2_0.json"),
+            str(source / "tests" / "data" / "public_api_2_1.json"),
             "--report-output",
             str(evidence / f"smoke-{kind}.json"),
         ],

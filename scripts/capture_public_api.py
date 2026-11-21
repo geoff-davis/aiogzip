@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Capture the deliberately curated aiogzip 2.0 public runtime contract."""
+"""Capture the deliberately curated aiogzip 2.x public runtime contract.
+
+The committed manifest for the current minor line is checked on every
+supported Python version. ``tests/data/public_api_2_0.json`` is the frozen
+2.0 baseline: a later manifest must contain every entry of it unaltered,
+which ``tests/test_public_api_contract.py`` checks.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +23,7 @@ import aiogzip
 import aiogzip.codec
 
 SCHEMA_VERSION = 1
-DEFAULT_MANIFEST = Path("tests/data/public_api_2_0.json")
+DEFAULT_MANIFEST = Path("tests/data/public_api_2_1.json")
 
 _FUNCTIONS = (
     "AsyncGzipFile",
@@ -29,6 +35,13 @@ _FUNCTIONS = (
     "verify",
     "decompress_chunks",
     "compress_chunks",
+    "compress",
+    "decompress",
+)
+
+_CODEC_FUNCTIONS = (
+    "compress",
+    "decompress",
 )
 
 _CLASS_MEMBERS = {
@@ -334,12 +347,19 @@ def capture() -> dict[str, object]:
     return {
         "schema_version": SCHEMA_VERSION,
         "package": "aiogzip",
-        "release_line": "2.0",
+        "release_line": "2.1",
         "modules": {
             "aiogzip": {"exports": _exports(aiogzip)},
             "aiogzip.codec": {"exports": _exports(aiogzip.codec)},
         },
         "functions": functions,
+        "codec_functions": {
+            name: {
+                "kind": _callable_kind(getattr(aiogzip.codec, name)),
+                "signature": _signature(getattr(aiogzip.codec, name)),
+            }
+            for name in _CODEC_FUNCTIONS
+        },
         "classes": {name: _class_contract(name) for name in sorted(_CLASS_MEMBERS)},
         "dataclasses": {name: _dataclass_contract(name) for name in _DATACLASSES},
         "exceptions": {

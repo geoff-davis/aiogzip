@@ -11,6 +11,7 @@
 - `EngineInfo` and `engine_info` — immutable diagnostic information about the default compression and active decompression engines
 - `GzipMemberInfo`, `GzipInfo`, and `inspect` — validated per-member metadata and aggregate sizes from a complete decompression scan
 - `VerificationResult` and `verify` — lightweight aggregate counts after complete integrity verification
+- `compress` and `decompress` — one-shot gzip compression and bounded decompression of a payload already in memory
 - `decompress_chunks` — pull-driven decompression from an `AsyncIterable[bytes]` with bounded output chunks
 - `compress_chunks` — one-member gzip compression from an `AsyncIterable[bytes]` with bounded output chunks
 - `CodecOperation` — the closeable iterator returned by codec state changes
@@ -542,6 +543,72 @@ When writing through an external asynchronous `fileobj`, its `write()` method
 may accept fewer bytes than requested as long as it returns the accepted byte
 count. `aiogzip` retries short writes until the complete gzip block is written.
 A zero-progress or otherwise invalid count raises `OSError`.
+
+## In-memory compression and decompression
+
+`compress()` and `decompress()` are coroutines for a payload that is already
+in memory, such as an HTTP body, a queue message or a cache value. They are
+the asynchronous counterparts of `gzip.compress()` and `gzip.decompress()`.
+
+```python
+blob = await aiogzip.compress(payload, mtime=0)
+data = await aiogzip.decompress(blob, max_decompressed_size=50 * 2**20)
+```
+
+`compress()` returns one gzip member and takes the options of
+`compress_chunks()`: `compresslevel`, `mtime`, `original_filename`,
+`fast_compress` and `strict_size`. Two defaults differ from
+`gzip.compress()`: the level is `6` on every Python version (the standard
+library used `9` before Python 3.15), and `mtime=None` stores the current
+time (the standard library stores `0` from Python 3.14). Pass `mtime=0` for
+reproducible output. No file name is stored unless one is given.
+
+`decompress()` decodes every concatenated member, accepts trailing zero
+padding and returns `b""` for empty input, as `gzip.decompress()` does. It
+returns only after every member's CRC and length have been checked.
+Corrupt or truncated input raises `gzip.BadGzipFile`. With
+`max_decompressed_size` set, a larger stream raises `OSError` as soon as it
+proves larger. It inflates one byte past the limit to prove it, and no more.
+`await asyncio.to_thread(gzip.decompress, data)` has no such bound.
+The default is `None`, no limit, as everywhere else in the API; set it for
+untrusted input.
+
+Both accept `bytes`, `bytearray` or `memoryview`. A mutable buffer is copied
+once before any work starts, so changing it afterwards does not affect the
+result. Invalid arguments raise when the call is awaited.
+
+The codec work does not hold the event loop for long. `compress()` runs a
+payload of 256 KiB or more in the default executor and a smaller one inline.
+`decompress()` inflates in bounded steps and yields to other tasks between
+them, with the first step of an input of 1 MiB or more in the executor. A
+cancelled call returns after the step in progress has finished. Two plain
+memory copies do run on the event loop and grow with the payload: the copy
+of a `bytearray` or `memoryview` input, and the join that builds the result.
+
+`aiogzip.codec.compress()` and `aiogzip.codec.decompress()` are synchronous
+twins with the same options, for code outside an event loop. They run
+entirely in the calling thread and, like the rest of the codec, accept
+`bytes` only.
+
+```python
+import aiogzip.codec
+
+blob = aiogzip.codec.compress(b"payload", mtime=0)
+data = aiogzip.codec.decompress(blob, max_decompressed_size=50 * 2**20)
+```
+
+Both pairs hold the whole input and the whole output in memory, and the
+output briefly twice while it is joined into one object. For a
+payload that arrives in pieces use `compress_chunks()` and
+`decompress_chunks()`; for a file use `open()`.
+
+::: aiogzip.compress
+
+::: aiogzip.decompress
+
+::: aiogzip.codec.compress
+
+::: aiogzip.codec.decompress
 
 ## Safety limits
 

@@ -26,6 +26,7 @@ from ._inspection import (
     VerificationResult,
     _scan_gzip,
 )
+from ._oneshot import _compress, _decompress
 from ._streaming import _compress_chunks, _decompress_chunks
 from ._text import AsyncGzipTextFile
 from .codec import CodecOperation, GzipDecoder, GzipEncoder
@@ -550,6 +551,104 @@ def compress_chunks(
     )
 
 
+async def compress(
+    data: Union[bytes, bytearray, memoryview],
+    *,
+    compresslevel: int = 6,
+    mtime: Optional[Union[int, float]] = None,
+    original_filename: Optional[Union[str, bytes]] = None,
+    fast_compress: bool = False,
+    strict_size: bool = False,
+) -> bytes:
+    """Compress a payload held in memory into one gzip member.
+
+    The asynchronous counterpart of ``gzip.compress()``. A payload of 256 KiB
+    or more is compressed in the default executor; a smaller one is
+    compressed inline, where a thread hop would cost more than the work.
+    Copying a mutable ``data`` and assembling the result are plain memory
+    copies made on the event loop. ``aiogzip.codec.compress()`` is the
+    synchronous twin.
+
+    An invalid argument raises when the call is awaited.
+
+    Args:
+        data: The payload, as ``bytes``, ``bytearray`` or ``memoryview``. A
+            mutable buffer is copied once, before anything else runs, so
+            later changes to it do not affect the result.
+        compresslevel: The compression level, from ``-1`` to ``9``. The
+            default is ``6``.
+        mtime: The timestamp stored in the gzip header, from ``0`` to
+            ``4294967295``. The default, ``None``, stores the current time;
+            pass ``0`` for reproducible output.
+        original_filename: The name stored in the gzip header. The default,
+            ``None``, stores no name.
+        fast_compress: With ``True``, compress with zlib-ng if the
+            ``aiogzip[fast]`` extra is installed and
+            ``AIOGZIP_ENGINE=stdlib`` has not disabled it. The default is
+            ``False``.
+        strict_size: With ``True``, a payload larger than 4294967295 bytes
+            raises ``OSError``. The default is ``False``.
+
+    Returns:
+        One complete gzip member.
+
+    Raises:
+        TypeError: If ``data`` or an option has an invalid type.
+        ValueError: If an option is outside its supported range.
+        OSError: If compression fails or ``strict_size`` rejects the payload.
+    """
+    return await _compress(
+        data,
+        compresslevel=compresslevel,
+        mtime=mtime,
+        original_filename=original_filename,
+        fast_compress=fast_compress,
+        strict_size=strict_size,
+    )
+
+
+async def decompress(
+    data: Union[bytes, bytearray, memoryview],
+    *,
+    max_decompressed_size: Optional[int] = None,
+) -> bytes:
+    """Decompress a complete gzip stream held in memory.
+
+    The asynchronous counterpart of ``gzip.decompress()``, with an output
+    limit. It decodes every concatenated member, accepts trailing zero
+    padding and returns ``b""`` for empty input. The result is returned only
+    after every member's CRC and length have been checked.
+
+    Inflation runs in bounded steps that yield to the event loop. Copying a
+    mutable ``data`` and assembling the result are plain memory copies made
+    on the event loop. With ``max_decompressed_size`` set, the call stops and
+    raises as soon as the stream proves larger: it inflates one byte past
+    the limit to prove it, and no more. The result is assembled with one
+    join, so the peak is about twice the output size.
+    ``aiogzip.codec.decompress()`` is the synchronous twin.
+
+    An invalid argument raises when the call is awaited.
+
+    Args:
+        data: The whole gzip stream, as ``bytes``, ``bytearray`` or
+            ``memoryview``. A mutable buffer is copied once, before anything
+            else runs.
+        max_decompressed_size: The largest number of decompressed bytes to
+            accept; a larger stream raises ``OSError``. The default,
+            ``None``, sets no limit. Set it for untrusted input.
+
+    Returns:
+        The decompressed payload of all members.
+
+    Raises:
+        TypeError: If ``data`` or the limit has an invalid type.
+        ValueError: If the limit is not positive.
+        gzip.BadGzipFile: If the stream is malformed, corrupt or truncated.
+        OSError: If the output would exceed ``max_decompressed_size``.
+    """
+    return await _decompress(data, max_decompressed_size=max_decompressed_size)
+
+
 __all__ = [
     "__version__",
     "AsyncGzipBinaryFile",
@@ -582,4 +681,6 @@ __all__ = [
     "verify",
     "decompress_chunks",
     "compress_chunks",
+    "compress",
+    "decompress",
 ]

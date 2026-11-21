@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import importlib.metadata
 import importlib.util
 import json
@@ -16,7 +17,69 @@ import aiogzip
 
 ROOT = Path(__file__).parents[1]
 SCRIPT = ROOT / "scripts" / "capture_public_api.py"
-MANIFEST = ROOT / "tests" / "data" / "public_api_2_0.json"
+MANIFEST = ROOT / "tests" / "data" / "public_api_2_1.json"
+BASELINE = ROOT / "tests" / "data" / "public_api_2_0.json"
+# The frozen 2.0 contract as released. A later line adds to it and never
+# edits it.
+BASELINE_SHA256 = "e0168ae90bf4f265da9255a6d0bfc3e27cf6f0282861ac6c5f253da67e9d8951"
+
+
+def _removed_or_altered(baseline: object, current: object, path: str) -> list[str]:
+    """List every baseline entry that ``current`` lacks or holds differently.
+
+    A mapping may gain keys and an export list may gain names. Everything
+    else, down to each parameter of each signature, must be equal.
+    """
+    if isinstance(baseline, dict):
+        if not isinstance(current, dict):
+            return [path]
+        problems = []
+        for key, value in baseline.items():
+            if key not in current:
+                problems.append(f"{path}.{key}")
+            else:
+                problems.extend(
+                    _removed_or_altered(value, current[key], f"{path}.{key}")
+                )
+        return problems
+    if path.endswith(".exports"):
+        assert isinstance(baseline, list) and isinstance(current, list)
+        return [f"{path}: {name}" for name in baseline if name not in current]
+    return [] if baseline == current else [path]
+
+
+def test_frozen_2_0_baseline_is_unchanged():
+    # A Windows checkout may convert line endings; the content is what counts.
+    content = BASELINE.read_bytes().replace(b"\r\n", b"\n")
+    digest = hashlib.sha256(content).hexdigest()
+    assert digest == BASELINE_SHA256
+
+
+def test_current_manifest_contains_the_2_0_contract_unaltered():
+    baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
+    current = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    assert baseline.pop("release_line") == "2.0"
+    assert current.pop("release_line") == "2.1"
+    assert _removed_or_altered(baseline, current, "api") == []
+
+
+def test_baseline_comparison_reports_removals_and_changes():
+    baseline = {"functions": {"f": {"default": 1}}, "m": {"exports": ["a", "b"]}}
+    assert _removed_or_altered(baseline, baseline, "api") == []
+    grown = {
+        "functions": {"f": {"default": 1}, "g": {}},
+        "m": {"exports": ["a", "b", "c"]},
+        "new": 1,
+    }
+    assert _removed_or_altered(baseline, grown, "api") == []
+    broken = {"functions": {"f": {"default": 2}}, "m": {"exports": ["b"]}}
+    assert _removed_or_altered(baseline, broken, "api") == [
+        "api.functions.f.default",
+        "api.m.exports: a",
+    ]
+    assert _removed_or_altered(baseline, {"m": baseline["m"]}, "api") == [
+        "api.functions"
+    ]
 
 
 def _capture_module():
