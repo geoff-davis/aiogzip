@@ -71,6 +71,7 @@ defaults to `None` (no limit) in all of them.
 | `aiogzip.open()` in a read mode, binary or text (also `AsyncGzipFile`, `AsyncGzipBinaryFile`, `AsyncGzipTextFile`) | `None` | `max_rewind_cache_size`, default 128 MiB |
 | `aiogzip.read()` | `None` | `max_rewind_cache_size`, default 128 MiB |
 | `aiogzip.decompress_chunks()` | `None` | None |
+| `aiogzip.decompress()` and `aiogzip.codec.decompress()` | `None` | None; the input and the output are held in memory |
 | `aiogzip.GzipDecoder` | `None` | `collect_member_info`, default `False` |
 | `aiogzip.inspect()` | `None` | None; always keeps a record for each member |
 | `aiogzip.verify()` | `None` | None |
@@ -107,6 +108,7 @@ The same keyword works on the other entry points:
 data = await aiogzip.read(path, max_decompressed_size=MAX_DECOMPRESSED_SIZE)
 result = await aiogzip.verify(path, max_decompressed_size=MAX_DECOMPRESSED_SIZE)
 info = await aiogzip.inspect(path, max_decompressed_size=MAX_DECOMPRESSED_SIZE)
+body = await aiogzip.decompress(blob, max_decompressed_size=MAX_DECOMPRESSED_SIZE)
 chunks = aiogzip.decompress_chunks(
     source, max_decompressed_size=MAX_DECOMPRESSED_SIZE
 )
@@ -138,6 +140,11 @@ Without the limit:
 - `read()` with no size, and `aiogzip.read()`, return the whole decompressed
   stream as one object. `readline()` and line iteration hold a whole line,
   and a stream with no line ending is one line.
+- `aiogzip.decompress()` and `aiogzip.codec.decompress()` return the whole
+  decompressed stream as one object, and hold it twice for a moment while
+  joining it. With `max_decompressed_size` set they stop inflating one byte
+  past the limit, so that is about twice the limit, plus under 1 MiB of
+  working buffers whatever the number of members.
 - `decompress_chunks()` and `GzipDecoder` inflate on demand and yield chunks
   no larger than `output_chunk_size` (default 256 KiB), so the decompressed
   data they hold at one time is small. That bounds the output buffer only.
