@@ -4,15 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Clearer errors for common mistakes. Exception types are unchanged. (#199)
+
 ### Fixed
 
 - Validate `compresslevel` on binary and text readers as well as writers.
   Invalid values now raise `TypeError` or `ValueError` when the handle is
   constructed, before any file is opened. (#233)
-
-### Changed
-
-- Clearer errors for common mistakes. Exception types are unchanged. (#199)
   - A synchronous file object passed as `fileobj` is reported as such:
     `fileobj.read() returned bytes, not an awaitable; aiogzip needs an async
     file object. Wrap a sync file with aiofiles.threadpool.wrap(f), or use
