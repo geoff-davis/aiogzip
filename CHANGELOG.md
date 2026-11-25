@@ -7,8 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Clearer errors for common mistakes. Exception types are unchanged. (#199)
-
-- A synchronous file object passed as `fileobj` is reported as such:
+  - A synchronous file object passed as `fileobj` is reported as such:
     `fileobj.read() returned bytes, not an awaitable; aiogzip needs an async
     file object. Wrap a sync file with aiofiles.threadpool.wrap(f), or use
     gzip.open().` It gave `'bytes' object can't be awaited` on the first
