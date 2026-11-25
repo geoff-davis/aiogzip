@@ -13,6 +13,10 @@ All notable changes to this project will be documented in this file.
 - Validate `compresslevel` on binary and text readers as well as writers.
   Invalid values now raise `TypeError` or `ValueError` when the handle is
   constructed, before any file is opened. (#233)
+
+- Validate `compresslevel` on binary and text readers as well as writers.
+  Invalid values now raise `TypeError` or `ValueError` when the handle is
+  constructed, before any file is opened. (#233)
   - A synchronous file object passed as `fileobj` is reported as such:
     `fileobj.read() returned bytes, not an awaitable; aiogzip needs an async
     file object. Wrap a sync file with aiofiles.threadpool.wrap(f), or use
