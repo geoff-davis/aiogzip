@@ -248,7 +248,8 @@ class AsyncGzipBinaryFile:
             range.
         compresslevel: Writing only. The compression level, from ``-1`` to
             ``9``; the default is ``6``. Raises ``TypeError`` if it is not
-            an ``int`` and ``ValueError`` if it is out of range. A reader checks it when the handle is constructed, then ignores it.
+            an ``int`` and ``ValueError`` if it is out of range. A reader
+            checks it when the handle is constructed, then ignores it.
         mtime: Writing only. The timestamp stored in the gzip header, in
             seconds since the epoch, from ``0`` to ``4294967295``. A
             ``float`` is truncated to an integer before the range check.
