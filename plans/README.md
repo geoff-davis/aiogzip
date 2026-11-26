@@ -8,7 +8,7 @@ stay at the paths they were committed under; this index is the way in.
 The [2.1.0 plan](RELEASE_2_1_0_PLAN.md) (gates M01–M14) is the first feature
 release after 2.0: one-shot helpers, a reader for `AsyncIterable[bytes]`
 sources and documentation, all additive. The maintainer decided D1 to D8 on
-2026-11-16. `main` stays `2.0.3.dev0` until 2.0.3 is published.
+2026-11-16. 2.0.3 was published on 2026-11-26 and `main` is `2.1.0.dev0`.
 
 - [2.0.2 benchmark table refresh](benchmarks/v2.0.2-table-refresh.md): the
   current `docs/performance.md` table and the baseline for gate M11, with
@@ -16,8 +16,8 @@ sources and documentation, all additive. The maintainer decided D1 to D8 on
 
 ## Released: 2.0.0
 
-2.0.0 was published on 2026-10-17, 2.0.1 on 2026-11-10 and 2.0.2 on
-2026-11-14; development continues as `2.0.3.dev0`.
+2.0.0 was published on 2026-10-17, 2.0.1 on 2026-11-10, 2.0.2 on
+2026-11-14 and 2.0.3 on 2026-11-26; development continues as `2.1.0.dev0`.
 The [2.0.0 plan](RELEASE_2_0_0_PLAN.md) (gates T01–T10) took 2.0.0rc2's
 source unchanged to the stable release, and its gate register is
 authoritative. It was drawn from two read-only readiness reviews:
