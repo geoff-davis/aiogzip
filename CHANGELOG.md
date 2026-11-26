@@ -27,6 +27,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Validate `compresslevel` on binary and text readers as well as writers.
+  Invalid values now raise `TypeError` or `ValueError` when the handle is
+  constructed, before any file is opened. (#233)
 - The `fast_compress=True` fallback warning (zlib-ng unavailable) from a file
   handle now behaves as it does for `GzipEncoder`. (#234)
   - It names the line of your code that called `aiogzip.open()`,
