@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Capture the deliberately curated aiogzip 2.0 public runtime contract."""
+"""Capture the deliberately curated aiogzip 2.x public runtime contract.
+
+The committed manifest for the current minor line is checked on every
+supported Python version. ``tests/data/public_api_2_0.json`` is the frozen
+2.0 baseline: a later manifest must contain every entry of it unaltered,
+which ``tests/test_public_api_contract.py`` checks.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +23,7 @@ import aiogzip
 import aiogzip.codec
 
 SCHEMA_VERSION = 1
-DEFAULT_MANIFEST = Path("tests/data/public_api_2_0.json")
+DEFAULT_MANIFEST = Path("tests/data/public_api_2_1.json")
 
 _FUNCTIONS = (
     "AsyncGzipFile",
@@ -29,6 +35,13 @@ _FUNCTIONS = (
     "verify",
     "decompress_chunks",
     "compress_chunks",
+    "compress",
+    "decompress",
+)
+
+_CODEC_FUNCTIONS = (
+    "compress",
+    "decompress",
 )
 
 _CLASS_MEMBERS = {
@@ -118,6 +131,7 @@ _CLASS_MEMBERS = {
         "finish",
     ),
     "GzipInfo": ("member_count",),
+    "IterableReader": ("read", "tell", "close", "aclose", "closed"),
 }
 
 _DATACLASSES = (
@@ -185,6 +199,15 @@ def _annotation_name(annotation: object, source: str | None = None) -> str | Non
             for item in arguments
         ]
         return f"Union[{', '.join(rendered_arguments)}]"
+    arguments = typing.get_args(annotation)
+    if origin is not None and any(
+        typing.get_origin(item) in (typing.Union, types.UnionType) for item in arguments
+    ):
+        # A union inside a generic is spelled differently by each
+        # interpreter's formatter; render its arguments here instead.
+        outer = inspect.formatannotation(annotation).split("[", 1)[0]
+        inner = ", ".join(str(_annotation_name(item)) for item in arguments)
+        return f"{outer.replace('typing.', '')}[{inner}]"
     rendered = inspect.formatannotation(annotation).replace("typing.", "")
     rendered = rendered.replace("pathlib._local.Path", "pathlib.Path")
     for private_module in (
@@ -334,12 +357,19 @@ def capture() -> dict[str, object]:
     return {
         "schema_version": SCHEMA_VERSION,
         "package": "aiogzip",
-        "release_line": "2.0",
+        "release_line": "2.1",
         "modules": {
             "aiogzip": {"exports": _exports(aiogzip)},
             "aiogzip.codec": {"exports": _exports(aiogzip.codec)},
         },
         "functions": functions,
+        "codec_functions": {
+            name: {
+                "kind": _callable_kind(getattr(aiogzip.codec, name)),
+                "signature": _signature(getattr(aiogzip.codec, name)),
+            }
+            for name in _CODEC_FUNCTIONS
+        },
         "classes": {name: _class_contract(name) for name in sorted(_CLASS_MEMBERS)},
         "dataclasses": {name: _dataclass_contract(name) for name in _DATACLASSES},
         "exceptions": {
@@ -360,7 +390,8 @@ def capture() -> dict[str, object]:
             "type": type(getattr(aiogzip, "__version__", None)).__name__,
         },
         "stable_message_prefixes": [
-            "decompressed output exceeded max_decompressed_size"
+            "decompressed output exceeded max_decompressed_size",
+            "gzip stream exceeded max_members",
         ],
         "non_guarantees": [
             "engine_info string values",

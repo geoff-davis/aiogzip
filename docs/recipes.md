@@ -92,7 +92,8 @@ is poisoned and must be discarded.
 
 ## Processing untrusted gzip input
 
-Set an application-appropriate decompressed-size ceiling:
+Set an application-appropriate decompressed-size ceiling, and a member
+ceiling next to it:
 
 ```python
 import aiogzip
@@ -101,15 +102,23 @@ async with aiogzip.open(
     "uploaded-data.gz",
     "rb",
     max_decompressed_size=100 * 1024 * 1024,
+    max_members=1_000,
 ) as f:
     while chunk := await f.read(64 * 1024):
         await process(chunk)
 ```
 
-The right limit depends on the file format, account quotas, and available
-resources. Crossing it raises `OSError`; the inflater is bounded to the
-remaining allowance plus one byte for overflow detection instead of first
-allocating the complete expanded payload.
+The right limits depend on the file format, account quotas, and available
+resources. Crossing the size limit raises `OSError`; the inflater is bounded
+to the remaining allowance plus one byte for overflow detection instead of
+first allocating the complete expanded payload.
+
+`max_members` covers what the size limit cannot see. An empty gzip member is
+20 bytes of input and no output, so a small file can hold a very large number
+of them. A file written through a single aiogzip handle has one member. Files built
+by appending or concatenating gzip files, and block formats such as `bgzip`,
+have many, so choose a count that fits the files you expect. Input that continues after
+that many members raises `OSError` before the next header is parsed.
 
 A small file read, such as `read(1)` or `peek(1)`, can inflate and retain much
 more plaintext than it returns. The file wrapper drains the compressed input
@@ -131,9 +140,14 @@ validation scan while discarding decompressed bytes:
 result = await aiogzip.verify(
     "uploaded-data.gz",
     max_decompressed_size=100 * 1024 * 1024,
+    max_members=1_000,
 )
 print(result.uncompressed_size)
 ```
+
+`inspect()` keeps a record for every member, so always give it `max_members`
+on untrusted input: without it, memory grows with a count the sender
+controls.
 
 ## Reproducible gzip output
 
@@ -281,7 +295,184 @@ source consumed without returning. An `OSError` alone does not imply that
 retrying a custom source is safe.
 Do not access a borrowed source concurrently through another owner.
 
-## Gzip over S3 / fsspec
+## Gzip over HTTP
+
+These recipes are for a `.gz` *file* served as it is: the body is gzip and
+you want its contents. That is different from `Content-Encoding: gzip`, which
+is compression the server applied for transport and which HTTP clients undo
+for you. Each client below has a way to hand over the body untouched; use it,
+or the client may decompress the body before aiogzip sees it.
+
+None of these libraries is an aiogzip dependency. The client behaviour
+described here was checked against the httpx, aiohttp 3.14 and aiobotocore
+3.8 documentation.
+
+Set `max_decompressed_size` whenever the server is not one you control; see
+[Processing untrusted gzip input](#processing-untrusted-gzip-input).
+
+### httpx
+
+`response.aiter_raw()` yields the body bytes without content decoding, so it
+is the right source. `response.aiter_bytes()` yields the body *after* httpx
+has decoded `Content-Encoding`, so use that one only when the gzip was
+transport compression and you want httpx to remove it.
+
+For decompressed byte chunks, pass the iterator to `decompress_chunks()`:
+
+```python
+import httpx
+
+import aiogzip
+
+
+async def download(url: str, sink) -> None:
+    async with httpx.AsyncClient() as client:
+        async with client.stream("GET", url) as response:
+            response.raise_for_status()
+            async for chunk in aiogzip.decompress_chunks(
+                response.aiter_raw(), max_decompressed_size=1024**3
+            ):
+                await sink.write(chunk)
+```
+
+For lines or text, wrap the iterator in `IterableReader` and open it:
+
+```python
+import httpx
+
+import aiogzip
+
+
+async def count_lines(url: str) -> int:
+    async with httpx.AsyncClient() as client:
+        async with client.stream("GET", url) as response:
+            response.raise_for_status()
+            reader = aiogzip.IterableReader(response.aiter_raw())
+            async with aiogzip.open(
+                None,
+                "rt",
+                fileobj=reader,
+                closefd=True,
+                max_decompressed_size=1024**3,
+            ) as f:
+                count = 0
+                async for _ in f:
+                    count += 1
+                return count
+```
+
+### aiohttp
+
+aiohttp decompresses a response that carries `Content-Encoding` unless
+`auto_decompress=False` is set on the `ClientSession` (or, from aiohttp 3.9,
+on the request). Set it when the server labels a `.gz` file that way, so the
+body reaches aiogzip still compressed.
+
+`response.content` has an asynchronous `read(n)`, so it works as `fileobj`
+directly:
+
+```python
+import aiohttp
+
+import aiogzip
+
+
+async def count_lines(url: str) -> int:
+    async with aiohttp.ClientSession(auto_decompress=False) as session:
+        async with session.get(url) as response:
+            response.raise_for_status()
+            async with aiogzip.open(
+                None,
+                "rt",
+                fileobj=response.content,
+                closefd=False,
+                max_decompressed_size=1024**3,
+            ) as f:
+                count = 0
+                async for _ in f:
+                    count += 1
+                return count
+```
+
+`closefd=False` leaves closing the response to its own `async with`.
+
+For decompressed byte chunks, use `response.content.iter_chunked()`:
+
+```python
+import aiohttp
+
+import aiogzip
+
+
+async def download(url: str, sink) -> None:
+    async with aiohttp.ClientSession(auto_decompress=False) as session:
+        async with session.get(url) as response:
+            response.raise_for_status()
+            async for chunk in aiogzip.decompress_chunks(
+                response.content.iter_chunked(256 * 1024),
+                max_decompressed_size=1024**3,
+            ):
+                await sink.write(chunk)
+```
+
+### S3 with aiobotocore
+
+The `Body` of a `get_object()` response is a streaming body. Its interface
+changed in aiobotocore 3.8.0: from that version `read(n)` with a size works
+and `async with response["Body"] as stream` returns the body itself. On
+3.8.0 or newer the body can be passed as `fileobj`:
+
+```python
+from aiobotocore.session import get_session
+
+import aiogzip
+
+
+async def count_lines(bucket: str, key: str) -> int:
+    session = get_session()
+    async with session.create_client("s3") as client:
+        response = await client.get_object(Bucket=bucket, Key=key)
+        async with response["Body"] as stream:
+            async with aiogzip.open(
+                None, "rt", fileobj=stream, closefd=False
+            ) as f:
+                count = 0
+                async for _ in f:
+                    count += 1
+                return count
+```
+
+On an older aiobotocore, or to avoid depending on its body interface at all,
+use the [fsspec recipe](#gzip-over-s3-with-fsspec) below.
+
+### Uploading compressed output
+
+`compress_chunks()` turns an async iterable of `bytes` into an async iterable
+of gzip `bytes`, which is the shape both clients accept as a streamed request
+body: `content=` in httpx, `data=` in aiohttp.
+
+```python
+import httpx
+
+import aiogzip
+
+
+async def upload(url: str, chunks) -> None:
+    async with httpx.AsyncClient() as client:
+        response = await client.put(
+            url,
+            content=aiogzip.compress_chunks(chunks),
+            headers={"Content-Type": "application/gzip"},
+        )
+        response.raise_for_status()
+```
+
+A body produced this way can be sent only once, so a client cannot resend it
+for a retry. aiohttp raises `ClientPayloadError` when it follows a redirect
+that needs the body again; a redirect that turns the request into a `GET`
+drops the body instead.
+
+## Gzip over S3 with fsspec
 
 The same `fileobj` mechanism streams gzip straight from object storage:
 anything exposing an async `read()` (for reading) or async `write()` (for
@@ -333,3 +524,63 @@ An external file object remains caller-owned if opening fails, preserving failed
 retry behavior. After opening succeeds, `closefd` controls whether closing the gzip
 handle also closes that object. Custom async sources/sinks must finish their resource
 access before returning or raising, including cancellation.
+
+## Gzip data already in memory
+
+For a complete gzip stream held as `bytes`, use the one-shot helpers. They
+need no file object and no event-loop file I/O:
+
+```python
+import aiogzip
+
+
+async def roundtrip(payload: bytes) -> bytes:
+    blob = await aiogzip.compress(payload)
+    return await aiogzip.decompress(blob, max_decompressed_size=64 * 1024 * 1024)
+```
+
+Pass `max_decompressed_size` whenever the bytes came from someone else; see
+[Processing untrusted gzip input](#processing-untrusted-gzip-input).
+
+To read lines or text from in-memory data, or to use any other handle method,
+wrap a synchronous file object with `aiofiles.threadpool.wrap()` and pass it
+as `fileobj`. `wrap()` accepts the standard library's file types, including
+`io.BytesIO` and the buffered binary files that `open(path, "rb")` returns.
+It raises `TypeError` for a type it does not know, such as a class of your
+own that only has a `read()` method:
+
+```python
+import io
+
+import aiofiles.threadpool
+
+import aiogzip
+
+
+async def lines(blob: bytes) -> list[str]:
+    source = aiofiles.threadpool.wrap(io.BytesIO(blob))
+    async with aiogzip.open(None, "rt", fileobj=source) as f:
+        return [line async for line in f]
+```
+
+The same wrapper works for writing: open with `"wb"` or `"wt"` and read the
+result from the `BytesIO` afterwards.
+
+## Command line
+
+`python -m aiogzip` checks gzip files without writing any code. Both commands
+read the whole file and validate every member's header, payload, CRC and
+size.
+
+```console
+$ python -m aiogzip verify data.gz
+OK: data.gz: 1 member(s), 23 bytes compressed, 3 bytes uncompressed
+$ python -m aiogzip inspect --json data.gz
+{"ok": true, "members": [{"index": 0, "compressed_offset": 0, ...}], ...}
+```
+
+- `verify` reports whether the file is valid.
+- `inspect` also lists each member's offset, sizes, `mtime`, original
+  filename, comment and CRC.
+- `--json` prints one JSON object for scripts.
+- The exit status is `0` for a valid file and non-zero otherwise.

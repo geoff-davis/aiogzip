@@ -282,6 +282,12 @@ class AsyncGzipTextFile:
             otherwise it warns (``UserWarning``) when the handle is
             constructed and uses zlib. The default is ``False``. Raises ``TypeError``
             for any value other than ``True`` or ``False``.
+        max_members: Reading only. The largest number of gzip members the
+            reader will accept in one pass through the stream; input that
+            continues after that many raises ``OSError`` from the read. A
+            positive integer; the default, ``None``, sets no limit. Raises
+            ``TypeError`` if it is not an ``int`` or ``None`` and
+            ``ValueError`` if it is below 1.
     """
 
     __slots__ = (
@@ -323,6 +329,7 @@ class AsyncGzipTextFile:
         "_buffer_origin",
         "_universal_newlines",
         "_max_decompressed_size",
+        "_max_members",
         "_max_rewind_cache_size",
         "_strict_size",
         "_fast_compress",
@@ -385,6 +392,7 @@ class AsyncGzipTextFile:
         max_rewind_cache_size: Optional[int] = _MAX_CHUNK_SIZE,
         strict_size: bool = False,
         fast_compress: bool = False,
+        max_members: Optional[int] = None,
     ) -> None:
         validated_closefd = _validate_optional_bool(closefd, "closefd")
         validated_strict_size = _validate_bool(strict_size, "strict_size")
@@ -395,6 +403,7 @@ class AsyncGzipTextFile:
         _validate_chunk_size(chunk_size)
         _validate_optional_positive_int(max_decompressed_size, "max_decompressed_size")
         _validate_optional_positive_int(max_rewind_cache_size, "max_rewind_cache_size")
+        _validate_optional_positive_int(max_members, "max_members")
 
         # Validate text-specific parameters
         if encoding is None:
@@ -478,6 +487,7 @@ class AsyncGzipTextFile:
         )
         self._universal_newlines: bool = newline in {None, ""}
         self._max_decompressed_size: Optional[int] = max_decompressed_size
+        self._max_members: Optional[int] = max_members
         self._max_rewind_cache_size: Optional[int] = max_rewind_cache_size
         self._strict_size = validated_strict_size
         self._fast_compress = validated_fast_compress
@@ -556,6 +566,7 @@ class AsyncGzipTextFile:
                 max_rewind_cache_size=self._max_rewind_cache_size,
                 strict_size=self._strict_size,
                 fast_compress=(self._fast_compress and _engine.have_fast_engine()),
+                max_members=self._max_members,
             )
             try:
                 await binary_file.open()
