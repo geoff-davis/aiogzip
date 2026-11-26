@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -840,7 +840,9 @@
 without taking ownership of files, sockets, an event loop, or any other
 transport. They are synchronous state machines: callers provide immutable
 <code>bytes</code>, consume bounded output chunks, and decide where those chunks go.</p>
-<p>The public codec API has been frozen for the 2.0 line since <code>2.0.0b1</code>.
+<p>The codec is part of aiogzip's public API and has the same compatibility
+commitment as the asyncio API: an incompatible change is made only in a new
+major release.
 Ordinary <code>asyncio</code> callers can continue using <code>open()</code>, <code>read()</code>, <code>write()</code>,
 <code>compress_chunks()</code>, and <code>decompress_chunks()</code> without changing their code.
 See the <a href="../stability/">stability policy</a> for guarantees and non-guarantees.</p>

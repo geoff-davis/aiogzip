@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -906,7 +906,7 @@
   acceleration provide competitive text and JSONL throughput without blocking
   the event loop. Direct single-file line iteration can be slower than
   synchronous <code>gzip</code>; see the <a href="performance/">Performance Guide</a>.</li>
-<li><strong>Simple API</strong>: Mimics the interface of <code>gzip.open()</code>, making it easy to adopt.</li>
+<li><strong>Familiar API</strong>: <code>aiogzip.open()</code> takes the paths, modes and keyword arguments of <code>gzip.open()</code>, and the file methods keep their <code>gzip</code> names. I/O methods are coroutines, so they are awaited; see the <a href="migration/">migration guide</a>.</li>
 <li><strong>Separate Binary and Text Modes</strong>: <code>AsyncGzipBinaryFile</code> and <code>AsyncGzipTextFile</code> provide clear, type-safe handling of data.</li>
 <li><strong>Excellent Compression Quality</strong>: Achieves compression ratios nearly identical to the standard <code>gzip</code> module.</li>
 <li><strong><code>aiocsv</code> Integration</strong>: Read and write compressed CSV files effortlessly.</li>
@@ -979,7 +979,7 @@ matching standard <code>io</code> objects) — create a new instance instead. Op
 before <code>open()</code> raise <code>ValueError</code> ("File not opened. Call await open() or
 use async with.").</p>
 <h2 id="compatibility">Compatibility</h2>
-<p><code>aiogzip</code> provides comprehensive compatibility with the standard <code>gzip</code> module's <code>GzipFile</code> API, including:</p>
+<p><code>aiogzip</code> reads and writes the same <code>.gz</code> format as the standard <code>gzip</code> module, and its file objects offer the familiar file operations of <code>gzip.GzipFile</code> under the same names. It is an asynchronous API, not a drop-in replacement: methods that perform I/O are coroutines and must be awaited, a <code>fileobj</code> must be an async file object, and some methods differ in detail (for example, <code>peek()</code> may return fewer bytes than <code>gzip</code> does, and <code>flush()</code> takes no <code>zlib_mode</code>). The <a href="migration/">migration guide</a> shows what changes when moving from <code>gzip.open()</code>. What is matched includes:</p>
 <ul>
 <li>✅ <code>seek()</code> and <code>tell()</code> methods for stream navigation (with the same performance characteristics as <code>gzip.GzipFile</code>)</li>
 <li>✅ <code>peek()</code> and <code>readinto()</code> for advanced reading patterns</li>
