@@ -12,6 +12,7 @@
 - `GzipMemberInfo`, `GzipInfo`, and `inspect` — validated per-member metadata and aggregate sizes from a complete decompression scan
 - `VerificationResult` and `verify` — lightweight aggregate counts after complete integrity verification
 - `compress` and `decompress` — one-shot gzip compression and bounded decompression of a payload already in memory
+- `IterableReader` — adapter that lets an `AsyncIterable[bytes]` be read through `open(..., fileobj=...)`
 - `decompress_chunks` — pull-driven decompression from an `AsyncIterable[bytes]` with bounded output chunks
 - `compress_chunks` — one-member gzip compression from an `AsyncIterable[bytes]` with bounded output chunks
 - `CodecOperation` — the closeable iterator returned by codec state changes
@@ -542,6 +543,44 @@ When writing through an external asynchronous `fileobj`, its `write()` method
 may accept fewer bytes than requested as long as it returns the accepted byte
 count. `aiogzip` retries short writes until the complete gzip block is written.
 A zero-progress or otherwise invalid count raises `OSError`.
+
+## Reading from an async iterable
+
+`decompress_chunks()` turns an asynchronous iterable of compressed bytes
+into decompressed chunks. To read lines, text or sized binary reads from such
+a source, wrap it in `IterableReader` and pass that as `fileobj`:
+
+```python
+reader = aiogzip.IterableReader(compressed_source())
+async with aiogzip.open(None, "rt", fileobj=reader, closefd=True) as stream:
+    async for line in stream:
+        print(line)
+```
+
+The source can be any asynchronous iterable of `bytes`, `bytearray` or
+`memoryview`: an HTTP response body, an object-store download, an async
+generator. Empty items are skipped. The reader pulls one item at a time and
+only when a read needs more input, so it applies backpressure to the source
+and never reads ahead.
+
+- **Closing.** With `closefd=True` the gzip handle closes the reader when it
+  closes, and the reader calls the iterator's `aclose()`, so an async
+  generator's cleanup runs even when you stop early. With the default,
+  the reader is left open and you close it with `await reader.aclose()`.
+- **Seeking.** The reader cannot seek. `seek()` backwards and `rewind()`
+  replay compressed input from the handle's rewind cache, which
+  [`max_rewind_cache_size`](#max_rewind_cache_size) bounds.
+- **Failures.** If the source raises, or a read is cancelled while waiting
+  for the next item, the reader cannot tell whether input was lost. It
+  becomes unusable and the gzip handle reports its stream as broken; reopen
+  from a new source. See
+  [source failures and cancellation](recipes.md#source-failures-and-cancellation).
+- **Limits.** `max_decompressed_size` works as for any other source.
+
+`reader.tell()` is the number of compressed bytes handed out so far. A reader
+serves one consumer and one gzip handle.
+
+::: aiogzip.IterableReader
 
 ## In-memory compression and decompression
 

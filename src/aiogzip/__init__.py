@@ -26,6 +26,7 @@ from ._inspection import (
     VerificationResult,
     _scan_gzip,
 )
+from ._iterable_reader import IterableReader
 from ._oneshot import _compress, _decompress
 from ._streaming import _compress_chunks, _decompress_chunks
 from ._text import AsyncGzipTextFile
@@ -661,6 +662,7 @@ __all__ = [
     "GzipDecoder",
     "GzipEncoder",
     "GzipMemberInfo",
+    "IterableReader",
     "VerificationResult",
     "WithAsyncRead",
     "WithAsyncReadWrite",

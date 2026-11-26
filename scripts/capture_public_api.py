@@ -131,6 +131,7 @@ _CLASS_MEMBERS = {
         "finish",
     ),
     "GzipInfo": ("member_count",),
+    "IterableReader": ("read", "tell", "close", "aclose", "closed"),
 }
 
 _DATACLASSES = (
@@ -198,6 +199,15 @@ def _annotation_name(annotation: object, source: str | None = None) -> str | Non
             for item in arguments
         ]
         return f"Union[{', '.join(rendered_arguments)}]"
+    arguments = typing.get_args(annotation)
+    if origin is not None and any(
+        typing.get_origin(item) in (typing.Union, types.UnionType) for item in arguments
+    ):
+        # A union inside a generic is spelled differently by each
+        # interpreter's formatter; render its arguments here instead.
+        outer = inspect.formatannotation(annotation).split("[", 1)[0]
+        inner = ", ".join(str(_annotation_name(item)) for item in arguments)
+        return f"{outer.replace('typing.', '')}[{inner}]"
     rendered = inspect.formatannotation(annotation).replace("typing.", "")
     rendered = rendered.replace("pathlib._local.Path", "pathlib.Path")
     for private_module in (
