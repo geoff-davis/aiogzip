@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `aiogzip.compress()` and `aiogzip.decompress()`: one-shot coroutines for a
+  payload already in memory, such as an HTTP body or a cache value. (#200)
+  - `decompress()` takes `max_decompressed_size` and stops inflating at the
+    limit, which `await asyncio.to_thread(gzip.decompress, data)` cannot do.
+    It decodes all members and accepts trailing zero padding, as
+    `gzip.decompress()` does.
+  - `compress()` takes `compresslevel`, `mtime`, `original_filename`,
+    `fast_compress` and `strict_size`, and returns one gzip member.
+  - Both accept `bytes`, `bytearray` or `memoryview`, offload large inputs
+    to the default executor and yield to the event loop between steps.
+- `aiogzip.codec.compress()` and `aiogzip.codec.decompress()`: synchronous
+  twins with the same options, for code outside an event loop. They accept
+  `bytes` only, like the rest of the codec.
+
 ## [2.0.3] - 2026-11-26
 
 ### Changed
