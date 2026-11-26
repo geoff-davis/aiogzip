@@ -41,6 +41,8 @@ All notable changes to this project will be documented in this file.
     whose message starts with `gzip stream exceeded max_members`, before the
     next header is parsed. Trailing zero padding is not a member.
 
+## [2.0.3] - 2026-11-26
+
 ### Changed
 
 - Clearer errors for common mistakes. Exception types are unchanged. (#199)
@@ -64,6 +66,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Validate `compresslevel` on binary and text readers as well as writers.
+  Invalid values now raise `TypeError` or `ValueError` when the handle is
+  constructed, before any file is opened. (#233)
 - The `fast_compress=True` fallback warning (zlib-ng unavailable) from a file
   handle now behaves as it does for `GzipEncoder`. (#234)
   - It names the line of your code that called `aiogzip.open()`,
