@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-11-26
+
 ### Changed
 
 - Clearer errors for common mistakes. Exception types are unchanged. (#199)
