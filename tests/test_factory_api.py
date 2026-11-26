@@ -89,12 +89,20 @@ class TestAsyncGzipFile:
         with pytest.raises(TypeError, match="mode must be a string"):
             AsyncGzipFile("test.gz", b"rb")  # type: ignore[arg-type]
 
-    def test_read_mode_ignores_compresslevel_validation(self):
-        """Read modes should accept any compresslevel like gzip.open()."""
-        binary = AsyncGzipFile("test.gz", "rb", compresslevel=-1)
-        text = AsyncGzipFile("test.gz", "rt", compresslevel=999)
-        assert isinstance(binary, AsyncGzipBinaryFile)
-        assert isinstance(text, AsyncGzipTextFile)
+    @pytest.mark.parametrize("mode", ["rb", "rt"])
+    @pytest.mark.parametrize(
+        ("compresslevel", "exception"),
+        [
+            (-2, ValueError),
+            (10, ValueError),
+            ("x", TypeError),
+            (True, TypeError),
+        ],
+    )
+    def test_read_mode_validates_compresslevel(self, mode, compresslevel, exception):
+        """Read modes validate the unused compression level at construction."""
+        with pytest.raises(exception, match="Compression level"):
+            AsyncGzipFile("test.gz", mode, compresslevel=compresslevel)
 
     @pytest.mark.parametrize(
         "kwarg_name, kwarg_value",

@@ -1,8 +1,8 @@
 # aiogzip 2.1.0 plan
 
 > **Status:** active from 2026-11-16, when the maintainer decided D1 to D8
-> (§2). Drafted on 2026-11-14. M01 stays open until 2.0.3 is published and
-> `main` is `2.1.0.dev0`.
+> (§2). Drafted on 2026-11-14. 2.0.3 was published on 2026-11-26 and `main`
+> moved to `2.1.0.dev0` the same day, which meets M01's release condition.
 >
 > **Theme:** gzip from anywhere, not just files. 2.1.0 is the first feature
 > release after 2.0. It adds public names and changes none.
