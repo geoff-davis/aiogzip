@@ -41,6 +41,17 @@ All notable changes to this project will be documented in this file.
     whose message starts with `gzip stream exceeded max_members`, before the
     next header is parsed. Trailing zero padding is not a member.
 
+### Documentation
+
+- **Recipes for gzip that is not in a local file**: `docs/recipes.md` now
+  covers a `.gz` file served over HTTP with httpx and aiohttp, an S3 object
+  with aiobotocore, uploading compressed output as a streamed request body,
+  and data already in memory. Each HTTP recipe says how to stop the client
+  from undoing `Content-Encoding` first. The fsspec recipe's heading is now
+  "Gzip over S3 with fsspec", which changes its link anchor. (#205)
+- **The command line is documented**: `python -m aiogzip inspect` and
+  `verify`, with `--json` and the exit status. (#205)
+
 ## [2.0.3] - 2026-11-26
 
 ### Changed
@@ -86,14 +97,6 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
-- **Recipes for gzip that is not in a local file**: `docs/recipes.md` now
-  covers a `.gz` file served over HTTP with httpx and aiohttp, an S3 object
-  with aiobotocore, uploading compressed output as a streamed request body,
-  and data already in memory. Each HTTP recipe says how to stop the client
-  from undoing `Content-Encoding` first. The fsspec recipe's heading is now
-  "Gzip over S3 with fsspec", which changes its link anchor. (#205)
-- **The command line is documented**: `python -m aiogzip inspect` and
-  `verify`, with `--json` and the exit status. (#205)
 - **The performance table is re-measured**: `docs/performance.md` and the
   README now quote aiogzip 2.0.2 on Python 3.14.2, replacing figures from the
   2.0.0a1 candidate on Python 3.12. The record, with 2.0.0a1 and 1.11.0
