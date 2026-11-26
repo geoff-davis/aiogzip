@@ -20,6 +20,8 @@ All notable changes to this project will be documented in this file.
   twins with the same options, for code outside an event loop. They accept
   `bytes` only, like the rest of the codec.
 
+## [2.0.3] - 2026-11-26
+
 ### Changed
 
 - Clearer errors for common mistakes. Exception types are unchanged. (#199)
@@ -43,6 +45,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Validate `compresslevel` on binary and text readers as well as writers.
+  Invalid values now raise `TypeError` or `ValueError` when the handle is
+  constructed, before any file is opened. (#233)
 - The `fast_compress=True` fallback warning (zlib-ng unavailable) from a file
   handle now behaves as it does for `GzipEncoder`. (#234)
   - It names the line of your code that called `aiogzip.open()`,
@@ -60,6 +65,11 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 
+- **The performance table is re-measured**: `docs/performance.md` and the
+  README now quote aiogzip 2.0.2 on Python 3.14.2, replacing figures from the
+  2.0.0a1 candidate on Python 3.12. The record, with 2.0.0a1 and 1.11.0
+  measured alongside, is `plans/benchmarks/v2.0.2-table-refresh.md`. (#206,
+  #161)
 - The error guide's taxonomy lists text decoding and encoding failures
   (`UnicodeDecodeError`, `UnicodeEncodeError`), an unknown `encoding` or
   `errors` handler (`LookupError`) and the library's two warnings. New
